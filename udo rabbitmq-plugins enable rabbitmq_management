@@ -1,0 +1,21 @@
+[0;1;32m●[0m rabbitmq-server.service - RabbitMQ Messaging Server
+     Loaded: loaded (/lib/systemd/system/rabbitmq-server.service; enabled; vendor preset: enabled)
+     Active: [0;1;32mactive (running)[0m since Mon 2024-04-22 16:56:59 IST; 10min ago
+   Main PID: 192335 (beam.smp)
+     Status: "Initialized"
+      Tasks: 163 (limit: 38285)
+     Memory: 76.6M
+     CGroup: /system.slice/rabbitmq-server.service
+             ├─192331 /bin/sh /usr/sbin/rabbitmq-server
+             ├─192335 /usr/lib/erlang/erts-10.6.4/bin/beam.smp -W w -A 128 -MBas ageffcbf -MHas ageffcbf -MBlmbcs 512 -MHlmbcs 512 -MMmcs 30 -P 1048576 -t 5000000 -stbt db -zdbbl 128000 -K true -- -root /usr/lib/erlang -progname erl -- -home /var/lib/rabbitmq -- -pa /usr/lib/rabbitmq/lib/rabbitmq_server-3.8.2/ebin  -noshell -noinput -s rabbit boot -sname rabbit@pavan-System-Product-Name -boot start_sasl -kernel inet_default_connect_options [{nodelay,true}] -sasl errlog_type error -sasl sasl_error_logger false -rabbit lager_log_root "/var/log/rabbitmq" -rabbit lager_default_file "/var/log/rabbitmq/rabbit@pavan-System-Product-Name.log" -rabbit lager_upgrade_file "/var/log/rabbitmq/rabbit@pavan-System-Product-Name_upgrade.log" -rabbit feature_flags_file "/var/lib/rabbitmq/mnesia/rabbit@pavan-System-Product-Name-feature_flags" -rabbit enabled_plugins_file "/etc/rabbitmq/enabled_plugins" -rabbit plugins_dir "/usr/lib/rabbitmq/plugins:/usr/lib/rabbitmq/lib/rabbitmq_server-3.8.2/plugins" -rabbit plugins_expand_dir "/var/lib/rabbitmq/mnesia/rabbit@pavan-System-Product-Name-plugins-expand" -os_mon start_cpu_sup false -os_mon start_disksup false -os_mon start_memsup false -mnesia dir "/var/lib/rabbitmq/mnesia/rabbit@pavan-System-Product-Name" -ra data_dir "/var/lib/rabbitmq/mnesia/rabbit@pavan-System-Product-Name/quorum" -kernel inet_dist_listen_min 25672 -kernel inet_dist_listen_max 25672 --
+             ├─192686 erl_child_setup 65536
+             ├─192812 inet_gethost 4
+             └─192813 inet_gethost 4
+
+Apr 22 16:56:56 pavan-System-Product-Name systemd[1]: Starting RabbitMQ Messaging Server...
+Apr 22 16:56:59 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m
+Apr 22 16:56:59 pavan-System-Product-Name systemd[1]: Started RabbitMQ Messaging Server.
+Apr 22 16:57:01 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m
+Apr 22 17:07:29 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m
+Apr 22 17:07:30 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m
+Apr 22 17:07:30 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m

@@ -10,7 +10,6 @@ from routes.drive import router
 
 from celery_worker.utils import create_celery 
 
-# import requi9red module
 import sys
 # Add sibling_folder to the Python path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -20,7 +19,6 @@ def create_app() -> FastAPI:
     current_app=FastAPI(title="App with Celery and RabbitMQ")
     current_app.celery_app =  create_celery()
     current_app.include_router(router)
-    current_app.celery_app.result_backend="rpc://"
     return current_app
 
 app = create_app()

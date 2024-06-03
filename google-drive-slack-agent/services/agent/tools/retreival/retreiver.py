@@ -41,3 +41,5 @@ def get_rag_tool()-> Tool:
     "Searches and returns data from our data.can be from google drive, pdf etc",
     )
     return tool
+
+

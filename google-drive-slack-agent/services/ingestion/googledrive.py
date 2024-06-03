@@ -11,6 +11,7 @@ from doctest import debug
 import os
 from pathlib import Path
 import queue
+import token
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 from fastapi.responses import JSONResponse
@@ -24,6 +25,11 @@ import googledocs as GoogleDocsLoader
 import googlesheets as GoogleSheetsLoader
 
 from celery import shared_task
+from celery_worker.tasks import load_document_from_id_task
+
+
+from googleapiclient.discovery import build
+
 
 SCOPES = ["https://www.googleapis.com/auth/documents",
           "https://www.googleapis.com/auth/spreadsheets.readonly",
@@ -412,3 +418,92 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             return self._load_documents_from_ids()
         else:
             return self._load_file_from_ids()
+        
+        
+    def configure_notifications(self,folder_id: str, topic_id: str):
+        """
+        Configure notifications for google drive changes
+        """
+        print("calling configure notification")
+        import uuid
+        import time
+           
+        creds= self._load_credentials()
+        service = build('drive', 'v3', credentials=creds)
+        # print(os.environ.get("GOOGLE_PUB_SUB_TOPICS_URL")/{topic_id})
+        channel_body = {
+                'id': str(uuid.uuid4()),  # Generate or define a unique ID
+                'type': 'web_hook',
+                'address': f'https://asia-south1-innovize-ai.cloudfunctions.net/google-drive-watch',
+                'token': f'target={folder_id}',  # Customize based on the file or folder
+                'expiration':int((time.time() + 604800) * 1000) #unix time stamp (for date 1week from now)
+            }
+        token= self.get_start_page_token(service)
+        
+        response = service.changes().watch(body=channel_body,pageToken= token).execute()
+
+        print(response)
+        return {"status": "success", "data": response}
+    
+
+    
+    def get_start_page_token(self,service):
+        response = service.changes().getStartPageToken().execute()
+        token = response.get("startPageToken")
+        print(f'Start token: {token}')
+        return token
+    
+    
+    async def fetch_changes(self):
+        """Retrieve the list of changes for the currently authenticated user.
+            prints changed file's ID
+        Args:
+            saved_start_page_token : StartPageToken for the current state of the
+            account.
+        Returns: saved start page token.
+
+        Load pre-authorized user credentials from the environment.
+        TODO(developer) - See https://developers.google.com/identity
+        for guides on implementing OAuth2 for the application.
+        """
+        from googleapiclient.errors import HttpError
+
+        creds= self._load_credentials()
+
+        try:
+            # create drive api client
+            service = build("drive", "v3", credentials=creds)
+
+            # Begin with our last saved start token for this user or the
+            # current token from getStartPageToken()
+            page_token = 86
+            # pylint: disable=maybe-no-member
+
+            while page_token is not None:
+                response = (
+                    service.changes().list(pageToken=page_token, spaces="drive").execute()
+                )
+                for change in response.get("changes"):
+                    # Process change
+                    print("change", change)
+                    print(f'Change found for file: {change.get("fileId")}')
+                    # {'kind': 'drive#change', 'removed': False, 'file': {'kind': 'drive#file', 'mimeType': 'application/vnd.google-apps.document', 'id': '1h1dVnclOrZ35JSC3xZXhqu0Zu9xXeNuNQoRauW9K0ek', 'name': 'How To Send 1000 Cold Emails A Day With 50%+ Open Rate'}, 'fileId': '1h1dVnclOrZ35JSC3xZXhqu0Zu9xXeNuNQoRauW9K0ek', 'time': '2024-05-14T12:21:40.661Z', 'type': 'file', 'changeType': 'file'}
+                    changed_file=  change.get("file")
+                    if changed_file.get("mimeType")=="application/vnd.google-apps.document":
+                        # start ingestion again
+                        load_document_from_id_task.apply_async(
+                        args=(changed_file["id"],creds),queue="load_doc"
+                    )
+
+                if "newStartPageToken" in response:
+                    # Last page, save this token for the next polling interval
+                    saved_start_page_token = response.get("newStartPageToken")
+                page_token = response.get("nextPageToken")
+
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            saved_start_page_token = None
+
+        return saved_start_page_token
+        
+            

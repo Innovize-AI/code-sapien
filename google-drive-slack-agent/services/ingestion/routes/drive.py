@@ -1,4 +1,5 @@
 import os
+from urllib import response
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, APIRouter
 from fastapi.responses import JSONResponse
@@ -76,3 +77,34 @@ def ingest_and_index():
     documents = loader.load()
    
     print(f"Indexed documents from Google Drive.")
+
+@router.post("/ingest-document-by-id")
+def ingest_document_by_id(document_id:str):
+    return
+
+@router.post("/configure-notification")
+def configure_notifications(folder_id: str, topic_id: str):
+    
+    loader = GoogleDriveLoader(
+        folder_id=GOOGLE_DRIVE_ID,
+        # document_ids=["1h1dVnclOrZ35JSC3xZXhqu0Zu9xXeNuNQoRauW9K0ek"],
+        file_types=["document"],
+        recursive=True,
+        service_account_key=os.path.join( cwd,'.credentials', 'keys.json')
+    )
+
+    return loader.configure_notifications(folder_id,topic_id)
+
+@router.get("/get-drive-changes")
+async def get_drive_changes():
+     
+     loader = GoogleDriveLoader(
+        folder_id=GOOGLE_DRIVE_ID,
+        # document_ids=["1h1dVnclOrZ35JSC3xZXhqu0Zu9xXeNuNQoRauW9K0ek"],
+        file_types=["document"],
+        recursive=True,
+        service_account_key=os.path.join( cwd,'.credentials', 'keys.json')
+    )
+     response= await loader.fetch_changes()
+
+     return response

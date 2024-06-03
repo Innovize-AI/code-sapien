@@ -9,16 +9,14 @@ import uvicorn
 # from app.api.routers.chat import chat_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes.chat import router
-from agents import create_agent_with_tools
+from routes.chat import chat_router
+from routes.slack import slack_router
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 app = FastAPI()
 
 environment = os.getenv("ENVIRONMENT", "dev")  # Default to 'development' if not set
-
-
 
 
 
@@ -33,7 +31,8 @@ if environment == "dev":
         allow_headers=["*"],
     )
 
-app.include_router(router)
+app.include_router(chat_router)
+app.include_router(slack_router)
 
 
 if __name__ == "__main__":

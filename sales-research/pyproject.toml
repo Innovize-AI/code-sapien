@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "sales-research"
+version = "0.1.0"
+description = ""
+authors = ["pavan kumar.v <pavan.kumar@the10xacademy.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+langgraph = "^0.1.19"
+langgraph-cli = "^0.1.50"
+langgraph-sdk = "^0.1.26"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -9,9 +9,7 @@ import uvicorn
 # from app.api.routers.chat import chat_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from routes import research
-
+from routes.sales_research import sales_router
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -32,4 +30,8 @@ if environment == "dev":
         allow_headers=["*"],
     )
 
-app.include_router(research)
+app.include_router(sales_router)
+
+
+if __name__ == "__main__":
+    uvicorn.run(app="main:app", host="0.0.0.0", port=8001, reload=True)

@@ -10,6 +10,8 @@ import os
 from pydantic import BaseModel, Json
 from langgraph.checkpoint.sqlite import SqliteSaver
 
+from fastapi import APIRouter
+
 memory = SqliteSaver.from_conn_string(":memory:")
 
 def _set_if_undefined(var: str):
@@ -35,6 +37,8 @@ from langchain_core.tools import tool
 from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, AIMessage, ChatMessage
 
 # tavily_tool = TavilySearchResults(max_results=5)
+sales_router = APIRouter(prefix='/sales-research', tags=['Sales Research'], responses={404: {"description": "Not found"}})
+
 
 class ProfilePost(BaseModel):
     post:str
@@ -215,7 +219,9 @@ REPORT_GENERATOR_PROMPT='''
         Key Findings: High-level insights from the analysis.
 
         Next Steps: Summary of recommended actions, first linkedin connection message using the above information from website and their linkedin posts and also
-        a hyperpersonalized email for outbound reach. Important "Never Start with "I hope this message finds you well or any other greeting".
+        a hyperpersonalized email for outbound reach. Never skip this.
+        
+        Important "Never Start with "I hope this message finds you well or any other greeting".
         and start with a compliment from the info you have. Never pitch the solutions in your personalized email.
         and always propose if they are interested in ebook which helps in finding high ROI potential AI use cases.But never use the word "AI" as it is becoming a buzz word.
 
@@ -241,7 +247,7 @@ REPORT_GENERATOR_PROMPT='''
 
         Inferred or explicitly stated challenges and goals.
 
-        3. Company Overview
+        3. Company Overview ((Don't use company_context paragraph or company name for the below sections))
 
         Basic Information:
 
@@ -255,25 +261,25 @@ REPORT_GENERATOR_PROMPT='''
 
         Unique selling propositions (USPs) and market differentiators.
 
-        Company Structure:
+        Company Structure: (Don't use company_context paragraph )
 
         Key executives and decision-makers.
 
         Organizational structure and departments of interest.
 
-        Recent Company News:
+        Recent Company News:(Don't use company_context paragraph)
 
         Recent announcements, press releases, or news articles.
 
         Any notable events such as product launches, partnerships, or changes in leadership.
 
-        Financial Overview:
+        Financial Overview:(Don't use company_context paragraph)
 
         Revenue, profitability, and any available financial metrics.
 
         Recent funding rounds, investors, and intended use of funds.
 
-        4. Industry and Market Analysis
+        4. Industry and Market Analysis (Don't use company_context paragraph)
 
         Industry Overview:
 
@@ -281,7 +287,7 @@ REPORT_GENERATOR_PROMPT='''
 
         Current trends, opportunities, and challenges in the industry.
 
-        Market Position:
+        Market Position: (Don't use company_context paragraph)
 
         Company’s position within the industry.
 
@@ -361,9 +367,14 @@ REPORT_GENERATOR_PROMPT='''
 
         Topics or questions that resonate with the prospect’s current situation or industry trends.
 
+        Pain Points:
+
+        Painpoints that they face.
+
         Proposed Solutions:
 
-        Custom AI or automation solutions that address identified pain points or opportunities.
+        Custom AI or automation solutions that address identified pain points or opportunities. 
+        Only suggest solutions, if you think its genuiely required,otherwise Dono suggest general solutions
 
         Follow-Up Plan:
 
@@ -428,7 +439,7 @@ builder.add_edge("website_scraper","website_analyzer")
 builder.add_edge("linkedin_profile_analyzer","report_generator")
 builder.add_edge("website_analyzer","report_generator")
 
-graph= builder.compile(checkpointer=memory)
+graph= builder.compile()
 
 from IPython.display import Image, display
 
@@ -437,19 +448,17 @@ display(Image(graph.get_graph(xray=1).draw_mermaid_png()))
 
 import uuid
 
-def run_graph():
+@sales_router.post("/")
+def run_graph(linkedin_url,website):
 
-    thread = {"configurable": {"thread_id": uuid.uuid4}}
+    # check of website regex
+    thread_id= uuid.uuid4
+    print("thread_id" , thread_id)
+    thread = {"configurable": {"thread_id":thread_id}}
     response= graph.invoke({
-        "linkedin_url":"https://www.linkedin.com/in/osricgrant",
-        "website":"http://www.fonoa.com",
+        "linkedin_url": linkedin_url,
+        "website":website,
         "company_context": COMPANY_CONTEXT
     },thread)
 
     return response
-
-
-if __name__== "__main__":
-    
-    reponse= run_graph()
-    print(reponse)

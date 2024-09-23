@@ -1,3 +1,4 @@
+import http
 from operator import add
 from typing import List, TypedDict, Optional, Annotated, Dict
 from langgraph.checkpoint.memory import MemorySaver
@@ -58,6 +59,8 @@ class UserProfile(BaseModel):
     posts: List[ProfilePost]
 
 class AgentState(TypedDict):
+
+    email_id:str
     linkedin_url:str
     website:str
     user_profile_details:Annotated[str,operator.add]
@@ -72,10 +75,34 @@ def collector(state:AgentState):
     print("WEBSITE COLLECTOR ", state["website"])
     return {"linkedin_url":state["linkedin_url"], "website":state["website"]}
 
+def should_enrich_linkedin(state:AgentState):
+    linkedin_profile= state["linkedin_url"]
+    
+    print("should enrich called" , linkedin_profile)
+    if len(linkedin_profile)==0:
+        return "enrich_linkedin"
+    else:
+        return "profile_fetcher"
+    
+def should_enrich_website(state:AgentState):
+
+    website=state["website"]
+    if len(website)==0:
+        return "enrich_website"
+    else:
+        return "website_scraper"
+
 #scrape webpages node
 def scrape_webpages(state:AgentState) -> str:
     """Use requests and bs4 to scrape the provided web pages for detailed information."""
     print("website " , state["website"])
+
+    website= state["website"]
+    # we could not find website
+    if len(website)==0:
+        return {"scraped_website_content", "Could not scrape empty website"}
+
+
     loader = WebBaseLoader(state["website"])
 
     docs = loader.load()
@@ -87,6 +114,39 @@ def scrape_webpages(state:AgentState) -> str:
         ]
     )
     return {"scraped_website_content": scraped_content}
+def enrich_linkedin(state:AgentState):
+
+    #create a llm to find the prospect linkedin from email and name
+    return {"linkedin_url": "https://www.linkedin.com/in/pavankumar34/"} #should change
+
+def enrich_website(state:AgentState):
+
+    #get website from work email
+    email_id= state["email_id"]
+
+    validate_email_regex= r"^(?!.*@(gmail\.com|hotmail\.com|yahoo\.com|outlook\.com|aol\.com|icloud\.com|mail\.com|zoho\.com|protonmail\.com|yandex\.com)).*@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$"
+
+
+    if len(email_id)==0:
+
+        return {"website":""} #should change
+    else:
+        import re
+
+        email = email_id
+        match = re.match(validate_email_regex, email)
+
+        if match:
+            domain = match.group(1)
+
+            url = f"https://{domain}"
+            print(f"Work domain: {domain}")
+            return {"website": url}
+        else:
+           
+            return {"website":""}
+
+
 
 #analyze linked_in node
 def get_linkedin_data(state: AgentState):
@@ -369,12 +429,12 @@ REPORT_GENERATOR_PROMPT='''
 
         Pain Points:
 
-        Painpoints that they face.
+        Pain points that they face.
 
         Proposed Solutions:
 
         Custom AI or automation solutions that address identified pain points or opportunities. 
-        Only suggest solutions, if you think its genuiely required,otherwise Dono suggest general solutions
+        Only suggest solutions, if you think its genuinely required,otherwise Donot suggest general solutions
 
         Follow-Up Plan:
 
@@ -427,17 +487,24 @@ builder.add_node("website_scraper", scrape_webpages)
 builder.add_node("linkedin_profile_analyzer", linkedin_profile_analyzer)
 builder.add_node("website_analyzer",website_analyzer)
 builder.add_node("report_generator",sales_research_report_generator)
+builder.add_node("enrich_linkedin",enrich_linkedin) #should change
+builder.add_node("enrich_website", enrich_website) # should change
+
 
 #set entry point
 builder.set_entry_point("collector")
 
 #add edges
-builder.add_edge("collector","profile_fetcher" )
-builder.add_edge("collector","website_scraper")
+# builder.add_edge("collector","profile_fetcher" )
+# builder.add_edge("collector","website_scraper")
 builder.add_edge("profile_fetcher", "linkedin_profile_analyzer")
 builder.add_edge("website_scraper","website_analyzer")
 builder.add_edge("linkedin_profile_analyzer","report_generator")
 builder.add_edge("website_analyzer","report_generator")
+builder.add_edge("enrich_linkedin","profile_fetcher")
+builder.add_edge("enrich_website","website_scraper")
+builder.add_conditional_edges("collector",should_enrich_linkedin)
+builder.add_conditional_edges("collector",should_enrich_website)
 
 graph= builder.compile()
 
@@ -449,13 +516,18 @@ display(Image(graph.get_graph(xray=1).draw_mermaid_png()))
 import uuid
 
 @sales_router.post("/")
-def run_graph(linkedin_url,website):
+def run_graph(linkedin_url,website, email: Optional[str]=None):
 
+    from fastapi.exceptions import HTTPException 
+    from utils import add_https_if_missing
     # check of website regex
+    website= add_https_if_missing(website)
+
     thread_id= uuid.uuid4
     print("thread_id" , thread_id)
     thread = {"configurable": {"thread_id":thread_id}}
     response= graph.invoke({
+        "email_id":email,
         "linkedin_url": linkedin_url,
         "website":website,
         "company_context": COMPANY_CONTEXT

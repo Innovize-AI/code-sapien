@@ -12,7 +12,7 @@ import os
 from pydantic import BaseModel, Field
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 memory = SqliteSaver.from_conn_string(":memory:")
 
@@ -62,25 +62,35 @@ class UserProfile(BaseModel):
 class IdealProfile(BaseModel):
 
     industry: str = Field(..., description="Industry of the lead's company")
-    company_size: Optional[int] = Field(..., description="Number of employees in the lead's company")
-    revenue: Optional[float] = Field(None, description="Annual revenue of the lead's company in millions")
+    company_size: Optional[str] = Field(..., description="Number of employees in the lead's company")
+    revenue: Optional[str] = Field(None, description="Annual revenue of the lead's company in millions")
     job_title: str = Field(..., description="Job title of the lead")
 
-
+class InputLeadData(BaseModel):
+    
+    lead_source: Optional[str] = None
+    download_marketing_material: Optional[bool] = None
+    demo_requested: Optional[bool] = None
+    referral_partner_introduction: Optional[bool] = None  # This can be missing in the body
+    project_urgency: Optional[int] = None  # This can be missing in the body
 
 class AgentState(TypedDict):
 
     email_id:str
     linkedin_url:str
     website:str
+    ideal_profile:IdealProfile
+    input_lead_data:InputLeadData
     ideal_profile: IdealProfile
     user_profile_details:Annotated[str,operator.add]
     scraped_website_content:Annotated[str, operator.add]
     user_profile_analysis: Annotated[str, operator.add]
     website_analysis: Annotated[str, operator.add]
+    lead_extracted_data:Annotated[str,operator.add]
+
     sales_research_report:Annotated[str,operator.add]
     company_context:str
-    lead_score: Annotated[str,operator.add]
+    lead_score_analysis:Annotated[str,operator.add]
     # companyProfile: 
 
 def collector(state:AgentState):
@@ -256,13 +266,152 @@ def website_analyzer(state: AgentState):
     return {"website_analysis":response.content}
      
 
-LEAD_SCORER_PROMPT= ''''''
+LEAD_SCORER_SYSTEM_PROMPT= '''
+
+You are a lead scoring assistant designed to analyze leads based on specific attributes such as demographic fit, engagement, sales readiness, and timing. Your task is to evaluate each lead by calculating a total lead score and providing a brief analysis with recommendations.
+
+The ideal_customer profile is present in {content} as json . Use this to get necessary details. 
+  
+
+The lead scoring follows these criteria:
+
+1. **Demographic Fit (Industry, Company Size, Revenue, Job Title)**:
+   - Industry: Is the lead in a target industry? (Yes: +20 points, No: +0 points)
+   - Company Size: Does the company have the ideal number of employees? (Ideal range: +15 points, Medium: +10 points, Small or Large: +0 points)
+   - Revenue: Does the company meet the revenue target? (Above $10M: +15 points, Below: +0 points)
+   - Job Title: Is the lead a decision-maker or influencer? (Decision Maker: +25 points, Influencer: +15 points, Non-decision-maker: +0 points)
+
+2. **Engagement (Website Visits, Content Interaction, Demo Request, Social Media)**:
+   - Website Visits: Has the lead visited the website multiple times or high-value pages? (Multiple visits: +10 points, High-value pages: +10 points, Single visit: +5 points)
+   - Content Interaction: Has the lead engaged with content (e.g., downloaded eBooks, attended webinars)? (Yes: +15 points, No: +0 points)
+   - Demo Request: Has the lead requested a demo or filled out a contact form? (Demo request: +25 points, Contact form: +20 points)
+   - Social Media Engagement: Has the lead engaged with social media content (e.g., liked, commented, shared)? (Yes: +5 points, No: +0 points)
+
+3. **Sales Readiness (Buying Stage, Recent Activity)**:
+   - Buying Stage: Is the lead in the awareness, consideration, or decision stage? (Decision: +35 points, Consideration: +25 points, Awareness: +10 points)
+   - Recent Activity: Has the lead recently engaged with the company (e.g., responded to emails, attended webinars)? (Yes: +25 points, No: +0 points)
+
+4. **Lead Source (Referral, Inbound Marketing, Paid Ads, Cold Outreach)**:
+   - Referral or Partner Introduction: Did the lead come through a referral? (Yes: +30 points, No: +0 points)
+   - Inbound Marketing: Did the lead come through inbound marketing efforts? (Yes: +20 points, No: +0 points)
+   - Paid Ad Click: Did the lead click on a paid advertisement? (Yes: +15 points, No: +0 points)
+   - Cold Outreach: Was the lead generated via cold outreach? (Yes: +10 points, No: +0 points)
+
+5. **Timing (Purchase Timeline, Project Urgency)**:
+   - Purchase Timeline: Is the lead ready to buy within the next 3 months? (3 months: +20 points, 6 months: +10 points, 6+ months: +5 points)
+   - Project Urgency: Does the lead have high urgency to find a solution? (High: +15 points, Medium: +10 points, Low: +0 points)
+
+you will receive data in this format:
+
+- Industry: Technology  
+- Company Size: 250 employees  
+- Revenue: $50.5M  
+- Job Title: CTO  
+- Website Visits: 3  
+- Visited High-Value Pages: Yes  
+- Content Interaction: Yes (Downloaded eBook, Attended Webinar)  
+- Demo Request: Yes  
+- Form Submission: No  
+- Social Media Engagement: No  
+- Recent Activity: Yes  
+- Buying Stage: Consideration  
+- Referral Partner Introduction: No  
+- Inbound Marketing: Yes  
+- Paid Ad Click: No  
+- Cold Outreach: No  
+- Purchase Timeline: 3 months  
+- Project Urgency: High  
+   
+When you receive lead details, you will:
+1. Calculate the total lead score based on the criteria.
+2. Provide an analysis explaining why the lead received that score.
+3. Offer recommendations on how to engage the lead, including potential next steps.
+
+
+##IMPORTANT
+            If you cannot infer any of the the details mention them as not available and give a score of 0, just don't make any assumptions.
+            Remember, your analysis should be based solely on the data provided. 
+            Please refrain from speculating or making assumptions. Your task is to extract factual and verifiable information.
+
+
+'''
+
+LEAD_DATA_EXTRACTOR_PROMPT='''
+
+You are a data extraction assistant tasked with extracting specific details from data present in different json's as text related to leads. Your goal is to analyze the provided string and extract the data in the below structure:
+
+Here are the details of a lead to be extracted:
+
+- Industry: Technology  
+- Company Size: 250 employees  
+- Revenue: $50.5M  
+- Job Title: CTO  
+- Website Visits: 3  
+- Visited High-Value Pages: Yes  
+- Content Interaction: Yes (Downloaded eBook, Attended Webinar)  
+- Demo Request: Yes  
+- Form Submission: No  
+- Social Media Engagement: No  
+- Recent Activity: Yes  
+- Buying Stage: Consideration  
+- Referral Partner Introduction: No  
+- Inbound Marketing: Yes  
+- Paid Ad Click: No  
+- Cold Outreach: No  
+- Purchase Timeline: 3 months  
+- Project Urgency: High  
+
+  ##IMPORTANT
+            If you cannot infer any of the the details mention them as not available , just don't make any assumptions.
+            Remember, your analysis should be based solely on the data provided for the scraped content. 
+            Please refrain from speculating or making assumptions. Your task is to extract factual and verifiable information.
+
+'''
+
+
+def lead_data_extractor(state:AgentState):
+    #lead data as json
+    user_profile_analysis= state['user_profile_analysis']
+    website_analysis=state["website_analysis"]
+    input_lead_data= state["input_lead_data"]
+
+    lead_data_json=  input_lead_data.json()
+
+    lead_data=  user_profile_analysis + " " + website_analysis + " " + lead_data_json
+
+    messages = [
+        SystemMessage(content= LEAD_DATA_EXTRACTOR_PROMPT),
+        HumanMessage(content= lead_data)
+    ]
+
+    llm= ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    response= llm.invoke(messages)
+
+
+    return {"lead_extracted_data": response.content}
+
 
 def lead_scorer(state:AgentState):
-    # score a lead based on the analysis
 
-    return
+    lead_extracted_data= state["lead_extracted_data"]
 
+    content= state["ideal_profile"]
+
+    content_json= content.json()
+
+    messages = [
+        SystemMessage(content= LEAD_SCORER_SYSTEM_PROMPT.format(content= content_json)),
+        HumanMessage(content= lead_extracted_data)
+    ]
+
+    llm= ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    response= llm.invoke(messages)
+
+
+    return {"lead_score_analysis": response.content}
+    
 
 COMPANY_CONTEXT= '''
     Innovize AI is a cutting-edge AI company specializing in customizable AI automation solutions designed to empower businesses without the need for extensive technical knowledge.
@@ -456,6 +605,21 @@ REPORT_GENERATOR_PROMPT='''
         Custom AI or automation solutions that address identified pain points or opportunities. 
         Only suggest solutions, if you think its genuinely required,otherwise Donot suggest general solutions
 
+        Lead Score Analysis:
+
+         ### Total Score Calculation:
+        - Demographic Fit:
+        - Engagement: 
+        - Sales Readiness: 
+        - Lead Source: 
+        - Timing: 
+
+        Total Lead Score = 
+
+        ### Recommendations:
+
+        Detailed Recommendations based on Lead Score Analysis
+
         Follow-Up Plan:
 
         Timeline and content for follow-up interactions."""  
@@ -465,7 +629,8 @@ def sales_research_report_generator(state:AgentState):
     user_profile_analysis= state['user_profile_analysis']
     website_analysis=state["website_analysis"]
     company_context=state["company_context"]
-    content = user_profile_analysis + " " + website_analysis 
+    lead_score_analysis= state["lead_score_analysis"]
+    content = user_profile_analysis + " " + website_analysis + " " + lead_score_analysis
     messages = [
         SystemMessage(content=REPORT_GENERATOR_PROMPT.format(content= content)),
         HumanMessage(content= "company context : " +  company_context)
@@ -506,6 +671,12 @@ builder.add_node("profile_fetcher", get_linkedin_data )
 builder.add_node("website_scraper", scrape_webpages)
 builder.add_node("linkedin_profile_analyzer", linkedin_profile_analyzer)
 builder.add_node("website_analyzer",website_analyzer)
+
+#scores leads
+builder.add_node("lead_data_extractor", lead_data_extractor)
+builder.add_node("lead_scorer", lead_scorer)
+
+
 builder.add_node("report_generator",sales_research_report_generator)
 builder.add_node("enrich_linkedin",enrich_linkedin) #should change
 builder.add_node("enrich_website", enrich_website) # should change
@@ -517,12 +688,16 @@ builder.set_entry_point("collector")
 #add edges
 # builder.add_edge("collector","profile_fetcher" )
 # builder.add_edge("collector","website_scraper")
+
 builder.add_edge("profile_fetcher", "linkedin_profile_analyzer")
 builder.add_edge("website_scraper","website_analyzer")
-builder.add_edge("linkedin_profile_analyzer","report_generator")
-builder.add_edge("website_analyzer","report_generator")
 builder.add_edge("enrich_linkedin","profile_fetcher")
 builder.add_edge("enrich_website","website_scraper")
+builder.add_edge("linkedin_profile_analyzer","lead_data_extractor")
+builder.add_edge("website_analyzer","lead_data_extractor")
+builder.add_edge("lead_data_extractor","lead_scorer")
+builder.add_edge("lead_scorer","report_generator")
+
 builder.add_conditional_edges("collector",should_enrich_linkedin)
 builder.add_conditional_edges("collector",should_enrich_website)
 
@@ -536,7 +711,8 @@ display(Image(graph.get_graph(xray=1).draw_mermaid_png()))
 import uuid
 
 @sales_router.post("/")
-def run_graph(linkedin_url,website, email: Optional[str]=None):
+def run_graph( options:InputLeadData,linkedin_url: str = Query(..., description="LinkedIn profile URL"),
+    website: str = Query(..., description="Website URL"), email:Optional[str] =Query(None)):
 
     from fastapi.exceptions import HTTPException 
     from utils import add_https_if_missing
@@ -545,12 +721,33 @@ def run_graph(linkedin_url,website, email: Optional[str]=None):
 
     thread_id= uuid.uuid4
     print("thread_id" , thread_id)
+
+
     thread = {"configurable": {"thread_id":thread_id}}
+
+    ideal_profile= IdealProfile(
+    industry= "Finance",
+    company_size= "10-50",
+    revenue= "$10M+",
+    job_title="CTO, CEO"
+)
+
+    lead_captured_data= InputLeadData(
+        lead_source= options.lead_source,
+        download_marketing_material= options.download_marketing_material,
+        demo_requested= options.demo_requested,
+        referral_partner_introduction= options.referral_partner_introduction,
+        project_urgency= options.project_urgency
+    )
+
+
     response= graph.invoke({
         "email_id":email,
         "linkedin_url": linkedin_url,
         "website":website,
-        "company_context": COMPANY_CONTEXT
+        "company_context": COMPANY_CONTEXT,
+        "ideal_profile":ideal_profile,
+        "input_lead_data":lead_captured_data
     },thread)
 
     return response

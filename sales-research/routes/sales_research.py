@@ -1,4 +1,5 @@
 import http
+import json
 from operator import add
 from typing import List, TypedDict, Optional, Annotated, Dict
 from langgraph.checkpoint.memory import MemorySaver
@@ -8,7 +9,7 @@ from langgraph.graph import StateGraph, START, END
 import getpass
 import os
 
-from pydantic import BaseModel, Json
+from pydantic import BaseModel, Field
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from fastapi import APIRouter
@@ -58,17 +59,28 @@ class UserProfile(BaseModel):
     currentPos:str
     posts: List[ProfilePost]
 
+class IdealProfile(BaseModel):
+
+    industry: str = Field(..., description="Industry of the lead's company")
+    company_size: Optional[int] = Field(..., description="Number of employees in the lead's company")
+    revenue: Optional[float] = Field(None, description="Annual revenue of the lead's company in millions")
+    job_title: str = Field(..., description="Job title of the lead")
+
+
+
 class AgentState(TypedDict):
 
     email_id:str
     linkedin_url:str
     website:str
+    ideal_profile: IdealProfile
     user_profile_details:Annotated[str,operator.add]
     scraped_website_content:Annotated[str, operator.add]
     user_profile_analysis: Annotated[str, operator.add]
     website_analysis: Annotated[str, operator.add]
     sales_research_report:Annotated[str,operator.add]
     company_context:str
+    lead_score: Annotated[str,operator.add]
     # companyProfile: 
 
 def collector(state:AgentState):
@@ -243,6 +255,14 @@ def website_analyzer(state: AgentState):
     response = model.invoke(messages)
     return {"website_analysis":response.content}
      
+
+LEAD_SCORER_PROMPT= ''''''
+
+def lead_scorer(state:AgentState):
+    # score a lead based on the analysis
+
+    return
+
 
 COMPANY_CONTEXT= '''
     Innovize AI is a cutting-edge AI company specializing in customizable AI automation solutions designed to empower businesses without the need for extensive technical knowledge.

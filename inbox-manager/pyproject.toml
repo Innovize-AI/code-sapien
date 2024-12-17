@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "content-generation"
+name = "inbox-manager"
 version = "0.1.0"
-description = "content-generation"
-authors = ["pavan kumar.v <pavan.kumar@the10xacademy.com>"]
+description = ""
+authors = ["pavan <saipavan4391@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.12"
 langgraph = "^0.1.19"
 langgraph-cli = "^0.1.50"
 langgraph-sdk = "^0.1.26"
@@ -20,7 +20,10 @@ fastapi = "^0.112.2"
 uvicorn = "^0.30.6"
 python-dotenv = "^1.0.1"
 beautifulsoup4 = "^4.12.3"
-pytrends= "^4.9.2"
+spacy = "3.7"
+crosslingual-coreference = { git = "https://github.com/Innovize-AI/crosslingual-coreference.git" }
+
+
 
 [build-system]
 requires = ["poetry-core"]

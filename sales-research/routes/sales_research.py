@@ -10,11 +10,11 @@ import getpass
 import os
 
 from pydantic import BaseModel, Field
-from langgraph.checkpoint.sqlite import SqliteSaver
+# from langgraph import SqliteSaver
 
 from fastapi import APIRouter, Query
 
-memory = SqliteSaver.from_conn_string(":memory:")
+# memory = SqliteSaver.from_conn_string(":memory:")
 
 def _set_if_undefined(var: str):
     if not os.environ.get(var):
@@ -39,7 +39,7 @@ from langchain_core.tools import tool
 from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, AIMessage, ChatMessage
 
 # tavily_tool = TavilySearchResults(max_results=5)
-sales_router = APIRouter(prefix='/sales-research', tags=['Sales Research'], responses={404: {"description": "Not found"}})
+sales_router = APIRouter(prefix='/sales-research', tags=['Sales Research'],responses={404: {"description": "Not found"}},)
 
 
 class ProfilePost(BaseModel):
@@ -278,7 +278,7 @@ The lead scoring follows these criteria:
 1. **Demographic Fit (Industry, Company Size, Revenue, Job Title)**:
    - Industry: Is the lead in a target industry? (Yes: +20 points, No: +0 points)
    - Company Size: Does the company have the ideal number of employees? (Ideal range: +15 points, Medium: +10 points, Small or Large: +0 points)
-   - Revenue: Does the company meet the revenue target? (Above $10M: +15 points, Below: +0 points)
+   - Revenue: Does the company meet the revenue target? (Met: +15 points, Not met: +0 points)
    - Job Title: Is the lead a decision-maker or influencer? (Decision Maker: +25 points, Influencer: +15 points, Non-decision-maker: +0 points)
 
 2. **Engagement (Website Visits, Content Interaction, Demo Request, Social Media)**:
@@ -711,12 +711,13 @@ display(Image(graph.get_graph(xray=1).draw_mermaid_png()))
 import uuid
 
 @sales_router.post("/")
+@sales_router.post("")
 def run_graph( options:InputLeadData,linkedin_url: str = Query(..., description="LinkedIn profile URL"),
     website: str = Query(..., description="Website URL"), email:Optional[str] =Query(None)):
 
     from fastapi.exceptions import HTTPException 
     from utils import add_https_if_missing
-    # check of website regex
+    # check of website regex,
     website= add_https_if_missing(website)
 
     thread_id= uuid.uuid4

@@ -10,7 +10,7 @@ import googleapiclient.discovery as discovery
 from httplib2 import Http
 from googleapiclient.discovery import build
 
-from langchain_core.pydantic_v1 import BaseModel, root_validator, validator
+from pydantic import BaseModel, root_validator, validator
 
 # current working directory
 cwd= os.getcwd()

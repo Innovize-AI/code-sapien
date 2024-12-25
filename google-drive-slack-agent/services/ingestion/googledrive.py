@@ -17,19 +17,19 @@ from typing import Any, Dict, List, Optional, Sequence, Union
 from fastapi.responses import JSONResponse
 from langchain_core._api.deprecation import deprecated
 from langchain_core.documents import Document
-from pydantic import BaseModel, root_validator, validator, model_validator
+from pydantic import BaseModel, root_validator, validator, model_validator, field_validator
 
 from langchain_community.document_loaders.base import BaseLoader
 
-import googledocs as GoogleDocsLoader
-import googlesheets as GoogleSheetsLoader
+import services.ingestion.googledocs as GoogleDocsLoader
+import services.ingestion.googlesheets as GoogleSheetsLoader
 
 from celery import shared_task
-from celery_worker.tasks import load_document_from_id_task
+from services.ingestion.celery_worker.tasks import load_document_from_id_task
 
-
+from google.auth.credentials import with_scopes_if_required
 from googleapiclient.discovery import build
-
+from services.ingestion import utils
 
 SCOPES = ["https://www.googleapis.com/auth/documents",
           "https://www.googleapis.com/auth/spreadsheets.readonly",
@@ -64,30 +64,32 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     file_loader_kwargs: Dict["str", Any] = {}
     """The file loader kwargs to use."""
 
-    @model_validator(mode="after")  # 'after' ensures it runs after fields are validated
-    def validate_inputs(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate that either folder_id or document_ids is set, but not both."""
-        if values.get("folder_id") and (
-            values.get("document_ids") or values.get("file_ids")
-        ):
+    class ExampleModel(BaseModel):
+        folder_id: Optional[str] = None
+        document_ids: Optional[List[str]] = None
+        file_ids: Optional[List[str]] = None
+        file_types: Optional[List[str]] = None
+        credentials_path: Path
+
+    @model_validator(mode="after")
+    def validate_inputs(self) -> "ExampleModel":
+        """Validate that either folder_id or document_ids/file_ids is set, but not both."""
+        if self.folder_id and (self.document_ids or self.file_ids):
             raise ValueError(
                 "Cannot specify both folder_id and document_ids nor "
                 "folder_id and file_ids"
             )
-        if (
-            not values.get("folder_id")
-            and not values.get("document_ids")
-            and not values.get("file_ids")
-        ):
+        if not self.folder_id and not self.document_ids and not self.file_ids:
             raise ValueError("Must specify either folder_id, document_ids, or file_ids")
 
-        file_types = values.get("file_types")
-        if file_types:
-            if values.get("document_ids") or values.get("file_ids"):
+        # Validate file_types
+        if self.file_types:
+            if self.document_ids or self.file_ids:
                 raise ValueError(
-                    "file_types can only be given when folder_id is given,"
-                    " (not when document_ids or file_ids are given)."
+                    "file_types can only be given when folder_id is given, "
+                    "(not when document_ids or file_ids are given)."
                 )
+
             type_mapping = {
                 "document": "application/vnd.google-apps.document",
                 "sheet": "application/vnd.google-apps.spreadsheet",
@@ -96,7 +98,8 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             allowed_types = list(type_mapping.keys()) + list(type_mapping.values())
             short_names = ", ".join([f"'{x}'" for x in type_mapping.keys()])
             full_names = ", ".join([f"'{x}'" for x in type_mapping.values()])
-            for file_type in file_types:
+
+            for file_type in self.file_types:
                 if file_type not in allowed_types:
                     raise ValueError(
                         f"Given file type {file_type} is not supported. "
@@ -104,15 +107,16 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                         f"their full-form names: {full_names}"
                     )
 
-            # replace short-form file types by full-form file types
+            # Replace short-form file types with full-form file types
             def full_form(x: str) -> str:
                 return type_mapping[x] if x in type_mapping else x
 
-            values["file_types"] = [full_form(file_type) for file_type in file_types]
-        return values
+            self.file_types = [full_form(file_type) for file_type in self.file_types]
 
-    @validator("credentials_path")
-    def validate_credentials_path(cls, v: Any, **kwargs: Any) -> Any:
+        return self
+
+    @field_validator("credentials_path")
+    def validate_credentials_path(cls, v: Any) -> Any:
         """Validate that credentials_path exists."""
         if not v.exists():
             raise ValueError(f"credentials_path {v} does not exist")
@@ -151,7 +155,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 creds.refresh(Request())
             elif "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
                 creds, project = default()
-                creds = creds.with_scopes(SCOPES)
+                creds = with_scopes_if_required(creds, SCOPES)
                 # no need to write to file
                 if creds:
                     return creds
@@ -170,7 +174,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
 
         from googleapiclient.discovery import build
 
-        creds = self._load_credentials()
+        creds = utils.load_credentials(SCOPES)
         print(id)
 
         # GoogleSheetsLoader.get_google_sheets_data(id,creds)
@@ -219,7 +223,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     #     from googleapiclient.errors import HttpError
     #     from googleapiclient.http import MediaIoBaseDownload
 
-    #     creds = self._load_credentials()
+    #     creds = utils.load_credentials(SCOPES)()
     #     service = build("drive", "v3", credentials=creds)
 
     #     document= GoogleDocsLoader.load_data_from_document_id(id,creds)
@@ -258,9 +262,9 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
         """Load documents from a folder."""
         from googleapiclient.discovery import build
         from celery import group
-        from celery_worker.tasks import load_document_from_id_task
+        from services.ingestion.celery_worker.tasks import load_document_from_id_task
 
-        creds = self._load_credentials()
+        creds = utils.load_credentials(SCOPES)
         service = build("drive", "v3", credentials=creds)
         files = self._fetch_files_recursive(service, folder_id)
         # If file types filter is provided, we'll filter by the file type.
@@ -281,10 +285,10 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             if file["trashed"] and not self.load_trashed_files:
                 continue
             elif file["mimeType"] == "application/vnd.google-apps.document":
-                print(file["id"])
-
+                print("file id ", file["id"])
+                print("creds", creds)
                 load_document_from_id_task.apply_async(
-                    args=(file["id"],creds),queue="load_doc"
+                    args=[file["id"]],queue="load_doc"
                 )
                  # create a group with all the tasks
                 # job = group(tasks)
@@ -357,8 +361,8 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
 
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaIoBaseDownload
-
-        creds = self._load_credentials()
+        print("loaded file from ", id)
+        creds = utils.load_credentials(SCOPES)
         service = build("drive", "v3", credentials=creds)
 
         file = service.files().get(fileId=id, supportsAllDrives=True).execute()
@@ -428,7 +432,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
         import uuid
         import time
            
-        creds= self._load_credentials()
+        creds= utils.load_credentials(SCOPES)
         service = build('drive', 'v3', credentials=creds)
         # print(os.environ.get("GOOGLE_PUB_SUB_TOPICS_URL")/{topic_id})
         channel_body = {
@@ -468,7 +472,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
         """
         from googleapiclient.errors import HttpError
 
-        creds= self._load_credentials()
+        creds= utils.load_credentials(SCOPES)
 
         try:
             # create drive api client
@@ -492,7 +496,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                     if changed_file.get("mimeType")=="application/vnd.google-apps.document":
                         # start ingestion again
                         load_document_from_id_task.apply_async(
-                        args=(changed_file["id"],creds),queue="load_doc"
+                        args=[changed_file["id"]],queue="load_doc"
                     )
 
                 if "newStartPageToken" in response:

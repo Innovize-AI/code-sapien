@@ -17,7 +17,7 @@ class LLMNode(Node):
         self.stop = stop
         self.guided_json = guided_json
 
-    def get_llm(self, json_model=True):
+    def get_llm(self, json_model=False):
         if self.server == 'openai':
             return openai_models.get_open_ai_json(model=self.model, temperature=self.temperature) if json_model else openai_models.get_open_ai(model=self.model, temperature=self.temperature)
         if self.server == 'ollama':

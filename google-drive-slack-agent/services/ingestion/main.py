@@ -6,15 +6,17 @@ from dotenv import load_dotenv
 
 import os
 from fastapi import FastAPI
-from routes.drive import router
+from services.ingestion.routes.drive import router
 
-from celery_worker.utils import create_celery 
+from services.ingestion.celery_worker.utils import create_celery 
 
 import sys
 # Add sibling_folder to the Python path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
 
-
+# Add parent directory to sys.path
+sys.path.append(parent_dir)
 def create_app() -> FastAPI:
     current_app=FastAPI(title="App with Celery and RabbitMQ")
     current_app.celery_app =  create_celery()

@@ -1,7 +1,7 @@
 from celery import current_app as current_celery_app
 from celery.result import AsyncResult
 
-from celery_worker import config
+from services.ingestion.celery_worker import config
 
 
 def create_celery():

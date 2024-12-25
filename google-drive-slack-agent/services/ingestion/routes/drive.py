@@ -3,9 +3,9 @@ from urllib import response
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, APIRouter
 from fastapi.responses import JSONResponse
-from googledrive import GoogleDriveLoader
-from celery_worker import utils
-from celery_worker.tasks import load_doc_task
+from services.ingestion.googledrive import GoogleDriveLoader
+from services.ingestion.celery_worker import utils
+from services.ingestion.celery_worker.tasks import load_doc_task
 
 from celery.result import AsyncResult
 
@@ -64,7 +64,8 @@ def ingest_and_index():
         import unstructured
     # Load documents from Google Drive
     # print(os.path.join(os.path.dirname(__file__), '..', '.credentials', 'keys.json'))
-
+    print("GOOGLE_DRIVE_FOLDER_ID", GOOGLE_DRIVE_ID)
+    print("path ", os.path.join( cwd,'.credentials', 'keys.json'))
     loader = GoogleDriveLoader(
         folder_id=GOOGLE_DRIVE_ID,
         # document_ids=["1h1dVnclOrZ35JSC3xZXhqu0Zu9xXeNuNQoRauW9K0ek"],

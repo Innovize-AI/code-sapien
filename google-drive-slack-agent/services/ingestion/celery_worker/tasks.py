@@ -3,8 +3,8 @@ from ast import List
 import os
 from celery import shared_task
 from langchain_core.documents import Document
-import googledocs as GoogleDocsLoader
-import googlesheets as GoogleSheetsLoader
+import services.ingestion.googledocs as GoogleDocsLoader
+import services.ingestion.googlesheets as GoogleSheetsLoader
 
 from langchain_text_splitters.character import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
@@ -14,19 +14,19 @@ from qdrant_client.http import models as rest
 
 
 
-@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 5},
+@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 0},
              name='load_doc:load_document_from_id_task')
-def load_document_from_id_task(id, creds ):
+def load_document_from_id_task(id):
         """Load a document from an ID."""
         from io import BytesIO
 
         from googleapiclient.discovery import build
         from googleapiclient.errors import HttpError
         from googleapiclient.http import MediaIoBaseDownload
-
+        import json
  
-        document= GoogleDocsLoader.load_data_from_document_id(id,creds)
-        # print(document)
+        document= GoogleDocsLoader.load_data_from_document_id(id)
+        # print("document loaded", str(document))
         metadata = {
             "source": f"https://docs.google.com/document/d/{id}/edit",
             # "title": f"{file.get('name')}",
@@ -40,20 +40,28 @@ def load_document_from_id_task(id, creds ):
         #         )
         # print(doc.page_content)
         
-        task= data_embed_ingest_task.delay([doc])
+        task= data_embed_ingest_task.delay(document)
         print(task.id)
         print(task.backend)
         # return Document(page_content=document, metadata=metadata)
         
 
-@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 5},
+@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 0},
              name='embed_ingest:data_embed_ingest_task')
              
-def data_embed_ingest_task(doc):
+def data_embed_ingest_task(document):
 
     '''
     Chunk data and ingest into vector store
     '''
+    metadata = {
+            "source": f"https://docs.google.com/document/d/{id}/edit",
+            # "title": f"{file.get('name')}",
+            # "when": f"{file.get('modifiedTime')}",
+        }
+    # print("document in celery task", document)
+    doc= Document(page_content=document,metadata=metadata)
+    # print("doc ", doc["page_content"])
     embeddings= OpenAIEmbeddings(model="text-embedding-3-small", api_key= os.environ.get("OPEN_API_SECRET"))
 #     embeddings = HuggingFaceEmbeddings(
 #     model_name="sentence-transformers/all-mpnet-base-v2"
@@ -62,12 +70,12 @@ def data_embed_ingest_task(doc):
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
-    splits = text_splitter.split_documents(doc)
+    splits = text_splitter.split_documents([doc])
     print(len(splits))
     from qdrant_client import QdrantClient
     from langchain_community.vectorstores.qdrant import Qdrant
 
-    collection_name = "gdrive-collection"
+    collection_name = "inbox-manager"
 
     client = QdrantClient()
 
@@ -92,7 +100,7 @@ def data_embed_ingest_task(doc):
     record_manager.create_schema()
     
     # Create the index
-    result= index(doc,record_manager,qd,cleanup="incremental",source_id_key="source",)
+    result= index([doc],record_manager,qd,cleanup="incremental",source_id_key="source",)
 
     print(result)
     return result

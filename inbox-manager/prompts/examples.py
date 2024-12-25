@@ -44,6 +44,25 @@ example_emails = [
             "reason_for_category_and_needs_response": "The email is from a different sender regarding a job position, indicating a need for a response about hiring status."
         """
     },
+    {
+        "input": """Hi Pavan Kumar,
+
+        What would be the cost to arrange a 53' dry van for a pickup on Wednesday, Dec 25, at 10:00 AM from Chicago, IL to Texas?
+
+        Best,
+        Greg 
+        company_domain_name: innovizeai.com,
+        sender_email_id: greg@levity.com""",
+
+        "output": """
+            "category": "Customer Support",
+            "needs_response": "Needs Response",
+            "confidence_score": 0.95,
+            "senders_domain": "levity.com",
+            "reason_for_category_and_needs_response": "The email is from a different sender requesting a quote, indicating a need for a response about shipment."
+        """
+    },
+
 
 ]
 

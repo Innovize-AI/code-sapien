@@ -3,6 +3,8 @@ from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, AIM
 from prompts.prompts import EMAIL_PREPROCCESSOR_SYSTEM_PROMPT, EMAIL_DRAFTER_PROMPT, EMAIL_DRAFTER_PROMPT_TEMPLATE
 from workflow.state import AgentGraphState
 from langgraph.graph import END
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
 
 class EmailDrafter(ReactAgent):
 
@@ -27,8 +29,6 @@ class EmailDrafter(ReactAgent):
         else:
             print("ended all tools called ")
             print("email draft", state['messages'][-1].content)
-            state["email_draft"]= last_message.content
-            print("updated state successfully") 
             # self.update_state("email_draft", last_message)
             return END
 
@@ -44,10 +44,45 @@ class EmailDrafter(ReactAgent):
         # self.model_with_tools.invoke("what is your pricing and lets setup a time for a call at 3PM next tuesday??").tool_calls
         formatted_messages = self.format_messages(messages)
 
-        response = self.model_with_tools.invoke(messages)
+        prompt = PromptTemplate.from_template(
+                """
+"Write responses without starting with phrases like 'Here is' or similar introductory phrases. Avoid ending responses with conclusions or questions. Maintain a concise, direct, and engaging tone throughout.
+{messages}. You can use calendar agent if there is need aout scheduling a meeting or any query related to meetings
+"""
+                ) 
 
+        chain = prompt | self.model_with_tools
+        response= chain.invoke({"messages": messages})
         print("response from call model", response.content)
         return {"messages":[response]}
+    
+    
+    def generate(self,state:AgentGraphState):
+        """
+        Generate answer
+
+        Args:
+            state (messages): The current state
+
+        Returns:
+            dict: The updated state with re-phrased question
+        """
+        print("---GENERATE---")
+        messages = state["messages"]
+        question = messages[0].content
+        last_message = messages[-1]
+
+        docs = last_message.content 
+        print("calling generate function  ", docs)
+        draft_prompt = PromptTemplate.from_template(
+            EMAIL_DRAFTER_PROMPT
+            )
+        # Chain
+        rag_chain =  draft_prompt | self.get_llm(json_model=False) | StrOutputParser()
+
+        # Run
+        response = rag_chain.invoke({"context": docs, "question": question})
+        return {"messages": [response]}
     
 
     def format_messages(self,messages):
@@ -65,3 +100,6 @@ class EmailDrafter(ReactAgent):
         return formatted
     
     # messages=[HumanMessage(content=processed_email)]
+
+
+    

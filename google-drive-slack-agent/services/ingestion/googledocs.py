@@ -20,6 +20,7 @@ import googleapiclient.discovery as discovery
 from httplib2 import Http
 from googleapiclient.discovery import build
 from pathlib import Path
+from services.ingestion import utils
 # from oauth2client import client
 # from oauth2client import file
 # from oauth2client import tools
@@ -123,11 +124,14 @@ def read_structural_elements(elements):
     return text
 
 
-def load_data_from_document_id(documentID,creds)->str:
+def load_data_from_document_id(documentID)->str:
     """Uses the Docs API to print out the text of a document."""
     # print(service_account_key)
     # http = credentials.authorize(Http())
+    creds = utils.load_credentials(SCOPES)
+    print("load_data_from_document_id called")
     service = build('docs', 'v1', credentials=creds)
     doc = service.documents().get(documentId=documentID).execute()
     doc_content = doc.get('body').get('content')
+    print("doc_content", doc_content)
     return read_structural_elements(doc_content)

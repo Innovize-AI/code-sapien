@@ -12,17 +12,17 @@ except NameError:
 # Add the parent directory to sys.path
 sys.path.append(os.path.abspath(os.path.join(current_dir, "..")))
 
-from agents.drafter import EmailDrafter
+from agents.calendar import CalendarAgent
 from langgraph.graph import StateGraph, MessagesState, START, END
 from state import AgentGraphState
 from langgraph.prebuilt import ToolNode, tools_condition
 from state import state
 
-def create_email_drafter_graph(tools) :
+def create_calendar_graph(tools) :
 
     workflow = StateGraph(AgentGraphState)
     tool_node= ToolNode(tools)
-    email_drafter_agent= EmailDrafter(
+    calendar_agent= CalendarAgent(
         model= "gpt-4o-mini",
         state= state,
         server="openai"
@@ -30,20 +30,20 @@ def create_email_drafter_graph(tools) :
     
     print("bind started sucessfully")
 
-    email_drafter_agent.bind_tools(tools)
+    calendar_agent.bind_tools(tools)
     print("bind completed sucessfully")
     # Define the two nodes we will cycle between
-    workflow.add_node("email_drafter", email_drafter_agent.call_model)
+    workflow.add_node("calendar", calendar_agent.call_model)
     workflow.add_node("tools", tool_node)
 
     # workflow.add_node("query_rewriter", email_drafter_agent.query_rewriter)  # Re-writing the question
     # workflow.add_node("generator", email_drafter_agent.generate)
 
-    workflow.add_edge(START, "email_drafter")
+    workflow.add_edge(START, "calendar")
 
     # Decide whether to tools
     workflow.add_conditional_edges(
-        "email_drafter",
+        "calendar",
         # Assess agent decision
         tools_condition,
         {
@@ -55,10 +55,10 @@ def create_email_drafter_graph(tools) :
     # workflow.add_conditional_edges("email_drafter", email_drafter_agent.should_continue, ["tools", END])
 
     # workflow.add_conditional_edges("tools",email_drafter_agent.grade_documents) 
-    workflow.add_edge("tools", "email_drafter")
+    workflow.add_edge("tools", "calendar")
 
     # workflow.add_edge("generator", END)
     # workflow.add_edge("query_rewriter", "email_drafter")
-    email_drafter_graph = workflow.compile()
+    calendar_graph = workflow.compile()
 
-    return email_drafter_graph
+    return calendar_graph

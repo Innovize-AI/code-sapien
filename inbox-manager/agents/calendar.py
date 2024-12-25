@@ -6,9 +6,9 @@ from langgraph.graph import END
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 
-class EmailDrafter(ReactAgent):
+class CalendarAgent(ReactAgent):
 
-    ''' Email drafter react agent'''
+    ''' Calendar react agent'''
 
     def bind_tools(self,tools):
 
@@ -27,9 +27,6 @@ class EmailDrafter(ReactAgent):
             print("call tool")
             return "tools"
         else:
-            print("ended all tools called ")
-            print("email draft", state['messages'][-1].content)
-            # self.update_state("email_draft", last_message)
             return END
 
    
@@ -47,9 +44,8 @@ class EmailDrafter(ReactAgent):
         prompt = PromptTemplate.from_template(
                 """
 "Write responses without starting with phrases like 'Here is' or similar introductory phrases. Avoid ending responses with conclusions or questions. Maintain a concise, direct, and engaging tone throughout.
-{messages}. You can use calendar agent if there is need aout scheduling a meeting or any query related to meetings
-"""
-                ) 
+{messages}.
+""") 
 
         chain = prompt | self.model_with_tools
         response= chain.invoke({"messages": messages})
@@ -100,6 +96,3 @@ class EmailDrafter(ReactAgent):
         return formatted
     
     # messages=[HumanMessage(content=processed_email)]
-
-
-    

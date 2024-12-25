@@ -13,7 +13,7 @@ def get_qdrant_as_retriver()-> VectorStoreRetriever:
 
     embeddings= OpenAIEmbeddings(model="text-embedding-3-small", api_key= os.environ.get("OPEN_API_SECRET"))
 
-    collection_name = "gdrive-collection"
+    collection_name = "collection_name"
     client= QdrantClient()
 
     qd = Qdrant(client, collection_name, embeddings)

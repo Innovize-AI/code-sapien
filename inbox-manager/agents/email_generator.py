@@ -21,9 +21,9 @@ class EmailGenerator(LLMNode):
             print("---GENERATE---")
             messages = state["messages"]
             email_query = messages[0].content
-            last_message = messages[-1]
+            docs = messages[1:]
 
-            docs = last_message.content 
+            # docs = last_message.content 
             print("question", email_query)
             print("calling generate function  ", docs)
             draft_prompt = PromptTemplate.from_template(

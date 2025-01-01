@@ -56,3 +56,9 @@ def make_handoff_tool(*, agent_name: str):
         )
 
     return handoff_to_agent
+
+
+def get_calendar_events():
+
+    
+    return

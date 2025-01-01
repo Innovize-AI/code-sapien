@@ -6,10 +6,10 @@ from models import gemini_models
 from models import vllm_models
 from models import groq_models
 from models import ollama_models
-
+from typing import Optional
 class LLMNode(Node):
-    def __init__(self, state, model=None, server=None, temperature=0, model_endpoint=None, stop=None, guided_json=None):
-        self.state = state
+    def __init__(self, state:Optional[str] = None,model=None, server=None, temperature=0, model_endpoint=None, stop=None, guided_json=None, ):
+        self.state = state 
         self.model = model
         self.server = server
         self.temperature = temperature
@@ -44,10 +44,10 @@ class LLMNode(Node):
                 temperature=self.temperature
             )
         if self.server == 'claude':
-            return claude_models.ClaudJSONModel(
+            return claude_models.get_claude_ai_json(
                 model=self.model,
                 temperature=self.temperature
-            ) if json_model else claude_models.ClaudModel(
+            ) if json_model else claude_models.get_claude_ai(
                 model=self.model,
                 temperature=self.temperature
             )

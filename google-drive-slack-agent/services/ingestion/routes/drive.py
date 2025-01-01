@@ -14,7 +14,7 @@ load_dotenv()
  
 
 GOOGLE_DRIVE_ID=os.environ.get("GOOGLE_DRIVE_FOLDER_ID")
-cwd=os.getcwd()
+cwd= os.getcwd()
 
 
 router = APIRouter(prefix='/drive', tags=['Drive'], responses={404: {"description": "Not found"}})

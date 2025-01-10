@@ -14,11 +14,20 @@ class Preprocess(Node):
 
         if 'raw_email_body' not in state:
             raise KeyError("'raw_email_body' key is missing in the state.")
+        if 'sender_email_id' not in state:
+            raise KeyError("sender_email_id key is missing in the state")
         
         raw_email_body= state['raw_email_body']
+        sender_email_id= state['sender_email_id']
+
+        print("sender_email_body", sender_email_id)
 
         parsed_email= self.parse_email(raw_email_body)
+        extracted_domain= self.extract_domain(sender_email_id)
+
+
         state['processed_email_body']= parsed_email
+        state['sender_domain_name']= extracted_domain
 
         
         return state
@@ -48,7 +57,13 @@ class Preprocess(Node):
         # lemmatized_tokens = [token.lemma_ for token in doc]
 
         return  plain_text
+    
 
-
+    def extract_domain(self,email_id):
+        try:
+            return email_id.split('@')[1]
+        
+        except IndexError:
+            raise ValueError("Invalid email address")
 
 

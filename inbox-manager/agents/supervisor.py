@@ -1,6 +1,6 @@
-from typing import TypeVar, Literal, TypedDict, Union, Optional
+from typing import TypeVar, Literal, Union, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
-
+from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.types import Command
 from langchain_core.messages import HumanMessage, trim_messages

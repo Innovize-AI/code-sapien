@@ -12,17 +12,13 @@ Objective:
 
 Senders email is {senders_email}
 Company Domain is {company_domain_name}
-
+Senders domain is {senders_domain_name}
 
 Instructions:
 Given the following email input, perform the following steps:
 
-Step 1: Extract domain of the senders email
-Get the domain of {senders_email} (E.g: pavan.kumar@innovizeai.com-- > innovizeai.com
-    pavan.kumar@hubspot.com --> hubspot.com)
-
     
-Step 2: Categorize the Email
+Step 1: Categorize the Email
 
 1. Always Emails are categorized as **Internal**, if the sender's domain matches the company domain.
 2. If the sender's domain does not match the company domain, classify the email based on its content, even if it appears internal. Use one of the following categories:
@@ -46,13 +42,13 @@ Step 2: Categorize the Email
     Logistics: Identify emails related to logistics (e.g., shipping, delivery schedules, transportation requests, quotes ) and supply chain management (e.g., supplier coordination, inventory updates, procurement)
 
 
-Step 3: Determine Response Needed
+Step 2: Determine Response Needed
 Evaluate the email and identify whether it requires a response or does not require a response:
 
 Needs Response: Clearly indicates an action item, request for feedback, or requires additional info or interested in learning more etc .
 No Response Needed: Informational or updates only or sometimes have no-reply or noreply in the senders name or not interested in the services/products.
 
-Step 4:Generate Output
+Step 3:Generate Output
  
 Provide a structured summary of your findings in the following json format with the following keys. Dont include any extra quotes:
 
@@ -62,7 +58,7 @@ Provide a structured summary of your findings in the following json format with 
 ## VERY IMPORTANT AND Never Skip the below instructions: 1. Always Emails should be categorized as Internal,when the sender's domain matches the {company_domain_name} (e.g., @companydomain.com).
 2. If the sender's domain does not match the company domain, even if the content resembles internal communication (e.g., "What's the update on our project status?","Let's set up a call tomorrow 3PM. etc), the email should always be classified into another appropriate category.
 
-Here are some examples of input and respective output below. 
+Here are some examples of input and respective output below.
 
 """
 
@@ -102,10 +98,45 @@ You are an email drafting assistant. Your task is to generate concise and contex
    - 0: The context provides minimal to no relevant information.
 6: Never Include subject and palceholders in your email draft.
 7. Never Skip important info such as meeting details, product enquiry, or any other important information in your response.
-8. If the confidence indication is less than 2, handoff to a human agent with 'yes' otherwise 'no'.Also include reason for your Confidence Indication"""
+8. If the confidence indication is less than 2, handoff to a human agent with 'yes' otherwise 'no'.
+9. Always include marketing material provided in the context to boost engagement and move down the funnel in your response
+10. Your response should never include additional details not related to question and included marketing material."""
                 
 
 EMAIL_DRAFTER_PROMPT_TEMPLATE= PromptTemplate(
     input_variables=["email"],
     template=EMAIL_DRAFTER_PROMPT
+)
+
+EMAIL_INTENT_PROMPT="""You are an AI trained to analyze messages from prospects and determine their stage in the sales funnel. Your goal is to classify the message into one of the following stages: Awareness, Interest, Consideration, Decision,Dormant/Disengaged.
+
+To identify the funnel stage, follow these steps:
+
+Analyze the Content of the Message:
+Look for key phrases, questions, or statements that indicate the prospect's knowledge, curiosity, or actions related to the product or service.
+
+Assess the tone of the message (e.g., exploratory, evaluative, decisive, or disengaged).
+
+Match Against Funnel Stage Indicators:
+Use the following descriptions and indicators for each stage:
+awareness: Prospect mentions challenges, industry trends, or general interest in learning more.
+
+interest: Prospect asks basic questions about your offering, such as features, use cases, or benefits.
+
+consideration: Prospect compares solutions, requests detailed information (e.g., pricing, case studies, demos), or evaluates options.
+
+decision: Prospect expresses readiness to move forward, negotiates terms, or requests contracts.
+
+disengaged: Prospect has stopped engaging, expresses disinterest, or provides reasons for disengagement.
+
+Provide a Justification:
+Offer a brief explanation for your classification, referencing specific parts of the message that support your decision.
+
+{input_email}
+
+"""
+
+EMAIL_INTENT_PROMPT_TEMPLATE=PromptTemplate(
+    input_variables=["input_email"],
+    template=EMAIL_INTENT_PROMPT
 )

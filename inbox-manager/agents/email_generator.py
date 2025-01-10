@@ -21,7 +21,7 @@ class EmailGenerator(LLMNode):
             print("---GENERATE---")
             messages = state["messages"]
             email_query = messages[0].content
-            docs = messages[1:]
+            docs = messages[-1]
 
             # docs = last_message.content 
             print("question", email_query)

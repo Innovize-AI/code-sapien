@@ -63,7 +63,7 @@ SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
 def load_credentials():
     cwd= os.getcwd()
-    service_account_key:Path= os.path.join("d:\innovizeai\code-sapien\inbox-manager",'.credentials', 'keys.json') # temporary
+    service_account_key:Path= os.path.join(cwd,'.credentials', 'keys.json') # temporary
     print("service account key path" , service_account_key)
 
     if os.path.exists(service_account_key):

@@ -741,7 +741,6 @@ def run_graph( options:InputLeadData,linkedin_url: str = Query(..., description=
         project_urgency= options.project_urgency
     )
 
-
     response= graph.invoke({
         "email_id":email,
         "linkedin_url": linkedin_url,

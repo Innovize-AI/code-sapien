@@ -245,10 +245,11 @@ def get_available_times(proposed_time:str):
     available_times_slots= find_intersection(proposed_ist_times, available_times)
     
     print("available_times_slots", available_times_slots)
+    processed_slots= process_slots(available_times_slots) 
     # convert this into a friendly text with llm
     slot_availabilty_chain= SLOT_AVAILABILITY_PROMPT_TEMPLATE | llm_4o_mini
 
-    response= slot_availabilty_chain.invoke({"context":available_times_slots})
+    response= slot_availabilty_chain.invoke({"context":  processed_slots })
 
     return response.content
 
@@ -305,13 +306,11 @@ def find_intersection(proposed_times, available_times):
         proposed = parsed_proposed_cache[time]
         if proposed in available_times_dict:
             available = available_times_dict[proposed]
-            intersections.append({
-                "proposed": proposed.isoformat(),
-                "available": {
+            intersections.append( {
                     "start": available["start"].isoformat(),
                     "end": available["end"].isoformat(),
                 },
-            })
+            )
 
     # Return all intersections or an empty list if no intersection is found
     # If no intersections, return 2 random available time slots with a label
@@ -331,3 +330,30 @@ def find_intersection(proposed_times, available_times):
         "type": "intersection_slots",
         "slots": intersections
     }
+
+def process_slots(input_data: dict) -> dict:
+    import utils
+    """
+    Processes the input data to convert all slots' start and end times to a readable format.
+
+    Args:
+        input_data (dict): Input data containing a type and a list of slots with start and end times.
+        timezone_str (str): The timezone string to use for conversion (e.g., "Asia/Kolkata", "GMT").
+    
+    Returns:
+        dict: A dictionary with the same structure, but with formatted start and end times.
+    """
+    try:
+        if input_data.get("type") in ["available_slots", "intersection_slots"] and "slots" in input_data:
+            formatted_slots = []
+            for slot in input_data["slots"]:
+                print("slot start", slot["start"])
+                start_readable = utils.convert_iso_to_readable(slot["start"])
+                end_readable = utils.convert_iso_to_readable(slot["end"])
+                formatted_slots.append({"start": start_readable, "end": end_readable})
+            
+            return {"type": input_data["type"], "slots": formatted_slots}
+        else:
+            return {"error": "Invalid input structure or type"}
+    except Exception as e:
+        return {"error": str(e)}

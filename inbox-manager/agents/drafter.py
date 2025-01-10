@@ -1,6 +1,6 @@
 from agents.react_agent import ReactAgent
 from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, AIMessage, ChatMessage
-from prompts.prompts import EMAIL_PREPROCCESSOR_SYSTEM_PROMPT, EMAIL_DRAFTER_PROMPT, EMAIL_DRAFTER_PROMPT_TEMPLATE
+from prompts.prompts import EMAIL_PREPROCCESSOR_SYSTEM_PROMPT, EMAIL_DRAFTER_PROMPT, EMAIL_DRAFTER_PROMPT_TEMPLATE, EMAIL_INTENT_PROMPT_TEMPLATE
 from workflow.state import AgentGraphState
 from langgraph.graph import END
 from langchain_core.output_parsers import StrOutputParser
@@ -12,6 +12,11 @@ from langchain_core.messages import ToolMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
 from workflow.state import AgentGraphState
 from langgraph.prebuilt import ToolNode, tools_condition
+from pydantic import BaseModel
+
+class EmailIntent(BaseModel):
+    intent_type: str
+    justification: str
 
 class EmailDrafter(ReactAgent):
 
@@ -20,9 +25,12 @@ class EmailDrafter(ReactAgent):
     def create_agent_graph(self, state: AgentGraphState):
 
         workflow = StateGraph(AgentGraphState)
+        #add resources based on the question intent and add any resources if required
+        workflow.add_node("intent_detector", self.intent_identifier)
         workflow.add_node("call_model", self.call_model)
         workflow.add_node("call_tools", self.call_tools)
-        workflow.add_edge(START, "call_model")
+        workflow.add_edge("intent_detector", "call_model")
+        workflow.add_edge(START, "intent_detector")
         workflow.add_edge("call_tools", "call_model")
         email_drafter_graph = workflow.compile()
 
@@ -99,8 +107,10 @@ class EmailDrafter(ReactAgent):
 2) Never end your responses with followup questions if there is any insufficient information..(e.g: Would you like to continue,  Would you like to check availability and so on)
 3) Determine if you have necessary answers and stop the execution, if all answers are found.
 4)If you have a response from a tool that answers the question, generate the final answer with findings included in the tool message. you can call a tool for a maximiun of 3 times only.
-
-""") 
+5) Always include only one relavant marketing material in your output response based on the funnel stage.
+6) Your response should never include additional details not related to question and included marketing material.
+7) if the response from the tool is not relevant to question, output as you were unable to find the answer."""
+        )
 
         chain = prompt | self.model_with_tools
         response= chain.invoke({"messages": messages})
@@ -184,5 +194,24 @@ class EmailDrafter(ReactAgent):
     
     # messages=[HumanMessage(content=processed_email)]
 
+    def intent_identifier(self, state: AgentGraphState):
 
-    
+        # Literal["awareness","interest","consideration","decision","disengaged","follow-up"]
+        messages = state["messages"]
+
+        chain= EMAIL_INTENT_PROMPT_TEMPLATE | self.get_llm(json_model=False).with_structured_output(EmailIntent)
+
+        response= chain.invoke({"input_email": messages})
+
+        print(response)
+
+        if response.intent_type== "awareness":
+            return {"messages":[HumanMessage("Add this the question, share either Introductory Video or Product Brochure ")]}
+        elif response.intent_type=="interest":
+            return {"messages":[HumanMessage("Add this the question, share either Product Brochure or some case studies")]}
+        elif response.intent_type=="consideration":
+            return {"messages":[HumanMessage("Add this the question, share either Feature Comparison Guide or Demo Video")]}
+        elif response.intent_type=="decision":
+            return {"messages":[HumanMessage("Add this the question, share either Implementation Plan Pricing Guide Training Resource Customer Testimonial Collection")]}
+
+        return  state

@@ -17,7 +17,7 @@ def get_qdrant_as_retriver(collection_name)-> VectorStoreRetriever:
 
     embeddings= OpenAIEmbeddings(model="text-embedding-3-small", api_key= os.environ.get("OPENAI_API_KEY"))
 
-    client= QdrantClient()
+    client= QdrantClient(url= "https://qdrant-512561667165.asia-south1.run.app", port=443)
 
     qd = Qdrant(client, collection_name, embeddings)
 
@@ -62,3 +62,32 @@ def get_calendar_events():
 
     
     return
+
+from datetime import datetime
+import pytz
+
+def convert_iso_to_readable(iso_datetime: str) -> str:
+    """
+    Converts an ISO 8601 datetime string to a readable date and time format with a timezone name.
+    
+    Args:
+        iso_datetime (str): The ISO 8601 datetime string (e.g., "2025-01-13T13:30:00+05:30").
+        timezone_str (str): The timezone string (e.g., "Asia/Kolkata", "GMT").
+        
+    Returns:
+        str: Formatted datetime string (e.g., "January 13, 2025, 01:30 PM IST").
+    """
+    try:
+        # Parse the ISO 8601 string
+        dt = datetime.fromisoformat(iso_datetime)
+
+        # # Assign the desired timezone
+        # timezone = pytz.timezone(timezone_str)
+        # localized_dt = dt.astimezone(timezone)
+
+        # Format the date and time with AM/PM and timezone name
+        formatted_date_time = dt.strftime("%B %d, %I:%M %p %Z")
+        return formatted_date_time
+
+    except Exception as e:
+        return f"Error: {e}"

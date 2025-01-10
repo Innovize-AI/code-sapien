@@ -15,10 +15,11 @@ class EmailCategorizer(LLMNode):
        senders_email= state['sender_email_id']
        company_domain_name= state['company_domain_name']
        email_to_analyze= state['processed_email_body']
-       print("calling email categorizer", senders_email, company_domain_name)
+       senders_domain= state['sender_domain_name']
+       print("calling email categorizer",email_to_analyze )
 
        few_shot_prompt = FewShotPromptTemplate(
-            prefix= EMAIL_CATEGORIZER_PROMPT_TEMPLATE.format(senders_email= senders_email, company_domain_name= company_domain_name),
+            prefix= EMAIL_CATEGORIZER_PROMPT_TEMPLATE.format(senders_email= senders_email, company_domain_name= company_domain_name, senders_domain_name= senders_domain),
             examples=example_emails,
             example_prompt=PromptTemplate(
                 input_variables=["input", "output"],
@@ -34,9 +35,9 @@ class EmailCategorizer(LLMNode):
        
        
        print(self.messages)
-       response=  self.get_llm().invoke(self.messages)
+       response=  self.get_llm(json_model=False).invoke(self.messages)
 
-       print(response.content)
+       print("ai response" , response.content)
        response_json = json.loads(response.content)
 
        state["needs_response"]=response_json['needs_response']

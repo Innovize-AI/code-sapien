@@ -1,5 +1,6 @@
+from typing import Optional
 class Node:
-    def __init__(self, state):
+    def __init__(self, state:Optional[str] = None):
         self.state = state
 
     def update_state(self, key, value):

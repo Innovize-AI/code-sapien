@@ -67,3 +67,8 @@ example_emails = [
 ]
 
 example_drafts=[]
+
+email_intent_examples=[
+
+    
+]

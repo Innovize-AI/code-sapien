@@ -1,0 +1,30 @@
+[
+  {
+    "subject": "null",
+    "user_id": "8fe0d164-d44b-42a4-bfef-32ebce8882ad",
+    "sender_email": "pavan.kumar@innovizeai.com",
+    "category": "Internal",
+    "intent": "awareness",
+    "pii_detected": false,
+    "preprocessed_email": "Can we schedule a call next week Monday or tuesday?",
+    "requires_response": true,
+    "received_at": "2025-01-16T18:44:19.176023",
+    "escalated_to_human": false,
+    "category_confidence_score": 0.95,
+    "email_response_draft": "Thank you for your inquiry about scheduling a call. I am available on Monday, January 20, from 11:00 AM - 11:30 AM UTC+05:30 or 10:30 AM - 11:00 AM UTC+05:30. On Tuesday, January 21, I can meet from 1:00 PM - 1:30 PM UTC+05:30 or 4:00 PM - 4:30 PM UTC+05:30. \n\nAdditionally, I recommend reviewing our \"AI Solution Comparison: Features & Benefits\" guide, which provides a detailed breakdown of features and capabilities to help evaluate the solution. \n\nPlease let me know which time works best for you!"
+  },
+  {
+    "subject": "null",
+    "user_id": "8fe0d164-d44b-42a4-bfef-32ebce8882ad",
+    "sender_email": "pavan.kumar@innovizeai.com",
+    "category": "Internal",
+    "intent": "awareness",
+    "pii_detected": false,
+    "preprocessed_email": "what crms does your sales research agent integrate? let schedule a meet at 3PM monday next week",
+    "requires_response": true,
+    "received_at": "2025-01-16T19:01:26.606365",
+    "escalated_to_human": true,
+    "category_confidence_score": 0.95,
+    "email_response_draft": "Our AI Sales Research Agent integrates with major CRM systems including HubSpot and Salesforce via APIs, allowing for automated lead research and real-time data syncing.\n\nI am available to meet on Monday, January 20, from 3:00 PM to 3:30 PM (UTC+05:30). Please confirm if this time works for you.\n\nFor more information, feel free to check our Feature Comparison Guide or Demo Video to learn more about our CRM integrations and capabilities."
+  }
+]

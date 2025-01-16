@@ -10,6 +10,10 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from  routes.inbox_manager import inbox_manager_router
+from routes.database import db_router
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.database import SessionLocal, engine, Base
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -31,6 +35,16 @@ if environment == "dev":
     )
 
 app.include_router(inbox_manager_router)
+app.include_router(db_router)
+
+async def get_db():
+    async with SessionLocal() as session:
+        yield session
+
+@app.on_event("startup")
+async def startup_event():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 if __name__ == "__main__":

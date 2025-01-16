@@ -31,6 +31,10 @@ pytz = "^2024.2"
 python-dateutil = "^2.9.0.post0"
 nltk = "^3.9.1"
 en_core_web_sm = {url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0.tar.gz"}
+sqlalchemy = "^2.0.37"
+alembic = "^1.14.0"
+asyncpg = "^0.30.0"
+psycopg2 = "^2.9.10"
 
 
 

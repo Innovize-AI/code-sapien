@@ -8,6 +8,7 @@ import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import Navbar from "@/components/navbar";
+import { RowProvider } from "@/context/emailRow";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -88,9 +89,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         > 
+        <RowProvider>
         <SidebarProvider>
+          
           {children}
         </SidebarProvider>
+        </RowProvider>
+
         </ThemeProvider>
 
         <Toaster position="top-center" reverseOrder={false} />

@@ -10,7 +10,7 @@ import { DataTable } from "@/components/ui/inbox/components/data-table";
 
 import { promises as fs } from "fs"
 import path from "path"
-import { taskSchema } from "@/components/ui/inbox/data/schema";
+import { emailSchema } from "@/components/ui/inbox/data/schema";
 import { z } from "zod";
 
 export default async function RootLayout({

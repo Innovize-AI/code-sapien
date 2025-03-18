@@ -8,18 +8,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import FastAPI, Depends, HTTPException
 from workflow.state import AgentGraphState
 import datetime
+import requests
+import os
 inbox_manager_router = APIRouter(prefix='/generate-draft', tags=['Inbox Manager'],responses={404: {"description": "Not found"}},)
 
 workflow= create_Workflow()
-
+N8N_WEBHOOK_URL= os.getenv("N8N_WEBHOOK_URL")
 
 class DrafterRequest(BaseModel):
     raw_email_body:str
     company_domain_name:str
     sender_email_id:str
     to_email_id:Optional[str]
+    thread_id:str
+    thread
 
-
+class SendEmailRequest(BaseModel):
+    thread_id:str
+    email_draft: str
 
 @inbox_manager_router.post("/")
 @inbox_manager_router.post("")
@@ -30,6 +36,7 @@ async def run_workflow(drafter_request: DrafterRequest,db: AsyncSession = Depend
     "raw_email_body": drafter_request.raw_email_body,
     "company_domain_name": drafter_request.company_domain_name,
     "sender_email_id": drafter_request.sender_email_id,
+    "thread_messages": dra
     # "to_email_id": drafter_request.to_email_id
     
     })
@@ -47,8 +54,11 @@ async def run_workflow(drafter_request: DrafterRequest,db: AsyncSession = Depend
             intent= "awareness",
             preprocessed_email=  response['processed_email_body'],
             requires_response= True if response['needs_response']== "Needs Response" else False,
-            received_at= datetime.datetime.now()
-        )
+            received_at= datetime.datetime.now(),
+            thread_id= drafter_request.thread_id,
+            email_sent= False
+
+                    )
     #add to database
     db_email= await create_email_record(
        emailcreate , db
@@ -59,3 +69,19 @@ async def run_workflow(drafter_request: DrafterRequest,db: AsyncSession = Depend
 
     return response
 
+@inbox_manager_router.post("/trigger-n8n/")
+def trigger_n8n_send_email_hook(send_email_request: SendEmailRequest):
+    """
+    Endpoint to trigger the n8n webhook with provided data.
+    """
+    try:
+        # Send the POST request to the n8n webhook
+
+        request= send_email_request.model_dump_json()
+
+        response = requests.post(N8N_WEBHOOK_URL, json=request)
+        response.raise_for_status()  # Raise an error for non-2xx status codes
+        return {"status": "success", "n8n_response": response.json()}
+    except requests.RequestException as e:
+        # Handle request errors
+        raise HTTPException(status_code=500, detail=f"Request to n8n failed: {str(e)}")

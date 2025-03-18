@@ -19,6 +19,8 @@ class EmailCreate(BaseModel):
     escalated_to_human:Optional[bool]
     category_confidence_score:float
     email_response_draft: str
+    thread_id: str
+    email_sent:bool
 
     class Config:
         orm_mode = True

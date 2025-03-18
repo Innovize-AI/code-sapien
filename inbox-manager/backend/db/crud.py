@@ -22,7 +22,8 @@ async def create_email(email: EmailCreate, db:AsyncSession):
         requires_response = email.requires_response,
         escalated_to_human= email.escalated_to_human,
         category_confidence_score= email.category_confidence_score,
-        email_response_draft= email.email_response_draft
+        email_response_draft= email.email_response_draft,
+        thread_id= email.thread_id
     )
     db.add(db_email)
     await db.commit()

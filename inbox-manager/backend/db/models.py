@@ -68,3 +68,6 @@ class Email(Base):
     category_confidence_score= Column(Float)
     email_response_draft = Column(Text, nullable=True)  # Field to store AI response
     created_at = Column(DateTime, default=datetime.now())
+    thread_id= Column(String, nullable=False, default= str(uuid.uuid4))
+    email_sent= Column(Boolean,default=False)
+

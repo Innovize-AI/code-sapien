@@ -28,9 +28,46 @@ import {
 import { DataTablePagination } from "./data-table-pagination"
 import { DataTableToolbar } from "./data-table-toolbar"
 
+import { useRouter } from "next/navigation";
+import { EmailRow, emailSchema } from "../data/schema"
+import { z } from "zod"
+import { useRow } from "@/context/emailRow"
+
+
+// Infer the type from the schema
+export type EmailData = z.infer<typeof emailSchema>;
+
+// Define the shape of the context value
+interface RowContextValue {
+  row: EmailData | null;
+  setRow: React.Dispatch<React.SetStateAction<EmailData | null>>;
+}
+
+// Create the context
+const RowContext = React.createContext<RowContextValue | undefined>(undefined);
+
+// Provider props interface
+interface RowProviderProps {
+  children: React.ReactNode;
+}
+
+// Create the provider
+export const RowProvider: React.FC<RowProviderProps> = ({ children }) => {
+  const [row, setRow] = React.useState<EmailData | null>(null);
+
+  return (
+    <RowContext.Provider value={{ row, setRow }}>
+      {children}
+    </RowContext.Provider>
+  );
+};
+
+
+
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+ 
 }
 
 export function DataTable<TData, TValue>({
@@ -44,6 +81,10 @@ export function DataTable<TData, TValue>({
     []
   )
   const [sorting, setSorting] = React.useState<SortingState>([])
+
+  const router= useRouter()
+  const { setRow } = useRow(); // Call useRow at the top level
+
 
   const table = useReactTable({
     data,
@@ -66,6 +107,21 @@ export function DataTable<TData, TValue>({
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
+
+  const handleRowClick =(row: any) => {
+    console.log("row", row)
+
+    
+    console.log("setRow", setRow)
+    setRow(row.original)
+    if (row?.id) {
+      router.push(`/inbox/${row.id}`);
+    } else {
+      console.warn('Row does not have an id:', row);
+    }
+    
+  };
+
 
   return (
     <div className="space-y-4">
@@ -95,6 +151,7 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
+                  onClick={() => handleRowClick(row)} // Bind the click event
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (

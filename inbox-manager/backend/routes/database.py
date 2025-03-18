@@ -37,6 +37,7 @@ async def get_emails_of_user(email_id, db: AsyncSession=Depends(get_db)):
     emails= await get_emails_with_user(email_id, db)
     print(emails)
     emails_json= convert_to_json(emails)
+    print("emails json", emails_json)
     return emails_json
 
 
@@ -55,6 +56,9 @@ def convert_to_json(data):
             received_at=item[5],
             escalated_to_human=item[10],
             category_confidence_score=item[11],
-            email_response_draft=item[12]
+            email_response_draft=item[12],
+            thread_id= item[14],
+            email_sent= item[15]
+
         ).dict())
     return json_array

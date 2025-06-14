@@ -705,8 +705,8 @@ graph= builder.compile()
 
 from IPython.display import Image, display
 
-# Setting xray to 1 will show the internal structure of the nested graph
-display(Image(graph.get_graph(xray=1).draw_mermaid_png()))
+# # Setting xray to 1 will show the internal structure of the nested graph
+# display(Image(graph.get_graph(xray=1).draw_mermaid_png()))
 
 import uuid
 

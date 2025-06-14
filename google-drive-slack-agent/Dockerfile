@@ -5,7 +5,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy the current directory contents into the container
-COPY . /app
+COPY ./services/agent /app
 
 # Install any necessary dependencies from pyproject.toml or requirements.txt
 RUN pip install --no-cache-dir poetry \

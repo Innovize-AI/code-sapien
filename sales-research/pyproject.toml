@@ -5,6 +5,9 @@ description = ""
 authors = ["pavan kumar.v <pavan.kumar@the10xacademy.com>"]
 readme = "README.md"
 
+
+package-mode = false
+
 [tool.poetry.dependencies]
 python = "^3.11"
 langgraph = "^0.1.19"
@@ -25,3 +28,4 @@ beautifulsoup4 = "^4.12.3"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+

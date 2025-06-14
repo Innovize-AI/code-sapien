@@ -163,3 +163,5 @@ cython_debug/
 /google-drive-slack-agent/qdrant_storage
 qdrant_storage
 backup.tar
+
+**/.credentials/

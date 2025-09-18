@@ -1,2 +1,2 @@
 # code-sapien
-This is the repo where innovize code lives
+This is the repo where public innovize code lives

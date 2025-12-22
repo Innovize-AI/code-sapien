@@ -140,3 +140,14 @@ EMAIL_INTENT_PROMPT_TEMPLATE=PromptTemplate(
     input_variables=["input_email"],
     template=EMAIL_INTENT_PROMPT
 )
+
+RELEVANT_THREAD_PROMPT= """Given the following list of email messages, extract the most relevant messages that match the context of the current email inquiry. The relevance is determined based on similar topics, key phrases, and entities mentioned in the current email.
+Ensure that responses consider synonyms and reworded inquiries. Prioritize emails that discuss the same subject, sender-recipient interaction, and continuity in the conversation.
+{thread_messages}
+
+"""
+
+RELEVANT_THREAD_PROMPT_TEMPLATE= PromptTemplate(
+    input_variables=["thread_messages"],
+    template=RELEVANT_THREAD_PROMPT
+)

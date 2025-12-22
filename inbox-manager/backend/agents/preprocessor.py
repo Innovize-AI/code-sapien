@@ -24,11 +24,13 @@ class Preprocess(Node):
 
         parsed_email= self.parse_email(raw_email_body)
         extracted_domain= self.extract_domain(sender_email_id)
+        
+        thread_messages= self.extract_thread_messages(state["email_thread_history"])
 
 
         state['processed_email_body']= parsed_email
         state['sender_domain_name']= extracted_domain
-
+        state['thread_messages']=thread_messages
         
         return state
 
@@ -65,5 +67,19 @@ class Preprocess(Node):
         
         except IndexError:
             raise ValueError("Invalid email address")
+        
+    def extract_thread_messages(self,messages:dict):
 
+        import utils
 
+        extracted_messages= []
+        for message in messages:
+            print(message["payload"]["parts"][0]["body"]["data"])
+            
+            decoded_string= utils.convert_base64_to_String(message)
+
+            extracted_messages.append(decoded_string)
+
+        return extracted_messages
+
+        

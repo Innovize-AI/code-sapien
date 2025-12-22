@@ -55,6 +55,7 @@ from workflow.state import AgentGraphState
 from agents.drafter import EmailDrafter
 from agents.calendar import CalendarAgent
 from agents.preprocessor import Preprocess
+from agents.relevant_threads import RelevantThreadMessagesExtractor
 
 
 def create_Workflow():
@@ -72,6 +73,10 @@ def create_Workflow():
     )
 
     preprocess_email= Preprocess()
+
+    #get relevant threads from the current email
+    relevant_thread_messages= RelevantThreadMessagesExtractor(model="gpt-4o-mini", server="openai")
+
     email_generator= EmailGenerator( model= "gpt-4o-mini", server= "openai")
 
     email_drafter_agent= EmailDrafter(
@@ -97,6 +102,7 @@ def create_Workflow():
 
     workflow.add_node("email_preprocessor",preprocess_email.preprocess_email)
     workflow.add_node("email_categorizer", email_categorizer.invoke)
+    workflow.add_node("relevant_thread_messages", relevant_thread_messages.invoke)
     workflow.add_node("email_drafter",email_drafter_agent.create_agent_graph)
     workflow.add_node("calendar_agent", calendar_agent.create_agent_graph)
     workflow.add_node("final_response", final_node)
@@ -105,6 +111,8 @@ def create_Workflow():
 
     workflow.add_edge(START, "email_preprocessor")
     workflow.add_edge("email_preprocessor","email_categorizer")
+    workflow.add_edge("email_preprocessor","relevant_thread_messages" )
+    workflow.add_edge("relevant_thread_messages","email_categorizer")
     workflow.add_conditional_edges("email_categorizer", should_respond, ["email_drafter", END])
     workflow.add_edge("email_generator","final_response")
     workflow.add_edge("final_response",END)

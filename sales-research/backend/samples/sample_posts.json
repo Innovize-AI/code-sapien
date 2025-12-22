@@ -1,0 +1,1973 @@
+{
+  "success": true,
+  "message": "response retrieved successfully",
+  "data": {
+    "posts": [
+      {
+        "urn": {
+          "activity_urn": "7396801721336889344",
+          "share_urn": "7396801720124735488",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7396801721336889344",
+        "posted_at": {
+          "date": "2025-11-19 07:49:16",
+          "relative": "1 month ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1763534956297
+        },
+        "text": "If your AI workflows break the moment your team depends on them, the problem is not the tool.\n\nIt is the architecture behind it.\n\nI have seen this happen inside teams again and again:\n\nAutomations work in testing\nThey fail during real usage\nThey break under compliance\nThey stall when multiple departments adopt them\n\nAnd suddenly the internal narrative becomes:\n“AI is unreliable.”\n\nBut that’s not the real issue.\n\nThe truth is simple:\nAI pilots do not scale because the architecture was not designed for the maturity level of the problem.\n\nHere are the symptoms your org is outgrowing its current setup:\n\n• Workflows keep failing under load\n• Agents lose context or give inconsistent answers\n• Data cannot leave your environment but the model needs context\n• No clear audit trail of agent decisions\n• Teams keep “fixing” the agent manually\n• Compliance blocks external tools\n• No structure for corrections or feedback\n\nEvery one of these is fixable —\nbut only when the system is designed for where your org is today, not where the tool promises you can be.\n\nThis is the lens I use when I architect AI systems for clients:\n\nexplore → operationalise → secure → scale\n\nDifferent stages.\nDifferent needs.\nDifferent architecture.\n\nAnd before I touch any workflow, I run one simple diagnostic:\na 12-point reliability scan across KPIs, data readiness, failure scenarios, cost control, monitoring, and compliance.\n(Most teams fail at least 4 of these before the pilot even starts.)\n\nIf you want to run the same scan internally, comment CHECKLIST and I’ll share the 12-point GenAI Pilot Success Checklist I use before architecting any AI workflow.\n\nSo let me ask you directly:\n\nWhat’s the biggest reliability, compliance, or adoption friction you’re facing in your AI workflows right now?\n\nDrop it in the comments. I’ll respond with the exact next step you should take based on your current maturity stage.",
+        "url": "https://www.linkedin.com/posts/pavan34_if-your-ai-workflows-break-the-moment-your-activity-7396801721336889344-obbw?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7396083269810847744",
+          "share_urn": "7396083266975469569",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7396083269810847744",
+        "posted_at": {
+          "date": "2025-11-17 08:14:24",
+          "relative": "1 month ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1763363664105
+        },
+        "text": "Tools Don’t Drive AI Transformation.... but \n\nMaturity Does.\n\nA question I hear from mid market teams all the time is:\n“Should we start with low code or go straight to advanced agent frameworks”\n\nIt sounds like a tooling decision, but it is actually a maturity decision.\n\nIf the organisation is not clear on what problem is worth solving, no tool will deliver impact.\n\nIf the organisation depends on AI for daily operations, simple workflows will not survive the load.\n\nAnd if the organisation handles sensitive data, the architecture has to be designed for compliance from the very first step.\n\nA recent project made this very clear.\n\nI built a HIPAA compliant inbox manager for an insurance benefits consultant  that triaged 200+ daily emails, extracts and answers policy details, and routes cases to corresponding carriers.\n\nOne requirement was non negotiable from day one.\n\nNo protected health information could ever be sent to an LLM in raw form.\n\nEverything names, policy details, claim data needed redaction before reaching the model provider.\n\nNothing sensitive could appear in logs or external traces.\n\nWith that boundary set from the start, low code alone wasn’t enough.\nWe needed speed for orchestration and precision for security.\nSo I began with a hybrid stack.\n\nn8n managed the operational flow\n\n➜Email intake, encryption, retries, alerts, and updates to internal tools.\n➜Flexible, visible, and easy for the team to work with.\n\nLangGraph handled the intelligence and compliance layer.\n➜n8n passed a structured payload to a secure API.\n➜Sensitive fields were redacted inside the client environment, bundle was sent to the model, and the result was validated and returned with strict structure checks.\n\nWe didn’t evolve into this architecture.\n\nWe started with it, because their maturity demanded it.\n\nSame business outcome.\n\nCompletely different foundation.\n\nCompanies don’t choose tools. They choose outcomes.\n\nAnd the maturity of the problem determines whether you need simple automation or a controlled intelligence layer built for reliability, structure, and compliance.\n\nSo when teams ask me about LangGraph vs n8n, I ask them a different question:\nWhere are you today?\n\nBecause the right tool isn't the one with the best features.\nIt’s the one that matches where you are now and can grow with you in the next stage.\n\nDrop a comment with your biggest AI implementation challenge and I’ll share specific guidance for your situation.",
+        "url": "https://www.linkedin.com/posts/pavan34_tools-dont-drive-ai-transformation-but-activity-7396083269810847744-jUmu?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 1,
+          "support": 0,
+          "love": 1,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 1,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7394746968985600000",
+          "share_urn": "7394746966229913600",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7394746968985600000",
+        "posted_at": {
+          "date": "2025-11-13 15:44:25",
+          "relative": "1 month ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1763045065161
+        },
+        "text": "Every failed AI agent sends a warning before it dies.\n\nMost teams never recognize it.\n\nAnd it never happens on Day 1.\n\nIt happens around Day 30, when the excitement fades and reality hits.\n\nThis is the point where external AI vendors stop being useful and internal teams stop knowing what to do next. Not because they lack technical skill.\n\nBut because they never validated the parts of the system that actually determine whether an agent survives real users.\n\nWhenever I talk about why AI agents collapse after deployment even when the logic is solid, I notice the same pattern.\n\n➜ People understand the concept.\n➜ They agree with the philosophy.\n➜ But they always ask one question:\n\n“Okay… what exactly should I check before launching an agent?”\n\nAnd that question matters.\n\nBecause you don’t fix Day 30 failures on Day 30.\n\nYou prevent them on Day 0.\n\nHere are the core foundations I use drawn directly from my GenAI Success Checklist  before touching n8n or LangGraph:\n\nThe Core 4 AI Agent Validation Checks\nThese four checkpoints decide whether your agent becomes a reliable system or a forgotten automation.\n1. Bottleneck Clarity- Is the agent solving the real operational friction, not just the visible task?\n2. Correction Pathway- Can users challenge the AI easily when it misinterprets context?\n3. Decision Visibility- Are the agent’s decisions explainable enough for people to trust them?\n4. Adoption Target- Is “success” defined in a way that can actually be measured after launch?\n\nThese aren’t theoretical ideas. They’re the exact steps that protect me from the early mistakes I made, agents that “ran perfectly” but quietly died because:\n• Nobody could correct them\n• Nobody understood their reasoning\n• Nobody knew if they were helping\n• Nobody owned the system after launch\n\nWhen these foundations are in place, the agent not only just execute but also evolves and stays relevant.\n\nIf you’ve ever built a workflow that technically worked but didn’t survive real usage, this is almost always where the cracks started.",
+        "url": "https://www.linkedin.com/posts/pavan34_every-failed-ai-agent-sends-a-warning-before-activity-7394746968985600000-TxyW?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 1,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7392089189414150145",
+          "share_urn": "7392083771748954113",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7392089189414150145",
+        "posted_at": {
+          "date": "2025-11-06 07:43:21",
+          "relative": "1 month ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1762411401132
+        },
+        "text": "The biggest reason AI pilots never scale isn’t accuracy.\n\nIt’s invisible reasoning.\n\nI see it all the time, teams build great systems that nobody uses.\n\n➜ The workflow runs.\n➜ The data flows.\n➜ The model performs.\n\nBut adoption stalls.\n\nWhy?\n\nBecause people cannot see how the AI reached its conclusion.\n\nSo they keep verifying, correcting, and redoing the work manually.\n\nEvery system I deploy fixes this upfront. I build transparency directly into the prompting layer.\n\nThe AI explains its reasoning, confidence, and key factors behind every decision.\n\nExample:\n❌ Before ➜ Lead Score: 78\n✅ After ➜ Lead Score: 78\n Reasoning:\n • Company size: Strong match\n • Industry fit: High relevance\n • Decision role: Confirmed authority\nConfidence: 0.84\n\nThe moment users see the logic, trust changes.\n\nThey stop treating AI as a black box and start collaborating with it.\n\nThat’s the T in my adoption framework : Transparency in reasoning.\n\nIt’s the first pillar of my TRUST Framework, designed to ensure AI systems are actually used, not just built.\n\nThe TRUST Framework expands on checkpoint #6 of my GenAI Pilot Success Checklist, which includes all 12 critical steps that take AI pilots from proof-of-concept to production-ready.\n\nYou can get the full checklist here 👇\n\n 👉 https://lnkd.in/dcyuPXye\n\nAnd if adoption is where your projects stall, explore the TRUST layer,  it’s where 68% pilots quietly fail long before scaling.",
+        "url": "https://www.linkedin.com/posts/pavan34_the-12-checkpoints-that-separate-winning-activity-7392089189414150145-ji5l?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 1,
+          "reposts": 0
+        },
+        "article": {
+          "url": "https://innovize-ai.kit.com/genai-success-checklist",
+          "title": "The 12 Checkpoints That Separate Winning AI Projects from Stalled Projects",
+          "subtitle": "innovize-ai.kit.com"
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7391005383932149760",
+          "share_urn": "7391005383105949696",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7391005383932149760",
+        "posted_at": {
+          "date": "2025-11-03 07:56:41",
+          "relative": "1 month ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1762153001769
+        },
+        "text": "My first AI Pilot in a regulated industry felt like a $50K Lesson (And you might feel too)\n\nso, i spent 3 weeks on HIPAA compliance, encryption protocols, and data governance.\n\nBuilt encryption pipelines, implemented PII redaction for LLMs and also set up secure data pipelines in cloud.\n\nEven asked the client : \"Please share different variations of emails you receive.\"\n\nThey shared 6-7 examples and we built the system around them and similar variations\n\nHere's what actually wasted the time\n\nThe Real Problem:\n\nWhile perfecting the security frameworks, completely missed the chaotic nature of the actual data.\nSpent weeks encrypting and redacting. Never spent a day auditing what that data actually looked like in the real.\n\nWhat they shared: clean, standalone emails with clear questions and answers\n\nWhat actual data looked like.\n\n➜ Emails with inconsistent formatting\n➜ one word replies (often skipped by LLM's)\n➜ \"Re: Re: Re: FW: URGENT\" subject lines\n➜ \"As I mentioned in my previous email...\" (which email? there are 47 in this thread)\n➜ Attachments with the real data (that we weren't even parsing)\n\nThe result: \n➜ Accuracy dropped after deployment\n➜ Had to pause and manually extract and audit the data\n\nThe Uncomfortable Truth:\n\nYour client doesn't know how messy their data is.\n\nThey shared \"clean examples\" because that's what felt professional.\n\nThe reality? Their data is chaotic, context-dependent, and full of human workarounds.\n\nThey are not hiding anything, they've just gone \"data blind\" from working with it daily. They know how to navigate the chaos. The AI doesn't.\n\nThe Real Lesson: \n\n➜ Perfect compliance on unaudited data = expensive failure.\n➜ Governance built on deep data understanding = real ROI.\n\nBefore your next AI pilot ask: Have I personally audited 100+ random real records?\n\nNot curated examples your client shared. raw, unfiltered data from their actual system.\n\nWhether it's emails, invoices, support tickets, medical records, or contracts,  the sample you see determines the system you build.\n\nDesigning based on their \"typical examples\"? You're designing for a fantasy.\n\nP.S.: Week 1 now starts with manual data audits, not compliance frameworks. Boring? Yes. But so is explaining why your AI failed later.",
+        "url": "https://www.linkedin.com/posts/pavan34_my-first-ai-pilot-in-a-regulated-industry-activity-7391005383932149760-HA-s?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 7,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7389655913533468672",
+          "share_urn": "7389655910811447296",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7389655913533468672",
+        "posted_at": {
+          "date": "2025-10-30 14:34:22",
+          "relative": "1 month ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1761831262954
+        },
+        "text": "You can now build an AI agent in 20 minutes. \nBut can you prove it's actually working in 20 days?\n\nThat's the question nobody's asking. \nThe visual Ai builders just made the impossible routine. Drag, connect, deploy. No code. No friction. \n\n➜ By next week your teams can ship many agents.\n➜ By month one you may have ten in production.\n➜ By month three you may not know which ones matter.\n\nThe build was easy. Proving impact is the hard part.\nI have reviewed many pilots after wiring systems with LangGraph and n8n. The pattern is consistent.\n\nWeek 1. A slick workflow. Everyone is excited.\nWeek 4. It runs, But nobody can answer \"Is it actually saving time? Improving accuracy? Justifying the cost?\"\nWeek 12. It is abandoned or running in the background, consuming budget with no clear outcome.\n\nThis is not a technical problem. It is a clarity problem.\n\nHere is 5% of teams decide before they build.\n➜ Define success in numbers. Not make it faster - Say reduce processing time from 4 hours to 45 minutes.\n➜ Capture the baseline first. You cannot prove change without a before.\n➜ Design human review inside the flow. Automation without validation leads to quiet failures.\n➜ Add monitoring from day one. Weekly metrics, not quarterly post mortems.\n\nThis is the shift from agent building to AI transformation.\n➜ Policies, data quality, and measurement are part of the build.\n➜ People and change are part of the plan.\n\nThe teams winning right now aren't the fastest. They're the ones who spent 2 weeks defining success, cleaning data, and setting expectations, then built in 20 minutes with confidence.\n\nBefore you open any visual AI tool tomorrow, ask yourself this:\n\n➜Can I define what success looks like? \n➜Can I measure it weekly? \n➜Can I defend it to my CFO in 30 days?\n\nIf yes, build fast and deploy confidently later.\n\nIf no, the 20 minutes you save building will cost you 20 weeks explaining why it didn't matter.\n\nThe speed is a feature now.\n\nThe discipline is the competitive advantage.\n\nAs an AI transformation partner I lead with readiness, baselines, review loops, and monitoring. Then we build.\n\nIf you want the pilot checklist I use to make results measurable, it is in my Featured section.",
+        "url": "https://www.linkedin.com/posts/pavan34_you-can-now-build-an-ai-agent-in-20-minutes-activity-7389655913533468672-yEVS?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7388826354219298816",
+          "share_urn": "7388825248315510784",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7388826354219298816",
+        "posted_at": {
+          "date": "2025-10-28 07:38:00",
+          "relative": "1 month ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1761633480601
+        },
+        "text": "We reduced ai tokens by 25% in our multi-agent system. Here's the business case that changed how we think about technology decisions.\n\nThe Problem:\nWe needed to extract data from thousands of PDFs monthly and process with additional multi agents.\n\nThe obvious solution? \nBuild an AI-powered extraction pipeline for the first part\n\nInstead, I took a step back and asked a simple question: \"What data structures already exist?\"\n\nTurned out a system that already emits clean JSON already exists to generate those PDF's\n\nWe were literally about to use AI to re-extract data that was already perfectly structured\nbut decided to create another API endpoint with required fields for additional agents\n\nThe Business Impact:\n➜ Deterministic results – 100% accurate structured data vs. 95-98% with AI extraction\n➜ Zero hallucination risk – No AI interpretation errors corrupting input for downstream agents\n➜ Faster response – Eliminated extraction latency entirely\n➜ Reduced complexity – Avoided weeks of prompt engineering handling edge cases.\n➜ 25% token reduction – Eliminated an entire AI layer from our inference costs\n\nThe lesson? AI is powerful, but it's not always the answer.\n\nThe core principle i use\n\nDon't stack AI on top of AI when deterministic solutions exist.\n Every AI layer adds: \n➜ Uncertainty \n➜ Latency \n➜ Cost \n➜ Debugging complexity\n\nThis is what proper AI transformation looks like.\n\nIt's not about using AI everywhere. it's about using it strategically where it creates real value.\n\nIn our case, using JSON for the AI agent instead of AI-extracted data made everything simpler, faster, and more reliable. \n\nThe best AI architecture eliminates unnecessary AI.\n\nSave this post, you’ll want to revisit it.\n\nWhat's your approach? How do you decide when to use AI vs. deterministic solutions in your pipelines?",
+        "url": "https://www.linkedin.com/posts/pavan34_we-reduced-ai-tokens-by-25-in-our-multi-agent-activity-7388826354219298816-tT04?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 7,
+          "like": 4,
+          "support": 2,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 1,
+          "funny": 0,
+          "comments": 1,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7387155309712031745",
+          "share_urn": "7387155306981695488",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7387155309712031745",
+        "posted_at": {
+          "date": "2025-10-23 17:57:52",
+          "relative": "1 month ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1761235072544
+        },
+        "text": "Most founders ask: 'Can you build this with AI?' and get 0% ROI. \nThe top 5% ask: 'Should we build it and what does success look like?' and see 3-5x returns in 90 days.\n\nI’ve seen it too often, teams watch tutorials, build quick automations on own or hire a developer... \nbut stop short of real transformation.\n\nThat single shift  from what to build → to why it matters separates automation from transformation.\n\nWhen I started as a technical founder, I focused on building things that worked: from chatbots, document processors, automations and everything i can imagine building..\n\nThey looked great in demos… but the real question was:\n\n\"Did they make the business better?\"\n Answer → \"No\"\n\nThe reason?\n\nThey were projects not transformations.\nProjects chase outputs:\n→ “Let’s build a chatbot.”\n→ “Let’s automate this form.”\n →“Let’s summarize our data.”\n\nBut transformation chase outcomes:\n\n→“Let’s redesign your process to save 80% of manual work.”\n→“Let’s turn your data into faster decisions.”\n→“Let’s build systems your team actually adopts.”\n\nThat’s when I shifted from building AI tools → to building AI transformation systems.\n\nEvery engagement I lead now runs through 3 Stages, split into 4 Phases with 12 measurable checkpoints:\n✅ Stage 1: Readiness Audit – align processes, data, and goals before building\n ✅ Stage 2: Workflow Design – create measurable checkpoints, not assumptions\n ✅ Stage 3: Adoption Tracking – measure time saved, cost reduced, and trust built\n\nThat’s how we move from “AI saved a few hours” → to “AI transformed how our business operates.”\n\nWhether your team is small or non-technical, an AI Transformation Partner helps you go from: Implementing tools → to redesigning how your business runs with AI.\n\nI’m curious, how are you approaching AI internally: as a project, or as a transformation?",
+        "url": "https://www.linkedin.com/posts/pavan34_most-founders-ask-can-you-build-this-with-activity-7387155309712031745-mMUz?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 2,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7384941261377675264",
+          "share_urn": "7384941259586453504",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7384941261377675264",
+        "posted_at": {
+          "date": "2025-10-17 15:20:02",
+          "relative": "2 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1760707202286
+        },
+        "text": "I fixed the #1 reason AI agents fail in production using a 12-checkpoint validation system\n\nMy feed is flooded with AI agent tutorials and n8n automations\n\"How to automate this.\" \"How to build that agent.\"\n\nBut here's where I do things differently\nI don't chase AI systems that look impressive.\nI build ones that can last.\n\nBecause success isn't about what you automate or which AI agent you deploy\n\nIt's about whether people keep using it once it's live.\n\nUsable. Reliable. Adopted. \nThat's my real definition of AI workflow success.\n\nAfter wiring dozens of AI agents with n8n,and LangGraph, I've seen stunning autonomous systems fail quietly in production.\n\nNot because of bad logic but because there was no validation, no ownership, no iteration.\n\nHere's what I keep seeing 👇\n🔹 AI agents launched and forgotten\n🔹 No feedback from users on agent outputs\n🔹 No improvement when data or process changes\n🔹 Agents operating in black boxes with zero transparency\n\nResult? Impressive demos. Zero adoption.\n\nTools like n8n, Agent Builder, and LangGraph made creation effortless. \n\nThe real opportunity now? \n\nBuilding AI systems that evolve, not just execute.\n\nAI agents should be treated like products:\n\n✅ Validated by users before scaling\n✅ Improved through feedback on decisions\n✅ Measured for real outcomes, not just completion rates\n\nBefore I build any AI agent or workflow, I run my \"Pipeline of Proof\":\n\n1️⃣ Define the bottleneck — what's truly slowing people down that AI can solve?\n2️⃣ Design feedback loops — how will users share what the agent got right or wrong?\n3️⃣ Create validation points — where does human review fit in the agent's workflow?\n4️⃣ Commit adoption target — how you will measure adoption and wire the analytics before the first deploy\n\nEveryone's building AI agents and workflows.\n\nBut the real edge is building ones that survive real users.\n\n💬 What's one AI agent or automation you've built that no one ended up using and why do you think that happened?",
+        "url": "https://www.linkedin.com/posts/pavan34_i-fixed-the-1-reason-ai-agents-fail-in-production-activity-7384941261377675264-P5pf?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 2,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 8,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7383869742677299201",
+          "share_urn": "7383869741968392193",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7383869742677299201",
+        "posted_at": {
+          "date": "2025-10-14 16:22:12",
+          "relative": "2 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1760451732320
+        },
+        "text": "No code. No backend chaos. Instant gratification. this was the feeling \n\nWhen OpenAI released Agent Builder, everyone rushed to create drag-and-drop agents.\n\nA week later, most of those agents might already are sitting unused.\n\nMeasurable. Reliable. Adopted.\nThat’s what separates working agents from winning systems.\n\nI’ve spent months wiring agents manually with LangGraph and n8n\nbreaking things, fixing them, and learning what actually makes agentic workflows succeed after deployment.\n\nHere’s the uncomfortable truth:\n\nMost AI pilots fail quietly because of these.\n\nNo KPIs.\nNo validation checkpoints.\nNo monitoring loop.\n\nAgent Builders made building effortless.\n\nNow the opportunity is to make evaluation effortless too.\n\nHere’s how I evaluate every agent Ai project now:\n1️⃣ Time Saved — measurable reduction in manual hours\n2️⃣ Accuracy Lift — better quality or decision confidence\n3️⃣ Adoption Rate — % of workflows that actually use it\n4️⃣ Confidence Score — how often humans trust its output\n\nThat simple shift turned “cool demos” into validated ROI.\n\nOnce we started tracking these metrics, All we changed was what we measured.\n\nThat insight became the foundation of my GenAI Success Checklist —\n12 critical checkpoints that separate winning AI projects from expensive failures.\n\nIt’s available in my Featured section for anyone building agentic systems and wants a reference checklist for tracking real ROI.\n\nIt’s what I now use before every pilot, to align teams and track impact.\n\nThe next advantage belongs to the teams who measure what matters \n\nFollow me for more insights on moving AI pilots to production without the hype.",
+        "url": "https://www.linkedin.com/posts/pavan34_no-code-no-backend-chaos-instant-gratification-activity-7383869742677299201-85b2?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 3,
+          "like": 3,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 1,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7382318076777627648",
+          "share_urn": "7382295772710526976",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7382318076777627648",
+        "posted_at": {
+          "date": "2025-10-10 09:36:26",
+          "relative": "2 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1760081786341
+        },
+        "text": "The AI worked perfectly. The rollout didn’t.\n\nI saw it happen last week. \n\nNot because the AI doesn’t work. It was the 12 checkpoints they skipped.\n\nHere’s the pattern I keep seeing👇 \n\n • Teams keep changing and tweaking the prompts. \n\n • They're switching AI models for better accuracy.\n\nwait for the next iteration to \"finally\" make it work. \n\nBut, it's not the model, nor the prompts, it has been the on structure around it.\n\nWhat actually works: \n\nBefore you start:\n\n • Identify one measurable process. \n\n • define what success looks like in numbers (reduction in time, cost reduction savings based on process, defendable rate of acceptable error). \n\n • Design a proper human-in-the-loop workflow to provide validation, and provide guidance to AI.\n\nAfter you launch:\n\n • Measure and follow business outcomes, not just \"AI accuracy\"\n\n • Plan on iteration- not model hopping\n\n • Connect outputs to real decisions people have already made.\n\nThe projects that seem to be the strongest are not the projects with the best prompts or better models.\n\nThey are built on clear metrics, consistent review, and a repeatable process\n\nIt is about developing systems that will keep getting better\n\nIf you are planning your AI pilot or scaling one, i built a simple 12-point checklist and actions that can help identify what is missing. Grab it from my profile. \n\nWhich of these do you see teams skipping most?\n\n👉 Follow me here for more practical insights and real use cases of AI agents in business — without the hype.",
+        "url": "https://www.linkedin.com/posts/pavan34_the-ai-worked-perfectly-the-rollout-didn-activity-7382318076777627648-6tq9?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7379145643002527744",
+          "share_urn": "7379051333112283137",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7379145643002527744",
+        "posted_at": {
+          "date": "2025-10-01 15:30:19",
+          "relative": "2 months ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1759325419188
+        },
+        "text": "News says AI bubble. I say it's a reset.\n\nLeaders everywhere are asking if the AI bubble will pop.\n\nBudgets feel risky. Pilots stall. Teams are unsure where to start.\n\nBut here's the truth: This is not about picking the perfect tool or model.\n\n𝘐𝘵'𝘴 𝘢𝘣𝘰𝘶𝘵 𝘧𝘪𝘹𝘪𝘯𝘨 𝘰𝘯𝘦 𝘤𝘰𝘴𝘵𝘭𝘺 𝘸𝘰𝘳𝘬𝘧𝘭𝘰𝘸 𝘸𝘪𝘵𝘩 𝘤𝘭𝘦𝘢𝘳 𝘱𝘢𝘺𝘣𝘢𝘤𝘬 𝘪𝘯 𝘮𝘰𝘯𝘵𝘩𝘴.\n\nMost stalled efforts skip the basics:\n 1. No shared definition of success\n 2. Data is available but not usable\n 3. No reviewer where judgment matters\n 4. Results are not tracked week to week\n\nHow to fix it:\n\n 1. Pick 𝗼𝗻𝗲 measurable process.\n 2. Write 𝘁𝗵𝗿𝗲𝗲 numbers before you begin: time saved, error rate, cost per case.\n 3. Keep a 𝗿𝗲𝘃𝗶𝗲𝘄𝗲𝗿 only for edge cases.\n 4. Meet 𝘄𝗲𝗲𝗸𝗹𝘆 to review outcomes and adjust.\n\nWhat experienced teams are doing instead:\n 1. They 𝘀𝘁𝗮𝗿𝘁 with one high-friction workflow, not a big AI rollout.\n 2. They 𝗱𝗲𝗳𝗶𝗻𝗲 success with 3 KPIs before writing a single prompt.\n 3. They 𝗱𝗲𝘀𝗶𝗴𝗻 for human review, not perfection.\n 4. They 𝘁𝗿𝗮𝗰𝗸 real outcomes weekly, not just usage metrics.\n 5. They 𝗯𝘂𝗱𝗴𝗲𝘁 for iteration, not a one-time build.\n 6. They 𝗮𝗹𝗶𝗴𝗻 AI output to existing decisions, not dashboards that go unused.\n\nThese are the habits of teams that are seeing results — even in a noisy market.\n\nThey aren't chasing AI.\n\n𝗧𝗵𝗲𝘆'𝗿𝗲 𝗳𝗶𝘅𝗶𝗻𝗴 𝗽𝗿𝗼𝗯𝗹𝗲𝗺𝘀.\n\n𝗤𝘂𝗶𝗲𝘁𝗹𝘆. 𝗖𝗼𝗻𝘀𝗶𝘀𝘁𝗲𝗻𝘁𝗹𝘆.\n\nThis isn't about the bubble bursting.\n\nIt's about AI growing up — and teams learning to use it with discipline.\n\nI've created a free 𝗚𝗲𝗻𝗔𝗜 𝗣𝗶𝗹𝗼𝘁 𝗦𝘂𝗰𝗰𝗲𝘀𝘀 𝗖𝗵𝗲𝗰𝗸𝗹𝗶𝘀𝘁 that helps you assess if your next AI project will succeed or stall.\n\nWant it?\nComment \"PILOT\" Below",
+        "url": "https://www.linkedin.com/posts/pavan34_news-says-ai-bubble-i-say-its-a-reset-activity-7379145643002527744-2xq5?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "media": {
+          "type": "image",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQHXoMVDSViaSQ/feedshare-shrink_2048_1536/B4DZmeoEheJEAw-/0/1759302933047?e=1767830400&v=beta&t=msCKMXDYfewtsqSEk6whkpqklgPLPh5Pgja-r9SrXUI",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQHXoMVDSViaSQ/feedshare-shrink_2048_1536/B4DZmeoEheJEAw-/0/1759302933047?e=1767830400&v=beta&t=msCKMXDYfewtsqSEk6whkpqklgPLPh5Pgja-r9SrXUI",
+              "width": 1482,
+              "height": 1536
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7377212854120316928",
+          "share_urn": null,
+          "ugcPost_urn": "7377004368455258112"
+        },
+        "full_urn": "urn:li:ugcPost:7377004368455258112",
+        "posted_at": {
+          "date": "2025-09-26 07:30:06",
+          "relative": "2 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1758864606409
+        },
+        "text": "“I can’t fully trust AI yet. What if it makes a mistake?”\n\nThat’s the fear I hear most often.\n\nHere’s the truth:\n\nAutomation ≠ replacement.\n\nThe real win is when AI + human oversight work together.\n\nTake this case:\n\nA reviewer used to spend 4 hours checking documents.\n\nNow the AI handles 90% of the work, and the reviewer spends just 30 minutes validating edge cases.\n\n 1. Faster turnaround\n 2. Quality intact\n 3. Confidence to scale\n\nSo why do so many teams still stall at 95% accuracy?\n\nBecause they’re chasing perfection instead of production.\n\nThey believe they need 99.9% accuracy before going live.\n\nBut that last 5%?\n\nEdge cases, unusual inputs, and context only humans can understand will always exist.\n\nAnd while they wait for “perfect AI,” their teams are stuck doing 100% manual work.\n\nThe solution isn’t more training data or bigger models.\n\n𝙄𝙩’𝙨 𝙙𝙚𝙨𝙞𝙜𝙣𝙞𝙣𝙜 𝙛𝙤𝙧 𝙝𝙪𝙢𝙖𝙣 𝙟𝙪𝙙𝙜𝙢𝙚𝙣𝙩 𝙛𝙧𝙤𝙢 𝙙𝙖𝙮 𝙤𝙣𝙚.\n\nThat’s what Human-in-the-Loop is about:\n\n 1. AI handles the 80–90% it’s great at\n 2. Reviewers step in for the remaining 10–20% that requires creativity, or critical thinking\n\nReal World Examples:\n\n 1. CSV reporting: 4 hrs → 40 mins (AI generates pivots + charts, reviews only reviewer checks summaries)\n 2. Insurance inbox: 100% manual → 90% auto-classified and suggest drafts from business knowledge (only 10% escalated to reviewer to review drafts)\n\nReviewers now become quality experts, not bottlenecks.\n\nThe system ships faster, scales better, and keeps trust high\nbecause humans are still at the wheel.\n\nThe moment you stop chasing perfect AI and start adding humans where needed, you unlock real business value.\n\n𝗜𝗳 𝘆𝗼𝘂 𝗹𝗲𝗮𝗱 𝗼𝗽𝘀, 𝘄𝗵𝗲𝗿𝗲 𝘄𝗼𝘂𝗹𝗱 𝘆𝗼𝘂 𝗮𝗱𝗱 𝗮 𝗵𝘂𝗺𝗮𝗻 𝗿𝗲𝘃𝗶𝗲𝘄 𝘀𝘁𝗲𝗽?\n\n👉 Follow me here for more practical insights and real use cases of AI agents in business — without the hype.\n\nPS: I’ve built a HITL Workflow Designer Template that maps decision points, review interfaces, and performance metrics. It shows exactly how to design these review loops so adoption doesn’t stall at “almost there.",
+        "url": "https://www.linkedin.com/posts/pavan34_crtical-steps-ai-pilots-to-production-activity-7377212854120316928-imlc?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 2,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "document": {
+          "title": "Crtical Steps- AI Pilots to production",
+          "page_count": 6,
+          "url": "https://media.licdn.com/dms/document/media/v2/D4D1FAQFiEcHwuzTi1g/feedshare-document-chunked-pdf/B4DZmBiB7JJgBo-/0/1758814807730?e=1767009600&v=beta&t=waitQIaqKO3gvNxhyPCrPQ7Fustfm8Q79VpHLUh9rxM",
+          "thumbnail": "https://media.licdn.com/dms/image/v2/D4D1FAQFiEcHwuzTi1g/feedshare-document-cover-images_1920/B4DZmBiB7JJgAw-/0/1758814807816?e=1767009600&v=beta&t=NTg6hsusIgQpGZvrnZyVb3Z2vUDuXaUYZzQcTL5Oidk"
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7376246511787094016",
+          "share_urn": null,
+          "ugcPost_urn": "7376135109915287552"
+        },
+        "full_urn": "urn:li:ugcPost:7376135109915287552",
+        "posted_at": {
+          "date": "2025-09-23 15:30:12",
+          "relative": "2 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1758634212443
+        },
+        "text": "Still spending ~10 hrs a week entering invoices into Excel\n\n👉86% of small and medium-sized businesses manually enter invoice data, increasing inefficiencies and error risk\n\nFinance teams, operations, procurement, even SMB founders feel this pain every day- and it adds up fast\n\nImagine: \n 1. 200 invoices × 10 minutes each = ~33 hours/month just for entering data.\n 2. Add in error correction: manual processes have ~39% of invoices with mistakes\n\nThe routine is the same:\n 1. Download invoices from emails\n 2. Open PDFs one by one\n 3. Type in vendor names, dates, totals, and line items\n 4. Double-check for errors\n 5. Spend entire afternoons just to keep records clean\n\nWhat slows you down is:\n\n 1. inconsistent formats (PDF, scan, email)\n 2. no system structured to auto-extract & store data\n 3. endless checks & corrections\n\nThe deeper cause? Invoices arrive in every possible format and your systems aren’t built to handle that variety\n\nIn the below demo you’ll see:\n\n𝘜𝘱𝘭𝘰𝘢𝘥 𝘢𝘯 𝘪𝘯𝘷𝘰𝘪𝘤𝘦 → 𝘥𝘦𝘵𝘢𝘪𝘭𝘴 𝘢𝘳𝘦 𝘢𝘶𝘵𝘰-𝘦𝘹𝘵𝘳𝘢𝘤𝘵𝘦𝘥 → 𝘴𝘵𝘳𝘶𝘤𝘵𝘶𝘳𝘦𝘥 𝘢𝘯𝘥 𝘴𝘵𝘰𝘳𝘦𝘥 𝘪𝘯 𝘚𝘶𝘱𝘢𝘣𝘢𝘴𝘦 → 𝘳𝘦𝘢𝘥𝘺 𝘧𝘰𝘳 𝘥𝘢𝘴𝘩𝘣𝘰𝘢𝘳𝘥𝘴, 𝘌𝘙𝘗, 𝘰𝘳 𝘳𝘦𝘤𝘰𝘯𝘤𝘪𝘭𝘪𝘢𝘵𝘪𝘰𝘯.\n\nNo more manual entry. No more copy-paste.\n\nAnd this is just the start.\n\n From here, the system can:\n\n✨Auto-fetch invoices from inboxes\n✨Reconcile with accounting software in real-time\n✨Flag duplicates or compliance mismatches\n✨Generate payment-ready reports\n\nIf your team spends time with invoices, contracts, or purchase orders, this kind of agent could change your week.\n\n👉Follow me here for more practical insights and real use cases of AI agents in business — without the hype.",
+        "url": "https://www.linkedin.com/posts/pavan34_still-spending-10-hrs-a-week-entering-invoices-activity-7376246511787094016-Ky5f?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 2,
+          "reposts": 0
+        },
+        "media": {
+          "type": "video",
+          "url": "https://dms.licdn.com/playlist/vid/v2/D5605AQECJmiVvT5pyQ/mp4-720p-30fp-crf28/B56Zl1LzNgJoBk-/0/1758607689139?e=1767009600&v=beta&t=3fegYr4IcUW-tv9lmv7F5TK0vOml6Uz8t30sEogPSFw",
+          "thumbnail": "https://media.licdn.com/dms/image/v2/D5605AQECJmiVvT5pyQ/videocover-high/B56Zl1LzNgJoB8-/0/1758607665199?e=1767009600&v=beta&t=gygC76XF1CfKfnzFJYLOV0njDSjqygpbYBROUFa7mxU"
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7374011844811804672",
+          "share_urn": null,
+          "ugcPost_urn": "7373977604841893890"
+        },
+        "full_urn": "urn:li:ugcPost:7373977604841893890",
+        "posted_at": {
+          "date": "2025-09-17 11:30:26",
+          "relative": "3 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1758101426318
+        },
+        "text": "Why 95% of GenAI pilots fail(part-3) — No continuous improvement.\n\nI often hear this from clients: \n\n\"𝘐𝘴𝘯'𝘵 𝘈𝘐 𝘢 𝘰𝘯𝘦-𝘵𝘪𝘮𝘦 𝘣𝘶𝘪𝘭𝘥? 𝘞𝘦 𝘫𝘶𝘴𝘵 𝘥𝘦𝘱𝘭𝘰𝘺 𝘢𝘯𝘥 𝘪𝘵 𝘳𝘶𝘯𝘴, 𝘳𝘪𝘨𝘩𝘵?\"\n\nThis mindset is exactly why most pilots stall.\n\nAI isn't like traditional software. Traditional software is predictable—same input, same output, every time. But AI?\n\nIt can work flawlessly 10 times, then mysteriously fail on the 11th with identical inputs.\n\nPlus:\n 1. Success metrics evolve as you scale\n 2. New use cases emerge from early wins\n 3. Cost optimization opportunities appear\n 4. Stakeholder requirements expand\n\nWithout ongoing measurement and tuning, yesterday's \"great result\" quietly becomes tomorrow's underperforming system.\n\nHere's what can happen:\n\nYou build an inbox manager.\n\n 1. It cuts email response time by 80%.\n 2. Week 3 : customer inquiry patterns shift.\n 3. The AI starts misclassifying urgent requests as routine.\n\nWithout monitoring, that win disappears.\n\nThis is why we use our VPS framework:\n\n 1. Visibility — Dashboards show when tasks fail or costs rise\n 2. Performance — We track completion, accuracy, and cost per outcome\n 3. Scale — We phase in changes safely without breaking what works\n\nWith proper monitoring, systems stay accurate, cost-effective, and scalable — months after launch.\n\n💡 Here's the truth: AI is not a one-time cost. It's a compounding investment. Each iteration compounds ROI: fewer errors, faster delivery, better margins.\n\nSo before you invest in AI, ask yourself 👉 Do we have a plan for monitoring, improving, and scaling beyond the pilot?\n\nBecause AI that's \"set and done\" … is usually set and dead.\n\nComment \"VPS\" and I'll send you the workbook.\n\n#AI #ContinuousImprovement #BusinessOutcomes #Automation #GenAI",
+        "url": "https://www.linkedin.com/posts/pavan34_3-critical-steps-to-take-ai-from-pilot-to-activity-7374011844811804672-kTHy?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 3,
+          "like": 3,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "document": {
+          "title": "3 Critical Steps to Take AI from Pilot to Production",
+          "page_count": 5,
+          "url": "https://media.licdn.com/dms/document/media/v2/D4D1FAQEWyC-EnjQDfA/feedshare-document-url-metadata-scrapper-pdf/B4DZlWhTT_IcA0-/0/1758093196224?e=1767009600&v=beta&t=StE8aqfE4thbJbU82M9suSIbNv51fRl5MbGmqwr7cO0",
+          "thumbnail": "https://media.licdn.com/dms/image/v2/D4D1FAQEWyC-EnjQDfA/feedshare-document-cover-images_1920/B4DZlWhTT_IcAw-/0/1758093196604?e=1767009600&v=beta&t=-UGaVQazHdJmkWT3kut5yas_AzFaTpuHKaeU0jkBmKU"
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7371112678020431872",
+          "share_urn": "7371082405543063553",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7371112678020431872",
+        "posted_at": {
+          "date": "2025-09-09 11:30:11",
+          "relative": "3 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1757410211091
+        },
+        "text": "Why 95% of GenAI pilots fail (part-2)\n\nits Data Readiness.\n\nIn our last post, we looked at how the absence of clear KPIs sinks most projects before they even start.\n\nBut even with KPIs defined, there’s another roadblock:\n👉 Your data isn’t ready.\n\nHere’s what I see again and again:\n\n 1. Data scattered across spreadsheets, CRMs, PDFs, and emails\n\n 2. Inconsistent formats that break pipelines\n\n 3. No process to clean or validate inputs\n\n 4. Sensitive data mixed with public data (security risk)\n\nWithout solving this, even the smartest AI system produces garbage outputs.\n\nWhen we built a reporting automation for a mid-sized agency, the key wasn’t just LangChain or Google APIs.\n\nIt was making their CSV → Google Sheets → Presentation pipeline reliable, clean, and repeatable.\n\nThat’s why I tell clients:\n\n👉 AI is only as strong as your weakest data source.\n\nA quick readiness checklist before any GenAI build:\n\n 1. Accessibility — Can the AI actually reach the data (APIs, permissions)?\n\n 2. Consistency — Is it structured in a standard way?\n\n 3. Quality — Do you trust it enough to let AI make decisions from it?\n\n 4. Security — Are compliance and privacy guardrails in place?\n\nThe projects that win aren’t the flashiest.\n\n𝗧𝗵𝗲𝘆’𝗿𝗲 𝘁𝗵𝗲 𝗼𝗻𝗲𝘀 𝘄𝗶𝘁𝗵 𝗰𝗹𝗲𝗮𝗻, 𝗮𝗰𝗰𝗲𝘀𝘀𝗶𝗯𝗹𝗲, 𝗮𝗻𝗱 𝘀𝗲𝗰𝘂𝗿𝗲 𝗱𝗮𝘁𝗮 𝗳𝗲𝗲𝗱𝗶𝗻𝗴 𝘁𝗵𝗲 𝘀𝘆𝘀𝘁𝗲𝗺.\n\n💡 If you skip this step, you’re not building AI. You’re building expensive noise.\n\nWhat’s the biggest data challenge you face: accessibility, consistency, quality, or security?\n\n👉 Follow me for more on taking AI systems from pilot to production that delivers results.\n\n#AI #DataReadiness #Automation #BusinessOutcomes #GenAI",
+        "url": "https://www.linkedin.com/posts/pavan34_ai-datareadiness-automation-activity-7371112678020431872-Ju0B?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "media": {
+          "type": "image",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQEjZzHgzjO37A/feedshare-shrink_2048_1536/B4DZktYX6LJUAw-/0/1757402991984?e=1767830400&v=beta&t=yw0TtqXgUe-86Czrh2dcHxAXvAWhrMUBePg3GNu_FnQ",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQEjZzHgzjO37A/feedshare-shrink_2048_1536/B4DZktYX6LJUAw-/0/1757402991984?e=1767830400&v=beta&t=yw0TtqXgUe-86Czrh2dcHxAXvAWhrMUBePg3GNu_FnQ",
+              "width": 1536,
+              "height": 1024
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7368515588836487169",
+          "share_urn": "7368502871094366208",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7368515588836487169",
+        "posted_at": {
+          "date": "2025-09-02 07:30:16",
+          "relative": "3 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1756791016778
+        },
+        "text": "95% of GenAI pilots are failing (MIT just published that stat.)\nWhy? Not because the tech doesn’t work.\n\nBut because success may not be defined.\n\nWhen KPIs aren’t set early, “success” becomes subjective:\n\n 1. Did the AI save enough time?\n 2. Did it reduce costs?\n 3. Did quality hold steady?\n 4. Did customers feel the benefit?\n\nWithout benchmarks, teams ship pilots that look impressive in demos but deliver nothing measurable in production.\n\nContrast that with a mid-sized agency we helped:\n\n 1. Clear KPI before build: cut reporting time by 75%\n 2. Actual outcome: 80% faster (4 hours → 40 minutes)\n 3. Added KPI: AI insights at 85% accuracy\n\nBusiness impact: 2 afternoons per week freed for client work\n\nThe difference wasn’t just the tech (Python, Pandas, LangChain, GCP).\n\n It was clarity from day one.\n\n👉 𝗠𝘆 𝗿𝘂𝗹𝗲: 𝗜𝗳 𝘆𝗼𝘂 𝗰𝗮𝗻’𝘁 𝗱𝗲𝗳𝗶𝗻𝗲 𝘀𝘂𝗰𝗰𝗲𝘀𝘀 𝗶𝗻 𝗻𝘂𝗺𝗯𝗲𝗿𝘀 𝗯𝗲𝗳𝗼𝗿𝗲 𝘁𝗵𝗲 𝗽𝗿𝗼𝗷𝗲𝗰𝘁 𝘀𝘁𝗮𝗿𝘁𝘀, 𝘁𝗵𝗲 𝗽𝗿𝗼𝗷𝗲𝗰𝘁 𝗶𝘀𝗻’𝘁 𝗿𝗲𝗮𝗱𝘆 𝘁𝗼 𝘀𝘁𝗮𝗿𝘁.\n\nWant a simple framework?\n\nSet 3 KPIs in advance:\n 1. Efficiency (time or cost saved per task)\n 2. Accuracy (acceptable error or quality threshold)\n 3. Scalability (how performance holds as usage grows)\n\nThis turns “AI experiments” into business wins.\n\nwhat matters to you most: time saved, cost reduced, or quality improved?\n\n#AI #BusinessOutcomes #Automation #GenAI #MIT #LatestAINews",
+        "url": "https://www.linkedin.com/posts/pavan34_ai-businessoutcomes-automation-activity-7368515588836487169-zxMl?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 3,
+          "like": 2,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7366706794158612480",
+          "share_urn": null,
+          "ugcPost_urn": "7365750547015987203"
+        },
+        "full_urn": "urn:li:ugcPost:7365750547015987203",
+        "posted_at": {
+          "date": "2025-08-28 07:42:46",
+          "relative": "3 months ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1756359766521
+        },
+        "text": "Back from DataHack Summit 2025 with takeaways I can put to work right away. The theme for me was clarity across tech choices, scale plans, security discipline, and direct business results.\n\nKeynote on Cancer Detection AI: how AI can help in the early detection of cancer showed me the power of focused AI applications. The lesson? Start with clear problem definitions, not flashy technology.\n\n𝗧𝗘𝗖𝗛 𝗖𝗛𝗢𝗜𝗖𝗘𝗦: 𝗧𝗛𝗘 𝗖𝗟𝗔𝗥𝗜𝗧𝗬 𝗜 𝗡𝗘𝗘𝗗𝗘𝗗\n\nMCP, A2A, and RAG each have a clear lane: MCP standardizes how models and tools interoperate, A2A coordinates agents for end to end workflow automation, and RAG retrieves the right knowledge for accurate answers\n\n𝗦𝗖𝗔𝗟𝗘 𝗣𝗟𝗔𝗡𝗦: 𝗙𝗥𝗢𝗠 𝗣𝗢𝗖 𝗧𝗢 𝗣𝗥𝗢𝗗𝗨𝗖𝗧𝗜𝗢𝗡\n\n1. Synthetic Data Sessions: The breakthrough for scaling without privacy concerns. We can now generate training data that matches production quality without exposing sensitive information.\n\n2. Evaluation Frameworks: Learned specifics to measure AI performance before production deployment. No more \"it feels right\" decisions.\n\n3. Agentic RAG Workshop with Arun Prakash Asokan: Production-grade strategies that move beyond basic retrieval. The focus on \"advanced retrieval strategies and KAG systems to improve context, relevance, and accuracy\" gave me a roadmap for our next implementation.\n\n𝗦𝗘𝗖𝗨𝗥𝗜𝗧𝗬 𝗗𝗜𝗦𝗖𝗜𝗣𝗟𝗜𝗡𝗘: 𝗪𝗛𝗔𝗧 𝗪𝗘'𝗩𝗘 𝗕𝗘𝗘𝗡 𝗠𝗜𝗦𝗦𝗜𝗡𝗚\n\n1. Red Teaming AI Agents: Eye-opening session on proactive security testing. The discipline of assuming your AI will be attacked and preparing accordingly.\n\n2. Responsible AI Frameworks: actual governance that prevents costly mistakes and builds stakeholder trust.\n\nLast but most important:\n\n𝗗𝗜𝗥𝗘𝗖𝗧 𝗕𝗨𝗦𝗜𝗡𝗘𝗦𝗦 𝗥𝗘𝗦𝗨𝗟𝗧𝗦: 𝗧𝗛𝗘 𝗥𝗘𝗔𝗟-𝗪𝗢𝗥𝗟𝗗 𝗜𝗠𝗣𝗔𝗖𝗧\nThe pattern was clear: companies implementing AI agents strategically are moving from cost centers to profit drivers. The \"experimental phase\" is definitively over reinforcing something important: AI success comes from disciplined implementation, not just advanced technology.\n\nHuge thanks to Analytics Vidhya and Kunal Jain for organizing sessions that delivered practical value over hype. The networking alone was worth the trip!\n\n𝘞𝘩𝘢𝘵 𝘪𝘴 𝘺𝘰𝘶𝘳 𝘣𝘪𝘨𝘨𝘦𝘴𝘵 𝘣𝘭𝘰𝘤𝘬𝘦𝘳 𝘳𝘪𝘨𝘩𝘵 𝘯𝘰𝘸: 𝘢𝘥𝘰𝘱𝘵𝘪𝘰𝘯, 𝘢𝘤𝘤𝘶𝘳𝘢𝘤𝘺, 𝘰𝘳 𝘴𝘤𝘢𝘭𝘦? 𝘏𝘢𝘱𝘱𝘺 𝘵𝘰 𝘴𝘩𝘢𝘳𝘦 𝘴𝘱𝘦𝘤𝘪𝘧𝘪𝘤 𝘵𝘢𝘬𝘦𝘢𝘸𝘢𝘺𝘴 𝘧𝘳𝘰𝘮 𝘵𝘩𝘦 𝘴𝘦𝘴𝘴𝘪𝘰𝘯𝘴. 𝘊𝘰𝘮𝘮𝘦𝘯𝘵 𝘣𝘦𝘭𝘰𝘸 👇\n\n#datahacksummit2025 #datahacksummit #responsibleAI #AgenticAi #AIAgents",
+        "url": "https://www.linkedin.com/posts/pavan34_datahacksummit2025-datahacksummit-responsibleai-ugcPost-7365750547015987203-jT4f?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "repost",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 22,
+          "like": 19,
+          "support": 0,
+          "love": 2,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 4,
+          "reposts": 2
+        },
+        "media": {
+          "type": "images",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQF065gaBtZzbw/feedshare-shrink_2048_1536/B4DZjhnFOaG8A4-/0/1756131777652?e=1767830400&v=beta&t=fdXXQvaDK9QgkUR7W27-0408JHoRF58XIzNMuukkzfk",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQF065gaBtZzbw/feedshare-shrink_2048_1536/B4DZjhnFOaG8A4-/0/1756131777652?e=1767830400&v=beta&t=fdXXQvaDK9QgkUR7W27-0408JHoRF58XIzNMuukkzfk",
+              "width": 1288,
+              "height": 966
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQHA4b7gV-ZS1Q/feedshare-shrink_2048_1536/B4DZjhnFN6H4A0-/0/1756131777533?e=1767830400&v=beta&t=vc9rquGhTz-PnOjvGX6yeCPrYtGcePRE3DlHXGXgQME",
+              "width": 725,
+              "height": 966
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQEXWvneui7E7A/feedshare-shrink_2048_1536/B4DZjhnFOPGsAw-/0/1756131776490?e=1767830400&v=beta&t=49hXmivQcsWSfu78ZnUrLjYn1XIT6CBeTeAX_-417Vg",
+              "width": 1280,
+              "height": 960
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7365757964797771778",
+          "share_urn": null,
+          "ugcPost_urn": "7365750547015987203"
+        },
+        "full_urn": "urn:li:ugcPost:7365750547015987203",
+        "posted_at": {
+          "date": "2025-08-25 16:52:27",
+          "relative": "3 months ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1756133547973
+        },
+        "text": "Back from DataHack Summit 2025 with takeaways I can put to work right away. The theme for me was clarity across tech choices, scale plans, security discipline, and direct business results.\n\nKeynote on Cancer Detection AI: how AI can help in the early detection of cancer showed me the power of focused AI applications. The lesson? Start with clear problem definitions, not flashy technology.\n\n𝗧𝗘𝗖𝗛 𝗖𝗛𝗢𝗜𝗖𝗘𝗦: 𝗧𝗛𝗘 𝗖𝗟𝗔𝗥𝗜𝗧𝗬 𝗜 𝗡𝗘𝗘𝗗𝗘𝗗\n\nMCP, A2A, and RAG each have a clear lane: MCP standardizes how models and tools interoperate, A2A coordinates agents for end to end workflow automation, and RAG retrieves the right knowledge for accurate answers\n\n𝗦𝗖𝗔𝗟𝗘 𝗣𝗟𝗔𝗡𝗦: 𝗙𝗥𝗢𝗠 𝗣𝗢𝗖 𝗧𝗢 𝗣𝗥𝗢𝗗𝗨𝗖𝗧𝗜𝗢𝗡\n\n1. Synthetic Data Sessions: The breakthrough for scaling without privacy concerns. We can now generate training data that matches production quality without exposing sensitive information.\n\n2. Evaluation Frameworks: Learned specifics to measure AI performance before production deployment. No more \"it feels right\" decisions.\n\n3. Agentic RAG Workshop with Arun Prakash Asokan: Production-grade strategies that move beyond basic retrieval. The focus on \"advanced retrieval strategies and KAG systems to improve context, relevance, and accuracy\" gave me a roadmap for our next implementation.\n\n𝗦𝗘𝗖𝗨𝗥𝗜𝗧𝗬 𝗗𝗜𝗦𝗖𝗜𝗣𝗟𝗜𝗡𝗘: 𝗪𝗛𝗔𝗧 𝗪𝗘'𝗩𝗘 𝗕𝗘𝗘𝗡 𝗠𝗜𝗦𝗦𝗜𝗡𝗚\n\n1. Red Teaming AI Agents: Eye-opening session on proactive security testing. The discipline of assuming your AI will be attacked and preparing accordingly.\n\n2. Responsible AI Frameworks: actual governance that prevents costly mistakes and builds stakeholder trust.\n\nLast but most important:\n\n𝗗𝗜𝗥𝗘𝗖𝗧 𝗕𝗨𝗦𝗜𝗡𝗘𝗦𝗦 𝗥𝗘𝗦𝗨𝗟𝗧𝗦: 𝗧𝗛𝗘 𝗥𝗘𝗔𝗟-𝗪𝗢𝗥𝗟𝗗 𝗜𝗠𝗣𝗔𝗖𝗧\nThe pattern was clear: companies implementing AI agents strategically are moving from cost centers to profit drivers. The \"experimental phase\" is definitively over reinforcing something important: AI success comes from disciplined implementation, not just advanced technology.\n\nHuge thanks to Analytics Vidhya and Kunal Jain for organizing sessions that delivered practical value over hype. The networking alone was worth the trip!\n\n𝘞𝘩𝘢𝘵 𝘪𝘴 𝘺𝘰𝘶𝘳 𝘣𝘪𝘨𝘨𝘦𝘴𝘵 𝘣𝘭𝘰𝘤𝘬𝘦𝘳 𝘳𝘪𝘨𝘩𝘵 𝘯𝘰𝘸: 𝘢𝘥𝘰𝘱𝘵𝘪𝘰𝘯, 𝘢𝘤𝘤𝘶𝘳𝘢𝘤𝘺, 𝘰𝘳 𝘴𝘤𝘢𝘭𝘦? 𝘏𝘢𝘱𝘱𝘺 𝘵𝘰 𝘴𝘩𝘢𝘳𝘦 𝘴𝘱𝘦𝘤𝘪𝘧𝘪𝘤 𝘵𝘢𝘬𝘦𝘢𝘸𝘢𝘺𝘴 𝘧𝘳𝘰𝘮 𝘵𝘩𝘦 𝘴𝘦𝘴𝘴𝘪𝘰𝘯𝘴. 𝘊𝘰𝘮𝘮𝘦𝘯𝘵 𝘣𝘦𝘭𝘰𝘸 👇\n\n#datahacksummit2025 #datahacksummit #responsibleAI #AgenticAi #AIAgents",
+        "url": "https://www.linkedin.com/posts/pavan34_datahacksummit2025-datahacksummit-responsibleai-activity-7365757964797771778-AyCz?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 22,
+          "like": 19,
+          "support": 0,
+          "love": 2,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 4,
+          "reposts": 2
+        },
+        "media": {
+          "type": "images",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQF065gaBtZzbw/feedshare-shrink_2048_1536/B4DZjhnFOaG8A4-/0/1756131777652?e=1767830400&v=beta&t=fdXXQvaDK9QgkUR7W27-0408JHoRF58XIzNMuukkzfk",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQF065gaBtZzbw/feedshare-shrink_2048_1536/B4DZjhnFOaG8A4-/0/1756131777652?e=1767830400&v=beta&t=fdXXQvaDK9QgkUR7W27-0408JHoRF58XIzNMuukkzfk",
+              "width": 1288,
+              "height": 966
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQHA4b7gV-ZS1Q/feedshare-shrink_2048_1536/B4DZjhnFN6H4A0-/0/1756131777533?e=1767830400&v=beta&t=vc9rquGhTz-PnOjvGX6yeCPrYtGcePRE3DlHXGXgQME",
+              "width": 725,
+              "height": 966
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQEXWvneui7E7A/feedshare-shrink_2048_1536/B4DZjhnFOPGsAw-/0/1756131776490?e=1767830400&v=beta&t=49hXmivQcsWSfu78ZnUrLjYn1XIT6CBeTeAX_-417Vg",
+              "width": 1280,
+              "height": 960
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7294588424278175744",
+          "share_urn": null,
+          "ugcPost_urn": "7294351777095680000"
+        },
+        "full_urn": "urn:li:ugcPost:7294351777095680000",
+        "posted_at": {
+          "date": "2025-02-10 06:30:07",
+          "relative": "10 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1739165407247
+        },
+        "text": "Here’s my hybrid approach for AI automation. 👇\n\nNot all automation needs code. But sometimes, no-code just isn’t enough.\n\nWhen automating workflows, I don’t default to writing code.\n\nWhy? Because:\n✅ No-code tools (like Make, n8n) work great for connecting apps quickly.\n✅ They help reduce development time.\n\nwhy reinvent the wheel?\n\nI use Make when:\n\n1. Connecting multiple apps like CRM, Slack, Google Sheets, and Email\n2. Automating repetitive, standardized tasks without coding\n3. Quickly setting up workflows without managing infrastructure\n\nI use n8n when:\n\n1. Running API calls, simple custom scripts and need structured outputs within workflows\n2. Self-hosting to avoid third-party platform costs and data security is a concern.\n\n\nI write custom code when:\n\n1. I need better tracking how automation performs and error handling for automation failures\n2. processing large-scale data efficiently is required.\n\n🚀 The key is picking the right tool for the right job.\n\nhow i mixed low-code and custom code for sales research agent\n\n1. n8n - connect to notion database acting as CRM, slack for notifications and process the output from json.\n2. custom code- langraph multi agent for extracting prospect details, LinkedIn posts, enriching, identify industry trends, generate personalized outreach recommendations etc. \n\nhere is an sample output: https://lnkd.in/dsmSW2fD\n\nWhy this approach?\n\n1. n8n gave me better control over connecting different apps easily and self-hosting\n2. Custom code allowed me to add deeper analytics, handle edge cases, and track multi agent easily with Lang smith.\n\nThe result? A system that automates without sacrificing flexibility.\n\n\nWhat’s your experience? Do you prefer low-code, custom code, or a mix of both?- Let’s discuss in the comments!",
+        "url": "https://www.linkedin.com/posts/pavan34_heres-my-hybrid-approach-for-ai-automation-activity-7294588424278175744-fj65?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "media": {
+          "type": "images",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQGGU98r1Z7yeg/feedshare-shrink_2048_1536/B4DZTq.SUoGcAo-/0/1739108984981?e=1767830400&v=beta&t=uABC5URtG3SP6QUd0XIW0xodV9JSqAvOfNCUYq8tptY",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQGGU98r1Z7yeg/feedshare-shrink_2048_1536/B4DZTq.SUoGcAo-/0/1739108984981?e=1767830400&v=beta&t=uABC5URtG3SP6QUd0XIW0xodV9JSqAvOfNCUYq8tptY",
+              "width": 1920,
+              "height": 1080
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQGmlXreeiodaA/feedshare-shrink_1280/B4DZTq.STIHwAk-/0/1739108984516?e=1767830400&v=beta&t=Tr15YjFkLf1_2pONRaUo6p_qWy2PJE8ipDeUccRp190",
+              "width": 941,
+              "height": 302
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7293229843159085057",
+          "share_urn": "7293229842538401792",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7293229843159085057",
+        "posted_at": {
+          "date": "2025-02-06 12:31:36",
+          "relative": "10 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1738841496267
+        },
+        "text": "🚀 Agents as a Service is booming—and the opportunities are limitless\n\nMany mistakenly assume one-size-fits-all solutions deliver results automatically.\n\nHere’s what I'm seeing on the ground: \n\n❌ Disjointed deployments that miss key performance indicators\n❌ Lack of real-time insights into agent effectiveness\n❌ Overlooked optimization opportunities that hinder ROI\n\nThe reality? Simply deploying AI agents isn’t enough. Success comes from precision, evaluation, and continuous improvement.\n\nKey hurdles to overcome: \n1️⃣ Visibility: Are you fully aware of how your AI agents are making decisions in real time?\n2️⃣ Performance Metrics: Do you have the right benchmarks to measure their success?\n3️⃣ Scalability: Is your infrastructure designed to support rapid, scalable deployments?\n\nmy approach : \n\n✔ Comprehensive Monitoring: Integrate advanced dashboards for full transparency into agent performance.\n✔ Tailored Evaluations: custom metrics ensure every AI agent is aligned with goals.\n✔ Optimized Deployments: Design and deploy to scale seamlessly catered to specific needs\n\nInterested in exploring how tailored AI agents can transform operations? Let's chat",
+        "url": "https://www.linkedin.com/posts/pavan34_agents-as-a-service-is-boomingand-the-activity-7293229843159085057-0Yu_?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7290647499885670400",
+          "share_urn": "7290613572408139776",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7290647499885670400",
+        "posted_at": {
+          "date": "2025-01-30 09:30:17",
+          "relative": "10 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1738225817653
+        },
+        "text": "🚨 Your AI agents might be failing—and you wouldn’t even know it.\n\nWhen most businesses launch AI agents, they assume they’re working.\n\nBut a few months in, the big question hits—are they actually driving results?\n\nAI agents running ≠ AI agents succeeding.\n\nMost of them overlook the most critical step: measuring AI agent performance.\n\nTwo key questions matter:\n\n1️⃣ Are our AI agents truly performing at their best?\n2️⃣ Are we tracking their impact effectively?\n\nThe answer? Establishing the right KPIs.\n\nKPIs turn AI agents from experimental tools into high-impact business assets.\n\nHere are three KPIs that should be tracked:\n\n1️⃣ Output Quality – Are the AI agents providing accurate, relevant, and context-aware responses?\n\n2️⃣ Efficiency & Adoption – Are they improving productivity, reducing response time, and seamlessly integrating with workflows?\n\n3️⃣ Business Impact – Are they increasing revenue, cutting costs, and ensuring compliance?\n\nAI agents aren’t just about automation. Tracking success is what makes them valuable.\n\nWhat KPIs are you tracking in your projects?\n\nP.s If you're exploring high-ROI AI agent use cases and how to measure their impact, my ebook, \"Discover High ROI Use Cases for AI Automation,\" breaks it all down.",
+        "url": "https://www.linkedin.com/posts/pavan34_your-ai-agents-might-be-failingand-you-activity-7290647499885670400-9zLd?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 3,
+          "like": 2,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7289575397921296384",
+          "share_urn": "7289569359914557440",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7289575397921296384",
+        "posted_at": {
+          "date": "2025-01-27 10:30:08",
+          "relative": "10 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1737970208626
+        },
+        "text": "I used to spend hours on sales research— now I save 70% of that time.\n\nIf you’ve ever felt like research and admin tasks take up more time than selling, you’re not alone.\n\nHere’s what my process used to look like:\n\n1️⃣ Digging through LinkedIn profiles for getting prospect info.\n2️⃣ Scouring websites and news for company insights.\n3️⃣ Spending hours crafting personalized outreach.\n\n\nThis is valuable work—but it’s slow.\n\nThat’s why I built the Sales Research Agent—a multi LLM workflow designed to take the load off.\n\nHere’s how it works:\n1️⃣ Instantly gathers insights from LinkedIn profiles, company websites, and CRMs.\n2️⃣ Scores leads based on engagement, relevance, and intent and past similar prospects\n3️⃣ Crafts tailored outreach and follow up strategies that SDRs can deploy immediately.\n4️⃣ Produces detailed reports you can revisit to refine your strategy.\n\nWhy this matters:\n\nOutbound leads? Hyper-personalized first messages in minutes based on research.\n\nInbound leads? Prioritized follow-ups without the guesswork.\n\nProductivity? No more wasting hours on repetitive research.\n\nScalability? Whether you’re managing 10 or 10,000 leads, it handles it effortlessly.\n\nThe best part?\n🔒 data stays secure—it never leaves my systems.\n🚀  Customize reports to tailor specific needs.\n\nBut sales research is just one piece of the puzzle.\n\nWant to see how this fits into a complete sales enablement package?\n🎥 I’ve created a short video that shows how Ai agents can be used to enhance your sales processes. \n⬇️ Comment or DM , and I’ll send you the link to the video!",
+        "url": "https://www.linkedin.com/posts/pavan34_i-used-to-spend-hours-on-sales-research-activity-7289575397921296384-BVwm?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 2,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "media": {
+          "type": "image",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQEJ--0wFMkhqg/feedshare-shrink_2048_1536/B4DZSnAsnFG8As-/0/1737968768510?e=1767830400&v=beta&t=bj3RkPdYG-gJvjuZdmCLvHCaA4Pj3-4Ohl8iKV_1AUM",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQEJ--0wFMkhqg/feedshare-shrink_2048_1536/B4DZSnAsnFG8As-/0/1737968768510?e=1767830400&v=beta&t=bj3RkPdYG-gJvjuZdmCLvHCaA4Pj3-4Ohl8iKV_1AUM",
+              "width": 400,
+              "height": 225
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7287023561301463041",
+          "share_urn": "7286998458383654912",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7287023561301463041",
+        "posted_at": {
+          "date": "2025-01-20 09:30:03",
+          "relative": "11 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1737361803365
+        },
+        "text": "We need AI agents to stay competitive!\n\nI’ve heard this many times from business leaders.\n\nBut here’s the reality: you can’t run before you can walk.\n\nIn a recent podcast, Gabriel Weintraub, a Stanford professor, highlighted how many leaders especially non-technical industries underestimate the journey to becoming data-driven.\n\nIf you don’t have your data structured and accessible, even the best AI agents won’t deliver results.\n\nHere are the three biggest lessons I took from the conversation:\n\n1️⃣ Start Small, Win Big\nFocusing on quick, high-ROI projects is the key to building momentum.\n\n2️⃣ Bridge the Gap Between Leadership and Data Teams\n\n- > Don't push for moonshot AI solutions without understanding the foundation required. \n\n3️⃣ Experimentation Drives Growth\n\n-> Even negative results are valuable. Experimentation shows what works, what doesn’t, and—most importantly—it encourages a culture of learning.\n\n So, where do you begin?\n\n👉 Start with the basics:\n\n1️⃣ Build data pipelines to organize and structure information.\n\n2️⃣ Identify high-ROI, low-hanging fruit projects.\n\n3️⃣ Use pre-built AI solutions for quick wins to build confidence.\n\nWhat’s the biggest barrier you’ve faced when trying to adopt a data-driven strategy?\n\nReady to Explore? \n\nP.S My ebook, \"Discover High ROI Use Cases for AI Automation,\" breaks down how you can identify High ROI AI use cases. Comment or DM me. I'll send it right away.",
+        "url": "https://www.linkedin.com/posts/pavan34_we-need-ai-agents-to-stay-competitive-i-activity-7287023561301463041-xyCY?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7285226713184186368",
+          "share_urn": null,
+          "ugcPost_urn": "7285198854491095042"
+        },
+        "full_urn": "urn:li:ugcPost:7285198854491095042",
+        "posted_at": {
+          "date": "2025-01-15 10:30:01",
+          "relative": "11 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1736933401390
+        },
+        "text": "Should we focus on doing tasks faster or doing the right tasks?\n\nEvery individual and business faces this question?\n\nEfficiency gets things done quickly and accurately. But effectiveness ensures we’re working on what truly matters.\n\nWhat if you didn’t have to choose?\n\nThis is where AI agents come in.\n\n1️⃣ Efficiency: Doing Things Right and with speed\n\nFor example, An AI-powered system that scans hundreds of profiles in seconds—gathering essential details like job titles, company updates, and recent activities. \n\nMeanwhile, another AI system categorizes your inbox, automating responses to routine emails like meeting confirmations or updates, saving you countless hours.\n\nThis is efficiency, clearing out tasks quickly.\n\n✅ Strength: Automates repetitive tasks with precision and speed\n✅ Outcome: Streamlined workflows and fewer manual errors\n❌ Limitation: Efficiency alone doesn’t guarantee you’re focused on the right priorities\n\nExample: Collecting lead data efficiently or auto-managing routine email responses.\n\n2️⃣ Effectiveness: Doing the Right Things\n\nNow, think about the same system going a step further—analyzing the collected data to prioritize top prospects and suggested next steps based on high-conversion signals like recent funding or downloading a marketing material.\n\nAt the same time, the inbox system flags important emails—like a prospects urgent query or a key prospect’s response—and provides you with relevant highly personalized marketing materials to share..\n\n✅ Strength: Focuses your efforts on tasks with the highest impact\n✅ Outcome: Strategic decision-making and maximized ROI\n❌ Limitation: Needs a clear understanding of business priorities for maximum value\n\nExample: Prioritizing leads most likely to convert or flagging critical emails for immediate attention.\n\n3️⃣ The Power of AI Agents: Efficiency + Effectiveness\nHere’s where it all comes together:\n\nOne system doesn’t just gather data but identifies top opportunities and suggests how to engage them.\n\nAnother system doesn’t just handle emails but ensures critical messages receive immediate, tailored responses.\n\n✅ Strength: Combines automation with intelligent prioritization\n✅ Outcome: Enhanced productivity and more impactful results\n❌ Limitation: Requires thoughtful implementation for the best outcomes\n\nExample: Producing a prioritized list of high-value prospects with actionable insights and ensuring your inbox surfaces the most critical tasks while automating the rest.\n\nInterested in seeing this in action?\n📚 My ebook, \"Discover High ROI Use Cases for AI Automation,\" breaks down how you can identify use cases like these to transform your workflows.\n\n💻 I also have ready-to-demo solutions that showcase how these AI systems work in real-world scenarios. If you’re curious, drop a comment or DM.",
+        "url": "https://www.linkedin.com/posts/pavan34_ai-agents-efficiency-vs-effectiveness-activity-7285226713184186368-O_qD?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 3,
+          "like": 3,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "document": {
+          "title": "AI Agents- Efficiency vs Effectiveness",
+          "page_count": 3,
+          "url": "https://media.licdn.com/dms/document/media/v2/D561FAQHk4eSycS3nhg/feedshare-document-url-metadata-scrapper-pdf/B56ZRo4ks3HoA4-/0/1736926450560?e=1767009600&v=beta&t=YyIeUbfv1wCMOPJmtqpxx7e6x-jnxuco_l6YCZd7dgQ",
+          "thumbnail": "https://media.licdn.com/dms/image/v2/D561FAQHk4eSycS3nhg/feedshare-document-cover-images_1920/B56ZRo4ks3HoA0-/0/1736926451111?e=1767009600&v=beta&t=9TWQ_ucICN4yTaAtz5Mblyp6fiYnDzO5ahaLN19jnXs"
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7282976899444715520",
+          "share_urn": "7282773335027970050",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7282976899444715520",
+        "posted_at": {
+          "date": "2025-01-09 05:30:03",
+          "relative": "11 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1736397003995
+        },
+        "text": "Most people think automation and AI agents are the same—and that’s where things go wrong.\n\nThis confusion wastes time, money, and opportunities to transform operations.\n\nLet’s explore three “helpers” and how they approach the task of improving workflows.\n\n1️⃣ Basic Automation\nBasic automation works like an assembly line—performing predictable, rule-based tasks with speed and efficiency.\n\n✅ Strengths: Handles repetitive tasks quickly\n❌ Weaknesses: Struggles with unpredictability and new scenarios\n\nExample: Routing emails, generating standard responses, or updating ticket statuses.\nOutcome: Reliable but stops functioning when faced with unstructured queries or issues outside its scope.\n\n2️⃣ Linear Automation with LLMs\nAdd an LLM (Large Language Model) to automation, and you get flexible workflows that can adapt slightly to new variations.\n\n✅ Strengths: Handles variations in tasks and gauges sentiment for personalized responses\n❌ Weaknesses: Still follows structured, step-by-step workflows\n\nExample: Parsing email content to detect urgency, tailoring responses, and routing messages accordingly.\nOutcome: Better than basic automation but still reactive rather than proactive.\n\n3️⃣ AI Agents\nAI agents take a leap forward by introducing autonomy and decision-making. These systems proactively learn, plan, and adjust to dynamic environments.\n\n✅ Strengths: Highly adaptive, capable of prioritizing and solving complex problems\n❌ Weaknesses: May produce unpredictable outcomes in some cases\n\nExample: Auto-prioritizing urgent customer queries, gathering resources dynamically, and suggesting personalized follow-up strategies.\nOutcome: Combines adaptability, decision-making, and discovery for next-level impact.\n\nNo matter the approach—basic automation, LLM workflows, or AI agents—success depends on identifying high ROI use cases.\n\nFocus on the processes that deliver maximum impact.\n\nTo help you get started, I’ve created an ebook, “Discover High ROI Use Cases for AI Automation.”\n📘 This guide will help you:\n→ Identify processes ripe for automation.\n→ Choose the right system for your business.\n→ Maximize outcomes with strategic implementation.\n\nInterested? Let me know\n\nwhat helpers are you using?",
+        "url": "https://www.linkedin.com/posts/pavan34_most-people-think-automation-and-ai-agents-activity-7282976899444715520-ooS1?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 3,
+          "like": 3,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 3,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7281965226193801216",
+          "share_urn": "7281949686716915712",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7281965226193801216",
+        "posted_at": {
+          "date": "2025-01-06 10:30:02",
+          "relative": "11 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1736155802296
+        },
+        "text": "Automation used to mean simple, rule-based tools. But AI agents have changed the game.\n\nThese intelligent partners don’t just execute tasks; they:\n\n→ Take actions.\n→ Make real-time decisions.\n→ Adapt to changing data.\n→ Seamlessly collaborate with humans and other agents.\n\nAnd the best part? Building them is easier than ever—whether you’re tech-savvy or not.\n\nTwo Approaches to Building AI Agents..\n\n1️⃣ No-Code Platforms:\nNo technical skills? No problem. Tools like n8n and flowise let you:\n→ Drag and drop to create workflows.\n→ Automate tasks like scheduling, data entry, or CRM updates.\n→ Quickly deploy functional agents without too much coding.\n\n✅ Best for: Businesses needing fast, cost-effective solutions with minimal setup.\n\n2️⃣ Custom Frameworks:\n\nFor advanced capabilities, frameworks like LangChain and langgraph provide the flexibility to:\n→ Build highly specialized AI agents for complex workflows.\n→ Integrate with proprietary databases and APIs.\n→ Scale to meet evolving business demands.\n✅ Best for: Companies looking for robust, deeply tailored solutions.\n\nWhy Not Both? The Hybrid Approach\n\nThe hybrid approach combines the simplicity of no-code platforms with the power of custom frameworks:\n\n→ Prototype quickly using no-code tools.\n→ Gradually add custom features to expand functionality.\n→ Maintain flexibility while addressing unique business needs.\n\nThis approach ensures you can adapt and grow your AI solutions over time.\n\nAI agents don’t just save time—they drive real business outcomes:\n\n1️⃣ Sales Optimization: Automate lead research, personalize outreach, and close deals faster.\n2️⃣ Customer Support: Provide instant, round-the-clock responses with improved accuracy.\n3️⃣ Marketing: Streamline content creation, testing, and optimization for faster results.\n\nHow to Get Started:\n\n1️⃣ Set clear goals: What’s the biggest challenge your team faces today? \n2️⃣ Identify repetitive tasks: what tasks eat up your teams time?\n3️⃣ Choose your approach: No-code, custom, or hybrid—select what fits your needs.\n4️⃣ Build your first agent: Test and refine it to suit your business objectives.\nWhy Goals Matter:\n\nWithout clear goals, your AI agent is just another tool. With the right goals, it becomes a strategic asset—saving time, improving efficiency, and unlocking growth.\n\nWhat’s one goal you’d like to achieve with an AI agent?",
+        "url": "https://www.linkedin.com/posts/pavan34_automation-used-to-mean-simple-rule-based-activity-7281965226193801216-Xfk9?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7280515685011640320",
+          "share_urn": "7280470280433528832",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7280515685011640320",
+        "posted_at": {
+          "date": "2025-01-02 10:30:04",
+          "relative": "11 months ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1735810204747
+        },
+        "text": "The past few months have been a busy blur.\n\nBetween diving into exciting AI projects, experimenting, and refining my vision, I unintentionally stepped away from LinkedIn. At first, I thought, “I’ll post next week.” Then weeks turned into months.\n\nThe truth?\n\nI needed time to refocus and think about the value I want to bring here.\n\nBut while I was deep in work, I missed something important: sharing the journey.\n\nBecause growth and learning are always better when you bring others along\n.\nSo, here I am, ready to make 2025 a fresh start—and this year, it’s all about AI agents and predictive analytics.\n\nHere’s what you can expect moving forward:\n✅ Insights on how AI is transforming businesses\n✅ Real-world examples of custom AI solutions/Agents\n✅ A peek behind the scenes at the wins and challenges of this journey\n\nMost importantly, I want to connect with YOU.\n\nLet’s make this the year we level up together.\n\nHere’s a question to start:\n\nWhat’s one challenge or curiosity you have about AI or automation this year?",
+        "url": "https://www.linkedin.com/posts/pavan34_the-past-few-months-have-been-a-busy-blur-activity-7280515685011640320-JXfZ?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 4,
+          "like": 4,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 3,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7238841200806400001",
+          "share_urn": null,
+          "ugcPost_urn": "7238787704442781696"
+        },
+        "full_urn": "urn:li:ugcPost:7238787704442781696",
+        "posted_at": {
+          "date": "2024-09-09 11:30:33",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1725874233438
+        },
+        "text": "\"Think Beyond AI Chatbots: The Real Power of AI is Just Getting Started\"\n\nWhen most people think of AI in business, chatbots are often the first thing that comes to mind. And while chatbots have transformed customer interactions, it’s time to think bigger.\n\n Chatbots are just the tip of the AI iceberg. \n\nThey’re great for handling routine queries, but AI has so much more to offer. \n\nThat’s what next-gen AI systems like Agentic Workflows are doing. \n\nlets go beyond conversation to transformation, now AI agents just don’t wait for a question but take initiative. They \n\n- can automate complex and time consuming tasks \n- predict trends \n- collaborate with humans in taking decisions \n\nSome of the most value AI can bring comes from optimizing internal processes that don't even require a user interface. \n\n\nLet's chat about how you can integrate AI beyond chatbots to truly transform your workflows.",
+        "url": "https://www.linkedin.com/posts/pavan34_think-beyond-ai-chatbots-the-real-power-activity-7238841200806400001-wUpp?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 1,
+          "reposts": 0
+        },
+        "media": {
+          "type": "images",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQFdUcg7wLlwCw/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1725861476920?e=1767830400&v=beta&t=-GeJ61nDG5P_F1CdWV84FrNOk0-pjWl3JP1zsHydRG4",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQFdUcg7wLlwCw/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1725861476920?e=1767830400&v=beta&t=-GeJ61nDG5P_F1CdWV84FrNOk0-pjWl3JP1zsHydRG4",
+              "width": 1024,
+              "height": 1024
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQFmNBKqDo5D8Q/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1725861477585?e=1767830400&v=beta&t=sxZkYULcw8kpcpUudDRRTLqA6QBffOY_MVvrFr76gIg",
+              "width": 1024,
+              "height": 1024
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7234130078345871360",
+          "share_urn": null,
+          "ugcPost_urn": "7234101464841736192"
+        },
+        "full_urn": "urn:li:ugcPost:7234101464841736192",
+        "posted_at": {
+          "date": "2024-08-27 11:30:14",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1724751014315
+        },
+        "text": "A new paradigm is emerging—Agentic Workflows, driven by sophisticated AI agents that are transforming how we think about collaboration and automation. \n\nAI is evolving from just assisting tasks to truly collaborating and adapting—enter Agentic Workflows\n\nInstead of merely executing tasks, these agents engage in decision-making, collaboration, and adaptation.\n\nWhat excites me is their ability to go beyond routine automation. these agents get better over time, collaborating not just with other AI systems/agents but with me and my team. \n\nhuman feedback plays a crucial role here. -your input helps these AI agents refine their actions, making them more aligned with your goals. \n\n- AI agents are no longer just tools—they’re becoming partners. \n\n- As with other AI automations, the true potential of agentic AI is achieved when they operate within ethical guidelines and implemented responsibly.\n\n How do you see agentic AI agents impacting your work?\n\n Whether you’re curious about the benefits of agentic workflows over traditional automations or you’re interested in implementing responsible AI, Comment below or reach out to me",
+        "url": "https://www.linkedin.com/posts/pavan34_agentic-workflows-activity-7234130078345871360-Wj4J?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "document": {
+          "title": "Agentic Workflows",
+          "page_count": 5,
+          "url": "https://media.licdn.com/dms/document/media/v2/D561FAQHdIC75P9OBCQ/feedshare-document-url-metadata-scrapper-pdf/feedshare-document-url-metadata-scrapper-pdf/0/1724744142898?e=1767009600&v=beta&t=pICtRfcF8Ou3Jd8RoyLIvcdX1a__Yl27Ui6DRa1Co2k",
+          "thumbnail": "https://media.licdn.com/dms/image/v2/D561FAQHdIC75P9OBCQ/feedshare-document-cover-images_1920/feedshare-document-cover-images_1920/0/1724744144489?e=1767009600&v=beta&t=ACdyiV_UxLDX3lYn88iAeufBdF8jlpxUUnA2Pvv5Yew"
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7231593336455761922",
+          "share_urn": null,
+          "ugcPost_urn": "7231572566081978369"
+        },
+        "full_urn": "urn:li:ugcPost:7231572566081978369",
+        "posted_at": {
+          "date": "2024-08-20 11:30:07",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1724146207918
+        },
+        "text": "Share your thoughts on other potential uses for RAG in the comments!",
+        "url": "https://www.linkedin.com/posts/pavan34_share-your-thoughts-on-other-potential-uses-activity-7231593336455761922-6ESP?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7229056648839839744",
+          "share_urn": "7228992717354057729",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7229056648839839744",
+        "posted_at": {
+          "date": "2024-08-13 11:30:14",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1723541414461
+        },
+        "text": "The surprising reason why many AI projects don’t deliver results might just be where they start.\n\nBefore going public, it’s crucial to optimize your internal processes first.\n\nWhy Internal Processes First? \n\nInternal processes are the backbone of any organization. By optimizing these with AI, you can create a more efficient, productive, and adaptable business environment.  \n\nStarting with internal processes allows you to \n\n- Identify inefficiencies and areas for improvement. \n- provides a clear understanding of how AI can enhance existing workflows. - ensures a smoother transition to AI automation.  \n\nOn the other hand Public-Facing AI \n\n- carry higher risks if not properly tested. \n- sets high expectations; \n- data privacy issues \n\nSuccessfully automating internal processes builds confidence and experience before tackling public-facing projects. \n\nhere are Steps to Success:  \n\n1. Conduct an Internal Audit: Evaluate your current workflows to pinpoint bottlenecks and repetitive tasks. \n\n2. Identify High-Impact Areas: Focus on processes that, when automated, will have the most significant positive impact. \n\n3. Collaborate with Teams: Involve employees in identifying pain points and potential improvements. \n\n4. Implement Gradually: Start with pilot projects to test AI solutions and refine them based on feedback. \n\nDid you start with internal processes, or did you take a different route?",
+        "url": "https://www.linkedin.com/posts/pavan34_the-surprising-reason-why-many-ai-projects-activity-7229056648839839744-5jVL?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 4,
+          "like": 3,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 1,
+          "reposts": 0
+        },
+        "media": {
+          "type": "image",
+          "url": "https://media.licdn.com/dms/image/v2/D5622AQHazR10WgxTSw/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1723526164647?e=1767830400&v=beta&t=4nZPk6J82iOLxUTRp5oDIFVxXUh4wMtxo5IDEdqUS3s",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D5622AQHazR10WgxTSw/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1723526164647?e=1767830400&v=beta&t=4nZPk6J82iOLxUTRp5oDIFVxXUh4wMtxo5IDEdqUS3s",
+              "width": 1152,
+              "height": 648
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7228746335238123520",
+          "share_urn": null,
+          "ugcPost_urn": "7228746333963079681"
+        },
+        "full_urn": "urn:li:ugcPost:7228746333963079681",
+        "posted_at": {
+          "date": "2024-08-12 14:57:09",
+          "relative": "1 year ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1723467429933
+        },
+        "text": "Just wrapped up four days of deep dives into the ever-evolving world of AI at the Data Hack Summit 2024, which concluded just two days ago.\n\nIt was a full of knowledge, innovation, and inspiration!\n\nFrom exploring the crucial importance of data in today’s business landscape to cutting edge advancements in  Retrieval-Augmented Generation (RAG) and Agentic AI Systems, the summit was full of actionable steps.\n\nThe discussions on Responsible AI and Explainable AI were particularly eye-opening, highlighting the need for ethical considerations and robust implementation plans for corporations.\n\nA standout for me was the practical workshop on RAG and Responsible AI, by Bhaskarjit Sarmah, where theory met hands-on implementation.\n\nA huge shout out to organizers Analytics Vidhya, Kunal Jain , speakers and attendees who made this event a memorable and enriching experience.\n\n#DataHackSummit2024 #ResponsibleAI #AI",
+        "url": "https://www.linkedin.com/posts/pavan34_datahacksummit2024-responsibleai-ai-activity-7228746335238123520-Gydy?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 6,
+          "like": 4,
+          "support": 0,
+          "love": 0,
+          "insight": 1,
+          "celebrate": 1,
+          "funny": 0,
+          "comments": 1,
+          "reposts": 0
+        },
+        "media": {
+          "type": "images",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQF5Qv-YtTWOHw/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1723467404062?e=1767830400&v=beta&t=a5ScgZsLcO5xkIyX0ZRWz8YjLEJgY1rmhCOMpiGlWPM",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQF5Qv-YtTWOHw/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1723467404062?e=1767830400&v=beta&t=a5ScgZsLcO5xkIyX0ZRWz8YjLEJgY1rmhCOMpiGlWPM",
+              "width": 1170,
+              "height": 883
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQHAvlo8DsqZBQ/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1723467413064?e=1767830400&v=beta&t=A0cuuwxSPhk-MpCeXSJ7AwB4mddYuKtjXVE8YWj8BW0",
+              "width": 2048,
+              "height": 1536
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQFUePeoxHRBQg/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1723467414350?e=1767830400&v=beta&t=f722jtpeeK_lPDchGJMnwJoqnkvrSi_UOrFZMi13lrg",
+              "width": 2048,
+              "height": 1536
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQHpldGjLU_S6Q/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1723467429258?e=1767830400&v=beta&t=cilPlfVLj0vcJxYOLBHgGmGF9POAXZ_Wx1uPYdGwFJY",
+              "width": 2048,
+              "height": 1536
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQE_D2n6N-arUA/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1723467402773?e=1767830400&v=beta&t=P4eer_CRUlVCDQlKrsQ-NP1Jaj-NsrtvR5lofkRdMfA",
+              "width": 1288,
+              "height": 966
+            },
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQEMlSq778-vIw/feedshare-shrink_1280/feedshare-shrink_1280/0/1723467422712?e=1767830400&v=beta&t=kiesEOTW5oO5VNsPNORmK8Z7bk5hi1hDDa1UdTrtnAY",
+              "width": 1280,
+              "height": 1707
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7225161809291304961",
+          "share_urn": null,
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:groupPost:3746827-7225161808821542913",
+        "posted_at": {
+          "date": "2024-08-02 17:33:32",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1722612812350
+        },
+        "url": "https://www.linkedin.com/feed/update/urn:li:activity:7225161809291304961?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "repost",
+        "author": {
+          "first_name": "Artificial",
+          "last_name": "Intelligence 🟥",
+          "headline": "Pavan Kumar Vuppaladadium • 3rd+",
+          "profile_url": "https://www.linkedin.com/groups/3746827?q=highlightedFeedForGroups&highlightedUpdateUrn=urn%3Ali%3AgroupPost%3A3746827-7225161808821542913",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "reshared_post": {
+          "urn": {
+            "activity_urn": "7224707969261703168",
+            "share_urn": null,
+            "ugcPost_urn": "7224385496599171072"
+          },
+          "posted_at": {
+            "date": "2024-08-01 11:30:08",
+            "relative": "1 year ago • Edited • Visible to anyone on or off LinkedIn",
+            "timestamp": 1722504608455
+          },
+          "text": "\"why some AI responses are spot-on while others miss the mark?\"\n\nThe secret lies in mastering prompt engineering— Apart from knowledge context\n\na skill that can make or break the effectiveness of your AI models\n\nPrompt engineering involves designing input queries to elicit desired responses from AI models.\n\nIt requires understanding the model's capabilities and tailoring prompts to harness its strengths. \n\nhow to master it- \n\n- Start with clear, concise, and specific queries. \n- Iterate on prompts to refine and improve AI responses.\n- Incorporate context to guide the AI towards relevant outputs.\n\nvague or ambiguous prompts  results in \n\n- inaccurate or irrelevant information, frustrating users.\n- leads to AI generating biased or inappropriate content.\n- wastes time and resources, reducing productivity.\n- misleading conclusions, impacting decisions. \n\nWhat strategies have you found effective in crafting better prompts?",
+          "url": "https://www.linkedin.com/posts/pavan34_advanced-prompt-techniques-activity-7224707969261703168-NUuz?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+          "post_type": "regular",
+          "author": {
+            "first_name": "Pavan",
+            "last_name": "Kumar Vuppaladadium",
+            "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+            "username": "pavan34",
+            "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+            "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+          },
+          "stats": {
+            "total_reactions": 0,
+            "like": 0,
+            "support": 0,
+            "love": 0,
+            "insight": 0,
+            "celebrate": 0,
+            "funny": 0,
+            "comments": 0,
+            "reposts": 0
+          },
+          "document": {
+            "title": "Advanced Prompt Techniques",
+            "page_count": 6,
+            "url": "https://media.licdn.com/dms/document/media/v2/D4D1FAQE4rJ_kQVSymg/feedshare-document-url-metadata-scrapper-pdf/feedshare-document-url-metadata-scrapper-pdf/0/1722427635385?e=1767009600&v=beta&t=Ui24VcGLIqThsXEjZmAt6U6NwgRHwx_MKyWpZWmMBt8",
+            "thumbnail": "https://media.licdn.com/dms/image/v2/D4D1FAQE4rJ_kQVSymg/feedshare-document-cover-images_1920/feedshare-document-cover-images_1920/0/1722427636791?e=1767009600&v=beta&t=CL04FYDDHNv8GxYog3bxFsUqcPTFNYdxYYCOG4lALuY"
+          }
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7225161469967921152",
+          "share_urn": null,
+          "ugcPost_urn": "7224385496599171072"
+        },
+        "full_urn": "urn:li:ugcPost:7224385496599171072",
+        "posted_at": {
+          "date": "2024-08-02 17:32:11",
+          "relative": "1 year ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1722612731449
+        },
+        "text": "\"why some AI responses are spot-on while others miss the mark?\"\n\nThe secret lies in mastering prompt engineering— Apart from knowledge context\n\na skill that can make or break the effectiveness of your AI models\n\nPrompt engineering involves designing input queries to elicit desired responses from AI models.\n\nIt requires understanding the model's capabilities and tailoring prompts to harness its strengths. \n\nhow to master it- \n\n- Start with clear, concise, and specific queries. \n- Iterate on prompts to refine and improve AI responses.\n- Incorporate context to guide the AI towards relevant outputs.\n\nvague or ambiguous prompts  results in \n\n- inaccurate or irrelevant information, frustrating users.\n- leads to AI generating biased or inappropriate content.\n- wastes time and resources, reducing productivity.\n- misleading conclusions, impacting decisions. \n\nWhat strategies have you found effective in crafting better prompts?",
+        "url": "https://www.linkedin.com/posts/pavan34_advanced-prompt-techniques-ugcPost-7224385496599171072-Vblq?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "repost",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 24,
+          "like": 22,
+          "support": 0,
+          "love": 1,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 3,
+          "reposts": 4
+        },
+        "document": {
+          "title": "Advanced Prompt Techniques",
+          "page_count": 6,
+          "url": "https://media.licdn.com/dms/document/media/v2/D4D1FAQE4rJ_kQVSymg/feedshare-document-url-metadata-scrapper-pdf/feedshare-document-url-metadata-scrapper-pdf/0/1722427635385?e=1767009600&v=beta&t=Ui24VcGLIqThsXEjZmAt6U6NwgRHwx_MKyWpZWmMBt8",
+          "thumbnail": "https://media.licdn.com/dms/image/v2/D4D1FAQE4rJ_kQVSymg/feedshare-document-cover-images_1920/feedshare-document-cover-images_1920/0/1722427636791?e=1767009600&v=beta&t=CL04FYDDHNv8GxYog3bxFsUqcPTFNYdxYYCOG4lALuY"
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7224707969261703168",
+          "share_urn": null,
+          "ugcPost_urn": "7224385496599171072"
+        },
+        "full_urn": "urn:li:ugcPost:7224385496599171072",
+        "posted_at": {
+          "date": "2024-08-01 11:30:08",
+          "relative": "1 year ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1722504608455
+        },
+        "text": "\"why some AI responses are spot-on while others miss the mark?\"\n\nThe secret lies in mastering prompt engineering— Apart from knowledge context\n\na skill that can make or break the effectiveness of your AI models\n\nPrompt engineering involves designing input queries to elicit desired responses from AI models.\n\nIt requires understanding the model's capabilities and tailoring prompts to harness its strengths. \n\nhow to master it- \n\n- Start with clear, concise, and specific queries. \n- Iterate on prompts to refine and improve AI responses.\n- Incorporate context to guide the AI towards relevant outputs.\n\nvague or ambiguous prompts  results in \n\n- inaccurate or irrelevant information, frustrating users.\n- leads to AI generating biased or inappropriate content.\n- wastes time and resources, reducing productivity.\n- misleading conclusions, impacting decisions. \n\nWhat strategies have you found effective in crafting better prompts?",
+        "url": "https://www.linkedin.com/posts/pavan34_advanced-prompt-techniques-activity-7224707969261703168-NUuz?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 24,
+          "like": 22,
+          "support": 0,
+          "love": 1,
+          "insight": 1,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 3,
+          "reposts": 4
+        },
+        "document": {
+          "title": "Advanced Prompt Techniques",
+          "page_count": 6,
+          "url": "https://media.licdn.com/dms/document/media/v2/D4D1FAQE4rJ_kQVSymg/feedshare-document-url-metadata-scrapper-pdf/feedshare-document-url-metadata-scrapper-pdf/0/1722427635385?e=1767009600&v=beta&t=Ui24VcGLIqThsXEjZmAt6U6NwgRHwx_MKyWpZWmMBt8",
+          "thumbnail": "https://media.licdn.com/dms/image/v2/D4D1FAQE4rJ_kQVSymg/feedshare-document-cover-images_1920/feedshare-document-cover-images_1920/0/1722427636791?e=1767009600&v=beta&t=CL04FYDDHNv8GxYog3bxFsUqcPTFNYdxYYCOG4lALuY"
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7217467767476658176",
+          "share_urn": "7217420733109460992",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7217467767476658176",
+        "posted_at": {
+          "date": "2024-07-12 12:00:09",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1720778409833
+        },
+        "text": "This is how to leverage the full potential of your internal knowledge? \n\nDo you know how to enhance your internal processes with AI? \n\nWhat if you could tap into your collective knowledge instantly, whenever you need it? \n\nThis isn't a distant dream- its the reality of RAG systems.\n\nSo, What is RAG? it’s Retrieval Augmented Generation. \n\nRAG combines the best of both worlds, retrieving relevant documents and data from various sources with generative AI capabilities. It\n\n- Eliminates time spent searching for documents from your CRM systems, stored docs, and shared drives. \n\n- Eliminates bottlenecks in decision-making with quick access to critical insights. \n\n- Eliminates knowledge silos by ensuring consistent information sharing across departments. \n\n- Eliminates training downtime with on-demand access to relevant documents. and more. \n\nThe real power of AI solutions comes with integrating custom internal knowledge. \n\nWell, What about data security? here is where tailored solutions steps in to meet specific security needs. \n\nAre you already implementing RAG with security measures in place?",
+        "url": "https://www.linkedin.com/posts/pavan34_this-is-how-to-leverage-the-full-potential-activity-7217467767476658176-7dxe?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7208400498494738433",
+          "share_urn": "7208372422503239680",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7208400498494738433",
+        "posted_at": {
+          "date": "2024-06-17 11:30:04",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1718616604446
+        },
+        "text": "There's a critical step in AI adoption that most companies overlook.\n\nit’s measuring AI Project Success.\n\nThe two points to consider here are\n\n1) Is our AI truly performing at its best?\n2) Are we measuring its impact effectively?\n\nSo, How to effectively measure the project success?\n\nThe answer is “Establishing the right KPIs (Key Performance Indicators)”.\n\nKPI’s provide a clear, data-driven way to track progress, optimize performance, and ensure your AI projects align with business goals.\n\nHere are the 3 types of KPI’s you can consider\n\n1) How effective and coherent are our generative AI outputs? - Consider metrics like accuracy, creativity, error rate.\n\n2) How efficient and user-friendly is our AI model? - Measure productivity impact, user satisfaction, adaptability,processing time and scalability on demand.\n\nThe most important and final one\n\n3) What financial and compliance benefits are we getting from AI solutions? - Look at ROI, cost savings, revenue growth, and compliance rate to assess the financial returns, cost efficiency, revenue impact, and adherence to regulatory standards of your AI initiatives.\n\nAI adoption doesn’t happen overnight. Tracking the crucial metrics determines the success of the initiative.\n\n\nWhat are your AI KPI’s?",
+        "url": "https://www.linkedin.com/posts/pavan34_theres-a-critical-step-in-ai-adoption-that-activity-7208400498494738433-zUND?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 4,
+          "like": 4,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        },
+        "media": {
+          "type": "image",
+          "url": "https://media.licdn.com/dms/image/v2/D4D22AQGkSSj9DAjMjA/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1718609909290?e=1767830400&v=beta&t=oE-XFa_tpgOB9opsGiDBXH0H7CW9QvDoSbOdSykmazA",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D4D22AQGkSSj9DAjMjA/feedshare-shrink_2048_1536/feedshare-shrink_2048_1536/0/1718609909290?e=1767830400&v=beta&t=oE-XFa_tpgOB9opsGiDBXH0H7CW9QvDoSbOdSykmazA",
+              "width": 1920,
+              "height": 1080
+            }
+          ]
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7206226165227831299",
+          "share_urn": "7206186109142286339",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7206226165227831299",
+        "posted_at": {
+          "date": "2024-06-11 11:30:02",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1718098202998
+        },
+        "text": "AI is Heading Towards Commoditization: Here is what you need to know \n\nJust like cloud computing, AI is becoming more accessible and affordable, transforming from a groundbreaking innovation to a commoditized service.\n\nwhy is this happening? \n\nDid you know AI is being developed by a wide range of actors, from businesses to researchers?  This widespread development is making AI a non-scarce technology.\n\nConsider the convenience of on-demand AI services offered by cloud providers. They reduce the need for in-house development. How does this affect your business?\n\nThink about the rise of foundation models like GPT-4o and Gemini-1.5pro.  Are these creating homogeneity in the market?\n\nHave you noticed how AI as a general-purpose technology, impacts every sector? \n\nReflecting on the current AI hype cycle, Is it driven more by market opportunities than the original goal of understanding intelligence?\n\nOff-the-shelf AI solutions are becoming more prevalent. While they offer ease of use and quick implementation, do they truly meet the unique needs of your business?\n\nWhat about security? As AI becomes more widespread, the risks associated with data breaches and cyber-attacks increases \n\nDespite these trends, here is how you can maintain a competitive edge.\n\nTailored solutions to specific business needs.\n\nDomain expertise in applying AI to complex business problems remains invaluable. \n\nDo you think AI is on its way to becoming a fully commoditized service? 🤔",
+        "url": "https://www.linkedin.com/posts/pavan34_ai-is-heading-towards-commoditization-here-activity-7206226165227831299-CqJG?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7204791751784468480",
+          "share_urn": "7204727442660298753",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7204791751784468480",
+        "posted_at": {
+          "date": "2024-06-07 12:30:12",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1717756212183
+        },
+        "text": "This is how you can improve your employee productivity\n\nWhat if I told you that adopting AI early could lead to happier, more fulfilled employees?\n\nIt's true! By automating mundane, repetitive tasks, you can free up your team's time and energy for more meaningful work.\n\nThink about it:\n\nNo more endless data entry\nNo more hours spent on manual reporting\nNo more tedious administrative tasks\n\nInstead, your employees can focus on high-value activities that require creativity, critical thinking, and human connection.\n\nEvery body know this.\n\nBut that's not all! Early AI adoption can also improve work-life balance.\nWith automation handling the grunt work, your team can enjoy more flexibility and control over their schedules.\n\nThey'll have more time for family, hobbies, and self-care - leading to reduced stress and increased job satisfaction.\n\nOn the flip side, companies that take a reactive approach to AI risk falling behind.\n\nThey may struggle with:\n\nOverworked, burnt-out employees\nHigh turnover rates\nDifficulty attracting top talent\n\nSo, what's the next step?\n\nStart by identifying areas where AI and automation could have the biggest impact.\n\nIt could be as simple as automating data entry or using chatbots for customer support.\n\nThen, gradually expand to other areas of your business.\n\nBy taking a proactive approach, you'll set your employees and your company up for long-term success.\n\nThe AI revolution is here to stay, and it's not going away anytime soon!\n\nWhat are your thoughts?",
+        "url": "https://www.linkedin.com/posts/pavan34_this-is-how-you-can-improve-your-employee-activity-7204791751784468480-PxbF?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7203342176737452032",
+          "share_urn": "7203316583874633730",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7203342176737452032",
+        "posted_at": {
+          "date": "2024-06-03 12:30:06",
+          "relative": "1 year ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1717410606560
+        },
+        "text": "When should we switch to more complex enterprise solution over ChatGPT? That’s a question one of the business owner asked in a webinar.\n\nWell, let’s start by asking, \"What challenges are you looking to tackle?\" Understanding the problem always guides us to the right solution.\n\nNow, there are two types of AI - Consumer level and Enterprise level AI.\nTo help clarify, I will share a comparison that illustrates the distinct roles of consumer AI and enterprise AI.\n\nMeet Laura, a head of sales at XYZ Company, she needs to quickly respond to clients, to handle the high volume of client emails here is where she can easily draft the emails using consumer tools like ChatGPT.\n\nAs her business grows, Laura now wants to analyze sales stage data of a prospect and get actionable insights from the past email conversations and meetings. \n\nThis is where integrating enterprise AI solutions with access to multiple knowledge sources, helps her get clear data insights, and create personalized sales pitches and close more deals.\n\nSo, When to Choose Enterprise AI Solutions:\n\nComplexity Increases: The tasks involve managing large-scale data or require integrating multiple systems that a simple AI cannot handle.\n\nSecurity is Paramount: The data involved is sensitive, and security and compliance are critical.\n\nCustomization is Needed: Off-the-shelf AI solutions do not offer the flexibility required to meet specific business needs.\n\n\nHave you found more general tools like ChatGPT helpful, or do you lean towards specialized enterprise solutions?",
+        "url": "https://www.linkedin.com/posts/pavan34_when-should-we-switch-to-more-complex-enterprise-activity-7203342176737452032-HTtJ?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7201171601860546560",
+          "share_urn": "7201156025444401152",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7201171601860546560",
+        "posted_at": {
+          "date": "2024-05-28 12:45:01",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1716893101182
+        },
+        "text": "This is a most common misconception of building AI systems.\n\nMyth: Building AI systems is over-complicated and disrupts existing systems.\n\nThe Reality: Though AI itself is complicated, implementing AI systems doesn't have to be?\n\nwhy?\n\nlatest advancements and costs for inference decreasing rapidly, entry has been easier than ever before.\n\n**Then ,What’s Holding Businesses Back?**\n\nMost businesses think that implementing new systems means\n\n- large system replacements\n- Massive data migrations\n- Extensive team training\n- Adapting to new user interfaces\n\n**so, how business can achieve maximum value?**\n\n- begin with small-scale projects that deliver immediate value.\n- Combining in-house process expertise with AI to enhance operations.\n- leveraging current infrastructure with minimal change.\n- and build on Small wins to pave the way for broader integration\n\nWhat do you think is the biggest reason holding businesses back in integrating AI?\n\nWant more tips on seamless AI integration? Follow me for regular updates and insights on leveraging AI effectively in your business operations.",
+        "url": "https://www.linkedin.com/posts/pavan34_this-is-a-most-common-misconception-of-building-activity-7201171601860546560-rjNL?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7199340812608950272",
+          "share_urn": "7199099215652831233",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7199340812608950272",
+        "posted_at": {
+          "date": "2024-05-23 11:30:07",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1716456607010
+        },
+        "text": "AI Readiness#4 📘 If we ask ChatGPT to always return a specific color, regardless of the context, it will do just that. This simplistic command illustrates the complex layers of governance required to ensure AI systems like ChatGPT or RAG systems function responsibly, effectively, and ethically\n\nHere are different governance and evaluation mechanisms you can consider when deploying AI systems at scale. \n\n1) Use Guardrails: To prevent AI from operating outside predefined safety and operational boundaries\n\n2) Model Governance : To evaluate the accuracy of AI agent responses with factual answers and required types of response using cosine similarities and evaluation frameworks\n\n3)Ethical and Legal Governance: To Determine what systems can be developed internally and which can be exposed to public adhering to relevant laws and regulations (e.g., GDPR for data privacy). \n\n4) Usage Governance: To create internal policies how AI systems can be used  within the business and what external AI tools can be used. \n\n5) Accountability Governance: To create how AI can be used for decision making and who are responsible for it.\n\nWhich governance mechanism do you think is most critical for AI applications today and what do you consider adding to your AI systems?",
+        "url": "https://www.linkedin.com/posts/pavan34_ai-readiness4-if-we-ask-chatgpt-to-always-activity-7199340812608950272-Vj2V?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7198616033912356865",
+          "share_urn": "7198317795212722176",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7198616033912356865",
+        "posted_at": {
+          "date": "2024-05-21 11:30:06",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1716283806303
+        },
+        "text": "AI Readiness #3 Here’s how I approach data preparation for AI readiness\n\nData Collection: start by identifying and gathering relevant data sources such as text, images, audio, or video as required by your use case.\n\nData Cleaning: Remove any inaccurate or irrelevant information. filter out noise, correct errors, and ensure data is of high quality.\n\nData Privacy and Ethics: Ensure that the data complies with all relevant privacy laws and ethical guidelines.\n\nData Splitting: Divide your data into training, validation, and test sets, to check and test the efficiency of the developed solution.\n\nWhy this is crucial?\nthe more effort put in optimizing data infrastructure, the more relevant data gets feed into the model and better output.\n\nHow are you optimizing your data infrastructure??",
+        "url": "https://www.linkedin.com/posts/pavan34_ai-readiness-3-heres-how-i-approach-data-activity-7198616033912356865-twuv?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7197568502226939905",
+          "share_urn": "7197568501673259008",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7197568502226939905",
+        "posted_at": {
+          "date": "2024-05-18 14:07:35",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1716034055287
+        },
+        "text": "Google I/O 2024. Its all about Gemini era.\n\nThe Gemini on Google Search, Photos, and Workspace  provides a smarter and more intuitive user experiences  \n\nThe launch of Gemini 1.5 Pro features a one million token context soon to be 2 million context, allowing for more extensive and complex data processing -  This might increase the \"lost-in-the-middle\" problem that most LLM's face and also increases cost. \n\nGemini On Android- On device LLM for more security.\n\nProject Astra, seems promising and can change how we learn.\n\nFinally, How many features showcased in Google I/O do you actually use?",
+        "url": "https://www.linkedin.com/posts/pavan34_google-io-2024-its-all-about-gemini-era-activity-7197568502226939905-nhHN?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7196467973929238529",
+          "share_urn": "7196467971622420481",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7196467973929238529",
+        "posted_at": {
+          "date": "2024-05-15 13:14:28",
+          "relative": "1 year ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1715771668894
+        },
+        "text": "AI readiness #2 : AI can automate almost every thing. How to find high ROI use cases for your business 👇 \n\nIdentifying a Problem to Solve\n\n1️⃣ Do I have an existing problem to solve?\n\nYes: Consider how AI can address this issue. E.g., Our team frequently searches internal documents to retrieve content.\n\nNo or unsure: Map out all existing processes and look for areas to integrate automation (repetitive tasks, constant information retrieval, improving customer service, etc.)\n\n2️⃣ If still unclear, gather all stakeholders and domain experts for an audit.\n \nFor each process or problem identified, address the following:\n\nAssessment\n\n1️⃣ What value does it bring to my business, employees, or end-users? (Increased productivity, reduced costs, customer satisfaction, etc.)\n\n2️⃣ How will I measure the success of the project? Establish KPIs (Financial metrics, Employee Productivity Rate, Customer Satisfaction Score, etc.)\n\n3️⃣ What are the alternative options for solving the problem?\n\n\nFeasibility & Risks:\n\n1️⃣ Assess the technical, financial, and human resources required (data, infrastructure, budget, etc.).\n\n2️⃣ Does it align with the company’s long-term goals?\n\n3️⃣ What are the potential risks of the project?\n\nPrioritize:  Rank and score the identified opportunities based on their potential impact, feasibility, and alignment with goals.\n\n🚀 Always start with a pilot project to measure effectiveness and identify any unforeseen challenges.\n\nRemember,\nPilot Project ➡️ Measure KPIs ➡️ Get Feedback ➡️ Iterate ➡️ Scale\n\nAre there any critical elements or steps you think needs to be added?\n\nHaving trouble identifying high ROI use cases? Reach out to me! 📲",
+        "url": "https://www.linkedin.com/posts/pavan34_ai-readiness-2-ai-can-automate-almost-activity-7196467973929238529-tfom?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7196034797931003904",
+          "share_urn": "7196034797490651137",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7196034797931003904",
+        "posted_at": {
+          "date": "2024-05-14 08:33:11",
+          "relative": "1 year ago • Visible to anyone on or off LinkedIn",
+          "timestamp": 1715668391688
+        },
+        "text": "🚀 A New Model Update from OpenAI: GPT-4o. What’s in for Us?\n\n1)Accepts a combination of text, audio, and video into the same input.\n2)More human-like voice interactions with expressions.\n3)Free for all users.\n4)Faster and 50% cheaper through API.\n5)Better tokenization for some languages.\n\nWhy is it faster?\n\nThey claim that all the text, voice, and video interactions are processed on the same neural network removing latency of conversion allowing it to better understand tone, identify speakers, and filter background noise.\n\nWhat I didn't like:\n\nThrough the demo, the assistant was always more expressive and lacked customization in the playground for now.\n\nHow it can help businesses - some use cases:\n\n1) A whole new customer service experience with different types of inputs.\n2) Can develop interactive training modules for employees.\n\n\n What use cases do you foresee with this new model?",
+        "url": "https://www.linkedin.com/posts/pavan34_a-new-model-update-from-openai-gpt-4o-activity-7196034797931003904-oOT3?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 1,
+          "like": 1,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7195746022310998017",
+          "share_urn": "7195746019601461248",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7195746022310998017",
+        "posted_at": {
+          "date": "2024-05-13 13:25:42",
+          "relative": "1 year ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1715599542215
+        },
+        "text": "🌱 Getting a business AI-ready is like growing a tree. 🌳\nMuch like a tree that grows well under the right conditions, AI accelerates businesses when the groundwork is properly laid.\n\n How? Let's break it down! 👇\n\n1️⃣ Select the right Seeds (Business Objectives) - Identifying the specific business objectives where AI can boost outcomes—like enhancing employee productivity or improving customer service, saving costs—is the first crucial step. \n\n2️⃣ Prepare the Soil (Data Preparation) - Creating a solid data infrastructure for collecting and structuring quality data is crucial. \n\n3️⃣ Setting Boundaries (Governance) - Having clear data governance policies and determining the level of security required in AI applications ensures a successful AI deployment. \n\n4️⃣ Regular Care and Pruning (Skills Set) - Regular training and skill development are required for the efficient use of developed solutions. \n\n5️⃣ Creating a Supportive Environment (Cultural Readiness) - Building a culture open to change, innovation, and AI is essential for successful technology adoption and use. \n\n\nWhat nurturing process do you think is most challenging for a business to get AI ready? 🤔 #AIForBusiness #Skill Development #Innovation",
+        "url": "https://www.linkedin.com/posts/pavan34_aiforbusiness-skill-innovation-activity-7195746022310998017-mAi0?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 2,
+          "like": 2,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      },
+      {
+        "urn": {
+          "activity_urn": "7194693837540278272",
+          "share_urn": "7194693834784575488",
+          "ugcPost_urn": null
+        },
+        "full_urn": "urn:li:activity:7194693837540278272",
+        "posted_at": {
+          "date": "2024-05-10 15:44:41",
+          "relative": "1 year ago • Edited • Visible to anyone on or off LinkedIn",
+          "timestamp": 1715348681817
+        },
+        "text": "🚀My journey to AI: Beyond code\n\nAs a founder myself, my journey was not just about technology but finding ways to improve workflows everyday.\n\nI was late to discover when ChatGPT got released but soon realized the potential it can bring to every day operations. Started looking into various ways it can benefit us, but soon was limited by its knowledge. Later with the introduction of various frameworks and advancements it have made easy to implement.\n\nHowever, Many businesses are not yet AI ready to enhance their daily operations.\n\n🔍 What I Learned\n\nAi is not one-fit-solution for all- Every business is unique and require a AI strategy\nCustomization is Key: Realising the need for bespoke solutions based on one’s goals.\n\n📚 What to expect here\n\nAI Readiness: How to get AI ready, by evaluating business’s technological maturity.\nRetrieval-Augmented Generation (RAG): How RAG systems helps in automating various tasks and their limitations.\nLLM Costs: Understanding the investment in large language models and their ROI for businesses.\nPractical Use Cases: Real-world applications and case studies of AI.\n\n\n💬Join the Conversation Where in your business you want AI to fit in. Let’s discuss in the comments below!",
+        "url": "https://www.linkedin.com/posts/pavan34_my-journey-to-ai-beyond-code-as-a-founder-activity-7194693837540278272-T53d?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGGHWpEBPU1iUYE3-q3m2CjAbjJNIK_P-3o",
+        "post_type": "regular",
+        "author": {
+          "first_name": "Pavan",
+          "last_name": "Kumar Vuppaladadium",
+          "headline": "Helping SMEs Reduce Manual Work and Cut Costs with AI Systems- Upto 70% Faster Workflows | AI Consultant | AI Integration | AI Advisor | Generative AI",
+          "username": "pavan34",
+          "profile_url": "https://www.linkedin.com/in/pavan34?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
+          "profile_picture": "https://media.licdn.com/dms/image/v2/D4D35AQFxXdBJkN4DZA/profile-framedphoto-shrink_800_800/profile-framedphoto-shrink_800_800/0/1713364234470?e=1767009600&v=beta&t=BaiOjJI782kWRWG5czeoPMKkwV7tv8yBV2K87Ae3SOY"
+        },
+        "stats": {
+          "total_reactions": 0,
+          "like": 0,
+          "support": 0,
+          "love": 0,
+          "insight": 0,
+          "celebrate": 0,
+          "funny": 0,
+          "comments": 0,
+          "reposts": 0
+        }
+      }
+    ],
+    "pagination_token": "dXJuOmxpOmFjdGl2aXR5OjcxOTQ2OTM4Mzc1NDAyNzgyNzItMTcxNTM0ODY4MTc4NA=="
+  }
+}

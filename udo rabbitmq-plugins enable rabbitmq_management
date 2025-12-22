@@ -1,4 +1,5 @@
-[0;1;32m●[0m rabbitmq-server.service - RabbitMQ Messaging Server
+
+0;1;32m●[0m rabbitmq-server.service - RabbitMQ Messaging Server
      Loaded: loaded (/lib/systemd/system/rabbitmq-server.service; enabled; vendor preset: enabled)
      Active: [0;1;32mactive (running)[0m since Mon 2024-04-22 16:56:59 IST; 10min ago
    Main PID: 192335 (beam.smp)
@@ -18,4 +19,5 @@ Apr 22 16:56:59 pavan-System-Product-Name systemd[1]: Started RabbitMQ Messaging
 Apr 22 16:57:01 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m
 Apr 22 17:07:29 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m
 Apr 22 17:07:30 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m
-Apr 22 17:07:30 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m
+-+
+pr 22 17:07:30 pavan-System-Product-Name systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mrabbitmq-server.service: Supervising process 192335 which is not our child. We'll most likely not notice when it exits.[0m

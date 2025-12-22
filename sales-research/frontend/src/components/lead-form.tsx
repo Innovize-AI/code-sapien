@@ -1,0 +1,261 @@
+"use client"
+
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { Loader2 } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { generateResearch, LeadData } from "@/lib/api"
+
+const formSchema = z.object({
+    linkedin_url: z.string().url({ message: "Please enter a valid LinkedIn URL." }),
+    website: z.string().url({ message: "Please enter a valid website URL." }),
+    email: z.string().email({ message: "Please enter a valid email." }).optional().or(z.literal("")),
+    lead_source: z.string().optional(),
+    download_marketing_material: z.boolean().default(false),
+    demo_requested: z.boolean().default(false),
+    referral_partner_introduction: z.boolean().default(false),
+    project_urgency: z.string().optional(),
+})
+
+interface LeadFormProps {
+    onSuccess: (data: any) => void
+    defaultUrl?: string
+}
+
+export function LeadForm({ onSuccess, defaultUrl }: LeadFormProps) {
+    const [isLoading, setIsLoading] = useState(false)
+    const [statusMessage, setStatusMessage] = useState("")
+
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            linkedin_url: defaultUrl || "",
+            website: "",
+            email: "",
+            lead_source: "",
+            download_marketing_material: false,
+            demo_requested: false,
+            referral_partner_introduction: false,
+            project_urgency: "",
+        },
+    })
+
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        setIsLoading(true)
+        try {
+            const urgencyMap: Record<string, number> = {
+                "Low": 1,
+                "Medium": 2,
+                "High": 3
+            }
+
+            const apiData: LeadData = {
+                linkedin_url: values.linkedin_url,
+                website: values.website,
+                email: values.email || undefined,
+                lead_source: values.lead_source || undefined,
+                download_marketing_material: values.download_marketing_material,
+                demo_requested: values.demo_requested,
+                referral_partner_introduction: values.referral_partner_introduction,
+                project_urgency: values.project_urgency ? urgencyMap[values.project_urgency] : undefined,
+            }
+
+            const result = await generateResearch(apiData, (status) => {
+                setStatusMessage(status)
+            })
+            onSuccess(result)
+        } catch (error) {
+            console.error("Error generating research:", error)
+            // You might want to show an error toast here
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    return (
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                    control={form.control}
+                    name="linkedin_url"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>LinkedIn URL</FormLabel>
+                            <FormControl>
+                                <Input placeholder="https://www.linkedin.com/in/..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="website"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Website URL</FormLabel>
+                            <FormControl>
+                                <Input placeholder="https://example.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Email (Optional)</FormLabel>
+                            <FormControl>
+                                <Input placeholder="email@example.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="lead_source"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Lead Source</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a source" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="Referral">Referral</SelectItem>
+                                        <SelectItem value="Inbound Marketing">Inbound Marketing</SelectItem>
+                                        <SelectItem value="Paid Ads">Paid Ads</SelectItem>
+                                        <SelectItem value="Cold Outreach">Cold Outreach</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="project_urgency"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Project Urgency</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select urgency" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="Low">Low</SelectItem>
+                                        <SelectItem value="Medium">Medium</SelectItem>
+                                        <SelectItem value="High">High</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                <div className="flex flex-col space-y-2">
+                    <FormField
+                        control={form.control}
+                        name="download_marketing_material"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                <FormControl>
+                                    <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                    />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                    <FormLabel>
+                                        Downloaded Marketing Material
+                                    </FormLabel>
+                                </div>
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="demo_requested"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                <FormControl>
+                                    <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                    />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                    <FormLabel>
+                                        Demo Requested
+                                    </FormLabel>
+                                </div>
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="referral_partner_introduction"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                <FormControl>
+                                    <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                    />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                    <FormLabel>
+                                        Referral Partner Introduction
+                                    </FormLabel>
+                                </div>
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                {isLoading && (
+                    <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg animate-pulse mb-4">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <span className="text-sm font-medium">{statusMessage || "Starting research..."}</span>
+                    </div>
+                )}
+
+                <Button type="submit" disabled={isLoading} className="w-full">
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Generate Research
+                </Button>
+            </form>
+        </Form>
+    )
+}

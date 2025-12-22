@@ -91,3 +91,9 @@ def convert_iso_to_readable(iso_datetime: str) -> str:
 
     except Exception as e:
         return f"Error: {e}"
+    
+def convert_base64_to_String(encoded_str):
+
+    import base64
+    decoded_bytes = base64.b64decode(encoded_str)
+    decoded_str = decoded_bytes.decode("utf-8")

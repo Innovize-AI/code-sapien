@@ -8,9 +8,9 @@ slack_router = APIRouter(prefix='/slack/events', tags=['slack'], responses={404:
 load_dotenv()
 
 # Set Slack API credentials
-SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_USER_ID")
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET")
-SLACK_BOT_USER_ID = os.environ.get("SLACK_BOT_TOKEN")
+SLACK_BOT_USER_ID = os.environ.get("SLACK_BOT_USER_ID")
 
 
 @slack_router.post("/")

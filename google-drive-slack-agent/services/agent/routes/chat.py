@@ -24,7 +24,7 @@ chat_history=[]
 @chat_router.post("/")
 async def chat(message: Message, conversation_id:str):
 
-    llm= ChatOpenAI(api_key= os.environ.get("OPEN_API_SECRET"), temperature=0, model= "gpt-3.5-turbo-0125")
+    llm= ChatOpenAI(api_key= os.environ.get("OPEN_API_SECRET"), temperature=0, model= "gpt-4o-mini")
     
     message_history = RedisChatMessageHistory(url="redis://localhost:6379", ttl=600, session_id=conversation_id)
     chat_key=r.get(conversation_id)

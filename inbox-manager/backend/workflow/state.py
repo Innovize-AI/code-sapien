@@ -20,6 +20,8 @@ class EmailIntent(BaseModel):
     intent_type: str
     justification: str
 
+class RelevantThreadMessages(BaseModel):
+    thread_messages:list[str]
 
 class AgentGraphState(TypedDict):
     #
@@ -27,7 +29,7 @@ class AgentGraphState(TypedDict):
     to_email_id:str
     raw_email_body:str
     processed_email_body:str
-    email_thread_history: str
+    email_thread_history: list[dict]
     company_domain_name:str
     sender_domain_name: str
 
@@ -42,7 +44,7 @@ class AgentGraphState(TypedDict):
     #intermediate messages
     messages: Annotated[list[AnyMessage], add_messages]
     email_intent: EmailIntent
-
+    thread_messages: list[str]
     
 state= AgentGraphState(
     raw_email_body= ""

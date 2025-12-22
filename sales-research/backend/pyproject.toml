@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "sales-research"
+version = "0.1.0"
+description = ""
+authors = ["pavan kumar.v <pavan.kumar@the10xacademy.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+langgraph = "^0.1.19"
+langgraph-cli = "^0.1.50"
+langgraph-sdk = "^0.1.26"
+ipython = "^8.26.0"
+langchain = "^0.2.14"
+langchain-community = "^0.2.12"
+langchain-openai = "^0.1.22"
+langchain-core = "^0.2.32"
+langchain-experimental = "^0.0.64"
+fastapi = "^0.112.2"
+uvicorn = "^0.30.6"
+python-dotenv = "^1.0.1"
+beautifulsoup4 = "^4.12.3"
+supabase = "^2.26.0"
+alembic = "^1.17.2"
+psycopg2 = "^2.9.11"
+asyncpg = "^0.31.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

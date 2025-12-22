@@ -21,7 +21,7 @@ class DrafterRequest(BaseModel):
     sender_email_id:str
     to_email_id:Optional[str]
     thread_id:str
-    thread
+    thread_messages: Optional[list[dict]]
 
 class SendEmailRequest(BaseModel):
     thread_id:str
@@ -36,7 +36,7 @@ async def run_workflow(drafter_request: DrafterRequest,db: AsyncSession = Depend
     "raw_email_body": drafter_request.raw_email_body,
     "company_domain_name": drafter_request.company_domain_name,
     "sender_email_id": drafter_request.sender_email_id,
-    "thread_messages": dra
+    "email_thread_history": drafter_request.thread_messages
     # "to_email_id": drafter_request.to_email_id
     
     })

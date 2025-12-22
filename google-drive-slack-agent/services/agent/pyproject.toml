@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "google-drive-slack-agent"
+version = "0.1.0"
+description = ""
+authors = ["pavan kumar.v <pavan.kumar@the10xacademy.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.110.1"
+langchain = "^0.1.15"
+langchain-community = "^0.0.32"
+chromadb = "^0.4.24"
+openai = "^1.16.2"
+langchain-text-splitters = "^0.0.1"
+google-api-python-client = "^2.125.0"
+google-auth-httplib2 = "^0.2.0"
+google-auth-oauthlib = "^1.2.0"
+oauth2client = "^4.1.3"
+pandas = "^2.2.2"
+celery = "^5.4.0"
+langchain-openai = "^0.1.3"
+qdrant-client = "^1.8.2"
+flower = "^2.0.1"
+redis = "^5.0.4"
+slack-sdk = "^3.27.1"
+slack-bolt = "^1.18.1"
+langchainhub = "^0.1.15"
+
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

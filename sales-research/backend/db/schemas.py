@@ -24,3 +24,31 @@ class ResearchReport(ResearchReportBase):
 
     class Config:
         from_attributes = True
+
+# ICP Schemas
+class IdealProfileData(BaseModel):
+    industry: str
+    company_size: Optional[str] = None
+    revenue: Optional[str] = None
+    job_title: str
+    value_proposition: Optional[str] = None
+
+class IntegrationSettings(BaseModel):
+    tavily_api_key: Optional[str] = None
+    apollo_api_key: Optional[str] = None
+
+class OrganizationSettingsBase(BaseModel):
+    icp_json: Optional[str] = None
+    tavily_api_key: Optional[str] = None
+    apollo_api_key: Optional[str] = None
+
+class OrganizationSettingsCreate(OrganizationSettingsBase):
+    pass
+
+class OrganizationSettings(OrganizationSettingsBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True

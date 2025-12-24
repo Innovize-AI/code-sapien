@@ -24,3 +24,20 @@ class ResearchReport(Base):
     # Metrics
     lead_score = Column(Integer, nullable=True)
     project_urgency = Column(Integer, nullable=True)
+
+class OrganizationSettings(Base):
+    __tablename__ = "organization_settings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))
+    
+    # For now, we assume single tenant or global settings. 
+    # In future, add user_id or org_id here.
+    
+    # Store ICP as JSON
+    icp_json = Column(Text, nullable=True) # Storing JSON string for flexibility
+    
+    # Integration Keys
+    tavily_api_key = Column(String, nullable=True)
+    apollo_api_key = Column(String, nullable=True)

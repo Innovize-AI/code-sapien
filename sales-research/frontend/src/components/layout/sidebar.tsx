@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Search, Settings, Home, History } from "lucide-react"
+import { BarChart3, Search, Settings, Home, History, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 
 const sidebarItems = [
     {
@@ -33,7 +34,7 @@ const sidebarItems = [
     },
 ]
 
-export function Sidebar() {
+export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
     const pathname = usePathname()
 
     return (
@@ -45,7 +46,17 @@ export function Sidebar() {
                 </div>
             </div>
 
-            <nav className="flex-1 p-4 space-y-2">
+            <div className="px-4 py-4">
+                <Button
+                    className="w-full justify-start gap-2"
+                    onClick={onAnalyzeClick}
+                >
+                    <Plus className="w-4 h-4" />
+                    New Research
+                </Button>
+            </div>
+
+            <nav className="flex-1 p-4 space-y-1">
                 {sidebarItems.map((item) => {
                     const isActive = pathname === item.href
                     return (

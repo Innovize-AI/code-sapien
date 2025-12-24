@@ -11,6 +11,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.sales_research import sales_router
 from routes.history import history_router
+from routes.settings import settings_router
+from routes.dashboard import dashboard_router
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -33,6 +35,8 @@ if environment == "dev":
 
 app.include_router(sales_router, prefix="/sales-research")
 app.include_router(history_router, prefix="/sales-research")
+app.include_router(settings_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
 
 
 if __name__ == "__main__":

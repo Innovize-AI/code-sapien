@@ -4,10 +4,49 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Search, BarChart3, Users, Zap } from "lucide-react";
+import { ArrowRight, Search, BarChart3, Users, Zap, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { fetchDashboardStats, fetchHistory, DashboardStats } from "@/lib/api";
 
 export default function Home() {
+    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [recentReports, setRecentReports] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const loadDashboardData = async () => {
+            try {
+                const [statsData, historyData] = await Promise.all([
+                    fetchDashboardStats(),
+                    fetchHistory()
+                ]);
+                setStats(statsData);
+                // Sort by date desc and take top 5
+                const sortedHistory = (historyData || []).sort((a: any, b: any) =>
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                ).slice(0, 5);
+                setRecentReports(sortedHistory);
+            } catch (e) {
+                console.error("Failed to load dashboard data", e);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadDashboardData();
+    }, []);
+
+    if (isLoading) {
+        return (
+            <DashboardLayout>
+                <div className="flex h-full items-center justify-center min-h-[50vh]">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            </DashboardLayout>
+        );
+    }
+
     return (
         <DashboardLayout>
             <div className="flex flex-col gap-8">
@@ -33,27 +72,27 @@ export default function Home() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard
                         title="Total Leads Found"
-                        value="1,248"
+                        value={stats?.total_leads.toLocaleString() || "0"}
                         icon={Users}
-                        trend={{ value: 12, isPositive: true }}
-                    />
-                    <StatCard
-                        title="Reports Generated"
-                        value="56"
-                        icon={BarChart3}
-                        trend={{ value: 4, isPositive: true }}
+                    // trend={{ value: 12, isPositive: true }} // Trend needs historical data diff
                     />
                     <StatCard
                         title="Avg. Lead Score"
-                        value="78"
+                        value={stats?.avg_lead_score.toString() || "0"}
+                        icon={BarChart3}
+                    // trend={{ value: 4, isPositive: true }}
+                    />
+                    <StatCard
+                        title="High Potential Leads"
+                        value={stats?.high_potential_leads.toLocaleString() || "0"}
                         icon={Zap}
-                        description="High Potential"
+                        description="Score > 70"
                     />
                     <StatCard
                         title="Time Saved"
-                        value="24h"
-                        icon={Users} // Placeholder icon
-                        description="This month"
+                        value={`${stats?.time_saved_hours.toFixed(1)}h` || "0h"}
+                        icon={Users}
+                        description="Estimated (30m/lead)"
                     />
                 </div>
 
@@ -100,25 +139,41 @@ export default function Home() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {/* Placeholder Items */}
-                                {[1, 2, 3].map((i) => (
-                                    <div key={i} className="flex items-center justify-between pb-4 border-b last:border-0 last:pb-0">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center font-bold text-xs">
-                                                L{i}
+                                {recentReports.length === 0 ? (
+                                    <div className="text-sm text-muted-foreground py-4 text-center">No reports generated yet.</div>
+                                ) : (
+                                    recentReports.map((report) => (
+                                        <Link href={`/reports?id=${report.id}`} key={report.id}>
+                                            <div className="flex items-center justify-between pb-4 border-b last:border-0 last:pb-0 hover:bg-muted/50 p-2 rounded-md transition-colors cursor-pointer">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center font-bold text-xs">
+                                                        {(report.fullname || "U")[0]}
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm font-medium leading-none">{report.fullname || "Unknown Lead"}</p>
+                                                        <p className="text-xs text-muted-foreground truncate w-32">
+                                                            {report.linkedin_url || report.website || "No link"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="font-medium text-sm">
+                                                    <span className={
+                                                        (report.lead_score || 0) > 70 ? "text-green-600 font-bold" :
+                                                            (report.lead_score || 0) > 40 ? "text-yellow-600" : "text-muted-foreground"
+                                                    }>
+                                                        {report.lead_score || "N/A"}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm font-medium leading-none">Global Tech Lead</p>
-                                                <p className="text-xs text-muted-foreground">linkedin.com/in/example...</p>
-                                            </div>
-                                        </div>
-                                        <div className="font-medium text-sm">Score: 85</div>
-                                    </div>
-                                ))}
+                                        </Link>
+                                    ))
+                                )}
                             </div>
-                            <Button variant="ghost" className="w-full mt-4 text-xs">
-                                View All History <ArrowRight className="w-3 h-3 ml-1" />
-                            </Button>
+                            <Link href="/history">
+                                <Button variant="ghost" className="w-full mt-4 text-xs">
+                                    View All History <ArrowRight className="w-3 h-3 ml-1" />
+                                </Button>
+                            </Link>
                         </CardContent>
                     </Card>
                 </div>

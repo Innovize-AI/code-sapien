@@ -3,8 +3,9 @@
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import Link from "next/link"
 import * as z from "zod"
-import { Loader2 } from "lucide-react"
+import { Loader2, Search, CheckSquare, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -23,22 +24,40 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { discoverLeads } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { LeadStatus } from "@/components/bulk-analysis-modal"
 
-export function DiscoveryForm({ onSelect }: { onSelect?: (url: string) => void }) {
+const findFormSchema = z.object({
+    industry: z.string().min(2, "Industry is required"),
+    job_title: z.string().min(2, "Job title is required"),
+    location: z.string().optional(),
+    provider: z.enum(["tavily", "apollo"]),
+})
+
+type FindFormValues = {
+    industry: string;
+    job_title: string;
+    location?: string;
+    provider: "tavily" | "apollo";
+}
+
+export function DiscoveryForm({
+    onSelect,
+    onBulkSelect,
+    leadsStatus
+}: {
+    onSelect?: (lead: { url: string, website: string }) => void,
+    onBulkSelect?: (leads: { url: string, website: string }[]) => void,
+    leadsStatus?: LeadStatus[]
+}) {
     const [isLoading, setIsLoading] = useState(false)
-    const [results, setResults] = useState<string[]>([])
+    const [results, setResults] = useState<{ url: string, website: string }[]>([])
+    const [selectedUrls, setSelectedUrls] = useState<string[]>([])
     const [error, setError] = useState<string | null>(null)
 
-    const findFormSchema = z.object({
-        industry: z.string().min(2, "Industry is required"),
-        job_title: z.string().min(2, "Job title is required"),
-        location: z.string().optional(),
-        provider: z.enum(["tavily", "apollo"]).default("tavily"),
-    })
-
-    const findForm = useForm<z.infer<typeof findFormSchema>>({
+    const findForm = useForm<FindFormValues>({
         resolver: zodResolver(findFormSchema),
         defaultValues: {
             industry: "",
@@ -48,15 +67,32 @@ export function DiscoveryForm({ onSelect }: { onSelect?: (url: string) => void }
         }
     })
 
-    async function onFindSubmit(values: z.infer<typeof findFormSchema>) {
+    const toggleUrl = (url: string) => {
+        setSelectedUrls(prev =>
+            prev.includes(url)
+                ? prev.filter(u => u !== url)
+                : [...prev, url]
+        )
+    }
+
+    const selectAll = () => {
+        if (selectedUrls.length === results.length && results.length > 0) {
+            setSelectedUrls([])
+        } else {
+            setSelectedUrls(results.map(r => r.url))
+        }
+    }
+
+    async function onFindSubmit(values: FindFormValues) {
         setIsLoading(true)
         setError(null)
         setResults([])
+        setSelectedUrls([])
         try {
             const data = await discoverLeads(values)
-            if (data.linkedin_urls) {
-                setResults(data.linkedin_urls)
-                if (data.linkedin_urls.length === 0) {
+            if (data.leads) {
+                setResults(data.leads)
+                if (data.leads.length === 0) {
                     setError("No leads found matching criteria.")
                 }
             } else if (data.error) {
@@ -151,33 +187,90 @@ export function DiscoveryForm({ onSelect }: { onSelect?: (url: string) => void }
 
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium">Results</h3>
-                    <span className="text-sm text-muted-foreground">{results.length} found</span>
+                    <div className="flex items-center gap-4">
+                        <h3 className="text-lg font-medium">Results</h3>
+                        {results.length > 0 && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={selectAll}
+                                className="h-8 gap-2"
+                            >
+                                {selectedUrls.length === results.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                                <span className="text-xs uppercase tracking-wider font-semibold">Select All</span>
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <span className="text-sm text-muted-foreground">{results.length} found</span>
+                        {selectedUrls.length > 0 && (
+                            <Button size="sm" onClick={() => {
+                                if (onBulkSelect) {
+                                    const selectedLeads = results.filter(r => selectedUrls.includes(r.url));
+                                    onBulkSelect(selectedLeads);
+                                }
+                            }}>
+                                Bulk Analyze ({selectedUrls.length})
+                            </Button>
+                        )}
+                    </div>
                 </div>
                 {results.length > 0 ? (
                     <div className="grid gap-3">
-                        {results.map((url, i) => (
-                            <Card key={i} className="overflow-hidden">
-                                <CardContent className="p-4 flex items-center justify-between gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-medium truncate text-sm">{url}</p>
-                                    </div>
-                                    <Button size="sm" variant="secondary" onClick={() => onSelect && onSelect(url)}>
-                                        Analyze
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        ))}
+                        {results.map((lead, i) => {
+                            const status = leadsStatus?.find(s => s.url === lead.url)?.status
+                            return (
+                                <Card key={i} className={`overflow-hidden transition-colors ${status === 'completed' ? 'border-green-500/50 bg-green-50/10' : 'hover:border-primary/50'}`}>
+                                    <CardContent className="p-4 flex items-center gap-4">
+                                        <Checkbox
+                                            checked={selectedUrls.includes(lead.url)}
+                                            onCheckedChange={() => toggleUrl(lead.url)}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium truncate text-sm">{lead.url}</p>
+                                            {lead.website && <p className="text-[10px] text-muted-foreground truncate opacity-70">{lead.website}</p>}
+                                        </div>
+
+                                        {status === 'analyzing' ? (
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                                Analyzing
+                                            </div>
+                                        ) : status === 'completed' ? (
+                                            (() => {
+                                                const result = leadsStatus?.find(s => s.url === lead.url)?.result;
+                                                return result?.id ? (
+                                                    <Link href={`/reports?id=${result.id}`} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-200 bg-transparent hover:bg-green-50 text-green-700 h-8 px-3">
+                                                        View Report
+                                                    </Link>
+                                                ) : (
+                                                    <Button size="sm" variant="outline" className="h-8 border-green-200 hover:bg-green-50 text-green-700" onClick={() => onSelect && onSelect(lead)}>
+                                                        View Report (Panel)
+                                                    </Button>
+                                                );
+                                            })()
+                                        ) : (
+                                            <Button size="sm" variant="outline" onClick={() => onSelect && onSelect(lead)}>
+                                                Analyze
+                                            </Button>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
                     </div>
                 ) : (
-                    <div className="h-64 border-2 border-dashed rounded-lg flex items-center justify-center text-muted-foreground p-8 text-center">
+                    <div className="h-64 border-2 border-dashed rounded-lg flex items-center justify-center text-muted-foreground p-8 text-center bg-muted/20">
                         {isLoading ? (
                             <div className="flex flex-col items-center gap-2">
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                 <p>Searching for leads...</p>
                             </div>
                         ) : (
-                            "Enter search criteria to find matching LinkedIn profiles."
+                            <div className="space-y-2">
+                                <Search className="w-8 h-8 mx-auto opacity-20" />
+                                <p>Enter search criteria to find matching LinkedIn profiles.</p>
+                            </div>
                         )}
                     </div>
                 )}

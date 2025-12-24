@@ -4,6 +4,9 @@ from bs4 import BeautifulSoup
 from langchain_community.tools.tavily_search import TavilySearchResults
 
 def add_https_if_missing(url):
+    if not url:
+        return url
+        
     # Parse the URL to check its scheme
     parsed_url = urlparse(url)
     

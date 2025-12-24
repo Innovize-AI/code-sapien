@@ -7,18 +7,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { Calendar, ExternalLink, ArrowRight } from "lucide-react";
+import { Calendar, ExternalLink, ArrowRight, Loader2 } from "lucide-react";
+import { useBulkAnalysis } from "@/context/bulk-analysis-context";
 
 interface HistoryItem {
     id: string;
     created_at: string;
     linkedin_url: string;
     lead_score: number;
+    // Optional fields for UI handling of temporary items
+    status?: 'pending' | 'analyzing' | 'completed' | 'error';
+    isTemporary?: boolean;
+    result?: any;
+    currentStep?: string;
 }
 
 export default function HistoryPage() {
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const { leadsStatus } = useBulkAnalysis();
 
     useEffect(() => {
         const loadHistory = async () => {
@@ -34,6 +41,21 @@ export default function HistoryPage() {
 
         loadHistory();
     }, []);
+
+    // Merge history with temporary bulk analysis items
+    const displayHistory = [
+        ...leadsStatus.map(lead => ({
+            id: `temp-${lead.url}`,
+            created_at: new Date().toISOString(), // Show as 'just now' effectively
+            linkedin_url: lead.url,
+            lead_score: lead.result?.lead_score || 0,
+            status: lead.status,
+            isTemporary: true,
+            result: lead.result,
+            currentStep: lead.currentStep
+        })),
+        ...history
+    ];
 
     return (
         <DashboardLayout>
@@ -53,11 +75,11 @@ export default function HistoryPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {loading ? (
+                        {loading && history.length === 0 ? (
                             <div className="flex justify-center p-8">
                                 <span className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></span>
                             </div>
-                        ) : history.length === 0 ? (
+                        ) : displayHistory.length === 0 ? (
                             <div className="text-center p-8 text-muted-foreground">
                                 No reports found. Generate your first lead analysis!
                             </div>
@@ -72,11 +94,16 @@ export default function HistoryPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {history.map((item) => (
-                                        <TableRow key={item.id}>
+                                    {displayHistory.map((item) => (
+                                        <TableRow key={item.id} className={item.isTemporary ? "bg-muted/30" : ""}>
                                             <TableCell className="font-medium flex items-center gap-2">
                                                 <Calendar className="h-4 w-4 text-muted-foreground" />
                                                 {new Date(item.created_at).toLocaleDateString()}
+                                                {item.isTemporary && (
+                                                    <Badge variant="outline" className="ml-2 text-xs h-5">
+                                                        {item.status === 'analyzing' ? 'Processing' : 'Unsaved'}
+                                                    </Badge>
+                                                )}
                                             </TableCell>
                                             <TableCell className="truncate max-w-[300px]">
                                                 <a href={item.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:underline">
@@ -84,16 +111,41 @@ export default function HistoryPage() {
                                                 </a>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant={item.lead_score > 70 ? "default" : "secondary"}>
-                                                    {item.lead_score}
-                                                </Badge>
+                                                {item.status === 'analyzing' || item.status === 'pending' ? (
+                                                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                        <span className="truncate max-w-[150px]" title={item.currentStep || "Analyzing..."}>
+                                                            {item.currentStep || "Analyzing..."}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <Badge variant={item.lead_score > 70 ? "default" : "secondary"}>
+                                                        {item.lead_score}
+                                                    </Badge>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <Link href={`/reports?id=${item.id}`}>
-                                                    <span className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
-                                                        View Report <ArrowRight className="ml-2 h-4 w-4" />
-                                                    </span>
-                                                </Link>
+                                                {item.isTemporary ? (
+                                                    item.status === 'completed' && item.result?.id ? (
+                                                        <Link href={`/reports?id=${item.result.id}`}>
+                                                            <span className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                                                                View Report <ArrowRight className="ml-2 h-4 w-4" />
+                                                            </span>
+                                                        </Link>
+                                                    ) : item.status === 'completed' ? (
+                                                        <span className="text-xs text-muted-foreground">ID missing - Check Find Leads</span>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {item.status === 'error' ? 'Failed' : 'Processing...'}
+                                                        </span>
+                                                    )
+                                                ) : (
+                                                    <Link href={`/reports?id=${item.id}`}>
+                                                        <span className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                                                            View Report <ArrowRight className="ml-2 h-4 w-4" />
+                                                        </span>
+                                                    </Link>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     ))}

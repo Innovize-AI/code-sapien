@@ -6,6 +6,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 
 function AnalyzeLeadContent() {
@@ -47,39 +48,54 @@ function AnalyzeLeadContent() {
     }, [idParam])
 
     const isHistoryView = !!idParam
+    const [showInput, setShowInput] = useState(!isHistoryView)
 
     return (
-        <div className={`grid grid-cols-1 ${isHistoryView ? "xl:grid-cols-1" : "xl:grid-cols-3"} gap-8`}>
-            {!isHistoryView && (
-                <div className="xl:col-span-1 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Analysis Input</CardTitle>
-                            <CardDescription>
-                                Enter details to generate a research report.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <LeadForm onSuccess={setResearchData} defaultUrl={defaultUrl} />
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+        <div className="space-y-6">
+            <div className="flex justify-end">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowInput(!showInput)}
+                    className="gap-2"
+                >
+                    <Search className="w-4 h-4" />
+                    {showInput ? "Hide Analysis Input" : "Show Analysis Input"}
+                </Button>
+            </div>
 
-            <div className={isHistoryView ? "xl:col-span-1" : "xl:col-span-2"}>
-                {researchData ? (
-                    <ReportDisplay data={researchData} />
-                ) : (
-                    <div className="h-full min-h-[400px] flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/30 p-8 text-center animate-in fade-in-50">
-                        <div className="bg-background p-4 rounded-full shadow-sm mb-4">
-                            <Search className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-lg font-medium">No Analysis Generated</h3>
-                        <p className="text-muted-foreground max-w-sm mt-2">
-                            Fill out the form on the left to start your deep dive research.
-                        </p>
+            <div className={`grid grid-cols-1 ${showInput ? "xl:grid-cols-3" : "xl:grid-cols-1"} gap-8`}>
+                {showInput && (
+                    <div className="xl:col-span-1 space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Analysis Input</CardTitle>
+                                <CardDescription>
+                                    Enter details to generate a research report.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <LeadForm onSuccess={setResearchData} defaultUrl={defaultUrl} />
+                            </CardContent>
+                        </Card>
                     </div>
                 )}
+
+                <div className={showInput ? "xl:col-span-2" : "xl:col-span-1"}>
+                    {researchData ? (
+                        <ReportDisplay data={researchData} />
+                    ) : (
+                        <div className="h-full min-h-[400px] flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/30 p-8 text-center animate-in fade-in-50">
+                            <div className="bg-background p-4 rounded-full shadow-sm mb-4">
+                                <Search className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                            <h3 className="text-lg font-medium">No Analysis Generated</h3>
+                            <p className="text-muted-foreground max-w-sm mt-2">
+                                Fill out the form on the left to start your deep dive research.
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )

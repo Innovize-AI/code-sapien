@@ -422,7 +422,7 @@ export function ReportDisplay({ data }: ReportDisplayProps) {
                                             "p-5 rounded-2xl border transition-transform hover:rotate-6",
                                             section.isPrimary ? "bg-primary text-white border-primary" : "bg-primary/5 text-primary border-primary/10"
                                         )}>
-                                            {React.cloneElement(section.icon as React.ReactElement, { className: "h-8 w-8" })}
+                                            {React.isValidElement(section.icon) && React.cloneElement(section.icon as React.ReactElement<any>, { className: "h-8 w-8" })}
                                         </div>
                                         <div className="space-y-1">
                                             <Badge variant="outline" className="text-[10px] uppercase font-black tracking-[0.25em] text-primary border-primary/20 h-6 px-3 rounded-full mb-1">{section.badge}</Badge>

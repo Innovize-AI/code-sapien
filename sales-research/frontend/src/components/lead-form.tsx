@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Loader2 } from "lucide-react"
+import { useBulkAnalysis } from "@/context/bulk-analysis-context"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -27,30 +28,42 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { generateResearch, LeadData } from "@/lib/api"
 
 const formSchema = z.object({
-    linkedin_url: z.string().url({ message: "Please enter a valid LinkedIn URL." }),
-    website: z.string().url({ message: "Please enter a valid website URL." }),
+    linkedin_url: z.string().optional(),
+    website: z.string().optional(),
     email: z.string().email({ message: "Please enter a valid email." }).optional().or(z.literal("")),
     lead_source: z.string().optional(),
     download_marketing_material: z.boolean().default(false),
     demo_requested: z.boolean().default(false),
     referral_partner_introduction: z.boolean().default(false),
     project_urgency: z.string().optional(),
-})
+}).refine(data => {
+    const hasLinkedin = !!data.linkedin_url && data.linkedin_url.length > 0;
+    const hasWebsite = !!data.website && data.website.length > 0;
+    return hasLinkedin || hasWebsite;
+}, {
+    message: "Either LinkedIn URL or Website URL is required.",
+    path: ["linkedin_url"],
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 interface LeadFormProps {
     onSuccess: (data: any) => void
     defaultUrl?: string
+    defaultWebsite?: string
 }
 
-export function LeadForm({ onSuccess, defaultUrl }: LeadFormProps) {
+export function LeadForm({ onSuccess, defaultUrl, defaultWebsite }: LeadFormProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [statusMessage, setStatusMessage] = useState("")
+    const [error, setError] = useState<string | null>(null)
+    const { addLeadStatus } = useBulkAnalysis()
 
-    const form = useForm<z.infer<typeof formSchema>>({
+    const form = useForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
             linkedin_url: defaultUrl || "",
-            website: "",
+            website: defaultWebsite || "",
             email: "",
             lead_source: "",
             download_marketing_material: false,
@@ -60,8 +73,14 @@ export function LeadForm({ onSuccess, defaultUrl }: LeadFormProps) {
         },
     })
 
-    async function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit(values: FormValues) {
         setIsLoading(true)
+        setError(null)
+        setStatusMessage("Initializing...")
+
+        // Add to global context as pending
+        addLeadStatus({ url: values.linkedin_url || values.website || "Single Analysis", status: "pending" })
+
         try {
             const urgencyMap: Record<string, number> = {
                 "Low": 1,
@@ -82,11 +101,31 @@ export function LeadForm({ onSuccess, defaultUrl }: LeadFormProps) {
 
             const result = await generateResearch(apiData, (status) => {
                 setStatusMessage(status)
+                // Update global context with progress
+                addLeadStatus({
+                    url: values.linkedin_url || values.website || "Single Analysis",
+                    status: "analyzing",
+                    currentStep: status
+                })
             })
+
+            // Update global context with completion
+            addLeadStatus({
+                url: values.linkedin_url || values.website || "Single Analysis",
+                status: "completed",
+                result: result
+            })
+
             onSuccess(result)
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error generating research:", error)
-            // You might want to show an error toast here
+            setError(error.message || "Failed to generate research. Please try again.")
+            // Update global context with error
+            addLeadStatus({
+                url: values.linkedin_url || values.website || "Single Analysis",
+                status: "error",
+                error: error.message
+            })
         } finally {
             setIsLoading(false)
         }
@@ -244,16 +283,27 @@ export function LeadForm({ onSuccess, defaultUrl }: LeadFormProps) {
                     />
                 </div>
 
-                {isLoading && (
-                    <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg animate-pulse mb-4">
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        <span className="text-sm font-medium">{statusMessage || "Starting research..."}</span>
+                {error && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <p className="text-sm font-medium text-red-500 flex items-center gap-2">
+                            <XCircle className="w-4 h-4" />
+                            Research Error
+                        </p>
+                        <p className="text-sm text-red-500/80 mt-1 ml-6">{error}</p>
                     </div>
                 )}
 
+
+
                 <Button type="submit" disabled={isLoading} className="w-full">
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Generate Research
+                    {isLoading ? (
+                        <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>{statusMessage || "Analyzing..."}</span>
+                        </div>
+                    ) : (
+                        "Generate Research"
+                    )}
                 </Button>
             </form>
         </Form>

@@ -2,9 +2,12 @@ from typing import List, Optional
 from langchain_community.tools.tavily_search import TavilySearchResults
 from pydantic import BaseModel, Field
 import os
+from sqlalchemy import select
+from db.models import OrganizationSettings
+from db.database import SessionLocal  # Need a synchronous way or run async
 
-# Ensure TAVILY_API_KEY is set in environment variables
-# os.environ["TAVILY_API_KEY"] = "..." 
+# We need to handle async properly if these functions are called from async routes.
+# But for now, let's allow passing keys in, or fetch them inside the router endpoint.
 
 class LeadDiscoveryInput(BaseModel):
     industry: str = Field(..., description="Target industry, e.g., 'FinTech', 'Healthcare'")
@@ -36,11 +39,18 @@ def generate_search_query(input_data: LeadDiscoveryInput) -> str:
 
     return " ".join(query_parts)
 
-def find_leads_tavily(input_data: LeadDiscoveryInput) -> List[str]:
+def find_leads_tavily(input_data: LeadDiscoveryInput, api_key: str = None) -> List[dict]:
     """
     Uses Tavily to search for LinkedIn profiles matching the criteria.
-    Returns a list of LinkedIn URLs.
+    Returns a list of dicts: {"url": str, "website": str}
     """
+    # Set the key in env for LangChain tool
+    if api_key:
+        os.environ["TAVILY_API_KEY"] = api_key
+    elif not os.environ.get("TAVILY_API_KEY"):
+         print("WARNING: TAVILY_API_KEY not found.")
+         return []
+
     query = generate_search_query(input_data)
     print(f"Executing Search Query: {query}")
     
@@ -50,28 +60,33 @@ def find_leads_tavily(input_data: LeadDiscoveryInput) -> List[str]:
     try:
         results = tavily_tool.invoke({"query": query})
         
-        linkedin_urls = []
+        leads = []
         for res in results:
             url = res.get("url")
             # Basic validation to ensure it's a profile URL
             if url and "linkedin.com/in/" in url:
-                linkedin_urls.append(url)
+                # Tavily doesn't usually return the company website directly in this dork
+                # We return an empty string, allowing the enrichment logic or user to fill it
+                leads.append({"url": url, "website": ""})
                 
-        return linkedin_urls
+        return leads
         
     except Exception as e:
         print(f"Error during Tavily search: {e}")
         return []
 
-def find_leads_apollo(input_data: LeadDiscoveryInput) -> List[str]:
+def find_leads_apollo(input_data: LeadDiscoveryInput, api_key: str = None) -> List[dict]:
     """
     Uses Apollo.io API to search for people.
+    Returns a list of dicts: {"url": str, "website": str}
     """
     import requests
     
-    api_key = os.environ.get("APOLLO_API_KEY")
-    if not api_key:
-        print("APOLLO_API_KEY not found in environment variables.")
+    # Use passed key, or fallback to env
+    final_api_key = api_key or os.environ.get("APOLLO_API_KEY")
+    
+    if not final_api_key:
+        print("APOLLO_API_KEY not found.")
         return []
 
     url = "https://api.apollo.io/v1/mixed_people/search"
@@ -79,7 +94,7 @@ def find_leads_apollo(input_data: LeadDiscoveryInput) -> List[str]:
     headers = {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
-        "X-Api-Key": api_key
+        "X-Api-Key": final_api_key
     }
     
     # Construct filters
@@ -93,9 +108,6 @@ def find_leads_apollo(input_data: LeadDiscoveryInput) -> List[str]:
         payload["person_locations"] = [input_data.location]
         
     if input_data.industry:
-        # Apollo uses strict industry IDs or tags usually, but keyword search often works in organization content
-        # For simplicity in this 'mixed_people/search', we can try adding it to 'q_organization_domains' or simply as a generic keyword query if supported?
-        # A safer bet for broad scraping without IDs is often just not being too specific or using 'q_keywords'
         payload["q_organization_keyword_tags"] = [input_data.industry]
 
     try:
@@ -111,12 +123,22 @@ def find_leads_apollo(input_data: LeadDiscoveryInput) -> List[str]:
         response.raise_for_status()
         data = response.json()
         
-        linkedin_urls = []
+        leads = []
         for person in data.get("people", []):
             if person.get("linkedin_url"):
-                linkedin_urls.append(person["linkedin_url"])
+                # Apollo often includes organization domain
+                website = ""
+                if person.get("organization") and person["organization"].get("website_url"):
+                    website = person["organization"]["website_url"]
+                elif person.get("organization") and person["organization"].get("primary_domain"):
+                    website = f"https://{person['organization']['primary_domain']}"
                 
-        return linkedin_urls
+                leads.append({
+                    "url": person["linkedin_url"],
+                    "website": website
+                })
+                
+        return leads
 
     except Exception as e:
         print(f"Error during Apollo search: {e}")

@@ -14,6 +14,8 @@ class ResearchReportBase(BaseModel):
     website_analysis: Optional[str] = None
     lead_score: Optional[int] = None
     project_urgency: Optional[int] = None
+    email_history: Optional[str] = None  # JSON string
+    intent_analysis: Optional[str] = None  # JSON string
 
 class ResearchReportCreate(ResearchReportBase):
     pass
@@ -36,11 +38,14 @@ class IdealProfileData(BaseModel):
 class IntegrationSettings(BaseModel):
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
+    email_config: Optional[str] = None
 
 class OrganizationSettingsBase(BaseModel):
     icp_json: Optional[str] = None
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
+    email_config: Optional[str] = None
+    crm_config: Optional[str] = None
 
 class OrganizationSettingsCreate(OrganizationSettingsBase):
     pass

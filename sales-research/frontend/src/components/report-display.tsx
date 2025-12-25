@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2 } from "lucide-react";
+import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -13,12 +13,28 @@ interface ReportDisplayProps {
         lead_score_analysis: string;
         user_profile_analysis: string;
         website_analysis: string;
+        intent_analysis?: {
+            intent: string;
+            summary: string;
+            next_steps: string;
+            sentiment: string;
+        };
+        email_history?: Array<{
+            id?: string;
+            subject: string;
+            from: string;
+            to?: string[];
+            date: string;
+            text: string;
+            direction: string;
+        }>;
         [key: string]: any;
     } | null;
 }
 
 export function ReportDisplay({ data }: ReportDisplayProps) {
     const [activeSection, setActiveSection] = React.useState<number>(0);
+    const [isNavVisible, setIsNavVisible] = React.useState<boolean>(true);
 
     if (!data) {
         return null;
@@ -97,6 +113,15 @@ export function ReportDisplay({ data }: ReportDisplayProps) {
         { id: "lead-score", title: "Qualification", icon: <TrendingUp className="h-4 w-4" />, content: data.lead_score_analysis, badge: "AI Score" },
         { id: "strategy", title: "Outreach Strategy", icon: <Target className="h-4 w-4" />, content: data.sales_research_report, badge: "Tactical", tactical: tacticalActions },
         { id: "website-analysis", title: "Digital Footprint", icon: <Globe className="h-4 w-4" />, content: data.website_analysis, badge: "Technical" },
+        // New Section for Intent & History
+        ...(data.email_history && data.email_history.length > 0 ? [{
+            id: "intent-history",
+            title: "Access & Intent",
+            icon: <MessageSquare className="h-4 w-4" />,
+            content: "", // Content handled by custom renderer
+            badge: "Interaction",
+            isIntent: true
+        }] : [])
     ];
 
     // Helper to render content based on its type (JSON or Markdown) with support for "sloppy" and fragmented formats
@@ -342,14 +367,85 @@ export function ReportDisplay({ data }: ReportDisplayProps) {
             </div>
 
             <div className="flex flex-col lg:flex-row gap-12 items-start">
-                <div className="hidden lg:block w-80 sticky top-24 shrink-0 space-y-8">
-                    <div className="p-8 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-8">
-                        <div>
-                            <div className="flex items-center gap-2 mb-6 px-1">
-                                <LayoutDashboard className="h-4 w-4 text-primary" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Navigation</span>
+                <div className={cn(
+                    "sticky top-24 shrink-0 space-y-8 transition-all duration-300",
+                    isNavVisible ? "w-80" : "w-16"
+                )}>
+                    <div className={cn(
+                        "rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-8 relative transition-all duration-300",
+                        isNavVisible ? "p-8" : "p-3"
+                    )}>
+                        {/* Toggle Button - Top Right Corner */}
+                        <button
+                            onClick={() => setIsNavVisible(!isNavVisible)}
+                            className="absolute -right-3 top-4 p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all shadow-sm z-10"
+                            title={isNavVisible ? "Close sidebar" : "Open sidebar"}
+                        >
+                            {isNavVisible ? <ChevronRight className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                        </button>
+
+                        {isNavVisible ? (
+                            <div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-6 px-1">
+                                        <LayoutDashboard className="h-4 w-4 text-primary" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Navigation</span>
+                                    </div>
+                                    <nav className="space-y-2">
+                                        {sections.map((section, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => {
+                                                    setActiveSection(idx);
+                                                    const el = document.getElementById(section.id);
+                                                    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                }}
+                                                className={cn(
+                                                    "w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-black transition-all duration-500 group border border-transparent",
+                                                    activeSection === idx
+                                                        ? "bg-primary text-white border-primary translate-x-3"
+                                                        : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    {React.cloneElement(section.icon as React.ReactElement, { className: cn("h-4 w-4 transition-transform group-hover:scale-110", activeSection === idx ? "text-white" : "text-zinc-400 group-hover:text-primary") })}
+                                                    {section.title}
+                                                </div>
+                                                <ChevronRight className={cn("h-3 w-3 transition-all duration-500", activeSection === idx ? "rotate-90" : "opacity-0 -translate-x-2")} />
+                                            </button>
+                                        ))}
+                                    </nav>
+                                </div>
+
+                                <div className="pt-8 border-t border-zinc-100 dark:border-zinc-900">
+                                    <div className="flex items-center gap-2 mb-4 px-1">
+                                        <Zap className="h-4 w-4 text-emerald-500" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Tactical actions</span>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {tacticalActions.map((action, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => {
+                                                    const el = document.getElementById('strategy');
+                                                    el?.scrollIntoView({ behavior: 'smooth' });
+                                                }}
+                                                className="w-full flex items-center gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-transparent hover:border-primary/20 transition-all text-left"
+                                            >
+                                                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                                    {action.icon}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-[11px] font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">{action.title}</div>
+                                                    <div className="text-[10px] font-bold text-zinc-500 tracking-tighter">Draft Ready</div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                            <nav className="space-y-2">
+                        ) : (
+                            <nav className="space-y-3">
                                 {sections.map((section, idx) => (
                                     <button
                                         key={idx}
@@ -359,48 +455,20 @@ export function ReportDisplay({ data }: ReportDisplayProps) {
                                             el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                         }}
                                         className={cn(
-                                            "w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-black transition-all duration-500 group border border-transparent",
+                                            "w-full p-3 rounded-xl transition-all duration-300 group",
                                             activeSection === idx
-                                                ? "bg-primary text-white border-primary translate-x-3"
-                                                : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                                ? "bg-primary text-white"
+                                                : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-primary"
                                         )}
+                                        title={section.title}
                                     >
-                                        <div className="flex items-center gap-4">
-                                            {React.cloneElement(section.icon as React.ReactElement, { className: cn("h-4 w-4 transition-transform group-hover:scale-110", activeSection === idx ? "text-white" : "text-zinc-400 group-hover:text-primary") })}
-                                            {section.title}
-                                        </div>
-                                        <ChevronRight className={cn("h-3 w-3 transition-all duration-500", activeSection === idx ? "rotate-90" : "opacity-0 -translate-x-2")} />
+                                        {React.cloneElement(section.icon as React.ReactElement, {
+                                            className: cn("h-5 w-5 mx-auto", activeSection === idx ? "text-white" : "")
+                                        })}
                                     </button>
                                 ))}
                             </nav>
-                        </div>
-
-                        <div className="pt-8 border-t border-zinc-100 dark:border-zinc-900">
-                            <div className="flex items-center gap-2 mb-4 px-1">
-                                <Zap className="h-4 w-4 text-emerald-500" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Tactical actions</span>
-                            </div>
-                            <div className="space-y-4">
-                                {tacticalActions.map((action, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => {
-                                            const el = document.getElementById('strategy');
-                                            el?.scrollIntoView({ behavior: 'smooth' });
-                                        }}
-                                        className="w-full flex items-center gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-transparent hover:border-primary/20 transition-all text-left"
-                                    >
-                                        <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                                            {action.icon}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="text-[11px] font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">{action.title}</div>
-                                            <div className="text-[10px] font-bold text-zinc-500 tracking-tighter">Draft Ready</div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 
@@ -468,6 +536,80 @@ export function ReportDisplay({ data }: ReportDisplayProps) {
                                                     </div>
                                                 </div>
                                             ))}
+                                        </div>
+                                    )}
+
+                                    {/* Custom Intent Rendering */}
+                                    {/* @ts-ignore */}
+                                    {section.isIntent && data.intent_analysis && (
+                                        <div className="space-y-12">
+                                            {/* Intent Cards */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="p-8 rounded-2xl bg-primary/5 border border-primary/10">
+                                                    <div className="flex items-center gap-3 mb-4">
+                                                        <Target className="h-5 w-5 text-primary" />
+                                                        <span className="text-xs font-black uppercase tracking-widest text-primary/70">DETECTED INTENT</span>
+                                                    </div>
+                                                    <div className="text-2xl font-black text-primary capitalize mb-2">{data.intent_analysis.intent}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Sentiment:</span>
+                                                        <Badge variant="outline" className="text-[10px] uppercase font-bold">{data.intent_analysis.sentiment}</Badge>
+                                                    </div>
+                                                </div>
+                                                <div className="p-8 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
+                                                    <div className="flex items-center gap-3 mb-4">
+                                                        <ArrowRight className="h-5 w-5 text-emerald-500" />
+                                                        <span className="text-xs font-black uppercase tracking-widest text-emerald-600/70">NEXT BEST ACTION</span>
+                                                    </div>
+                                                    <div className="text-lg font-medium text-emerald-900 dark:text-emerald-100 italic leading-relaxed">
+                                                        "{data.intent_analysis.next_steps}"
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Summary */}
+                                            <div className="space-y-4">
+                                                <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-3">
+                                                    <Info className="h-4 w-4 text-zinc-400" />
+                                                    Conversation Summary
+                                                </h3>
+                                                <div className="p-6 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 leading-relaxed text-[15px]">
+                                                    {data.intent_analysis.summary}
+                                                </div>
+                                            </div>
+
+                                            {/* Timeline */}
+                                            <div className="space-y-8">
+                                                <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-3">
+                                                    <Calendar className="h-4 w-4 text-zinc-400" />
+                                                    Conversation Timeline
+                                                </h3>
+                                                <div className="relative pl-8 border-l-2 border-zinc-200 dark:border-zinc-800 space-y-8 ml-3">
+                                                    {data.email_history?.map((email, idx) => (
+                                                        <div key={idx} className="relative">
+                                                            <div className={cn(
+                                                                "absolute -left-[41px] top-0 p-1.5 rounded-full border-2 z-10 bg-white dark:bg-zinc-950",
+                                                                email.direction === 'sent' ? "border-zinc-200 dark:border-zinc-700" : "border-primary bg-primary text-white"
+                                                            )}>
+                                                                {email.direction === 'sent' ? <ArrowRight className="h-3 w-3 text-zinc-400" /> : <Mail className="h-3 w-3" />}
+                                                            </div>
+                                                            <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:border-primary/20 transition-all">
+                                                                <div className="flex items-center justify-between mb-4">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{email.from}</span>
+                                                                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{new Date(email.date).toLocaleDateString()}</span>
+                                                                    </div>
+                                                                    <Badge variant="secondary" className="text-[10px] uppercase font-bold">{email.direction}</Badge>
+                                                                </div>
+                                                                <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">{email.subject}</div>
+                                                                <div className="text-sm text-zinc-500 leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">
+                                                                    {email.text}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
 

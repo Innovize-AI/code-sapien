@@ -24,6 +24,8 @@ supabase = "^2.26.0"
 alembic = "^1.17.2"
 psycopg2 = "^2.9.11"
 asyncpg = "^0.31.0"
+imap-tools = "^1.5.0"
+pydantic-settings = "^2.2.1"
 
 
 [build-system]

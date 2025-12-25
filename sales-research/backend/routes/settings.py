@@ -62,13 +62,14 @@ async def get_integrations(db: AsyncSession = Depends(get_db)):
     
     return IntegrationSettings(
         tavily_api_key=settings.tavily_api_key,
-        apollo_api_key=settings.apollo_api_key
+        apollo_api_key=settings.apollo_api_key,
+        email_config=settings.email_config
     )
 
 @settings_router.post("/settings/integrations", response_model=IntegrationSettings)
 async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depends(get_db)):
     """
-    Save integration keys.
+    Save integration keys and configs.
     """
     result = await db.execute(select(OrganizationSettings).limit(1))
     settings = result.scalars().first()
@@ -76,10 +77,12 @@ async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depend
     if settings:
         settings.tavily_api_key = data.tavily_api_key
         settings.apollo_api_key = data.apollo_api_key
+        settings.email_config = data.email_config
     else:
         settings = OrganizationSettings(
             tavily_api_key=data.tavily_api_key, 
-            apollo_api_key=data.apollo_api_key
+            apollo_api_key=data.apollo_api_key,
+            email_config=data.email_config
         )
         db.add(settings)
         

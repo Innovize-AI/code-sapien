@@ -34,6 +34,7 @@ const icpFormSchema = z.object({
 const keysFormSchema = z.object({
     tavily_api_key: z.string().optional(),
     apollo_api_key: z.string().optional(),
+    email_config: z.string().optional(),
 })
 
 export default function SettingsPage() {
@@ -58,6 +59,7 @@ export default function SettingsPage() {
         defaultValues: {
             tavily_api_key: "",
             apollo_api_key: "",
+            email_config: "",
         },
     })
 
@@ -259,6 +261,30 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
 
+                                <div className="pt-4 border-t">
+                                    <h3 className="text-lg font-medium mb-4">Email Configuration (IMAP)</h3>
+                                    <FormField
+                                        control={keysForm.control}
+                                        name="email_config"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>IMAP Configuration (JSON)</FormLabel>
+                                                <FormControl>
+                                                    <Textarea
+                                                        placeholder='{"imap_server": "imap.gmail.com", "email_user": "your@email.com", "email_password": "app-password"}'
+                                                        className="resize-none min-h-[100px] font-mono text-sm"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    Provide IMAP server details in JSON format. Required for email history analysis.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
                                 {error && <div className="text-red-500 text-sm">{error}</div>}
                                 {success && <div className="text-green-500 text-sm">{success}</div>}
 
@@ -275,6 +301,6 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </div >
     )
 }

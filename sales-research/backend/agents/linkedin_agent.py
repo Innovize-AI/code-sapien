@@ -26,7 +26,7 @@ def get_linkedin_data(state: AgentState):
     linkedin_base_url = os.getenv("LINKEDIN_RAPID_BASE_URL")
     
     linkedin_url = state.get("linkedin_url")
-    if not linkedin_url:
+    if not linkedin_url or len(linkedin_url) == 0:
         return {
             "user_profile_details": json.dumps({"description": "No LinkedIn URL provided"}),
             "fullname": "",

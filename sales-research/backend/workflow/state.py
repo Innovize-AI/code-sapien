@@ -29,5 +29,9 @@ class AgentState(TypedDict):
     sales_research_report: Annotated[str, operator.add]
     company_context: str
     lead_score_analysis: Annotated[str, operator.add]
+    email_history: List[dict]
+    intent_analysis: dict
     fullname: Optional[str]
     profile_picture_url: Optional[str]
+    event_type: Optional[str] # e.g., "EMAIL_RECEIVED", "SOCIAL_UPDATE", "MANUAL_RECOVERY"
+    last_event_data: Optional[dict]

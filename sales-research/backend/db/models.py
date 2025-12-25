@@ -24,6 +24,10 @@ class ResearchReport(Base):
     # Metrics
     lead_score = Column(Integer, nullable=True)
     project_urgency = Column(Integer, nullable=True)
+    
+    # Email & Intent Analysis
+    email_history = Column(Text, nullable=True)  # JSON array of email objects
+    intent_analysis = Column(Text, nullable=True)  # JSON object with intent data
 
 class OrganizationSettings(Base):
     __tablename__ = "organization_settings"
@@ -41,3 +45,7 @@ class OrganizationSettings(Base):
     # Integration Keys
     tavily_api_key = Column(String, nullable=True)
     apollo_api_key = Column(String, nullable=True)
+    
+    # New Configs
+    email_config = Column(Text, nullable=True) # JSON store for IMAP details
+    crm_config = Column(Text, nullable=True)   # JSON store for CRM details

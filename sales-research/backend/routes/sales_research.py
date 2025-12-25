@@ -24,19 +24,8 @@ class BulkLeadInput(BaseModel):
     leads: List[LeadItem]
     options: InputLeadData
 
-async def run_single_research(
-    linkedin_url: Optional[str] = None,
-    website: Optional[str] = None,
-    options: InputLeadData = None,
-    email: Optional[str] = None,
-    progress_callback=None  # New callback argument
-):
-    website = add_https_if_missing(website)
-    thread_id = str(uuid.uuid4())
-    thread = {"configurable": {"thread_id": thread_id}}
-    
-    # Fetch ICP from DB
-    icp_data = None
+async def _get_organization_icp() -> IdealProfile:
+    """Helper to fetch ICP from database settings."""
     async with SessionLocal() as db:
         from sqlalchemy import select
         from db.models import OrganizationSettings
@@ -45,11 +34,7 @@ async def run_single_research(
         if settings and settings.icp_json:
             try:
                 icp_dict = json.loads(settings.icp_json)
-                # Map value_proposition to something useful if needed, or just let it be in extra fields if Pydantic allows, 
-                # but IdealProfile in state.py needs to match.
-                # state.py IdealProfile: industry, company_size, revenue, job_title.  
-                # Our stored data has these.
-                icp_data = IdealProfile(
+                return IdealProfile(
                     industry=icp_dict.get("industry", "Technology"),
                     company_size=icp_dict.get("company_size", "10-50"),
                     revenue=icp_dict.get("revenue", "$1M+"),
@@ -57,18 +42,68 @@ async def run_single_research(
                 )
             except Exception as e:
                 print(f"Error parsing ICP settings: {e}")
+    
+    # Fallback default
+    return IdealProfile(
+        industry="Finance",
+        company_size="10-50",
+        revenue="$10M+",
+        job_title="CTO, CEO"
+    )
 
-    # Fallback if no settings found (to avoid breaking existing flows immediately, though we should onboarding)
-    if not icp_data:
-        print("WARNING: No ICP settings found. Using defaults.")
-        icp_data = IdealProfile(
-            industry="Finance",
-            company_size="10-50",
-            revenue="$10M+",
-            job_title="CTO, CEO"
-        )
+async def _persist_results(db, linkedin_url, website, final_state, options):
+    """Common logic to save research results to DB."""
+    if not final_state.get("sales_research_report"):
+        print("Skipping database save: No research report generated.")
+        return None
 
-    ideal_profile = icp_data
+    print(f"DEBUG: Final state keys: {list(final_state.keys())}")
+    
+    # Extract numeric lead score if possible
+    lead_score = None
+    score_analysis = final_state.get("lead_score_analysis", "")
+    if score_analysis:
+        import re
+        match = re.search(r"Score:\s*(\d+)", score_analysis)
+        if match:
+            try:
+                lead_score = int(match.group(1))
+            except:
+                pass
+
+    report_data = ResearchReportCreate(
+        linkedin_url=linkedin_url or "",
+        website=website or "",
+        sales_research_report=final_state.get("sales_research_report"),
+        lead_score_analysis=score_analysis,
+        user_profile_analysis=final_state.get("user_profile_analysis"),
+        website_analysis=final_state.get("website_analysis"),
+        fullname=final_state.get("fullname"),
+        profile_picture_url=final_state.get("profile_picture_url"),
+        lead_score=lead_score,
+        project_urgency=options.project_urgency if options else None,
+        email_history=json.dumps(final_state.get("email_history") or []),
+        intent_analysis=json.dumps(final_state.get("intent_analysis") or {})
+    )
+    
+    print(f"DEBUG: Saving report with email_history length: {len(final_state.get('email_history') or [])}")
+    saved_report = await save_report(db, report_data)
+    
+    if saved_report:
+        print(f"DEBUG: Saved report with ID: {saved_report.id}")
+        final_state["id"] = str(saved_report.id)
+        return saved_report
+    else:
+        print("DEBUG: Failed to save report or no object returned.")
+        return None
+
+async def _run_research_gen(linkedin_url, website, options, email):
+    """Core generator that runs the research graph and yields updates."""
+    website = add_https_if_missing(website)
+    thread_id = str(uuid.uuid4())
+    thread = {"configurable": {"thread_id": thread_id}}
+    
+    ideal_profile = await _get_organization_icp()
 
     initial_state = {
         "email_id": email,
@@ -81,46 +116,36 @@ async def run_single_research(
 
     final_state = {}
     
-    if options is None:
-         pass 
-
     try:
         async for update in graph.astream(initial_state, thread, stream_mode="updates"):
             for node_name, state_update in update.items():
                 final_state.update(state_update)
-                
-                # Send progress update if callback is provided
-                if progress_callback:
-                    message = NODE_STATUS_MAPPING.get(node_name, f"Processing {node_name}...")
-                    # We pass the url to identify which lead this update is for
-                    await progress_callback(linkedin_url, message)
+                yield node_name, state_update, final_state
+    except Exception as e:
+        print(f"Error during graph execution: {e}")
+        raise e
 
-        # Persist results to DB inside this task
+async def run_single_research(
+    linkedin_url: Optional[str] = None,
+    website: Optional[str] = None,
+    options: InputLeadData = None,
+    email: Optional[str] = None,
+    progress_callback=None
+):
+    final_state = {}
+    try:
+        async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):
+            final_state = current_state
+            if progress_callback:
+                message = NODE_STATUS_MAPPING.get(node_name, f"Processing {node_name}...")
+                await progress_callback(linkedin_url, message)
+
+        # Persist results to DB
         async with SessionLocal() as db:
-            if final_state.get("sales_research_report"):
-                report_data = ResearchReportCreate(
-                    linkedin_url=linkedin_url or "",
-                    website=website or "",
-                    sales_research_report=final_state.get("sales_research_report"),
-                    lead_score_analysis=final_state.get("lead_score_analysis"),
-                    user_profile_analysis=final_state.get("user_profile_analysis"),
-                    website_analysis=final_state.get("website_analysis"),
-                    fullname=final_state.get("fullname"),
-                    profile_picture_url=final_state.get("profile_picture_url"),
-                    lead_score=None,
-                    project_urgency=options.project_urgency
-                )
-                saved_report = await save_report(db, report_data)
-                # Inject ID into final state so it's returned to frontend
-                if saved_report:
-                    print(f"DEBUG: Saved report with ID: {saved_report.id}")
-                    final_state["id"] = str(saved_report.id)
-                else:
-                    print("DEBUG: Failed to save report or no object returned.")
+            await _persist_results(db, linkedin_url, website, final_state, options)
                 
         return {"linkedin_url": linkedin_url, "result": final_state}
     except Exception as e:
-        # Re-raise exception so the caller knows this task failed
         raise e
 
 @sales_router.post("/discover")
@@ -157,63 +182,20 @@ async def run_research(
     email: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
-    website = add_https_if_missing(website)
-
     async def event_generator():
-        thread_id = str(uuid.uuid4())
-        thread = {"configurable": {"thread_id": thread_id}}
-        
-        ideal_profile = IdealProfile(
-            industry="Finance",
-            company_size="10-50",
-            revenue="$10M+",
-            job_title="CTO, CEO"
-        )
-
-        initial_state = {
-            "email_id": email,
-            "linkedin_url": linkedin_url,
-            "website": website,
-            "company_context": COMPANY_CONTEXT,
-            "ideal_profile": ideal_profile,
-            "input_lead_data": options
-        }
-
         final_state = {}
-        
         try:
-            async for update in graph.astream(initial_state, thread, stream_mode="updates"):
-                for node_name, state_update in update.items():
-                    final_state.update(state_update)
-                    message = NODE_STATUS_MAPPING.get(node_name, f"Processing {node_name}...")
-                    yield f"data: {json.dumps({'status': message})}\n\n"
+            async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):
+                final_state = current_state
+                message = NODE_STATUS_MAPPING.get(node_name, f"Processing {node_name}...")
+                yield f"data: {json.dumps({'status': message})}\n\n"
         except Exception as e:
-            print(f"Error during graph execution: {e}")
             yield f"data: {json.dumps({'status': 'Error', 'message': str(e)})}\n\n"
             return
 
         # Persist results to DB
         try:
-            if final_state.get("sales_research_report"):
-                report_data = ResearchReportCreate(
-                    linkedin_url=linkedin_url or "",
-                    website=website or "",
-                    sales_research_report=final_state.get("sales_research_report"),
-                    lead_score_analysis=final_state.get("lead_score_analysis"),
-                    user_profile_analysis=final_state.get("user_profile_analysis"),
-                    website_analysis=final_state.get("website_analysis"),
-                    fullname=final_state.get("fullname"),
-                    profile_picture_url=final_state.get("profile_picture_url"),
-                    lead_score=None,
-                    project_urgency=options.project_urgency
-                )
-                saved_report = await save_report(db, report_data)
-                if saved_report:
-                    print("DEBUG: Single analysis, saved report with ID:", saved_report.id)
-                    final_state["id"] = str(saved_report.id)
-                print("Report saved successfully to database.")
-            else:
-                print("Skipping database save: No research report generated.")
+            await _persist_results(db, linkedin_url, website, final_state, options)
         except Exception as e:
             print(f"Failed to save report: {e}")
 

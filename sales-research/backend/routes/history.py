@@ -21,6 +21,7 @@ async def read_report_item(report_id: str, db: AsyncSession = Depends(get_db)):
         "id": str(data.id),
         "created_at": data.created_at.isoformat() if data.created_at else None,
         "linkedin_url": data.linkedin_url,
+        "email_id": data.email_id,
         "website": data.website,
         "fullname": data.fullname,
         "profile_picture_url": data.profile_picture_url,

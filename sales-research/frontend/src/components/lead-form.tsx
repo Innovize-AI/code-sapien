@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Loader2 } from "lucide-react"
+import { Loader2, XCircle } from "lucide-react"
 import { useBulkAnalysis } from "@/context/bulk-analysis-context"
 
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,7 @@ const formSchema = z.object({
     demo_requested: z.boolean().default(false),
     referral_partner_introduction: z.boolean().default(false),
     project_urgency: z.string().optional(),
+    refresh: z.boolean().default(false),
 }).refine(data => {
     const hasLinkedin = !!data.linkedin_url && data.linkedin_url.length > 0;
     const hasWebsite = !!data.website && data.website.length > 0;
@@ -70,6 +71,7 @@ export function LeadForm({ onSuccess, defaultUrl, defaultWebsite }: LeadFormProp
             demo_requested: false,
             referral_partner_introduction: false,
             project_urgency: "",
+            refresh: false,
         },
     })
 
@@ -97,6 +99,7 @@ export function LeadForm({ onSuccess, defaultUrl, defaultWebsite }: LeadFormProp
                 demo_requested: values.demo_requested,
                 referral_partner_introduction: values.referral_partner_introduction,
                 project_urgency: values.project_urgency ? urgencyMap[values.project_urgency] : undefined,
+                refresh: values.refresh,
             }
 
             const result = await generateResearch(apiData, (status) => {
@@ -277,6 +280,28 @@ export function LeadForm({ onSuccess, defaultUrl, defaultWebsite }: LeadFormProp
                                     <FormLabel>
                                         Referral Partner Introduction
                                     </FormLabel>
+                                </div>
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="refresh"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-primary/5 border-primary/20">
+                                <FormControl>
+                                    <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                    />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                    <FormLabel className="text-primary font-semibold">
+                                        Refresh / Re-run Research
+                                    </FormLabel>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Check this to bypass existing report and get fresh data.
+                                    </p>
                                 </div>
                             </FormItem>
                         )}

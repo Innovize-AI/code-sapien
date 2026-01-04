@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query, Depends, Body
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import save_report, get_db, SessionLocal
+from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedin
 from db.schemas import ResearchReportCreate
 from utils import add_https_if_missing
 from workflow.state import IdealProfile, InputLeadData
@@ -31,15 +31,9 @@ async def _get_organization_icp() -> IdealProfile:
         from db.models import OrganizationSettings
         result = await db.execute(select(OrganizationSettings).limit(1))
         settings = result.scalars().first()
-        if settings and settings.icp_json:
+        if settings and settings.ideal_profile:
             try:
-                icp_dict = json.loads(settings.icp_json)
-                return IdealProfile(
-                    industry=icp_dict.get("industry", "Technology"),
-                    company_size=icp_dict.get("company_size", "10-50"),
-                    revenue=icp_dict.get("revenue", "$1M+"),
-                    job_title=icp_dict.get("job_title", "CTO")
-                )
+                return IdealProfile(**json.loads(settings.ideal_profile))
             except Exception as e:
                 print(f"Error parsing ICP settings: {e}")
     
@@ -50,6 +44,32 @@ async def _get_organization_icp() -> IdealProfile:
         revenue="$10M+",
         job_title="CTO, CEO"
     )
+
+class CheckReportsInput(BaseModel):
+    leads: List[dict] # [{linkedin_url: str, email: str}]
+
+@sales_router.post("/check-existing")
+async def check_existing_reports(
+    input_data: CheckReportsInput,
+    db: AsyncSession = Depends(get_db)
+):
+    results = {}
+    for lead in input_data.leads:
+        linkedin_url = lead.get("linkedin_url") or lead.get("url")
+        email = lead.get("email")
+        existing = await get_report_by_email_or_linkedin(
+            db, 
+            email_id=email, 
+            linkedin_url=linkedin_url
+        )
+        key = linkedin_url or email
+        if existing and key:
+            results[key] = {
+                "exists": True,
+                "report_id": str(existing.id),
+                "data": _report_to_dict(existing)
+            }
+    return results
 
 async def _persist_results(db, linkedin_url, website, final_state, options):
     """Common logic to save research results to DB."""
@@ -73,6 +93,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
 
     report_data = ResearchReportCreate(
         linkedin_url=linkedin_url or "",
+        email_id=final_state.get("email_id") or "",
         website=website or "",
         sales_research_report=final_state.get("sales_research_report"),
         lead_score_analysis=score_analysis,
@@ -97,6 +118,39 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         print("DEBUG: Failed to save report or no object returned.")
         return None
 
+def _report_to_dict(report):
+    """Helper to convert ResearchReport model to final_state dictionary."""
+    return {
+        "id": str(report.id),
+        "linkedin_url": report.linkedin_url,
+        "email_id": report.email_id,
+        "website": report.website,
+        "sales_research_report": report.sales_research_report,
+        "lead_score_analysis": report.lead_score_analysis,
+        "user_profile_analysis": report.user_profile_analysis,
+        "website_analysis": report.website_analysis,
+        "fullname": report.fullname,
+        "profile_picture_url": report.profile_picture_url,
+        "lead_score": report.lead_score,
+        "email_history": json.loads(report.email_history) if report.email_history else [],
+        "intent_analysis": json.loads(report.intent_analysis) if report.intent_analysis else {}
+    }
+
+def _prepare_state_for_json(state):
+    """Helper to convert Pydantic models in the state to dicts for JSON serialization."""
+    if not state:
+        return state
+    
+    cleaned = {}
+    for k, v in state.items():
+        if hasattr(v, 'dict'):
+            cleaned[k] = v.dict()
+        elif hasattr(v, 'model_dump'):
+            cleaned[k] = v.model_dump()
+        else:
+            cleaned[k] = v
+    return cleaned
+
 async def _run_research_gen(linkedin_url, website, options, email):
     """Core generator that runs the research graph and yields updates."""
     website = add_https_if_missing(website)
@@ -114,7 +168,7 @@ async def _run_research_gen(linkedin_url, website, options, email):
         "input_lead_data": options
     }
 
-    final_state = {}
+    final_state = initial_state.copy()
     
     try:
         async for update in graph.astream(initial_state, thread, stream_mode="updates"):
@@ -132,6 +186,15 @@ async def run_single_research(
     email: Optional[str] = None,
     progress_callback=None
 ):
+    # Check for existing report if refresh is not requested
+    if options and not options.refresh:
+        async with SessionLocal() as db:
+            existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
+            if existing:
+                if progress_callback:
+                    await progress_callback(linkedin_url, "Using existing report...")
+                return {"linkedin_url": linkedin_url, "result": _report_to_dict(existing)}
+
     final_state = {}
     try:
         async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):
@@ -144,7 +207,7 @@ async def run_single_research(
         async with SessionLocal() as db:
             await _persist_results(db, linkedin_url, website, final_state, options)
                 
-        return {"linkedin_url": linkedin_url, "result": final_state}
+        return {"linkedin_url": linkedin_url, "result": _prepare_state_for_json(final_state)}
     except Exception as e:
         raise e
 
@@ -183,6 +246,14 @@ async def run_research(
     db: AsyncSession = Depends(get_db)
 ):
     async def event_generator():
+        # Check for existing report if refresh is not requested
+        if not options.refresh:
+            existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
+            if existing:
+                yield f"data: {json.dumps({'status': 'Using existing report...'})}\n\n"
+                yield f"data: {json.dumps({'status': 'Done', 'result': _report_to_dict(existing)})}\n\n"
+                return
+
         final_state = {}
         try:
             async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):
@@ -199,7 +270,7 @@ async def run_research(
         except Exception as e:
             print(f"Failed to save report: {e}")
 
-        yield f"data: {json.dumps({'status': 'Done', 'result': final_state})}\n\n"
+        yield f"data: {json.dumps({'status': 'Done', 'result': _prepare_state_for_json(final_state)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

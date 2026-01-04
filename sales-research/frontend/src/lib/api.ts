@@ -11,7 +11,18 @@ export interface LeadData {
     demo_requested?: boolean;
     referral_partner_introduction?: boolean;
     project_urgency?: number; // 1: Low, 2: Medium, 3: High
+    refresh?: boolean;
 }
+
+export const checkExistingReports = async (leads: { linkedin_url?: string; url?: string; email?: string }[]) => {
+    try {
+        const response = await axios.post(`${API_URL}/sales-research/check-existing`, { leads });
+        return response.data;
+    } catch (error) {
+        console.error("Error checking existing reports:", error);
+        return {};
+    }
+};
 
 export const generateResearch = async (
     data: LeadData,

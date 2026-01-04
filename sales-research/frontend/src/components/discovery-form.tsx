@@ -25,7 +25,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { discoverLeads } from "@/lib/api"
+import { discoverLeads, checkExistingReports } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { LeadStatus } from "@/components/bulk-analysis-modal"
 
@@ -48,13 +48,15 @@ export function DiscoveryForm({
     onBulkSelect,
     leadsStatus
 }: {
-    onSelect?: (lead: { url: string, website: string }) => void,
-    onBulkSelect?: (leads: { url: string, website: string }[]) => void,
+    onSelect?: (lead: { url: string, website: string, result?: any }) => void,
+    onBulkSelect?: (leads: { url: string, website: string }[], options?: { refresh: boolean }) => void,
     leadsStatus?: LeadStatus[]
 }) {
     const [isLoading, setIsLoading] = useState(false)
     const [results, setResults] = useState<{ url: string, website: string }[]>([])
     const [selectedUrls, setSelectedUrls] = useState<string[]>([])
+    const [refreshAll, setRefreshAll] = useState(false)
+    const [existingReports, setExistingReports] = useState<Record<string, any>>({})
     const [error, setError] = useState<string | null>(null)
 
     const findForm = useForm<FindFormValues>({
@@ -88,10 +90,17 @@ export function DiscoveryForm({
         setError(null)
         setResults([])
         setSelectedUrls([])
+        setExistingReports({}) // Clear existing reports on new search
         try {
             const data = await discoverLeads(values)
             if (data.leads) {
                 setResults(data.leads)
+
+                // Check for existing reports
+                const checkLeads = data.leads.map((l: { url: string, website: string }) => ({ linkedin_url: l.url, website: l.website }));
+                const existing = await checkExistingReports(checkLeads);
+                setExistingReports(existing);
+
                 if (data.leads.length === 0) {
                     setError("No leads found matching criteria.")
                 }
@@ -204,14 +213,24 @@ export function DiscoveryForm({
                     <div className="flex items-center gap-4">
                         <span className="text-sm text-muted-foreground">{results.length} found</span>
                         {selectedUrls.length > 0 && (
-                            <Button size="sm" onClick={() => {
-                                if (onBulkSelect) {
-                                    const selectedLeads = results.filter(r => selectedUrls.includes(r.url));
-                                    onBulkSelect(selectedLeads);
-                                }
-                            }}>
-                                Bulk Analyze ({selectedUrls.length})
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-full border mr-2">
+                                    <Checkbox
+                                        id="refresh-all"
+                                        checked={refreshAll}
+                                        onCheckedChange={(checked) => setRefreshAll(!!checked)}
+                                    />
+                                    <label htmlFor="refresh-all" className="text-[10px] font-medium cursor-pointer">Re-run All</label>
+                                </div>
+                                <Button size="sm" onClick={() => {
+                                    if (onBulkSelect) {
+                                        const selectedLeads = results.filter(r => selectedUrls.includes(r.url));
+                                        onBulkSelect(selectedLeads, { refresh: refreshAll });
+                                    }
+                                }}>
+                                    Bulk Analyze ({selectedUrls.length})
+                                </Button>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -236,16 +255,20 @@ export function DiscoveryForm({
                                                 <Loader2 className="w-3 h-3 animate-spin" />
                                                 Analyzing
                                             </div>
-                                        ) : status === 'completed' ? (
+                                        ) : (status === 'completed' || existingReports[lead.url]) ? (
                                             (() => {
-                                                const result = leadsStatus?.find(s => s.url === lead.url)?.result;
-                                                return result?.id ? (
-                                                    <Link href={`/reports?id=${result.id}`} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-200 bg-transparent hover:bg-green-50 text-green-700 h-8 px-3">
+                                                const existingData = existingReports[lead.url]?.data;
+                                                const sessionResult = leadsStatus?.find(s => s.url === lead.url)?.result;
+                                                const finalResult = sessionResult || existingData;
+
+                                                return (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 border-green-200 hover:bg-green-100 bg-green-50/50 text-green-700 font-bold gap-2"
+                                                        onClick={() => onSelect && onSelect({ ...lead, result: finalResult })}
+                                                    >
                                                         View Report
-                                                    </Link>
-                                                ) : (
-                                                    <Button size="sm" variant="outline" className="h-8 border-green-200 hover:bg-green-50 text-green-700" onClick={() => onSelect && onSelect(lead)}>
-                                                        View Report (Panel)
                                                     </Button>
                                                 );
                                             })()

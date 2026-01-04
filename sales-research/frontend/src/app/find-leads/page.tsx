@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { useBulkAnalysis } from "@/context/bulk-analysis-context"
 
 export default function FindLeadsPage() {
-    const [selectedLead, setSelectedLead] = useState<{ url: string, website: string } | null>(null)
+    const [selectedLead, setSelectedLead] = useState<{ url: string, website: string, result?: any } | null>(null)
     const [isPanelOpen, setIsPanelOpen] = useState(false)
 
     // Use global bulk analysis state
@@ -27,18 +27,19 @@ export default function FindLeadsPage() {
         setBulkLeads
     } = useBulkAnalysis()
 
-    const handleAnalyze = (lead: { url: string, website: string }) => {
+    const handleAnalyze = (lead: { url: string, website: string, result?: any }) => {
         setSelectedLead(lead)
         setIsPanelOpen(true)
     }
 
-    const handleBulkAnalyze = (leads: { url: string, website: string }[]) => {
+    const handleBulkAnalyze = (leads: { url: string, website: string }[], options?: { refresh: boolean }) => {
         setBulkLeads(leads)
         setIsBulkModalOpen(true)
         if (!isProcessing) {
             startBulkAnalysis(leads, {
                 project_urgency: 2,
-                lead_source: "Discovery"
+                lead_source: "Discovery",
+                refresh: options?.refresh || false
             })
         }
     }
@@ -96,7 +97,7 @@ export default function FindLeadsPage() {
                     <AnalysisSidePanel
                         initialUrl={selectedLead.url}
                         initialWebsite={selectedLead.website}
-                        initialData={leadsStatus.find(s => s.url === selectedLead.url)?.result}
+                        initialData={selectedLead.result || leadsStatus.find(s => s.url === selectedLead.url)?.result}
                         open={isPanelOpen}
                         onOpenChange={setIsPanelOpen}
                     />

@@ -11,6 +11,7 @@ class ResearchReport(Base):
     
     # Input Data
     linkedin_url = Column(Text, nullable=True)
+    email_id = Column(Text, nullable=True)
     website = Column(Text, nullable=True)
     fullname = Column(Text, nullable=True)
     profile_picture_url = Column(Text, nullable=True)

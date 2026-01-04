@@ -30,9 +30,10 @@ interface ReportDisplayProps {
         }>;
         [key: string]: any;
     } | null;
+    onRerun?: () => void;
 }
 
-export function ReportDisplay({ data }: ReportDisplayProps) {
+export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     const [activeSection, setActiveSection] = React.useState<number>(0);
     const [isNavVisible, setIsNavVisible] = React.useState<boolean>(true);
 
@@ -363,6 +364,18 @@ export function ReportDisplay({ data }: ReportDisplayProps) {
                             <Badge className="bg-emerald-500/20 text-emerald-400 border-none hover:bg-emerald-500/30 text-[10px] uppercase font-black">Ready to Outreach</Badge>
                         </div>
                     </div>
+
+                    {onRerun && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onRerun}
+                            className="bg-white/10 hover:bg-white/20 border-white/20 text-white gap-2"
+                        >
+                            <Zap className="h-4 w-4" />
+                            Re-run Analysis
+                        </Button>
+                    )}
                 </div>
             </div>
 

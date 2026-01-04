@@ -14,6 +14,7 @@ class InputLeadData(BaseModel):
     demo_requested: Optional[bool] = None
     referral_partner_introduction: Optional[bool] = None
     project_urgency: Optional[int] = None
+    refresh: bool = False
 
 class AgentState(TypedDict):
     email_id: str
@@ -33,5 +34,3 @@ class AgentState(TypedDict):
     intent_analysis: dict
     fullname: Optional[str]
     profile_picture_url: Optional[str]
-    event_type: Optional[str] # e.g., "EMAIL_RECEIVED", "SOCIAL_UPDATE", "MANUAL_RECOVERY"
-    last_event_data: Optional[dict]

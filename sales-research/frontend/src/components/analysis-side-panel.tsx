@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { BarChart3, Search } from "lucide-react"
+import { useState, useEffect } from "react"
+import { BarChart3, Search, Loader2 } from "lucide-react"
+import { generateResearch } from "@/lib/api"
+import { useBulkAnalysis } from "@/context/bulk-analysis-context"
 import {
     Sheet,
     SheetContent,
@@ -31,15 +33,53 @@ export function AnalysisSidePanel({
 }) {
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
     const [researchData, setResearchData] = useState<any>(initialData || null)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const [refreshStatus, setRefreshStatus] = useState("")
+    const { addLeadStatus } = useBulkAnalysis()
 
-    // Update internal state if initialData changes (e.g. re-opening with new data)
-    if (initialData && researchData !== initialData) {
-        setResearchData(initialData)
-    }
+    // Sync researchData with initialData when props change
+    useEffect(() => {
+        setResearchData(initialData || null);
+        setIsRefreshing(false);
+        setRefreshStatus("");
+    }, [initialData, initialUrl]);
 
     const isControlled = controlledOpen !== undefined
     const open = isControlled ? controlledOpen : uncontrolledOpen
     const setOpen = isControlled ? controlledOnOpenChange : setUncontrolledOpen
+
+    const handleRerun = async () => {
+        if (!researchData) return
+
+        setIsRefreshing(true)
+        setRefreshStatus("Initiating re-run...")
+
+        try {
+            const apiData = {
+                linkedin_url: researchData.linkedin_url,
+                website: researchData.website,
+                refresh: true
+            }
+
+            const result = await generateResearch(apiData, (status) => {
+                setRefreshStatus(status)
+            })
+
+            setResearchData(result)
+
+            // Update global context
+            addLeadStatus({
+                url: researchData.linkedin_url || researchData.website || "Rerun",
+                status: "completed",
+                result: result
+            })
+        } catch (error: any) {
+            console.error("Error during re-run:", error)
+            setRefreshStatus("Error: " + error.message)
+        } finally {
+            setIsRefreshing(false)
+        }
+    }
 
     return (
         <Sheet open={open} onOpenChange={(val) => {
@@ -79,12 +119,19 @@ export function AnalysisSidePanel({
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setResearchData(null)}
+                                    disabled={isRefreshing}
                                 >
                                     <Search className="w-4 h-4 mr-2" />
                                     New Search
                                 </Button>
+                                {isRefreshing && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
+                                        <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                                        {refreshStatus}
+                                    </div>
+                                )}
                             </div>
-                            <ReportDisplay data={researchData} />
+                            <ReportDisplay data={researchData} onRerun={handleRerun} />
                         </div>
                     )}
                 </div>

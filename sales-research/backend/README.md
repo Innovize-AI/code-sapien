@@ -23,7 +23,7 @@ Sales Assistant to chat and get recommendations
  
 CSV upload of prospects (linkedin url and websites)
 
-#add goal to outreach
+# add goal to outreach
 
 # integrate inbox manager with salesresearch
 
@@ -34,3 +34,7 @@ CSV upload of prospects (linkedin url and websites)
 # get reactions to posts and comments to see if the lead is interested in the product/service
 
 # extract website from linkedin profile or viceversa
+
+# focus on report itself (use tavily deep agents or langraph depp agents)
+
+# waterfall likeoutreach priority (comment, hiring, etc)

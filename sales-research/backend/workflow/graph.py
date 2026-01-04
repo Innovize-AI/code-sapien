@@ -15,20 +15,8 @@ def collector(state: AgentState):
 def research_router(state: AgentState):
     """
     Router to decide which parallel branches to trigger from collector.
-    Supports incremental re-runs based on event_type.
     """
-    event_type = state.get("event_type")
     next_nodes = []
-    
-    # If it's an email update, only run email branch
-    if event_type == "EMAIL_RECEIVED":
-        return ["email_history_fetcher"]
-        
-    # If it's a social update, only run LinkedIn branch
-    if event_type == "SOCIAL_UPDATE":
-        return ["profile_fetcher"]
-
-    # Default logic (full run or initial run)
     
     # Branch 1: LinkedIn
     if not state.get("linkedin_url"):
@@ -45,6 +33,11 @@ def research_router(state: AgentState):
     # Branch 3: Email History
     if state.get("email_id"):
         next_nodes.append("email_history_fetcher")
+    else:
+        # If no email, we must still connect to the merge node to avoid a dead end
+        # But LangGraph handles multiple branches merging. If we don't return 
+        # email_history_fetcher, the other branches will satisfy lead_data_extractor.
+        pass
         
     return next_nodes
 

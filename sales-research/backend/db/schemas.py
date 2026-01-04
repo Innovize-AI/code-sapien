@@ -5,6 +5,7 @@ from uuid import UUID
 
 class ResearchReportBase(BaseModel):
     linkedin_url: Optional[str] = None
+    email_id: Optional[str] = None
     website: Optional[str] = None
     fullname: Optional[str] = None
     profile_picture_url: Optional[str] = None

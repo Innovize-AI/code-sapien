@@ -13,10 +13,16 @@ from routes.sales_research import sales_router
 from routes.history import history_router
 from routes.settings import settings_router
 from routes.dashboard import dashboard_router
+from routes.webhooks import webhooks_router
+from routes.integrations_kit import kit_router
+from fastapi.staticfiles import StaticFiles
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 app = FastAPI()
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 environment = os.getenv("ENVIRONMENT", "dev")  # Default to 'development' if not set
 
@@ -37,6 +43,8 @@ app.include_router(sales_router, prefix="/sales-research")
 app.include_router(history_router, prefix="/sales-research")
 app.include_router(settings_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(webhooks_router, prefix="/api")
+app.include_router(kit_router, prefix="/api")
 
 
 if __name__ == "__main__":

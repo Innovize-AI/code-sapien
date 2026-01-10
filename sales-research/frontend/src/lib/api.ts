@@ -210,6 +210,9 @@ export interface IntegrationSettings {
     tavily_api_key?: string;
     apollo_api_key?: string;
     email_config?: string;
+    integrations_config?: string;
+    kit_api_key?: string;
+    kit_api_secret?: string;
 }
 
 export const getIntegrations = async (): Promise<IntegrationSettings | null> => {
@@ -223,5 +226,20 @@ export const getIntegrations = async (): Promise<IntegrationSettings | null> => 
 
 export const saveIntegrations = async (data: IntegrationSettings) => {
     const response = await axios.post(`${API_URL}/api/settings/integrations`, data);
+    return response.data;
+};
+
+export const getOnboardingStatus = async (): Promise<{ complete: boolean }> => {
+    const response = await axios.get(`${API_URL}/api/settings/onboarding-status`);
+    return response.data;
+};
+
+export const setOnboardingComplete = async () => {
+    const response = await axios.post(`${API_URL}/api/settings/onboarding-complete`);
+    return response.data;
+};
+
+export const fetchKitForms = async () => {
+    const response = await axios.get(`${API_URL}/api/integrations/kit/forms`);
     return response.data;
 };

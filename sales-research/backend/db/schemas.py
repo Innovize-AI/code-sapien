@@ -17,9 +17,32 @@ class ResearchReportBase(BaseModel):
     project_urgency: Optional[int] = None
     email_history: Optional[str] = None  # JSON string
     intent_analysis: Optional[str] = None  # JSON string
+    extra_metadata: Optional[str] = None  # JSON string
 
 class ResearchReportCreate(ResearchReportBase):
     pass
+
+class LeadSubmissionBase(BaseModel):
+    email: str
+    linkedin_url: Optional[str] = None
+    source: str
+    payload: Optional[str] = None
+    action_type: Optional[str] = "form_submission"
+    action_metadata: Optional[str] = None
+    external_form_id: Optional[str] = None
+    external_form_name: Optional[str] = None
+
+class LeadSubmissionCreate(LeadSubmissionBase):
+    pass
+
+class LeadSubmission(LeadSubmissionBase):
+    id: UUID
+    created_at: datetime
+    processed_at: Optional[datetime] = None
+    research_id: Optional[UUID] = None
+
+    class Config:
+        from_attributes = True
 
 class ResearchReport(ResearchReportBase):
     id: UUID
@@ -40,6 +63,9 @@ class IntegrationSettings(BaseModel):
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
     email_config: Optional[str] = None
+    integrations_config: Optional[str] = None
+    kit_api_key: Optional[str] = None
+    kit_api_secret: Optional[str] = None
 
 class OrganizationSettingsBase(BaseModel):
     icp_json: Optional[str] = None
@@ -47,6 +73,8 @@ class OrganizationSettingsBase(BaseModel):
     apollo_api_key: Optional[str] = None
     email_config: Optional[str] = None
     crm_config: Optional[str] = None
+    integrations_config: Optional[str] = None
+    onboarding_complete: Optional[int] = 0
 
 class OrganizationSettingsCreate(OrganizationSettingsBase):
     pass

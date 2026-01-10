@@ -104,7 +104,8 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         lead_score=lead_score,
         project_urgency=options.project_urgency if options else None,
         email_history=json.dumps(final_state.get("email_history") or []),
-        intent_analysis=json.dumps(final_state.get("intent_analysis") or {})
+        intent_analysis=json.dumps(final_state.get("intent_analysis") or {}),
+        extra_metadata=json.dumps(final_state.get("extra_research_context") or {})
     )
     
     print(f"DEBUG: Saving report with email_history length: {len(final_state.get('email_history') or [])}")
@@ -133,7 +134,8 @@ def _report_to_dict(report):
         "profile_picture_url": report.profile_picture_url,
         "lead_score": report.lead_score,
         "email_history": json.loads(report.email_history) if report.email_history else [],
-        "intent_analysis": json.loads(report.intent_analysis) if report.intent_analysis else {}
+        "intent_analysis": json.loads(report.intent_analysis) if report.intent_analysis else {},
+        "extra_metadata": json.loads(report.extra_metadata) if report.extra_metadata else {}
     }
 
 def _prepare_state_for_json(state):
@@ -165,7 +167,8 @@ async def _run_research_gen(linkedin_url, website, options, email):
         "website": website,
         "company_context": COMPANY_CONTEXT,
         "ideal_profile": ideal_profile,
-        "input_lead_data": options
+        "input_lead_data": options,
+        "extra_research_context": options.extra_metadata if options else None
     }
 
     final_state = initial_state.copy()

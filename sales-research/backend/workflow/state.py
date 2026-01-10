@@ -15,6 +15,7 @@ class InputLeadData(BaseModel):
     referral_partner_introduction: Optional[bool] = None
     project_urgency: Optional[int] = None
     refresh: bool = False
+    extra_metadata: Optional[dict] = None # For webhook/form extras
 
 class AgentState(TypedDict):
     email_id: str
@@ -34,3 +35,4 @@ class AgentState(TypedDict):
     intent_analysis: dict
     fullname: Optional[str]
     profile_picture_url: Optional[str]
+    extra_research_context: Optional[dict]

@@ -26,9 +26,34 @@ class ResearchReport(Base):
     lead_score = Column(Integer, nullable=True)
     project_urgency = Column(Integer, nullable=True)
     
-    # Email & Intent Analysis
+    # New Email & Intent Analysis
     email_history = Column(Text, nullable=True)  # JSON array of email objects
     intent_analysis = Column(Text, nullable=True)  # JSON object with intent data
+    extra_metadata = Column(Text, nullable=True)   # JSON object for extra fields from webhooks/forms
+
+class LeadSubmission(Base):
+    __tablename__ = "lead_submissions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    processed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    email = Column(String, nullable=False)
+    linkedin_url = Column(String, nullable=True)
+    source = Column(String, nullable=False) # 'webhook', 'form', 'calendly', 'cal'
+    
+    payload = Column(Text, nullable=True) # Full JSON payload
+    
+    # Action-based system
+    action_type = Column(String, nullable=True, server_default=text("'form_submission'")) # e.g., 'booked_call', 'downloaded_magnet', 'form_submission'
+    action_metadata = Column(Text, nullable=True) # JSON store for action-specific data (call time, magnet name, etc.)
+    
+    # Specific form tracking
+    external_form_id = Column(String, nullable=True)
+    external_form_name = Column(String, nullable=True)
+    
+    # Link to resulting report if processed
+    research_id = Column(UUID(as_uuid=True), nullable=True)
 
 class OrganizationSettings(Base):
     __tablename__ = "organization_settings"
@@ -50,3 +75,7 @@ class OrganizationSettings(Base):
     # New Configs
     email_config = Column(Text, nullable=True) # JSON store for IMAP details
     crm_config = Column(Text, nullable=True)   # JSON store for CRM details
+    integrations_config = Column(Text, nullable=True) # JSON store for all third-party integrations
+    onboarding_complete = Column(Integer, server_default=text("0"), nullable=False) # 0 or 1
+    kit_api_key = Column(String, nullable=True) # Public Key for v3
+    kit_api_secret = Column(String, nullable=True) # Secret Key for v3

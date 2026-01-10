@@ -6,10 +6,12 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Search, BarChart3, Users, Zap, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { fetchDashboardStats, fetchHistory, DashboardStats } from "@/lib/api";
+import { fetchDashboardStats, fetchHistory, DashboardStats, getOnboardingStatus } from "@/lib/api";
 
 export default function Home() {
+    const router = useRouter();
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [recentReports, setRecentReports] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -17,6 +19,13 @@ export default function Home() {
     useEffect(() => {
         const loadDashboardData = async () => {
             try {
+                // Check onboarding status first
+                const status = await getOnboardingStatus();
+                if (!status.complete) {
+                    router.push("/onboarding");
+                    return;
+                }
+
                 const [statsData, historyData] = await Promise.all([
                     fetchDashboardStats(),
                     fetchHistory()
@@ -35,7 +44,7 @@ export default function Home() {
         };
 
         loadDashboardData();
-    }, []);
+    }, [router]);
 
     if (isLoading) {
         return (

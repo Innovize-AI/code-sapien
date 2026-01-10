@@ -34,3 +34,11 @@ async def get_report(db: AsyncSession, report_id: str):
     query = select(ResearchReport).where(ResearchReport.id == report_id)
     result = await db.execute(query)
     return result.scalar_one_or_none()
+
+async def save_lead_submission(db: AsyncSession, submission: ResearchReportCreate):
+    from db.models import LeadSubmission
+    db_item = LeadSubmission(**submission.dict())
+    db.add(db_item)
+    await db.commit()
+    await db.refresh(db_item)
+    return db_item

@@ -18,6 +18,7 @@ interface ReportDisplayProps {
             summary: string;
             next_steps: string;
             sentiment: string;
+            recommended_email?: string;
         };
         email_history?: Array<{
             id?: string;
@@ -579,6 +580,39 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {/* Recommended Email */}
+                                            {data.intent_analysis?.recommended_email && (
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-3">
+                                                            <Mail className="h-4 w-4 text-primary" />
+                                                            Recommended Follow-up Email
+                                                        </h3>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 gap-2 group"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(data.intent_analysis?.recommended_email || "");
+                                                            }}
+                                                        >
+                                                            <Copy className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+                                                            Copy Email
+                                                        </Button>
+                                                    </div>
+                                                    <div className="relative group p-8 rounded-2xl bg-zinc-900 text-white border border-zinc-800 shadow-xl overflow-hidden">
+                                                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] rounded-full -mr-16 -mt-16 pointer-events-none" />
+                                                        <div className="relative z-10 text-[16px] font-medium leading-relaxed italic text-zinc-100">
+                                                            {data.intent_analysis.recommended_email}
+                                                        </div>
+                                                        <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                                            <ShieldCheck className="h-3 w-3" />
+                                                            AI PROMPT: AS HUMAN AS POSSIBLE
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             {/* Summary */}
                                             <div className="space-y-4">

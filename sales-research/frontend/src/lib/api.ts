@@ -225,3 +225,8 @@ export const saveIntegrations = async (data: IntegrationSettings) => {
     const response = await axios.post(`${API_URL}/api/settings/integrations`, data);
     return response.data;
 };
+
+export const analyzeCompetitors = async (urls: string[]) => {
+    const response = await axios.post(`${API_URL}/api/competitor-analysis/analyze`, { urls });
+    return response.data;
+};

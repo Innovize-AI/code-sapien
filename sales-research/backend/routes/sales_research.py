@@ -31,9 +31,9 @@ async def _get_organization_icp() -> IdealProfile:
         from db.models import OrganizationSettings
         result = await db.execute(select(OrganizationSettings).limit(1))
         settings = result.scalars().first()
-        if settings and settings.ideal_profile:
+        if settings and settings.icp_json:
             try:
-                return IdealProfile(**json.loads(settings.ideal_profile))
+                return IdealProfile(**json.loads(settings.icp_json))
             except Exception as e:
                 print(f"Error parsing ICP settings: {e}")
     

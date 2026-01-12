@@ -209,8 +209,11 @@ export const fetchDashboardStats = async (): Promise<DashboardStats | null> => {
 export interface IntegrationSettings {
     tavily_api_key?: string;
     apollo_api_key?: string;
+    user_linkedin_url?: string;
+    company_linkedin_url?: string;
     email_config?: string;
 }
+
 
 export const getIntegrations = async (): Promise<IntegrationSettings | null> => {
     try {

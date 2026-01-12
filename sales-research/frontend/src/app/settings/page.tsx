@@ -34,8 +34,11 @@ const icpFormSchema = z.object({
 const keysFormSchema = z.object({
     tavily_api_key: z.string().optional(),
     apollo_api_key: z.string().optional(),
+    user_linkedin_url: z.string().optional().refine(val => !val || val.includes("linkedin.com"), "Must be a valid LinkedIn URL"),
+    company_linkedin_url: z.string().optional().refine(val => !val || val.includes("linkedin.com"), "Must be a valid LinkedIn URL"),
     email_config: z.string().optional(),
 })
+
 
 export default function SettingsPage() {
     const [isLoading, setIsLoading] = useState(false)
@@ -59,8 +62,11 @@ export default function SettingsPage() {
         defaultValues: {
             tavily_api_key: "",
             apollo_api_key: "",
+            user_linkedin_url: "",
+            company_linkedin_url: "",
             email_config: "",
         },
+
     })
 
     // Load existing settings
@@ -259,7 +265,38 @@ export default function SettingsPage() {
                                             )}
                                         />
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                        <FormField
+                                            control={keysForm.control}
+                                            name="user_linkedin_url"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Your LinkedIn URL</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="https://linkedin.com/in/yourname" {...field} />
+                                                    </FormControl>
+                                                    <FormDescription>Used to track lead engagement with your posts.</FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={keysForm.control}
+                                            name="company_linkedin_url"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Company LinkedIn URL</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="https://linkedin.com/company/yourcompany" {...field} />
+                                                    </FormControl>
+                                                    <FormDescription>Used to track lead engagement with company posts.</FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
                                 </div>
+
 
                                 <div className="pt-4 border-t">
                                     <h3 className="text-lg font-medium mb-4">Email Configuration (IMAP)</h3>

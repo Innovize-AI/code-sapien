@@ -2,11 +2,12 @@ import re
 import json
 from langgraph.graph import StateGraph, START, END
 from workflow.state import AgentState
-from agents.linkedin_agent import get_linkedin_data, linkedin_profile_analyzer
+from agents.linkedin_agent import get_linkedin_profile, get_linkedin_posts, get_linkedin_engagement, get_linkedin_company_data, linkedin_profile_analyzer
 from agents.website_agent import scrape_webpages, website_analyzer
 from agents.lead_scoring_agent import lead_data_extractor, lead_scorer
 from agents.report_agent import sales_research_report_generator
 from agents.intent_agent import email_history_node
+from agents.strategy_agent import viability_node, pain_point_node, solution_node, outreach_node
 
 def collector(state: AgentState):
     print("WEBSITE COLLECTOR ", state["website"])
@@ -68,12 +69,28 @@ def enrich_website(state: AgentState):
 builder = StateGraph(AgentState)
 
 builder.add_node("collector", collector)
-builder.add_node("profile_fetcher", get_linkedin_data)
-builder.add_node("website_scraper", scrape_webpages)
+
+# LinkedIn Subgraph Nodes
+builder.add_node("linkedin_profile_fetcher", get_linkedin_profile)
+builder.add_node("linkedin_posts_fetcher", get_linkedin_posts)
+builder.add_node("linkedin_engagement_fetcher", get_linkedin_engagement)
+builder.add_node("linkedin_company_fetcher", get_linkedin_company_data)
 builder.add_node("linkedin_profile_analyzer", linkedin_profile_analyzer)
+
+# Website Nodes
+builder.add_node("website_scraper", scrape_webpages)
 builder.add_node("website_analyzer", website_analyzer)
+
+# Logic/Bridge Nodes
 builder.add_node("lead_data_extractor", lead_data_extractor)
 builder.add_node("lead_scorer", lead_scorer)
+
+# Strategic Nodules
+builder.add_node("viability_check", viability_node)
+builder.add_node("pain_point_discovery", pain_point_node)
+builder.add_node("solution_mapping", solution_node)
+builder.add_node("outreach_designer", outreach_node)
+
 builder.add_node("report_generator", sales_research_report_generator)
 builder.add_node("enrich_linkedin", enrich_linkedin)
 builder.add_node("enrich_website", enrich_website)
@@ -83,29 +100,69 @@ builder.add_node("email_history_fetcher", email_history_node)
 builder.set_entry_point("collector")
 
 # Add edges
-builder.add_edge("profile_fetcher", "linkedin_profile_analyzer")
-builder.add_edge("website_scraper", "website_analyzer")
-builder.add_edge("enrich_linkedin", "profile_fetcher")
+
+# LinkedIn Subgraph flow
+builder.add_edge("linkedin_profile_fetcher", "linkedin_posts_fetcher")
+builder.add_edge("linkedin_posts_fetcher", "linkedin_engagement_fetcher")
+builder.add_edge("linkedin_engagement_fetcher", "linkedin_company_fetcher")
+builder.add_edge("linkedin_company_fetcher", "linkedin_profile_analyzer")
+
+# Enrichment flow
+builder.add_edge("enrich_linkedin", "linkedin_profile_fetcher")
 builder.add_edge("enrich_website", "website_scraper")
+
+# Cross-functional flows
+builder.add_edge("website_scraper", "website_analyzer")
+
+# Convergence to Data Extraction
 builder.add_edge("linkedin_profile_analyzer", "lead_data_extractor")
 builder.add_edge("website_analyzer", "lead_data_extractor")
-builder.add_edge("email_history_fetcher", "lead_data_extractor") # Merge back
+builder.add_edge("email_history_fetcher", "lead_data_extractor")
+
+# Sequential Logic
 builder.add_edge("lead_data_extractor", "lead_scorer")
-builder.add_edge("lead_scorer", "report_generator")
+
+# Strategic Nodules (Parallel Fan-out)
+builder.add_edge("lead_scorer", "viability_check")
+builder.add_edge("lead_scorer", "pain_point_discovery")
+
+# Dependencies between nodules
+builder.add_edge("pain_point_discovery", "solution_mapping")
+builder.add_edge("solution_mapping", "outreach_designer")
+
+# Convergence to Report
+builder.add_edge("viability_check", "report_generator")
+builder.add_edge("outreach_designer", "report_generator")
+
 builder.add_edge("report_generator", END)
 
-builder.add_conditional_edges("collector", research_router)
+builder.add_conditional_edges("collector", research_router, {
+    "enrich_linkedin": "enrich_linkedin",
+    "profile_fetcher": "linkedin_profile_fetcher",
+    "enrich_website": "enrich_website",
+    "website_scraper": "website_scraper",
+    "email_history_fetcher": "email_history_fetcher"
+})
+
 
 graph = builder.compile()
 
 NODE_STATUS_MAPPING = {
-    "lead_data_extractor": "Extracting lead data...",
-    "collector": "Gathering research data...",
-    "lead_scorer": "Calculating lead score...",
-    "report_generator": "Generating final report...",
-    "profile_fetcher": "Fetching LinkedIn profile...",
-    "website_scraper": "Scraping company website...",
-    "linkedin_profile_analyzer": "Analyzing social activity...",
-    "website_analyzer": "Analyzing company footprint...",
-    "email_history_fetcher": "Analyzing email history...",
+    "lead_data_extractor": "Extracting combined lead intelligence...",
+    "collector": "Intelligent gathering started...",
+    "lead_scorer": "Calculating lead score and intent...",
+    "report_generator": "Synthesizing research into final report...",
+    "linkedin_profile_fetcher": "Fetching LinkedIn profile details...",
+    "linkedin_posts_fetcher": "Retrieving recent posts and activity...",
+    "linkedin_engagement_fetcher": "Analyzing reactions and audience engagement...",
+    "linkedin_company_fetcher": "Gathering company news and hiring status...",
+    "website_scraper": "Scraping company website footprint...",
+    "linkedin_profile_analyzer": "Conducting deep social persona analysis...",
+    "website_analyzer": "Analyzing company operations and market position...",
+    "email_history_fetcher": "Reviewing past email interactions...",
+    "viability_check": "Evaluating Lead-to-ICP viability...",
+    "pain_point_discovery": "Identifying specific business pain points...",
+    "solution_mapping": "Mapping Innovize AI solutions to challenges...",
+    "outreach_designer": "Designing personalized outreach strategy...",
 }
+

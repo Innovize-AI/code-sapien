@@ -15,6 +15,7 @@ class InputLeadData(BaseModel):
     referral_partner_introduction: Optional[bool] = None
     project_urgency: Optional[int] = None
     refresh: bool = False
+    extra_metadata: Optional[dict] = None # For webhook/form extras
 
 class AgentState(TypedDict):
     email_id: str
@@ -34,3 +35,18 @@ class AgentState(TypedDict):
     intent_analysis: dict
     fullname: Optional[str]
     profile_picture_url: Optional[str]
+    extra_research_context: Optional[dict]
+    
+    # LinkedIn Subgraph Data
+    post_engagements: List[dict]
+    company_news: List[dict]
+    hiring_data: List[dict]
+    user_linkedin_url: Optional[str]
+    company_linkedin_url: Optional[str]
+
+    # Specialized Nodules
+
+    viability_analysis: Annotated[str, operator.add]
+    target_pain_points: Annotated[str, operator.add]
+    strategic_solutions: Annotated[str, operator.add]
+    personalized_outreach: Annotated[str, operator.add]

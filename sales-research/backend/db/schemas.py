@@ -13,10 +13,23 @@ class ResearchReportBase(BaseModel):
     lead_score_analysis: Optional[str] = None
     user_profile_analysis: Optional[str] = None
     website_analysis: Optional[str] = None
+    
+    # Modular Nodules
+    viability_analysis: Optional[str] = None
+    target_pain_points: Optional[str] = None
+    strategic_solutions: Optional[str] = None
+    personalized_outreach: Optional[str] = None
+    
+    # LinkedIn Subgraph Data
+    post_engagements: Optional[str] = None # JSON string
+    company_news: Optional[str] = None     # JSON string
+    hiring_data: Optional[str] = None      # JSON string
+
     lead_score: Optional[int] = None
     project_urgency: Optional[int] = None
     email_history: Optional[str] = None  # JSON string
     intent_analysis: Optional[str] = None  # JSON string
+
 
 class ResearchReportCreate(ResearchReportBase):
     pass
@@ -39,13 +52,19 @@ class IdealProfileData(BaseModel):
 class IntegrationSettings(BaseModel):
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
+    user_linkedin_url: Optional[str] = None
+    company_linkedin_url: Optional[str] = None
     email_config: Optional[str] = None
+
 
 class OrganizationSettingsBase(BaseModel):
     icp_json: Optional[str] = None
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
+    user_linkedin_url: Optional[str] = None
+    company_linkedin_url: Optional[str] = None
     email_config: Optional[str] = None
+
     crm_config: Optional[str] = None
 
 class OrganizationSettingsCreate(OrganizationSettingsBase):

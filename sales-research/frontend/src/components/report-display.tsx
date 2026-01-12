@@ -29,10 +29,54 @@ interface ReportDisplayProps {
             text: string;
             direction: string;
         }>;
+        // Modular Nodules
+        viability_analysis?: string;
+        target_pain_points?: string;
+        strategic_solutions?: string;
+        personalized_outreach?: string;
+        // LinkedIn Subgraph
+        post_engagements?: Array<{
+            type: string;
+            target: string;
+            post_id: string;
+            content: string;
+            reaction_type?: string;
+            comment_text?: string;
+        }>;
+        company_news?: Array<{
+            title: string;
+            source: string;
+            date: string;
+        }>;
+        hiring_data?: Array<{
+            role: string;
+            location: string;
+        }>;
+        extra_metadata?: {
+            lead_source?: string;
+            download_marketing_material?: boolean;
+            demo_requested?: boolean;
+            referral_partner_introduction?: boolean;
+            [key: string]: any;
+        };
         [key: string]: any;
     } | null;
+
     onRerun?: () => void;
 }
+
+type ActivityType = 'email' | 'linkedin_reaction' | 'linkedin_comment' | 'conversion' | 'discovery';
+
+interface Activity {
+    id: string;
+    type: ActivityType;
+    title: string;
+    description: string;
+    date: string;
+    status?: string;
+    meta?: any;
+}
+
 
 export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     const [activeSection, setActiveSection] = React.useState<number>(0);
@@ -82,9 +126,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         return items;
     };
 
-    const tacticalActions = extractTacticalItems(data.sales_research_report);
-
     // Extract basic profile details from analysis string
+
     const getIdentity = () => {
         // Prioritize explicit database fields if available
         if (data.fullname) {
@@ -110,13 +153,30 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
 
     const identity = getIdentity();
 
-    const sections = [
+    interface Section {
+        id: string;
+        title: string;
+        icon: React.ReactNode;
+        content: string;
+        badge: string;
+        isPrimary?: boolean;
+        isActivity?: boolean;
+        isIntent?: boolean;
+        tactical?: any[];
+    }
+
+    const sections: Section[] = [
+
         { id: "profile", title: "Profile Intelligence", icon: <User className="h-4 w-4" />, content: data.user_profile_analysis, badge: "Intelligence", isPrimary: true },
+        { id: "viability", title: "ICP Viability", icon: <ShieldCheck className="h-4 w-4" />, content: data.viability_analysis || "", badge: "Strategic" },
+        { id: "activity", title: "Activity Board", icon: <BarChart3 className="h-4 w-4" />, content: "", badge: "Real-time", isActivity: true },
+        { id: "pain-points", title: "Lead Pain Points", icon: <Zap className="h-4 w-4" />, content: data.target_pain_points || "", badge: "Discovery" },
+        { id: "solutions", title: "Strategic Solutions", icon: <ArrowDown className="h-4 w-4" />, content: data.strategic_solutions || "", badge: "Matching" },
+        { id: "outreach", title: "Outreach Design", icon: <Target className="h-4 w-4" />, content: data.personalized_outreach || "", badge: "Tactical" },
         { id: "lead-score", title: "Qualification", icon: <TrendingUp className="h-4 w-4" />, content: data.lead_score_analysis, badge: "AI Score" },
-        { id: "strategy", title: "Outreach Strategy", icon: <Target className="h-4 w-4" />, content: data.sales_research_report, badge: "Tactical", tactical: tacticalActions },
         { id: "website-analysis", title: "Digital Footprint", icon: <Globe className="h-4 w-4" />, content: data.website_analysis, badge: "Technical" },
         // New Section for Intent & History
-        ...(data.email_history && data.email_history.length > 0 ? [{
+        ...((data.email_history && data.email_history.length > 0) || (data.post_engagements && data.post_engagements.length > 0) ? [{
             id: "intent-history",
             title: "Access & Intent",
             icon: <MessageSquare className="h-4 w-4" />,
@@ -125,6 +185,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
             isIntent: true
         }] : [])
     ];
+
+
 
     // Helper to render content based on its type (JSON or Markdown) with support for "sloppy" and fragmented formats
     const DynamicContent = ({ content, title, isSocial = false, className = "" }: { content: string, title?: string, isSocial?: boolean, className?: string }) => {
@@ -299,26 +361,26 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         );
     };
 
-    return (
-        <div className="flex flex-col gap-10 max-w-[1400px] mx-auto px-4 py-8">
-            <div className="relative overflow-hidden rounded-2xl bg-zinc-900 text-white p-10 md:p-12 border border-zinc-800">
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 blur-[130px] rounded-full -mr-32 -mt-32 pointer-events-none" />
+    const tacticalActions = data.personalized_outreach ? [
+        { type: 'linkedin' as const, title: 'LinkedIn Hook', content: data.personalized_outreach, icon: <Linkedin className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Hook', content: data.personalized_outreach, icon: <Mail className="h-4 w-4" /> }
+    ] : extractTacticalItems(data.sales_research_report);
 
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-                    <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
+    return (
+        <div className="relative min-h-screen bg-zinc-50 dark:bg-zinc-950/50">
+            {/* Header / Hero Section */}
+            <div className="relative overflow-hidden bg-zinc-900 border-b border-white/5 pt-20 pb-16 px-8 md:px-12">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.1),transparent)]" />
+                <div className="max-w-7xl mx-auto relative flex flex-col md:flex-row md:items-end justify-between gap-8">
+                    <div className="flex items-center gap-8">
                         {data.profile_picture_url ? (
-                            <div className="relative group">
-                                <div className="absolute -inset-1 bg-gradient-to-r from-primary/50 to-emerald-500/50 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
-                                <div className="relative h-28 w-28 rounded-2xl overflow-hidden border-2 border-primary/20 bg-zinc-800">
-                                    <img
-                                        src={data.profile_picture_url}
-                                        alt={identity.name}
-                                        className="h-full w-full object-cover grayscale-[20%] hover:grayscale-0 transition-all duration-500"
-                                    />
-                                </div>
-                            </div>
+                            <img
+                                src={data.profile_picture_url}
+                                alt={identity.name}
+                                className="h-32 w-32 rounded-3xl object-cover ring-4 ring-white/5 shadow-2xl transition-transform hover:scale-105 duration-500"
+                            />
                         ) : (
-                            <div className="p-6 rounded-2xl bg-primary/10 border border-primary/20 text-primary">
+                            <div className="h-32 w-32 rounded-3xl bg-zinc-800 flex items-center justify-center text-zinc-600 ring-4 ring-white/5">
                                 <User className="h-12 w-12" />
                             </div>
                         )}
@@ -358,11 +420,13 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                     <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-md">
                         <div className="text-right pr-4 border-r border-white/10">
                             <div className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-1">Lead Score</div>
-                            <div className="text-3xl font-black text-primary leading-none">85</div>
+                            <div className="text-3xl font-black text-primary leading-none">{data.lead_score || 85}</div>
                         </div>
                         <div className="pl-2">
-                            <div className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-1">Status</div>
-                            <Badge className="bg-emerald-500/20 text-emerald-400 border-none hover:bg-emerald-500/30 text-[10px] uppercase font-black">Ready to Outreach</Badge>
+                            <div className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-1">Intent</div>
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-none hover:bg-emerald-500/30 text-[10px] uppercase font-black">
+                                {data.post_engagements && data.post_engagements.length > 0 ? "High Interaction" : "Discovery Phase"}
+                            </Badge>
                         </div>
                     </div>
 
@@ -521,11 +585,12 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                     )}
                                 </CardHeader>
                                 <CardContent className="px-12 pb-16">
-                                    {section.id === 'strategy' && section.tactical && section.tactical.length > 0 && (
+                                    {section.id === 'outreach' && tacticalActions.length > 0 && (
                                         <div className="mb-12 grid grid-cols-1 md:grid-cols-2 gap-6">
                                             {/* Action Cards for tactical extraction */}
-                                            {section.tactical.map((action, i) => (
+                                            {tacticalActions.map((action, i) => (
                                                 <div key={i} className="group relative p-8 rounded-2xl bg-zinc-900 text-white border border-zinc-800 overflow-hidden hover:scale-[1.01] transition-transform">
+
                                                     <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <Button
                                                             variant="secondary"
@@ -553,10 +618,110 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                         </div>
                                     )}
 
+
                                     {/* Custom Intent Rendering */}
                                     {/* @ts-ignore */}
-                                    {section.isIntent && data.intent_analysis && (
-                                        <div className="space-y-12">
+                                    {/* Unified Activity Board */}
+                                    {section.isActivity && (
+                                        <div className="space-y-8">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                <Card className="bg-white/5 border-white/10">
+                                                    <CardHeader className="pb-2">
+                                                        <CardDescription className="uppercase text-[10px] font-black">Social Intent</CardDescription>
+                                                        <CardTitle className="text-2xl font-black text-primary">{data.post_engagements?.length || 0}</CardTitle>
+                                                    </CardHeader>
+                                                </Card>
+                                                <Card className="bg-white/5 border-white/10">
+                                                    <CardHeader className="pb-2">
+                                                        <CardDescription className="uppercase text-[10px] font-black">Emails Scanned</CardDescription>
+                                                        <CardTitle className="text-2xl font-black text-emerald-500">{data.email_history?.length || 0}</CardTitle>
+                                                    </CardHeader>
+                                                </Card>
+                                                <Card className="bg-white/5 border-white/10">
+                                                    <CardHeader className="pb-2">
+                                                        <CardDescription className="uppercase text-[10px] font-black">Conversion Events</CardDescription>
+                                                        <CardTitle className="text-2xl font-black text-amber-500">
+                                                            {[
+                                                                data.extra_metadata?.download_marketing_material,
+                                                                data.extra_metadata?.demo_requested,
+                                                                data.extra_metadata?.referral_partner_introduction
+                                                            ].filter(Boolean).length}
+                                                        </CardTitle>
+                                                    </CardHeader>
+                                                </Card>
+                                            </div>
+
+                                            <div className="space-y-6">
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400">Interaction Timeline</h3>
+                                                <div className="relative pl-8 border-l border-white/10 space-y-8 ml-4">
+                                                    {/* LinkedIn Engagements */}
+                                                    {data.post_engagements?.map((eng, idx) => (
+                                                        <div key={`social-${idx}`} className="relative">
+                                                            <div className="absolute -left-[45px] top-0 p-2 rounded-full bg-primary/20 border border-primary/30 text-primary">
+                                                                <Linkedin className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-black text-white capitalize">{eng.type} on {eng.target} post</span>
+                                                                    <Badge variant="outline" className="text-[9px] uppercase border-primary/30 text-primary">Intent High</Badge>
+                                                                </div>
+                                                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                                                    {eng.reaction_type ? `Reacted with ${eng.reaction_type}` : `Commented: "${eng.comment_text}"`}
+                                                                </p>
+                                                                <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">Recent Activity</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    {/* Emails */}
+                                                    {data.email_history?.slice(0, 5).map((email, idx) => (
+                                                        <div key={`email-${idx}`} className="relative">
+                                                            <div className="absolute -left-[45px] top-0 p-2 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-500">
+                                                                <Mail className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-black text-white">Email {email.direction}</span>
+                                                                    <Badge variant="outline" className="text-[9px] uppercase border-emerald-500/30 text-emerald-500">{email.direction}</Badge>
+                                                                </div>
+                                                                <p className="text-sm text-zinc-400 line-clamp-1">{email.subject}</p>
+                                                                <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">{new Date(email.date).toLocaleDateString()}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    {/* Conversion Events */}
+                                                    {data.extra_metadata?.download_marketing_material && (
+                                                        <div className="relative">
+                                                            <div className="absolute -left-[45px] top-0 p-2 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-500">
+                                                                <FileText className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <span className="text-sm font-black text-white">Converted: Marketing Download</span>
+                                                                <p className="text-sm text-zinc-400">Lead downloaded resource from website/portal.</p>
+                                                                <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">Historical Data</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {data.extra_metadata?.demo_requested && (
+                                                        <div className="relative">
+                                                            <div className="absolute -left-[45px] top-0 p-2 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-500">
+                                                                <Zap className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <span className="text-sm font-black text-white">Converted: Demo Requested</span>
+                                                                <p className="text-sm text-zinc-400">Direct high-intent request for a product demonstration.</p>
+                                                                <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">Priority Event</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {section.id === "intent-history" && data.intent_analysis && (
+                                        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
                                             {/* Intent Cards */}
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div className="p-8 rounded-2xl bg-primary/5 border border-primary/10">

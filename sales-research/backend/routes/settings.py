@@ -63,8 +63,11 @@ async def get_integrations(db: AsyncSession = Depends(get_db)):
     return IntegrationSettings(
         tavily_api_key=settings.tavily_api_key,
         apollo_api_key=settings.apollo_api_key,
+        user_linkedin_url=settings.user_linkedin_url,
+        company_linkedin_url=settings.company_linkedin_url,
         email_config=settings.email_config
     )
+
 
 @settings_router.post("/settings/integrations", response_model=IntegrationSettings)
 async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depends(get_db)):
@@ -77,14 +80,19 @@ async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depend
     if settings:
         settings.tavily_api_key = data.tavily_api_key
         settings.apollo_api_key = data.apollo_api_key
+        settings.user_linkedin_url = data.user_linkedin_url
+        settings.company_linkedin_url = data.company_linkedin_url
         settings.email_config = data.email_config
     else:
         settings = OrganizationSettings(
             tavily_api_key=data.tavily_api_key, 
             apollo_api_key=data.apollo_api_key,
+            user_linkedin_url=data.user_linkedin_url,
+            company_linkedin_url=data.company_linkedin_url,
             email_config=data.email_config
         )
         db.add(settings)
+
         
     await db.commit()
     await db.refresh(settings)

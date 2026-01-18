@@ -13,6 +13,8 @@ from routes.sales_research import sales_router
 from routes.history import history_router
 from routes.settings import settings_router
 from routes.dashboard import dashboard_router
+from routes.competitor_analysis import competitor_router
+from routes.competitors import router as competitors_crud_router
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -37,6 +39,18 @@ app.include_router(sales_router, prefix="/sales-research")
 app.include_router(history_router, prefix="/sales-research")
 app.include_router(settings_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(competitor_router, prefix="/api/competitor-analysis")
+app.include_router(competitors_crud_router, prefix="/api")
+
+@app.on_event("startup")
+async def startup_event():
+    try:
+        from scheduler import start_scheduler
+        start_scheduler()
+    except ImportError:
+        logging.warning("APScheduler not installed. Background automation disabled.")
+    except Exception as e:
+        logging.error(f"Failed to start background scheduler: {e}")
 
 
 if __name__ == "__main__":

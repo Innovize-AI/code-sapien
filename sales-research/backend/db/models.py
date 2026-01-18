@@ -67,3 +67,39 @@ class OrganizationSettings(Base):
 
     email_config = Column(Text, nullable=True) # JSON store for IMAP details
     crm_config = Column(Text, nullable=True)   # JSON store for CRM details
+
+class CompetitorAnalysis(Base):
+    __tablename__ = "competitor_analysis"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    competitor_urls = Column(Text, nullable=False) # Store comma-separated or JSON list
+    analysis_report = Column(Text, nullable=False)
+
+class Competitor(Base):
+    __tablename__ = "competitors"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    name = Column(String, nullable=True)
+    linkedin_url = Column(Text, nullable=False, unique=True)
+
+class IdentifiedProfile(Base):
+    __tablename__ = "identified_profiles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    name = Column(String, nullable=True)
+    linkedin_url = Column(Text, nullable=False, unique=True)
+    
+    # Aggregated Data
+    comment_history = Column(Text, nullable=True) # JSON array of comments
+    source_posts = Column(Text, nullable=True)    # JSON array of {title, url, competitor}
+    interaction_history = Column(Text, nullable=True) # Hierarchical: [ { competitor, posts: [ {url, title, comments: []} ] } ]
+    
+    # Status/Metadata
+    last_interaction_at = Column(DateTime(timezone=True), server_default=text("now()"))
+    profile_metadata = Column(Text, nullable=True)         # JSON for flexibility

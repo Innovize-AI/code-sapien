@@ -24,26 +24,39 @@ class BulkLeadInput(BaseModel):
     leads: List[LeadItem]
     options: InputLeadData
 
-async def _get_organization_icp() -> IdealProfile:
-    """Helper to fetch ICP from database settings."""
+async def _get_organization_settings() -> dict:
+    """Helper to fetch settings from database."""
     async with SessionLocal() as db:
         from sqlalchemy import select
         from db.models import OrganizationSettings
         result = await db.execute(select(OrganizationSettings).limit(1))
         settings = result.scalars().first()
-        if settings and settings.ideal_profile:
-            try:
-                return IdealProfile(**json.loads(settings.ideal_profile))
-            except Exception as e:
-                print(f"Error parsing ICP settings: {e}")
-    
-    # Fallback default
-    return IdealProfile(
-        industry="Finance",
-        company_size="10-50",
-        revenue="$10M+",
-        job_title="CTO, CEO"
-    )
+        
+        icp = IdealProfile(
+            industry="Finance",
+            company_size="10-50",
+            revenue="$10M+",
+            job_title="CTO, CEO"
+        )
+        
+        user_linkedin = None
+        company_linkedin = None
+
+        if settings:
+            if settings.icp_json:
+                try:
+                    icp = IdealProfile(**json.loads(settings.icp_json))
+                except Exception as e:
+                    print(f"Error parsing ICP settings: {e}")
+            user_linkedin = settings.user_linkedin_url
+            company_linkedin = settings.company_linkedin_url
+            
+        return {
+            "icp": icp,
+            "user_linkedin_url": user_linkedin,
+            "company_linkedin_url": company_linkedin
+        }
+
 
 class CheckReportsInput(BaseModel):
     leads: List[dict] # [{linkedin_url: str, email: str}]
@@ -77,8 +90,6 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         print("Skipping database save: No research report generated.")
         return None
 
-    print(f"DEBUG: Final state keys: {list(final_state.keys())}")
-    
     # Extract numeric lead score if possible
     lead_score = None
     score_analysis = final_state.get("lead_score_analysis", "")
@@ -104,18 +115,27 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         lead_score=lead_score,
         project_urgency=options.project_urgency if options else None,
         email_history=json.dumps(final_state.get("email_history") or []),
-        intent_analysis=json.dumps(final_state.get("intent_analysis") or {})
+        intent_analysis=json.dumps(final_state.get("intent_analysis") or {}),
+        extra_metadata=json.dumps(final_state.get("extra_research_context") or {}),
+        
+        # Modular Nodules
+        viability_analysis=final_state.get("viability_analysis"),
+        target_pain_points=final_state.get("target_pain_points"),
+        strategic_solutions=final_state.get("strategic_solutions"),
+        personalized_outreach=final_state.get("personalized_outreach"),
+        
+        # LinkedIn Subgraph Data
+        post_engagements=json.dumps(final_state.get("post_engagements") or []),
+        company_news=json.dumps(final_state.get("company_news") or []),
+        hiring_data=json.dumps(final_state.get("hiring_data") or [])
     )
     
-    print(f"DEBUG: Saving report with email_history length: {len(final_state.get('email_history') or [])}")
     saved_report = await save_report(db, report_data)
     
     if saved_report:
-        print(f"DEBUG: Saved report with ID: {saved_report.id}")
         final_state["id"] = str(saved_report.id)
         return saved_report
     else:
-        print("DEBUG: Failed to save report or no object returned.")
         return None
 
 def _report_to_dict(report):
@@ -133,7 +153,19 @@ def _report_to_dict(report):
         "profile_picture_url": report.profile_picture_url,
         "lead_score": report.lead_score,
         "email_history": json.loads(report.email_history) if report.email_history else [],
-        "intent_analysis": json.loads(report.intent_analysis) if report.intent_analysis else {}
+        "intent_analysis": json.loads(report.intent_analysis) if report.intent_analysis else {},
+        "extra_metadata": json.loads(report.extra_metadata) if report.extra_metadata else {},
+        
+        # Modular Nodules
+        "viability_analysis": report.viability_analysis,
+        "target_pain_points": report.target_pain_points,
+        "strategic_solutions": report.strategic_solutions,
+        "personalized_outreach": report.personalized_outreach,
+        
+        # LinkedIn Subgraph Results
+        "post_engagements": json.loads(report.post_engagements) if report.post_engagements else [],
+        "company_news": json.loads(report.company_news) if report.company_news else [],
+        "hiring_data": json.loads(report.hiring_data) if report.hiring_data else []
     }
 
 def _prepare_state_for_json(state):
@@ -157,7 +189,8 @@ async def _run_research_gen(linkedin_url, website, options, email):
     thread_id = str(uuid.uuid4())
     thread = {"configurable": {"thread_id": thread_id}}
     
-    ideal_profile = await _get_organization_icp()
+    org_settings = await _get_organization_settings()
+    ideal_profile = org_settings["icp"]
 
     initial_state = {
         "email_id": email,
@@ -165,7 +198,25 @@ async def _run_research_gen(linkedin_url, website, options, email):
         "website": website,
         "company_context": COMPANY_CONTEXT,
         "ideal_profile": ideal_profile,
-        "input_lead_data": options
+        "user_linkedin_url": org_settings["user_linkedin_url"],
+        "company_linkedin_url": org_settings["company_linkedin_url"],
+        "input_lead_data": options,
+
+        "extra_research_context": options.extra_metadata if options else None,
+        "user_profile_details": "",
+        "scraped_website_content": "",
+        "user_profile_analysis": "",
+        "website_analysis": "",
+        "lead_extracted_data": "",
+        "sales_research_report": "",
+        "lead_score_analysis": "",
+        "viability_analysis": "",
+        "target_pain_points": "",
+        "strategic_solutions": "",
+        "personalized_outreach": "",
+        "post_engagements": [],
+        "company_news": [],
+        "hiring_data": []
     }
 
     final_state = initial_state.copy()
@@ -228,10 +279,8 @@ async def discover_leads(input_data: LeadDiscoveryInput, db: AsyncSession = Depe
         apollo_key = settings.apollo_api_key if settings else None
         
         if input_data.provider == "apollo":
-            print(f"Discovering leads using Apollo for: {input_data}")
             leads = find_leads_apollo(input_data, api_key=apollo_key)
         else:
-            print(f"Discovering leads using Tavily for: {input_data}")
             leads = find_leads_tavily(input_data, api_key=tavily_key)
         return {"leads": leads}
     except Exception as e:

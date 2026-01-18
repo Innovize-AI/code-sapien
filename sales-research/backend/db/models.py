@@ -22,6 +22,17 @@ class ResearchReport(Base):
     user_profile_analysis = Column(Text, nullable=True)
     website_analysis = Column(Text, nullable=True)
     
+    # Modular Nodules
+    viability_analysis = Column(Text, nullable=True)
+    target_pain_points = Column(Text, nullable=True)
+    strategic_solutions = Column(Text, nullable=True)
+    personalized_outreach = Column(Text, nullable=True)
+    
+    # LinkedIn Subgraph Data
+    post_engagements = Column(Text, nullable=True) # JSON array
+    company_news = Column(Text, nullable=True)     # JSON array
+    hiring_data = Column(Text, nullable=True)      # JSON array
+    
     # Metrics
     lead_score = Column(Integer, nullable=True)
     project_urgency = Column(Integer, nullable=True)
@@ -29,6 +40,7 @@ class ResearchReport(Base):
     # Email & Intent Analysis
     email_history = Column(Text, nullable=True)  # JSON array of email objects
     intent_analysis = Column(Text, nullable=True)  # JSON object with intent data
+
 
 class OrganizationSettings(Base):
     __tablename__ = "organization_settings"
@@ -46,7 +58,48 @@ class OrganizationSettings(Base):
     # Integration Keys
     tavily_api_key = Column(String, nullable=True)
     apollo_api_key = Column(String, nullable=True)
+
+    # LinkedIn Identity for Engagement Tracking
+    user_linkedin_url = Column(Text, nullable=True)
+    company_linkedin_url = Column(Text, nullable=True)
     
     # New Configs
+
     email_config = Column(Text, nullable=True) # JSON store for IMAP details
     crm_config = Column(Text, nullable=True)   # JSON store for CRM details
+
+class CompetitorAnalysis(Base):
+    __tablename__ = "competitor_analysis"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    competitor_urls = Column(Text, nullable=False) # Store comma-separated or JSON list
+    analysis_report = Column(Text, nullable=False)
+
+class Competitor(Base):
+    __tablename__ = "competitors"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    name = Column(String, nullable=True)
+    linkedin_url = Column(Text, nullable=False, unique=True)
+
+class IdentifiedProfile(Base):
+    __tablename__ = "identified_profiles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    name = Column(String, nullable=True)
+    linkedin_url = Column(Text, nullable=False, unique=True)
+    
+    # Aggregated Data
+    comment_history = Column(Text, nullable=True) # JSON array of comments
+    source_posts = Column(Text, nullable=True)    # JSON array of {title, url, competitor}
+    interaction_history = Column(Text, nullable=True) # Hierarchical: [ { competitor, posts: [ {url, title, comments: []} ] } ]
+    
+    # Status/Metadata
+    last_interaction_at = Column(DateTime(timezone=True), server_default=text("now()"))
+    profile_metadata = Column(Text, nullable=True)         # JSON for flexibility

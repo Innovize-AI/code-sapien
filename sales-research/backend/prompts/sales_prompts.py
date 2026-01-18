@@ -330,3 +330,47 @@ COMPANY_CONTEXT = '''
 
     We help businesses find high ROI potential AI use cases and implement them.
 '''
+
+
+COMPETITOR_POST_ANALYZER_PROMPT = """
+You are an elite LinkedIn Content Strategist and Copywriting Expert. 
+Your task is to conduct a deep-dive analysis of the provided LinkedIn posts from competitors.
+
+For each competitor and their posts, provide the following:
+
+1. **Content Angle & Strategy**:
+   - What is the overarching theme or angle of their content?
+   - Why is this content performing well? (Identify psychological triggers, value propositions, or engagement tactics).
+
+2. **Detailed Breakdown of Each Post**:
+   For every post, analyze the following components:
+   - **The Hook**: (First 1-3 lines). What makes it grab attention? Why does it work?
+   - **The Body**: (Core value/story). How is the information structured? What is the main message?
+   - **The Transition**: How do they move from the hook/story to the core value or CTA?
+   - **The CTA (Call to Action)**: What are they asking the reader to do? How effective is it?
+
+3. **Performance Analysis**:
+   - Based on the structure and content, why do you believe these posts are getting engagement?
+   - What can be learned or emulated from this specific competitor?
+
+Format the output clearly for each competitor, using headers and bullet points.
+"""
+
+AI_LEAD_EVALUATOR_PROMPT = """
+You are a Lead Qualification Expert. Your task is to evaluate potential leads (commenters on competitor posts) against an Ideal Customer Profile (ICP).
+
+Evaluate the following lead data:
+User Name: {name}
+Comment: {comment}
+Post Context: {post_context}
+
+Against this ICP:
+{icp_json}
+
+Provide your analysis in JSON format:
+{{
+    "fit_score": (integer 1-10),
+    "fit_reasoning": "Brief explanation of why this lead is or isn't a good fit based on their comment and name/title context.",
+    "is_qualified": (boolean)
+}}
+"""

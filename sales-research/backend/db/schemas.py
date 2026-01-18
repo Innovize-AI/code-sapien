@@ -77,3 +77,38 @@ class OrganizationSettings(OrganizationSettingsBase):
 
     class Config:
         from_attributes = True
+
+# Competitor Schemas
+class CompetitorBase(BaseModel):
+    name: Optional[str] = None
+    linkedin_url: str
+
+class CompetitorCreate(CompetitorBase):
+    pass
+
+class Competitor(CompetitorBase):
+    id: UUID
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class IdentifiedProfileBase(BaseModel):
+    name: Optional[str] = None
+    linkedin_url: str
+    comment_history: Optional[str] = None
+    source_posts: Optional[str] = None
+    interaction_history: Optional[str] = None
+    profile_metadata: Optional[str] = None
+
+class IdentifiedProfileCreate(IdentifiedProfileBase):
+    pass
+
+class IdentifiedProfile(IdentifiedProfileBase):
+    id: UUID
+    created_at: datetime
+    last_interaction_at: Optional[datetime] = None
+    latest_report_id: Optional[UUID] = None  # New field for linking
+
+    class Config:
+        from_attributes = True

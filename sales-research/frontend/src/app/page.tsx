@@ -126,6 +126,17 @@ export default function Home() {
                                     </CardContent>
                                 </Card>
                             </Link>
+                            <Link href="/competitors">
+                                <Card className="hover:bg-muted/50 transition-colors cursor-pointer border-dashed border-2">
+                                    <CardContent className="flex flex-col items-center justify-center p-6 text-center gap-2">
+                                        <div className="p-3 bg-orange-500/10 rounded-full text-orange-500">
+                                            <Users className="w-6 h-6" />
+                                        </div>
+                                        <h3 className="font-semibold">Competitor Post Analysis</h3>
+                                        <p className="text-sm text-muted-foreground">Compare content strategies across competitors.</p>
+                                    </CardContent>
+                                </Card>
+                            </Link>
                         </CardContent>
                     </Card>
 

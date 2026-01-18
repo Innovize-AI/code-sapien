@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Loader2, Save } from "lucide-react"
+import { Loader2, Save, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { saveICP, getICP, IdealProfileData, saveIntegrations, getIntegrations, IntegrationSettings } from "@/lib/api"
+import { saveICP, getICP, IdealProfileData, saveIntegrations, getIntegrations, IntegrationSettings, getCompetitors, addCompetitor, deleteCompetitor, Competitor } from "@/lib/api"
 
 const icpFormSchema = z.object({
     industry: z.string().min(2, "Industry is required"),
@@ -45,6 +45,9 @@ export default function SettingsPage() {
     const [isFetching, setIsFetching] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
+    const [competitors, setCompetitors] = useState<Competitor[]>([])
+    const [newCompetitorUrl, setNewCompetitorUrl] = useState("")
+    const [isAddingCompetitor, setIsAddingCompetitor] = useState(false)
 
     const form = useForm<IdealProfileData>({
         resolver: zodResolver(icpFormSchema),
@@ -73,7 +76,7 @@ export default function SettingsPage() {
     useEffect(() => {
         const loadSettings = async () => {
             try {
-                const [icpData, keysData] = await Promise.all([getICP(), getIntegrations()])
+                const [icpData, keysData, competitorsData] = await Promise.all([getICP(), getIntegrations(), getCompetitors()])
                 if (icpData) {
                     // Start: Sanitize nulls to empty strings
                     const sanitizedIcp = Object.fromEntries(
@@ -87,6 +90,9 @@ export default function SettingsPage() {
                     ) as IntegrationSettings
                     keysForm.reset(sanitizedKeys)
                 }
+                if (competitorsData) {
+                    setCompetitors(competitorsData)
+                }
             } catch (e) {
                 console.error("Failed to load settings", e)
             } finally {
@@ -95,6 +101,30 @@ export default function SettingsPage() {
         }
         loadSettings()
     }, [form, keysForm])
+
+    const handleAddCompetitor = async () => {
+        if (!newCompetitorUrl) return
+        setIsAddingCompetitor(true)
+        try {
+            await addCompetitor({ linkedin_url: newCompetitorUrl })
+            setNewCompetitorUrl("")
+            const updated = await getCompetitors()
+            setCompetitors(updated)
+        } catch (e) {
+            console.error("Failed to add competitor", e)
+        } finally {
+            setIsAddingCompetitor(false)
+        }
+    }
+
+    const handleDeleteCompetitor = async (id: string) => {
+        try {
+            await deleteCompetitor(id)
+            setCompetitors(competitors.filter(c => c.id !== id))
+        } catch (e) {
+            console.error("Failed to delete competitor", e)
+        }
+    }
 
     async function onSubmit(values: IdealProfileData) {
         setIsLoading(true)
@@ -335,6 +365,41 @@ export default function SettingsPage() {
                                 </Button>
                             </form>
                         </Form>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-border">
+                    <CardHeader>
+                        <CardTitle>Competitor List</CardTitle>
+                        <CardDescription>
+                            Add competitor LinkedIn profiles to track and generate leads from.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="LinkedIn Profile URL"
+                                    value={newCompetitorUrl}
+                                    onChange={(e) => setNewCompetitorUrl(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleAddCompetitor()}
+                                />
+                                <Button onClick={handleAddCompetitor} disabled={isAddingCompetitor || !newCompetitorUrl}>
+                                    {isAddingCompetitor ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                    <span className="ml-2">Add</span>
+                                </Button>
+                            </div>
+                            <div className="space-y-2">
+                                {competitors.map((competitor) => (
+                                    <div key={competitor.id} className="flex items-center justify-between p-2 border rounded-md">
+                                        <span className="text-sm truncate max-w-[300px]">{competitor.linkedin_url}</span>
+                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteCompetitor(competitor.id)}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
             </div>

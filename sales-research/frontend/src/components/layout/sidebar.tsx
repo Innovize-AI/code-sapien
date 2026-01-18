@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Search, Settings, Home, History, Plus } from "lucide-react"
+import { BarChart3, Search, Settings, Home, History, Plus, Users, UserCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -18,6 +18,11 @@ const sidebarItems = [
         icon: Search,
     },
     {
+        title: "Identified Profiles",
+        href: "/profiles",
+        icon: UserCheck,
+    },
+    {
         title: "Analyze Lead",
         href: "/analyze",
         icon: BarChart3,
@@ -26,6 +31,11 @@ const sidebarItems = [
         title: "History",
         href: "/history",
         icon: History,
+    },
+    {
+        title: "Competitors",
+        href: "/competitors",
+        icon: Users,
     },
     {
         title: "Settings",

@@ -1,17 +1,19 @@
 import json
 import uuid
 from typing import Optional, List
-from fastapi import APIRouter, Query, Depends, Body
+from fastapi import APIRouter, Query, Depends, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedin
+from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedin, batch_upsert_identified_profiles
 from db.schemas import ResearchReportCreate
 from utils import add_https_if_missing
 from workflow.state import IdealProfile, InputLeadData
 from workflow.graph import graph, NODE_STATUS_MAPPING
 from prompts.sales_prompts import COMPANY_CONTEXT
 from .lead_discovery import LeadDiscoveryInput, find_leads_tavily, find_leads_apollo
+from agents.linkedin_agent import discover_leads_from_keywords
+from services.classification_service import run_classification_and_update
 from pydantic import BaseModel
 
 sales_router = APIRouter(tags=['Sales Research'], responses={404: {"description": "Not found"}},)
@@ -308,7 +310,7 @@ async def run_single_research(
         raise e
 
 @sales_router.post("/discover")
-async def discover_leads(input_data: LeadDiscoveryInput, db: AsyncSession = Depends(get_db)):
+async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     Endpoint to discover/find new leads based on criteria.
     """
@@ -325,6 +327,39 @@ async def discover_leads(input_data: LeadDiscoveryInput, db: AsyncSession = Depe
         
         if input_data.provider == "apollo":
             leads = find_leads_apollo(input_data, api_key=apollo_key)
+        elif input_data.provider == "linkedin_keyword":
+            if not input_data.keywords:
+                return {"error": "Keywords are required for this provider."}
+            leads_data = await discover_leads_from_keywords(input_data.keywords)
+            
+            # Prepare for DB and Frontend
+            leads = []
+            raw_leads_to_save = []
+            
+            for l in leads_data:
+                # Map fields for consistency
+                l['comment'] = l.get('comment_text', '')
+                
+                raw_leads_to_save.append({
+                    "linkedin_url": l["linkedin_url"],
+                    "name": l["name"],
+                    "headline": l.get("headline"),
+                    "comment": l["comment"], 
+                    "source_post": l.get("source_post"),
+                    "source_post_url": l.get("source_post_url"),
+                    "competitor": l.get("competitor"),
+                    # Defaults
+                    "is_fit": False,
+                    "is_competitor": False,
+                    "is_decision_maker": False,
+                    "fit_reasoning": ""
+                })
+                leads.append(l)
+
+            # Upsert and trigger background task
+            if raw_leads_to_save:
+                 await batch_upsert_identified_profiles(db, raw_leads_to_save)
+                 background_tasks.add_task(run_classification_and_update, raw_leads_to_save)
         else:
             leads = find_leads_tavily(input_data, api_key=tavily_key)
         return {"leads": leads}

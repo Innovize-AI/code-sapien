@@ -67,21 +67,66 @@ async def check_existing_reports(
     db: AsyncSession = Depends(get_db)
 ):
     results = {}
+    if not input_data.leads:
+        return results
+
+    # Optimize with batch query
+    from sqlalchemy import select, or_
+    from db.models import ResearchReport
+    
+    conditions = []
+    
+    # Collect all emails and linkedin_urls to query in bulk
+    emails = set()
+    linkedin_urls = set()
+    
+    for lead in input_data.leads:
+        l_url = lead.get("linkedin_url") or lead.get("url")
+        email = lead.get("email")
+        if l_url: linkedin_urls.add(l_url)
+        if email: emails.add(email)
+        
+    # Build query
+    query_conditions = []
+    if linkedin_urls:
+         query_conditions.append(ResearchReport.linkedin_url.in_(linkedin_urls))
+    if emails:
+         query_conditions.append(ResearchReport.email_id.in_(emails))
+    
+    if not query_conditions:
+        return results
+        
+    stmt = select(ResearchReport).where(or_(*query_conditions))
+    db_results = await db.execute(stmt)
+    existing_reports = db_results.scalars().all()
+    
+    # Map results for fast lookup
+    report_map = {} # Key: url or email -> Report
+    for report in existing_reports:
+        if report.linkedin_url:
+            report_map[report.linkedin_url] = report
+        if report.email_id:
+            report_map[report.email_id] = report
+            
+    # Build response
     for lead in input_data.leads:
         linkedin_url = lead.get("linkedin_url") or lead.get("url")
         email = lead.get("email")
-        existing = await get_report_by_email_or_linkedin(
-            db, 
-            email_id=email, 
-            linkedin_url=linkedin_url
-        )
+        
+        found_report = None
+        if linkedin_url and linkedin_url in report_map:
+            found_report = report_map[linkedin_url]
+        elif email and email in report_map:
+            found_report = report_map[email]
+            
         key = linkedin_url or email
-        if existing and key:
-            results[key] = {
+        if found_report and key:
+             results[key] = {
                 "exists": True,
-                "report_id": str(existing.id),
-                "data": _report_to_dict(existing)
+                "report_id": str(found_report.id),
+                "data": _report_to_dict(found_report)
             }
+
     return results
 
 async def _persist_results(db, linkedin_url, website, final_state, options):

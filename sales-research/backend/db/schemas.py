@@ -95,7 +95,15 @@ class Competitor(CompetitorBase):
 
 class IdentifiedProfileBase(BaseModel):
     name: Optional[str] = None
+    headline: Optional[str] = None
     linkedin_url: str
+    
+    # Classification
+    is_fit: bool = False
+    is_competitor: bool = False
+    is_decision_maker: bool = False
+    fit_reasoning: Optional[str] = None
+    
     comment_history: Optional[str] = None
     source_posts: Optional[str] = None
     interaction_history: Optional[str] = None

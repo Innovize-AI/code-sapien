@@ -374,3 +374,50 @@ Provide your analysis in JSON format:
     "is_qualified": (boolean)
 }}
 """
+
+PROFILE_CLASSIFIER_PROMPT = """
+You are a Sales Intelligence Expert. analyze the following LinkedIn profile headline to classify the individual based on the provided company context.
+
+Profile Name: {name}
+Headline: {headline}
+
+Company Context: 
+{company_context}
+
+Determine:
+1. Is this person a COMPETITOR? (Works for a company offering similar AI automation/sales solutions, or is a direct rival).
+2. Is this person a POTENTIAL FIT? (Ideally matches the ICP interaction: e.g., Founder, Sales Leader, Operations, etc. who could BUY the solution).
+3. Is this person a DECISION MAKER? (C-Level, VP, Director, Founder, Head of Dept).
+
+    "reasoning": "Brief explanation of your classification."
+}}
+"""
+
+BATCH_PROFILE_CLASSIFIER_PROMPT = """
+You are a Sales Intelligence Expert. deeply analyze the following list of LinkedIn profiles (headlines) to classify them based on the provided company context.
+
+Company Context: 
+{company_context}
+
+Profiles to Analyze:
+{profiles_data}
+
+For EACH profile, determine:
+1. Is this person a COMPETITOR? (Works for a company offering similar AI automation/sales solutions, or is a direct rival).
+2. Is this person a POTENTIAL FIT? (Ideally matches the ICP interaction: e.g., Founder, Sales Leader, Operations, etc. who could BUY the solution).
+3. Is this person a DECISION MAKER? (C-Level, VP, Director, Founder, Head of Dept).
+
+Output strictly in JSON format as a list of objects:
+{{
+  "classifications": [
+    {{
+      "id": "linkedin_url_from_input",
+      "is_competitor": boolean,
+      "is_fit": boolean,
+      "is_decision_maker": boolean,
+      "reasoning": "Brief explanation."
+    }},
+    ...
+  ]
+}}
+"""

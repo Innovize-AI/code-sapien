@@ -67,8 +67,22 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
         if url not in batch_map:
             batch_map[url] = {
                 "name": l.get("name"),
+                "headline": l.get("headline"),
+                "is_fit": l.get("is_fit"),
+                "is_competitor": l.get("is_competitor"),
+                "is_decision_maker": l.get("is_decision_maker"),
+                "fit_reasoning": l.get("fit_reasoning"),
                 "interactions": []
             }
+        elif l.get("headline") and not batch_map[url].get("headline"):
+            batch_map[url]["headline"] = l.get("headline")
+            
+        # Update classification if missing/False
+        if l.get("is_fit"): batch_map[url]["is_fit"] = True
+        if l.get("is_competitor"): batch_map[url]["is_competitor"] = True
+        if l.get("is_decision_maker"): batch_map[url]["is_decision_maker"] = True
+        if l.get("fit_reasoning") and not batch_map[url].get("fit_reasoning"):
+            batch_map[url]["fit_reasoning"] = l.get("fit_reasoning")
         
         # Helper for URL normalization (strip query and trailing slash)
         n_source_url = normalize(l.get("source_post_url"))
@@ -155,6 +169,11 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "id": p.id,
                 "linkedin_url": url,
                 "name": data["name"] or p.name,
+                "headline": data.get("headline") or p.headline,
+                "is_fit": data.get("is_fit") or p.is_fit,
+                "is_competitor": data.get("is_competitor") or p.is_competitor,
+                "is_decision_maker": data.get("is_decision_maker") or p.is_decision_maker,
+                "fit_reasoning": data.get("fit_reasoning") or p.fit_reasoning,
                 "comment_history": json.dumps(db_comments),
                 "source_posts": json.dumps(db_sources),
                 "interaction_history": json.dumps(db_history),
@@ -198,6 +217,11 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             upsert_rows.append({
                 "linkedin_url": url,
                 "name": data["name"],
+                "headline": data.get("headline"),
+                "is_fit": data.get("is_fit"),
+                "is_competitor": data.get("is_competitor"),
+                "is_decision_maker": data.get("is_decision_maker"),
+                "fit_reasoning": data.get("fit_reasoning"),
                 "comment_history": json.dumps(legacy_comments),
                 "source_posts": json.dumps(legacy_sources),
                 "interaction_history": json.dumps(new_history),
@@ -211,7 +235,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             IdentifiedProfile.__table__,
             upsert_rows,
             conflict_cols=["linkedin_url"],
-            update_cols=["name", "comment_history", "source_posts", "interaction_history", "last_interaction_at"]
+            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "comment_history", "source_posts", "interaction_history", "last_interaction_at"]
         )
         await db.commit()
         print(f"DEBUG: Batch upsert committed successfully. Results count: {len(results)}")

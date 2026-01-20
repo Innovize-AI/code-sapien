@@ -599,3 +599,151 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
     except Exception as e:
         print(f"Error in async batch classification: {e}")
         return {}
+
+async def get_posts_by_keyword(keywords: List[str]):
+    """Get linkedin posts by keywords - Async version with parallel execution for multiple keywords"""
+    import asyncio
+    
+    api_key = os.getenv("RAPID_API_KEY")
+    linkedin_base_url = os.getenv("LINKEDIN_RAPID_BASE_URL")
+    
+    if not linkedin_base_url:
+        print("Error: LINKEDIN_RAPID_BASE_URL not set")
+        return []
+        
+    search_url = f"{linkedin_base_url.rstrip('/')}/posts/search"
+    headers = {
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": "linkedin-scraper-api-real-time-fast-affordable.p.rapidapi.com"
+    }
+
+    async def fetch_for_single_keyword(keyword: str):
+        try:
+            print(f"DEBUG: Fetching posts for keyword: '{keyword}'")
+            response = await asyncio.to_thread(
+                requests.get,
+                search_url,
+                headers=headers,
+                params={"keyword": keyword}
+            )
+            
+            if response.status_code != 200:
+                print(f"DEBUG: API error for keyword '{keyword}': {response.status_code}")
+                return []
+
+            posts_data = response.json()
+            
+            if "data" in posts_data:
+                if isinstance(posts_data["data"], list):
+                    return posts_data["data"]
+                elif isinstance(posts_data["data"], dict):
+                    if "posts" in posts_data["data"]:
+                        return posts_data["data"]["posts"]
+                    return [posts_data["data"]]
+            return []
+        except Exception as e:
+            print(f"Error fetching for keyword '{keyword}': {e}")
+            return []
+
+    try:
+        # Run all keyword searches in parallel
+        tasks = [fetch_for_single_keyword(k) for k in keywords]
+        results = await asyncio.gather(*tasks)
+        
+        # Flatten and Deduplicate based on URN/ID
+        all_posts = []
+        seen_ids = set()
+        
+        for i, batch in enumerate(results):
+            keyword_for_batch = keywords[i]
+            for post in batch:
+                # Try to find a unique ID
+                pid = post.get("id") or post.get("urn")
+                if isinstance(pid, dict): pid = pid.get("activity_urn")
+                
+                # If no ID, generate a signature from text (fallback)
+                if not pid:
+                     pid = str(hash(post.get("text", "")[:50]))
+                
+                if pid not in seen_ids:
+                    seen_ids.add(pid)
+                    # Tag post with keyword
+                    post["matched_keyword"] = keyword_for_batch
+                    all_posts.append(post)
+
+        print(f"DEBUG: Found {len(all_posts)} unique posts across {len(keywords)} keywords")
+        return all_posts
+
+    except Exception as e:
+        print(f"Error in get_posts_by_keyword: {e}")
+        return []
+
+async def discover_leads_from_keywords(keywords: List[str]):
+    """
+    High-level function to discover leads via keyword search.
+    1. Fetches posts matching keywords.
+    2. Extracts the AUTHOR of each post as a lead.
+    """
+    posts = await get_posts_by_keyword(keywords)
+    print(f"DEBUG: Processing {len(posts)} posts for leads extraction...")
+    
+    leads = []
+    seen_urls = set()
+    
+    for post in posts:
+        try:
+            author = post.get("author", {})
+            if not author:
+                continue
+                
+            linkedin_url = author.get("profile_url") or author.get("url")
+            if not linkedin_url and author.get("username"):
+                linkedin_url = f"https://www.linkedin.com/in/{author.get('username')}"
+                
+            if not linkedin_url:
+                continue
+            
+            # Normalize
+            linkedin_url = linkedin_url.split("?")[0].strip().strip("/")
+            
+            if linkedin_url in seen_urls:
+                continue
+                
+            seen_urls.add(linkedin_url)
+            
+            headline = author.get("headline") or author.get("subtitle") or author.get("description") or ""
+            post_text = post.get("text", "")
+            
+            # Post URL
+            post_id = post.get("id") or post.get("urn")
+            if isinstance(post_id, dict): post_id = post_id.get("activity_urn")
+            elif isinstance(post_id, str) and ":" in post_id: post_id = post_id.split(":")[-1]
+            
+            source_post_url = post.get("post_url") or post.get("url")
+            if not source_post_url and post_id:
+                 source_post_url = f"https://www.linkedin.com/feed/update/urn:li:activity:{post_id}"
+
+            # Get matched keyword
+            matched_keyword = post.get("matched_keyword", "Keyword Search")
+            competitor_source = f"Keyword: {matched_keyword}"
+
+            leads.append({
+                "name": author.get("name") or "Unknown",
+                "headline": headline,
+                "linkedin_url": linkedin_url,
+                "comment_text": f"Posted about keywords: {post_text[:200]}...", # Storing post text as 'comment' context
+                "source_post": post_text[:100] + "...",
+                "source_post_url": source_post_url or "",
+                "competitor": competitor_source, # Marker with keyword
+                "is_fit": False,
+                "is_competitor": False,
+                "is_decision_maker": False,
+                "fit_reasoning": ""
+            })
+            
+        except Exception as e:
+            print(f"Error extracting lead from post: {e}")
+            continue
+            
+    print(f"DEBUG: Extracted {len(leads)} unique leads from keyword search posts.")
+    return leads

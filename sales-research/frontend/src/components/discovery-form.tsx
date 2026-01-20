@@ -32,12 +32,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { LeadStatus } from "@/components/bulk-analysis-modal"
 
 const findFormSchema = z.object({
-    industry: z.string(),
-    job_title: z.string(),
-    location: z.string(),
-    provider: z.enum(["tavily", "apollo", "competitor"]),
+    industry: z.string().optional(),
+    job_title: z.string().optional(),
+    location: z.string().optional(),
+    provider: z.enum(["tavily", "apollo", "competitor", "linkedin_keyword"]),
+    keywords: z.string().optional(),
 }).superRefine((data, ctx) => {
-    if (data.provider !== "competitor") {
+    if (data.provider === "linkedin_keyword") {
+        if (!data.keywords || data.keywords.trim().length < 3) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Keywords are required (comma separated)",
+                path: ["keywords"],
+            });
+        }
+    } else if (data.provider !== "competitor") {
         if (!data.industry || data.industry.trim().length < 2) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -56,10 +65,11 @@ const findFormSchema = z.object({
 })
 
 type FindFormValues = {
-    industry: string;
-    job_title: string;
-    location: string;
-    provider: "tavily" | "apollo" | "competitor";
+    industry?: string;
+    job_title?: string;
+    location?: string;
+    provider: "tavily" | "apollo" | "competitor" | "linkedin_keyword";
+    keywords?: string;
 }
 
 export function DiscoveryForm({
@@ -69,7 +79,7 @@ export function DiscoveryForm({
     onSelect?: (lead: { url: string, website: string, result?: any }) => void,
     onBulkSelect?: (leads: { url: string, website: string }[], options?: { refresh: boolean }) => void,
 }) {
-    const [urlInput, setUrlInput] = useState("")
+    const [keywordInput, setKeywordInput] = useState("")
     const [leadsStatus, setLeadsStatus] = useState<LeadStatus[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [results, setResults] = useState<{ url: string, website: string, name?: string, comment?: string, metadata?: any, fit_score?: number, fit_reasoning?: string, source_post_url?: string }[]>([])
@@ -139,6 +149,7 @@ export function DiscoveryForm({
             job_title: "",
             location: "",
             provider: "tavily",
+            keywords: ""
         }
     })
 
@@ -157,6 +168,35 @@ export function DiscoveryForm({
             setSelectedUrls(results.map(r => r.url))
         }
     }
+
+    // Keyword logic
+    const handleAddKeyword = (currentDetails: string) => {
+        if (!keywordInput.trim()) return;
+        const current = currentDetails ? currentDetails.split(",").filter(k => k.trim()) : [];
+        if (!current.includes(keywordInput.trim())) {
+            const newVal = [...current, keywordInput.trim()].join(",");
+            findForm.setValue("keywords", newVal);
+        }
+        setKeywordInput("");
+    };
+
+    const handleRemoveKeyword = (target: string, currentDetails: string) => {
+        const current = currentDetails ? currentDetails.split(",").filter(k => k.trim()) : [];
+        const newVal = current.filter(k => k !== target).join(",");
+        findForm.setValue("keywords", newVal);
+    };
+
+    const handleKeywordKeyDown = (e: React.KeyboardEvent, currentDetails: string) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddKeyword(currentDetails);
+        } else if (e.key === 'Backspace' && !keywordInput && currentDetails) {
+            const current = currentDetails.split(",").filter(k => k.trim());
+            if (current.length > 0) {
+                handleRemoveKeyword(current[current.length - 1], currentDetails);
+            }
+        }
+    };
 
     async function onFindSubmit(values: FindFormValues) {
         setIsLoading(true)
@@ -196,12 +236,49 @@ export function DiscoveryForm({
                         setError((data as any).message || "No leads found from competitors.")
                     }
                 }
+            } else if (values.provider === "linkedin_keyword") {
+                // Pass dummy values for required fields
+                const payload = {
+                    industry: values.industry || "Keyword Search",
+                    job_title: values.job_title || "Any",
+                    location: values.location,
+                    provider: values.provider,
+                    keywords: values.keywords ? values.keywords.split(",").map(k => k.trim()).filter(k => k) : []
+                };
+                const data = await discoverLeads(payload as any)
+
+                if (data.leads) {
+                    const mappedLeads = data.leads.map((l: any) => ({
+                        name: l.name,
+                        url: l.linkedin_url || l.url,
+                        website: l.website || "",
+                        comment: l.comment,
+                        source_post_url: l.source_post_url,
+                        metadata: {
+                            headline: l.headline,
+                            is_fit: l.is_fit,
+                            is_competitor: l.is_competitor,
+                            is_decision_maker: l.is_decision_maker,
+                            fit_reasoning: l.fit_reasoning,
+                            competitor: l.competitor,
+                            source_post: l.source_post
+                        }
+                    }));
+                    setResults(mappedLeads)
+                    const checkLeads = mappedLeads.map((l: { url: string, website: string }) => ({ linkedin_url: normalizeUrl(l.url), website: l.website }));
+                    const existing = await checkExistingReports(checkLeads);
+                    setExistingReports(existing);
+
+                    if (data.leads.length === 0) {
+                        setError("No leads found matching keywords.")
+                    }
+                } else if (data.error) {
+                    setError(data.error)
+                }
             } else {
-                const data = await discoverLeads(values)
+                const data = await discoverLeads(values as any)
                 if (data.leads) {
                     setResults(data.leads)
-
-                    // Check for existing reports
                     const checkLeads = data.leads.map((l: { url: string, website: string }) => ({ linkedin_url: normalizeUrl(l.url), website: l.website }));
                     const existing = await checkExistingReports(checkLeads);
                     setExistingReports(existing);
@@ -230,45 +307,7 @@ export function DiscoveryForm({
                 <CardContent>
                     <Form {...findForm}>
                         <form onSubmit={findForm.handleSubmit(onFindSubmit)} className="space-y-4">
-                            <FormField
-                                control={findForm.control}
-                                name="industry"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Industry</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="e.g. FinTech" {...field} disabled={findForm.watch("provider") === "competitor"} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={findForm.control}
-                                name="job_title"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Job Title</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="e.g. CTO" {...field} disabled={findForm.watch("provider") === "competitor"} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={findForm.control}
-                                name="location"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Location (Optional)</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="e.g. San Francisco" {...field} disabled={findForm.watch("provider") === "competitor"} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                            {/* 1. Provider Selection (Top) */}
                             <FormField
                                 control={findForm.control}
                                 name="provider"
@@ -284,13 +323,115 @@ export function DiscoveryForm({
                                             <SelectContent>
                                                 <SelectItem value="tavily">Web Search (Tavily)</SelectItem>
                                                 <SelectItem value="apollo">Apollo Database</SelectItem>
-                                                <SelectItem value="competitor">Competitor Comments (Saved Config)</SelectItem>
+                                                <SelectItem value="linkedin_keyword">LinkedIn Keywords</SelectItem>
+                                                <SelectItem value="competitor">Competitor Comments</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
+
+                            {/* 2. Conditional Inputs */}
+                            {(findForm.watch("provider") === "tavily" || findForm.watch("provider") === "apollo") && (
+                                <>
+                                    <FormField
+                                        control={findForm.control}
+                                        name="industry"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Industry</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g. FinTech" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={findForm.control}
+                                        name="job_title"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Job Title</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g. CTO" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={findForm.control}
+                                        name="location"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Location (Optional)</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g. San Francisco" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </>
+                            )}
+
+                            {findForm.watch("provider") === "linkedin_keyword" && (
+                                <FormField
+                                    control={findForm.control}
+                                    name="keywords"
+                                    render={({ field }) => {
+                                        const strings = field.value ? field.value.split(",").filter((k: string) => k.trim()) : [];
+                                        return (
+                                            <FormItem>
+                                                <FormLabel>Keywords</FormLabel>
+                                                <div className="space-y-2">
+                                                    <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-white focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                                                        {strings.map((k: string, i: number) => (
+                                                            <Badge key={i} variant="secondary" className="gap-1 pr-1 flex items-center">
+                                                                {k}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveKeyword(k, field.value)}
+                                                                    className="hover:bg-muted rounded-full p-0.5"
+                                                                >
+                                                                    <span className="sr-only">Remove</span>
+                                                                    <svg
+                                                                        xmlns="http://www.w3.org/2000/svg"
+                                                                        width="12"
+                                                                        height="12"
+                                                                        viewBox="0 0 24 24"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        strokeWidth="2"
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        className="w-3 h-3"
+                                                                    >
+                                                                        <path d="M18 6 6 18" />
+                                                                        <path d="m6 6 12 12" />
+                                                                    </svg>
+                                                                </button>
+                                                            </Badge>
+                                                        ))}
+                                                        <input
+                                                            className="flex-1 outline-none bg-transparent text-sm min-w-[200px]"
+                                                            placeholder={strings.length === 0 ? "Type keyword and press Enter..." : ""}
+                                                            value={keywordInput}
+                                                            onChange={(e) => setKeywordInput(e.target.value)}
+                                                            onKeyDown={(e) => handleKeywordKeyDown(e, field.value)}
+                                                            onBlur={() => handleAddKeyword(field.value)}
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-muted-foreground">Press Enter to add multiple keywords.</p>
+                                                </div>
+                                                <FormMessage />
+                                            </FormItem>
+                                        );
+                                    }}
+                                />
+                            )}
 
                             {findForm.watch("provider") === "competitor" && (
                                 <div className="space-y-2 mt-4 p-4 bg-muted/30 rounded-lg border border-dashed">

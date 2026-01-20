@@ -47,6 +47,9 @@ def enrich_linkedin(state: AgentState):
     return {"linkedin_url": ""}
 
 def enrich_website(state: AgentState):
+
+    """enrich website from email_id"""
+    
     email_id = state["email_id"]
     validate_email_regex = r"^(?!.*@(gmail\.com|hotmail\.com|yahoo\.com|outlook\.com|aol\.com|icloud\.com|mail\.com|zoho\.com|protonmail\.com|yandex\.com)).*@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$"
 

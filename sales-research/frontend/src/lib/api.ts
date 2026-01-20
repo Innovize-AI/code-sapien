@@ -92,7 +92,8 @@ export interface LeadDiscoveryInput {
     job_title: string;
     location?: string;
     company_size?: string;
-    provider?: 'tavily' | 'apollo' | 'competitor';
+    provider?: 'tavily' | 'apollo' | 'competitor' | 'linkedin_keyword';
+    keywords?: string[];
 }
 
 export const discoverLeads = async (data: LeadDiscoveryInput) => {

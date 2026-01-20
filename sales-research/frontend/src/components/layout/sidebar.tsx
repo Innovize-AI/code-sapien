@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Search, Settings, Home, History, Plus, Users, UserCheck } from "lucide-react"
+import { BarChart3, Search, Settings, Home, History, Plus, Users, UserCheck, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
 const sidebarItems = [
     {
@@ -38,6 +39,12 @@ const sidebarItems = [
         icon: Users,
     },
     {
+        title: "Knowledge Base",
+        href: "#",
+        icon: BookOpen,
+        comingSoon: true
+    },
+    {
         title: "Settings",
         href: "/settings",
         icon: Settings,
@@ -69,6 +76,32 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
             <nav className="flex-1 p-4 space-y-1">
                 {sidebarItems.map((item) => {
                     const isActive = pathname === item.href
+                    const content = (
+                        <>
+                            <item.icon className="w-4 h-4" />
+                            <span className="flex-1">{item.title}</span>
+                            {item.comingSoon && (
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-primary/10 text-primary border-none">
+                                    Soon
+                                </Badge>
+                            )}
+                        </>
+                    )
+
+                    if (item.comingSoon) {
+                        return (
+                            <div
+                                key={item.title}
+                                className={cn(
+                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors opacity-60 cursor-not-allowed",
+                                    "text-muted-foreground"
+                                )}
+                            >
+                                {content}
+                            </div>
+                        )
+                    }
+
                     return (
                         <Link
                             key={item.href}
@@ -80,8 +113,7 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
                                     : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
                             )}
                         >
-                            <item.icon className="w-4 h-4" />
-                            {item.title}
+                            {content}
                         </Link>
                     )
                 })}

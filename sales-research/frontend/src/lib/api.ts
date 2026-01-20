@@ -263,9 +263,11 @@ export interface CompetitorLead {
     source_post: string;
     source_post_url?: string;
     competitor: string;
-    fit_score?: number;
+    headline?: string;
+    is_fit?: boolean;
+    is_competitor?: boolean;
+    is_decision_maker?: boolean;
     fit_reasoning?: string;
-    is_qualified?: boolean;
 }
 
 export const discoverCompetitorLeads = async (urls: string[]): Promise<{ leads: CompetitorLead[] }> => {
@@ -276,7 +278,15 @@ export const discoverCompetitorLeads = async (urls: string[]): Promise<{ leads: 
 export interface IdentifiedProfile {
     id: string;
     name?: string;
+    headline?: string;
     linkedin_url: string;
+
+    // Classification
+    is_fit?: boolean;
+    is_competitor?: boolean;
+    is_decision_maker?: boolean;
+    fit_reasoning?: string;
+
     comment_history?: string; // JSON string
     source_posts?: string;    // JSON string
     interaction_history?: string; // JSON string

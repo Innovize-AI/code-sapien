@@ -8,6 +8,7 @@ import * as z from "zod"
 import { Loader2, Search, CheckSquare, Square, ExternalLink } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
     Form,
     FormControl,
@@ -25,6 +26,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { normalizeUrl } from "@/lib/utils"
 import { discoverLeads, checkExistingReports, discoverCompetitorLeads, getCompetitors, Competitor } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { LeadStatus } from "@/components/bulk-analysis-modal"
@@ -63,12 +65,12 @@ type FindFormValues = {
 export function DiscoveryForm({
     onSelect,
     onBulkSelect,
-    leadsStatus
 }: {
     onSelect?: (lead: { url: string, website: string, result?: any }) => void,
     onBulkSelect?: (leads: { url: string, website: string }[], options?: { refresh: boolean }) => void,
-    leadsStatus?: LeadStatus[]
 }) {
+    const [urlInput, setUrlInput] = useState("")
+    const [leadsStatus, setLeadsStatus] = useState<LeadStatus[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [results, setResults] = useState<{ url: string, website: string, name?: string, comment?: string, metadata?: any, fit_score?: number, fit_reasoning?: string, source_post_url?: string }[]>([])
     const [selectedUrls, setSelectedUrls] = useState<string[]>([])
@@ -77,6 +79,45 @@ export function DiscoveryForm({
     const [error, setError] = useState<string | null>(null)
     const [allCompetitors, setAllCompetitors] = useState<Competitor[]>([])
     const [selectedCompetitorUrls, setSelectedCompetitorUrls] = useState<string[]>([])
+    // SSE Listener for Real-Time Updates
+    useEffect(() => {
+        const eventSource = new EventSource('http://localhost:8000/api/competitor-analysis/events/classification');
+
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'classification_update' && data.leads) {
+                    setResults(prevResults => {
+                        // Create a map for faster lookup
+                        const updatesMap = new Map<string, any>(data.leads.map((l: any) => [l.linkedin_url, l]));
+
+                        return prevResults.map(lead => {
+                            const update = updatesMap.get(lead.url);
+                            if (update) {
+                                return {
+                                    ...lead,
+                                    metadata: {
+                                        ...lead.metadata,
+                                        is_fit: update.is_fit,
+                                        is_competitor: update.is_competitor,
+                                        is_decision_maker: update.is_decision_maker,
+                                        fit_reasoning: update.fit_reasoning
+                                    }
+                                };
+                            }
+                            return lead;
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error("Error parsing SSE event:", error);
+            }
+        };
+
+        return () => {
+            eventSource.close();
+        };
+    }, []);
 
     useEffect(() => {
         const load = async () => {
@@ -127,20 +168,27 @@ export function DiscoveryForm({
             if (values.provider === "competitor") {
                 const data = await discoverCompetitorLeads(selectedCompetitorUrls)
                 if (data.leads) {
-                    const mappedLeads = data.leads.map(l => ({
-                        url: l.linkedin_url || "",
-                        website: "",
+                    const mappedLeads = data.leads.map((l: any) => ({
                         name: l.name,
+                        url: l.linkedin_url || "", // Ensure url is always a string
+                        website: "", // Keep website for consistency with other lead types
                         comment: l.comment_text,
-                        fit_score: l.fit_score,
-                        fit_reasoning: l.fit_reasoning,
                         source_post_url: l.source_post_url,
-                        metadata: { competitor: l.competitor, source_post: l.source_post }
+                        fit_score: l.fit_score, // Keep fit_score at top level if needed for display
+                        metadata: {
+                            competitor: l.competitor,
+                            source_post: l.source_post,
+                            headline: l.headline,
+                            is_fit: l.is_fit,
+                            is_competitor: l.is_competitor,
+                            is_decision_maker: l.is_decision_maker,
+                            fit_reasoning: l.fit_reasoning // Move fit_reasoning to metadata
+                        }
                     })).filter(l => !!l.url)
                     setResults(mappedLeads)
 
                     // Check for existing reports
-                    const checkLeads = mappedLeads.map(l => ({ linkedin_url: l.url, website: l.website }));
+                    const checkLeads = mappedLeads.map(l => ({ linkedin_url: normalizeUrl(l.url), website: l.website }));
                     const existing = await checkExistingReports(checkLeads);
                     setExistingReports(existing);
 
@@ -154,7 +202,7 @@ export function DiscoveryForm({
                     setResults(data.leads)
 
                     // Check for existing reports
-                    const checkLeads = data.leads.map((l: { url: string, website: string }) => ({ linkedin_url: l.url, website: l.website }));
+                    const checkLeads = data.leads.map((l: { url: string, website: string }) => ({ linkedin_url: normalizeUrl(l.url), website: l.website }));
                     const existing = await checkExistingReports(checkLeads);
                     setExistingReports(existing);
 
@@ -374,10 +422,36 @@ export function DiscoveryForm({
                                                 >
                                                     {lead.name || lead.url}
                                                 </a>
-                                                {lead.metadata?.competitor && (
-                                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground shrink-0">
-                                                        vs {lead.metadata.competitor}
-                                                    </span>
+                                                <div className="flex flex-wrap gap-1.5 ml-2">
+                                                    {(!lead.metadata?.fit_reasoning && !lead.metadata?.is_fit && !lead.metadata?.is_competitor) && (
+                                                        <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-gray-100 text-gray-500 animate-pulse">
+                                                            AI Analyzing...
+                                                        </Badge>
+                                                    )}
+                                                    {lead.metadata?.is_competitor && (
+                                                        <Badge variant="destructive" className="text-[9px] h-4 px-1">Competitor</Badge>
+                                                    )}
+                                                    {lead.metadata?.is_fit && (
+                                                        <Badge variant="outline" className="text-[9px] h-4 px-1 bg-green-50 text-green-700 border-green-200" title={lead.metadata?.fit_reasoning}>
+                                                            Fit
+                                                        </Badge>
+                                                    )}
+                                                    {lead.metadata?.is_decision_maker && (
+                                                        <Badge variant="outline" className="text-[9px] h-4 px-1 bg-blue-50 text-blue-700 border-blue-200">
+                                                            Decision Maker
+                                                        </Badge>
+                                                    )}
+                                                    {lead.metadata?.competitor && (
+                                                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground shrink-0 border border-muted-foreground/10">
+                                                            vs {lead.metadata.competitor}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {lead.metadata?.fit_reasoning && (
+                                                    <div className="mt-2 text-[10px] text-muted-foreground bg-muted/40 p-2 rounded border border-muted/50 italic leading-relaxed">
+                                                        <span className="font-semibold not-italic text-primary/70 mr-1">AI Reasoning:</span>
+                                                        {lead.metadata.fit_reasoning}
+                                                    </div>
                                                 )}
                                             </div>
                                             {lead.comment ? (
@@ -441,9 +515,9 @@ export function DiscoveryForm({
                                                     <Loader2 className="w-3 h-3 animate-spin" />
                                                     Analyzing
                                                 </div>
-                                            ) : (status === 'completed' || existingReports[lead.url]) ? (
+                                            ) : (status === 'completed' || existingReports[normalizeUrl(lead.url)]) ? (
                                                 (() => {
-                                                    const existingData = existingReports[lead.url]?.data;
+                                                    const existingData = existingReports[normalizeUrl(lead.url)]?.data;
                                                     const sessionResult = leadsStatus?.find(s => s.url === lead.url)?.result;
                                                     const finalResult = sessionResult || existingData;
 

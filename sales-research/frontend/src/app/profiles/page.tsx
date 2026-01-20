@@ -61,6 +61,48 @@ export default function ProfilesPage() {
         loadProfiles()
     }, [page])
 
+    // SSE Listener for Real-Time Updates
+    useEffect(() => {
+        const eventSource = new EventSource('http://localhost:8000/api/competitor-analysis/events/classification');
+
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'classification_update' && data.leads) {
+                    setProfiles(prevProfiles => {
+                        // Create a map for faster lookup
+                        const updatesMap = new Map<string, any>(data.leads.map((l: any) => [l.linkedin_url, l]));
+
+                        return prevProfiles.map(profile => {
+                            const update = updatesMap.get(profile.linkedin_url);
+                            if (update) {
+                                return {
+                                    ...profile,
+                                    is_fit: update.is_fit,
+                                    is_competitor: update.is_competitor,
+                                    is_decision_maker: update.is_decision_maker,
+                                    fit_reasoning: update.fit_reasoning
+                                };
+                            }
+                            return profile;
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error("Error parsing SSE event:", error);
+            }
+        };
+
+        eventSource.onerror = (err) => {
+            console.error("SSE Error:", err);
+            eventSource.close();
+        };
+
+        return () => {
+            eventSource.close();
+        };
+    }, []);
+
     const toggleSelection = (id: string) => {
         const newSelected = new Set(selectedIds)
         if (newSelected.has(id)) {
@@ -211,6 +253,41 @@ export default function ProfilesPage() {
                                                     LinkedIn Profile
                                                     <ExternalLink className="w-2.5 h-2.5" />
                                                 </a>
+                                                {profile.headline && (
+                                                    <p className="text-xs text-muted-foreground mt-1 text-ellipsis overflow-hidden line-clamp-2">
+                                                        {profile.headline}
+                                                    </p>
+                                                )}
+                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                    {(!profile.fit_reasoning && !profile.is_fit && !profile.is_competitor) && (
+                                                        <Badge variant="secondary" className="text-[9px] h-5 px-1.5 bg-gray-100 text-gray-500 animate-pulse">
+                                                            AI Analyzing...
+                                                        </Badge>
+                                                    )}
+                                                    {profile.is_competitor && (
+                                                        <Badge variant="destructive" className="text-[10px] h-5 px-1.5">
+                                                            Competitor
+                                                        </Badge>
+                                                    )}
+                                                    {profile.is_fit && (
+                                                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-help" title={profile.fit_reasoning}>
+                                                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                                                            Potential Fit
+                                                        </Badge>
+                                                    )}
+                                                    {profile.is_decision_maker && (
+                                                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+                                                            <UserCheck className="w-3 h-3 mr-1" />
+                                                            Decision Maker
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                {profile.fit_reasoning && (
+                                                    <div className="mt-3 text-[10px] text-muted-foreground bg-muted/40 p-2 rounded border border-muted/50 italic leading-relaxed">
+                                                        <span className="font-semibold not-italic text-primary/70 mr-1">AI Reasoning:</span>
+                                                        {profile.fit_reasoning}
+                                                    </div>
+                                                )}
                                             </div>
                                             {sources.length > 1 && (
                                                 <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10">

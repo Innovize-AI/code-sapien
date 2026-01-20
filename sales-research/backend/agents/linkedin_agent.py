@@ -5,10 +5,99 @@ import time
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
-from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT
+from langchain_core.pydantic_v1 import BaseModel, Field
+from typing import Optional, List, Dict
+from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, COMPANY_CONTEXT
 from models.openai_models import get_open_ai
 
 load_dotenv()
+
+load_dotenv()
+
+class ProfileClassificationResult(BaseModel):
+    id: str = Field(description="The LinkedIn URL or unique identifier of the profile")
+    is_competitor: bool = Field(description="Is the person a competitor working for a rival company?")
+    is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
+    is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
+    reasoning: str = Field(description="Brief explanation of the classification.")
+
+class BatchProfileClassification(BaseModel):
+    classifications: List[ProfileClassificationResult] = Field(description="List of profile classifications")
+
+class ProfileClassification(BaseModel):
+    is_competitor: bool = Field(description="Is the person a competitor working for a rival company?")
+    is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
+    is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
+    reasoning: str = Field(description="Brief explanation of the classification.")
+
+def batch_classify_profiles(profiles: List[Dict]):
+    """
+    Classifies a batch of profiles using LLM based on headline and company context.
+    Expects profiles list of dicts: [{'id': 'url', 'headline': '...'}, ...]
+    """
+    if not profiles:
+        return {}
+        
+    try:
+        # Reverting to gpt-4o-mini as gpt-5-mini is not a valid model
+        llm = get_open_ai(temperature=0, model="gpt-4.1-mini")
+        structured_llm = llm.with_structured_output(BatchProfileClassification)
+        
+        # Format profiles for prompt
+        profiles_text = json.dumps(profiles, indent=2)
+        
+        prompt = BATCH_PROFILE_CLASSIFIER_PROMPT.format(
+            company_context=COMPANY_CONTEXT,
+            profiles_data=profiles_text
+        )
+        
+        response = structured_llm.invoke([
+            SystemMessage(content="You are a helpful assistant."),
+            HumanMessage(content=prompt)
+        ])
+        
+        results_map = {}
+        if response and response.classifications:
+            for res in response.classifications:
+                results_map[res.id] = res.dict()
+                
+        return results_map
+
+    except Exception as e:
+        print(f"Error in batch classification: {e}")
+        return {}
+
+def classify_profile(name: str, headline: str):
+    """
+    Classifies a profile using LLM based on headline and company context.
+    Uses structured output for reliable JSON parsing.
+    """
+    if not headline or len(headline) < 3:
+        return {"is_competitor": False, "is_fit": False, "is_decision_maker": False, "reasoning": "No headline provided."}
+        
+    try:
+        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
+        structured_llm = llm.with_structured_output(ProfileClassification)
+        
+        prompt = PROFILE_CLASSIFIER_PROMPT.format(
+            name=name, 
+            headline=headline,
+            company_context=COMPANY_CONTEXT
+        )
+        
+        response = structured_llm.invoke([
+            SystemMessage(content="You are a helpful assistant."),
+            HumanMessage(content=prompt)
+        ])
+        
+        if response:
+            return response.dict()
+        else:
+             return {"is_competitor": False, "is_fit": False, "is_decision_maker": False, "reasoning": "Empty response from LLM"}
+
+    except Exception as e:
+        print(f"Error classifying profile {name}: {e}")
+        return {"is_competitor": False, "is_fit": False, "is_decision_maker": False, "reasoning": "Error during classification."}
 
 def get_username_from_url(linkedin_url: str):
     # Remove query parameters and trailing slashes
@@ -322,6 +411,60 @@ def analyze_lead_with_ai(lead: dict, icp_data: dict):
         lead["is_qualified"] = False
         return lead
 
+def _process_single_post(post, user_name):
+    """Helper to process a single post and return extracted leads."""
+    leads_acc = []
+    # Resilient post_id extraction
+    post_id = post.get("post_id") or post.get("id")
+    
+    if not post_id:
+        urn_val = post.get("urn")
+        if isinstance(urn_val, dict):
+            post_id = urn_val.get("activity_urn")
+        elif isinstance(urn_val, str):
+            post_id = urn_val.split(":")[-1]
+    
+    if not post_id:
+        return []
+    
+    source_post_title = post.get("text", "")[:100] + "..."
+    source_post_url = post.get("post_url") or post.get("url") or (f"https://www.linkedin.com/feed/update/urn:li:activity:{post_id}" if ":" not in str(post_id) else f"https://www.linkedin.com/feed/update/{post_id}")
+
+    try:
+        commenters = get_post_commenters(source_post_url)
+    except Exception as e:
+        print(f"Error fetching commenters for post {post_id}: {e}")
+        return []
+
+    for commenter in commenters:
+        author = commenter.get("author")
+        if not author: continue
+        linkedin_url = author.get("profile_url")
+        if not linkedin_url: continue
+        
+        # Normalize URL: remove query params, trailing slashes, strip whitespace
+        linkedin_url = linkedin_url.split("?")[0].strip().strip("/")
+        
+        comment_text = commenter.get("text")
+        headline = author.get("headline") or author.get("subtitle") or author.get("description") or ""
+
+        # Collect raw lead info
+        leads_acc.append({
+            "name": author.get("name") or "Anonymous",
+            "headline": headline,
+            "linkedin_url": linkedin_url,
+            "comment_text": comment_text,
+            "source_post": source_post_title,
+            "source_post_url": source_post_url or "",
+            "competitor": user_name,
+            # Initialize classification fields as unset/default
+            "is_fit": False,
+            "is_competitor": False,
+            "is_decision_maker": False,
+            "fit_reasoning": ""
+        })
+    return leads_acc
+
 def discover_leads_from_competitor(competitor_url: str):
     """Fetches recent posts from a competitor and extracts commenters as potential leads."""
     api_key = os.getenv("RAPID_API_KEY")
@@ -337,7 +480,7 @@ def discover_leads_from_competitor(competitor_url: str):
     try:
         print(f"DEBUG: Starting discovery for competitor: {competitor_url}")
         # 1. Fetch recent posts
-        response = requests.get(posts_url, headers=headers, params={"username": user_name})
+        response = requests.get(posts_url, headers=headers, params={"username": user_name}, timeout=15)
         if response.status_code != 200:
             print(f"DEBUG: posts API error {response.status_code} for {user_name}: {response.text[:200]}")
             raise Exception(f"LinkedIn Posts API error: {response.status_code} for {user_name}")
@@ -357,12 +500,11 @@ def discover_leads_from_competitor(competitor_url: str):
         
         if not posts:
             print(f"DEBUG: No posts found in response for {user_name}. Keys present: {list(posts_data.keys()) if isinstance(posts_data, dict) else 'is list'}")
-            # Log snippet of response to help debugging without exposing everything
             print(f"DEBUG: Response snippet: {str(posts_data)[:200]}")
 
         print(f"DEBUG: Found {len(posts)} total posts for {user_name}")
 
-        # Filter posts from the last 30 days (30 * 24 * 60 * 60 * 1000 ms)
+        # Filter posts from the last 30 days
         now_ms = int(time.time() * 1000)
         one_month_ms = 30 * 24 * 60 * 60 * 1000
         
@@ -376,72 +518,84 @@ def discover_leads_from_competitor(competitor_url: str):
                     if (now_ms - ts) <= one_month_ms:
                         recent_posts.append(p)
                 except:
-                    print(f"DEBUG: Failed to parse timestamp: {timestamp}")
+                    pass
             else:
-                print(f"DEBUG: Post missing timestamp: {p.get('post_id') or p.get('id')}")
+                pass
         
         print(f"DEBUG: {len(recent_posts)} posts within last 30 days out of {len(posts)}")
-        posts = recent_posts if recent_posts else posts[:5] # Fallback to latest 5 if none in last month
+        posts = recent_posts if recent_posts else posts[:5] # Fallback to latest 5 if none
 
         # Sort posts by engagement
         def get_engagement(p):
             stats = p.get("stats", {})
-            comments = stats.get("comments", 0)
-            reactions = stats.get("total_reactions", 0)
-            reposts = stats.get("reposts", 0)
             try:
-                return int(comments) + int(reactions) + int(reposts)
+                return int(stats.get("comments", 0)) + int(stats.get("total_reactions", 0)) + int(stats.get("reposts", 0))
             except:
                 return 0
 
         posts.sort(key=get_engagement, reverse=True)
+        top_posts = posts[:5]
 
-        leads_list = []
-        # 2. For each post, fetch commenters
-        for post in posts[:5]:
-            # Resilient post_id extraction
-            post_id = post.get("post_id") or post.get("id")
-            
-            if not post_id:
-                urn_val = post.get("urn")
-                if isinstance(urn_val, dict):
-                    post_id = urn_val.get("activity_urn")
-                elif isinstance(urn_val, str):
-                    post_id = urn_val.split(":")[-1]
-            
-            if not post_id:
-                continue
-            
-            source_post_title = post.get("text", "")[:100] + "..."
-            source_post_url = post.get("post_url") or post.get("url") or (f"https://www.linkedin.com/feed/update/urn:li:activity:{post_id}" if ":" not in str(post_id) else f"https://www.linkedin.com/feed/update/{post_id}")
+        raw_leads_buffer = []
 
-            commenters = get_post_commenters(source_post_url)
-
-            for commenter in commenters:
-                author = commenter.get("author")
-                if not author: continue
-                linkedin_url = author.get("profile_url")
-                if not linkedin_url: continue
-                
-                # Normalize URL: remove query params, trailing slashes, strip whitespace
-                linkedin_url = linkedin_url.split("?")[0].strip().strip("/")
-                
-                comment_text = commenter.get("text")
-                
-                # No aggregation here, return discrete events
-                leads_list.append({
-                    "name": author.get("name") or "Anonymous",
-                    "linkedin_url": linkedin_url,
-                    "comment_text": comment_text,
-                    "source_post": source_post_title,
-                    "source_post_url": source_post_url or "",
-                    "competitor": user_name
-                })
+        # 2. Sequential Comment Fetching (Safety First)
+        # Avoid nested threading inside discover_leads (which is already threaded)
+        # Timeouts on requests ensure this won't hang for long
+        for post in top_posts:
+            try:
+                leads = _process_single_post(post, user_name)
+                if leads:
+                    raw_leads_buffer.extend(leads)
+            except Exception as exc:
+                print(f"Post processing exception for {post.get('id', 'unknown')}: {exc}")
         
-        print(f"DEBUG: Found {len(leads_list)} interactions for {user_name}")
-        return leads_list
+        print(f"DEBUG: Found {len(raw_leads_buffer)} interactions for {user_name}")
+        return raw_leads_buffer
     except Exception as e:
         print(f"CRITICAL Error discovering leads from competitor {competitor_url}: {e}")
         import traceback
         traceback.print_exc()
-        raise e # Let route handle the error
+        raise e
+
+
+async def batch_classify_profiles_async(profiles: List[Dict]):
+    """
+    Async version: Classifies a batch of profiles using LLM based on headline and company context.
+    Expects profiles list of dicts: [{'id': 'url', 'headline': '...'}, ...]
+    """
+    if not profiles:
+        return {}
+        
+    try:
+        llm = get_open_ai(temperature=0, model="gpt-4.1-mini")
+        structured_llm = llm.with_structured_output(BatchProfileClassification)
+        
+        # Format profiles for prompt
+        profiles_text = json.dumps(profiles, indent=2)
+        
+        prompt = BATCH_PROFILE_CLASSIFIER_PROMPT.format(
+            company_context=COMPANY_CONTEXT,
+            profiles_data=profiles_text
+        )
+        
+        # Native async call
+        response = await structured_llm.ainvoke([
+            SystemMessage(content="You are a helpful assistant."),
+            HumanMessage(content=prompt)
+        ])
+        
+        results_map = {}
+        if response and response.classifications:
+            for item in response.classifications:
+                results_map[item.id] = {
+                    "is_fit": item.is_fit,
+                    "is_competitor": item.is_competitor,
+                    "is_decision_maker": item.is_decision_maker,
+                    "reasoning": item.reasoning
+                }
+                
+        return results_map
+
+    except Exception as e:
+        print(f"Error in async batch classification: {e}")
+        return {}

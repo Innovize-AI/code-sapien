@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, text
+from sqlalchemy import Column, Integer, String, Text, DateTime, text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 import datetime
 from db.database import Base
@@ -93,8 +93,15 @@ class IdentifiedProfile(Base):
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     
     name = Column(String, nullable=True)
+    headline = Column(Text, nullable=True)
     linkedin_url = Column(Text, nullable=False, unique=True)
     
+    # Classification
+    is_fit = Column(Boolean, default=False)
+    is_competitor = Column(Boolean, default=False)
+    is_decision_maker = Column(Boolean, default=False)
+    fit_reasoning = Column(Text, nullable=True)
+
     # Aggregated Data
     comment_history = Column(Text, nullable=True) # JSON array of comments
     source_posts = Column(Text, nullable=True)    # JSON array of {title, url, competitor}

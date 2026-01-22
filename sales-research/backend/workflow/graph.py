@@ -47,23 +47,46 @@ def enrich_linkedin(state: AgentState):
     return {"linkedin_url": ""}
 
 def enrich_website(state: AgentState):
-
-    """enrich website from email_id"""
+    """enrich website from email_id or cached LinkedIn company profile"""
     
-    email_id = state["email_id"]
+    # 1. Try Email Domain (Fastest)
+    email_id = state.get("email_id")
     validate_email_regex = r"^(?!.*@(gmail\.com|hotmail\.com|yahoo\.com|outlook\.com|aol\.com|icloud\.com|mail\.com|zoho\.com|protonmail\.com|yandex\.com)).*@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$"
 
-    if not email_id:
-        return {"website": ""}
+    if email_id:
+        match = re.match(validate_email_regex, email_id)
+        if match:
+            domain = match.group(2)
+            url = f"https://{domain}"
+            print(f"Work domain found from email: {domain}")
+            return {"website": url}
     
-    match = re.match(validate_email_regex, email_id)
-    if match:
-        domain = match.group(2) # Group 2 is the domain
-        url = f"https://{domain}"
-        print(f"Work domain: {domain}")
-        return {"website": url}
-    else:
-        return {"website": ""}
+    # 2. LinkedIn Enrichment Fallback
+    linkedin_url = state.get("linkedin_url")
+    if linkedin_url:
+        from agents.linkedin_agent import get_linkedin_profile, get_company_details
+        
+        # 1. Ensure we have the profile (and thus the lead company URL)
+        profile_res = get_linkedin_profile(state)
+        company_url = profile_res.get("lead_company_linkedin_url") or state.get("lead_company_linkedin_url")
+        
+        if company_url:
+            print(f"Enriching company info for: {company_url}")
+            company_details = get_company_details(company_url)
+            if company_details:
+                basic_info = company_details.get("basic_info", {})
+                # 2. Return ONLY website and company intelligence
+                return {
+                    "website": basic_info.get("website"),
+                    "company_name": basic_info.get("name"),
+                    "company_description": basic_info.get("description"),
+                    "company_industries": basic_info.get("industries", []),
+                    "lead_company_linkedin_url": company_url,
+                    "user_profile_details": profile_res.get("user_profile_details")
+                }
+    
+    return {"website": ""}
+
 
 # nodes moved or integrated into router
 

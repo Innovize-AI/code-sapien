@@ -159,6 +159,10 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         website_analysis=final_state.get("website_analysis"),
         fullname=final_state.get("fullname"),
         profile_picture_url=final_state.get("profile_picture_url"),
+        company_name=final_state.get("company_name"),
+        company_description=final_state.get("company_description"),
+        company_industries=json.dumps(final_state.get("company_industries") or []),
+
         lead_score=lead_score,
         project_urgency=options.project_urgency if options else None,
         email_history=json.dumps(final_state.get("email_history") or []),
@@ -174,8 +178,10 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         # LinkedIn Subgraph Data
         post_engagements=json.dumps(final_state.get("post_engagements") or []),
         company_news=json.dumps(final_state.get("company_news") or []),
-        hiring_data=json.dumps(final_state.get("hiring_data") or [])
+        hiring_data=json.dumps(final_state.get("hiring_data") or []),
+        company_stats=json.dumps(final_state.get("company_stats") or {})
     )
+
     
     saved_report = await save_report(db, report_data)
     
@@ -198,6 +204,10 @@ def _report_to_dict(report):
         "website_analysis": report.website_analysis,
         "fullname": report.fullname,
         "profile_picture_url": report.profile_picture_url,
+        "company_name": report.company_name,
+        "company_description": report.company_description,
+        "company_industries": json.loads(report.company_industries) if report.company_industries else [],
+
         "lead_score": report.lead_score,
         "email_history": json.loads(report.email_history) if report.email_history else [],
         "intent_analysis": json.loads(report.intent_analysis) if report.intent_analysis else {},
@@ -212,8 +222,10 @@ def _report_to_dict(report):
         # LinkedIn Subgraph Results
         "post_engagements": json.loads(report.post_engagements) if report.post_engagements else [],
         "company_news": json.loads(report.company_news) if report.company_news else [],
-        "hiring_data": json.loads(report.hiring_data) if report.hiring_data else []
+        "hiring_data": json.loads(report.hiring_data) if report.hiring_data else [],
+        "company_stats": json.loads(report.company_stats) if report.company_stats else {}
     }
+
 
 def _prepare_state_for_json(state):
     """Helper to convert Pydantic models in the state to dicts for JSON serialization."""
@@ -247,7 +259,9 @@ async def _run_research_gen(linkedin_url, website, options, email):
         "ideal_profile": ideal_profile,
         "user_linkedin_url": org_settings["user_linkedin_url"],
         "company_linkedin_url": org_settings["company_linkedin_url"],
+        "lead_company_linkedin_url": "",
         "input_lead_data": options,
+
 
         "extra_research_context": options.extra_metadata if options else None,
         "user_profile_details": "",
@@ -263,8 +277,13 @@ async def _run_research_gen(linkedin_url, website, options, email):
         "personalized_outreach": "",
         "post_engagements": [],
         "company_news": [],
-        "hiring_data": []
+        "hiring_data": [],
+        "company_name": "",
+        "company_description": "",
+        "company_industries": [],
+        "company_stats": {}
     }
+
 
     final_state = initial_state.copy()
     

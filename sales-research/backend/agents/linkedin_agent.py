@@ -129,6 +129,26 @@ def merge_json(json1, json2):
 
 def get_linkedin_profile(state: AgentState):
     """Fetches basic profile details."""
+    # Check if we already have the profile data in state to avoid duplicate calls
+    user_details_str = state.get("user_profile_details")
+    if user_details_str and "\"id\"" in user_details_str:
+        # Even if lead_company_linkedin_url is missing as a separate state field, 
+        # we can extract it from the cached detail if available.
+        if not state.get("lead_company_linkedin_url"):
+            try:
+                base_data = json.loads(user_details_str)
+                experience = base_data.get("experience", [])
+                if experience and len(experience) > 0:
+                    current_job = experience[0]
+                    if isinstance(current_job, dict):
+                        lead_company_url = current_job.get("company_linkedin_url") or current_job.get("url")
+                        return {"lead_company_linkedin_url": lead_company_url}
+            except Exception:
+                pass
+
+        print("LinkedIn profile already fetched, skipping duplicate call.")
+        return state
+
     api_key = os.getenv("RAPID_API_KEY")
     linkedin_base_url = os.getenv("LINKEDIN_RAPID_BASE_URL")
     
@@ -159,11 +179,21 @@ def get_linkedin_profile(state: AgentState):
         fullname = basic_info.get("fullname", "")
         profile_pic = basic_info.get("profile_picture_url", "")
 
+        # Extract lead's current company URL if possible
+        lead_company_linkedin_url = None
+        experience = base_data.get("experience", [])
+        if experience and len(experience) > 0:
+            current_job = experience[0]
+            if isinstance(current_job, dict):
+                lead_company_linkedin_url = current_job.get("company_linkedin_url") or current_job.get("url")
+
         return {
             "user_profile_details": json.dumps(base_data),
             "fullname": fullname,
-            "profile_picture_url": profile_pic
+            "profile_picture_url": profile_pic,
+            "lead_company_linkedin_url": lead_company_linkedin_url
         }
+
     except Exception as e:
         print(f"Error fetching LinkedIn profile: {e}")
         return {"user_profile_details": json.dumps({"error": str(e)})}
@@ -283,18 +313,64 @@ def get_linkedin_engagement(state: AgentState):
     return {"post_engagements": found_engagements}
 
 
-def get_linkedin_company_data(state: AgentState):
-    """Gathers hiring status and recent company news."""
-    # Simulation for now
-    return {
-        "company_news": [
-            {"title": "Expanding AI Engineering team", "source": "LinkedIn News", "date": "2024-01-10"}
-        ],
-        "hiring_data": [
-            {"role": "Full Stack Developer", "location": "Remote"},
-            {"role": "Product Manager", "location": "London"}
-        ]
+def get_company_details(company_identifier: str):
+    """Fetches company details using the company identifier (username or URL)."""
+    api_key = os.getenv("RAPID_API_KEY")
+    linkedin_base_url = os.getenv("LINKEDIN_RAPID_BASE_URL")
+    
+    if not company_identifier:
+        return None
+    
+    # RapidAPI Endpoint for company details
+    company_url = f"{linkedin_base_url.rstrip('/')}/companies/detail"
+    querystring = {"identifier": company_identifier}
+
+    headers = {
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": "linkedin-scraper-api-real-time-fast-affordable.p.rapidapi.com"
     }
+
+    try:
+        response = requests.get(company_url, headers=headers, params=querystring)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("data", data)
+        return None
+    except Exception as e:
+        print(f"Error fetching company details: {e}")
+        return None
+
+def get_linkedin_company_data(state: AgentState):
+    """Gathers hiring status and recent company news, and enriches website if missing."""
+    # Skip if already fetched
+    if state.get("company_news") or state.get("hiring_data"):
+        print("Company news/hiring already fetched, skipping duplicate call.")
+        return {}
+
+    company_url = state.get("lead_company_linkedin_url")
+    if not company_url:
+        return {}
+
+    company_data = get_company_details(company_url)
+    if not company_data:
+        return {}
+
+    # Extract website if missing in state
+    basic_info = company_data.get("basic_info", {})
+    
+    # Extract hiring and news (updates and jobs)
+    news = company_data.get("updates", [])
+    hiring = company_data.get("jobs", [])
+    
+    return {
+        "company_name": basic_info.get("name"),
+        "company_description": basic_info.get("description"),
+        "company_industries": basic_info.get("industries", []),
+        "company_stats": basic_info.get("stats", {}),
+        "company_news": news[:5],
+        "hiring_data": hiring[:5],
+    }
+
 
 def linkedin_profile_analyzer(state: AgentState):
     """Synthesizes all LinkedIn data into a deep profile analysis."""

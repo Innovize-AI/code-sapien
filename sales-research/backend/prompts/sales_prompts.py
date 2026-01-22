@@ -120,6 +120,85 @@ Here are the details of a lead to be extracted:
             Please refrain from speculating or making assumptions. Your task is to extract factual and verifiable information.
 '''
 
+REPORT_SYNTHESIS_PROMPT = '''
+    You are the Lead Strategist. Your task is to provide a "Global Executive Synthesis" of the research findings.
+    Instead of repeating the details, you must synthesize the various modules into a high-level strategic narrative.
+
+    Modular Findings:
+    {content}
+
+    User Message Company Context:
+    {company_context}
+
+    Your synthesis MUST follow this structure:
+
+    1. EXECUTION SUMMARY: A 2-3 sentence high-level pitch on why this prospect represents a unique opportunity for Innovize AI.
+    2. THE "BIG WIN": Identify the single most impactful solution we can offer that would drive immediate ROI.
+    3. STRATEGIC POSITIONING: How should the sales team position themselves? (e.g., as a technical partner, a cost-saver, or a scaling accelerator).
+    4. CRITICAL RISKS: Any potential red flags or blockers identified in the data (e.g., low authority, recent pivot, or competing tech).
+
+    NOTE: Keep this concise and high-impact. Do not repeat the individual module data verbatim.
+'''
+
+VIABILITY_ASSESSMENT_PROMPT = '''
+    Evaluate the strategic viability of this lead based on the following Ideal Customer Profile (ICP):
+    {icp}
+    
+    Use the provided analysis:
+    LinkedIn Analysis: {user_analysis}
+    Website Analysis: {website_analysis}
+    Company Stats: {company_stats}
+    
+    Provide a concise viability assessment focusing on:
+    1. Demographic Fit (Industry, Size, Revenue)
+    2. Authority (Job Title/Role)
+    3. Strategic Alignment
+    
+    Output strictly in Markdown.
+'''
+
+PAIN_POINT_DISCOVERY_PROMPT = '''
+    Identify 3-5 specific, actionable pain points for this lead.
+    Look for signals in:
+    - LinkedIn Analysis: {user_analysis}
+    - Website Analysis: {website_analysis}
+    - Hiring Trends: {hiring_data}
+    - Company News: {company_news}
+    - Company Stats: {company_stats}
+    
+    Focus on challenges related to operational efficiency, AI adoption, or scaling.
+    Output strictly in Markdown.
+'''
+
+STRATEGIC_SOLUTION_PROMPT = '''
+    Based on these identified pain points:
+    {pain_points}
+    
+    Map them to Innovize AI's specific solutions described here:
+    {company_context}
+    
+    Propose 2-3 tailored AI/Automation solutions that directly address the pain points.
+    Focus on ROI and efficiency gains.
+    Output strictly in Markdown.
+'''
+
+OUTREACH_DESIGN_PROMPT = '''
+    Craft a high-performance personalized outreach strategy.
+    
+    Intelligence:
+    - Profile Insights: {user_analysis}
+    - Recent Engagements: {engagements}
+    - Proposed Solutions: {solutions}
+    
+    Deliver:
+    1. THE "HOOK": A personalized opening based on a specific achievement or recent activity.
+    2. LINKEDIN MESSAGE: Concise, high-intent (under 300 chars).
+    3. HYPER-PERSONALIZED EMAIL: Use the 'Value-First' approach. Never start with "I hope this message finds you well". Propose a relevant case study or ebook.
+    
+    Output strictly in Markdown using headers for each piece.
+'''
+
+
 REPORT_GENERATOR_PROMPT = '''
     you are expert analyzer agent specialized in creating sales research report that is used by 
     sales team to reach the potential prospects. you are tasked to create a comprehensive sales research report

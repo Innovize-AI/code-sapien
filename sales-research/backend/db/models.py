@@ -15,6 +15,11 @@ class ResearchReport(Base):
     website = Column(Text, nullable=True)
     fullname = Column(Text, nullable=True)
     profile_picture_url = Column(Text, nullable=True)
+    company_name = Column(Text, nullable=True)
+    company_description = Column(Text, nullable=True)
+    company_industries = Column(Text, nullable=True) # JSON array
+    company_stats = Column(Text, nullable=True)      # JSON object
+
     
     # Analysis Results (Markdown Content)
     sales_research_report = Column(Text, nullable=True)

@@ -9,6 +9,12 @@ class ResearchReportBase(BaseModel):
     website: Optional[str] = None
     fullname: Optional[str] = None
     profile_picture_url: Optional[str] = None
+
+    company_name: Optional[str] = None
+    company_description: Optional[str] = None
+    company_industries: Optional[str] = None # JSON string
+    company_stats: Optional[str] = None      # JSON string
+
     sales_research_report: Optional[str] = None
     lead_score_analysis: Optional[str] = None
     user_profile_analysis: Optional[str] = None

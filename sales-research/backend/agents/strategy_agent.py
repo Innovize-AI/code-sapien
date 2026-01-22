@@ -1,27 +1,29 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
 from models.openai_models import get_open_ai
+from prompts.sales_prompts import (
+    VIABILITY_ASSESSMENT_PROMPT, 
+    PAIN_POINT_DISCOVERY_PROMPT, 
+    STRATEGIC_SOLUTION_PROMPT, 
+    OUTREACH_DESIGN_PROMPT
+)
 import json
+
 
 def viability_node(state: AgentState):
     """Evaluates the lead against the Ideal Customer Profile (ICP)."""
     user_analysis = state.get("user_profile_analysis", "")
     website_analysis = state.get("website_analysis", "")
+    company_stats = state.get("company_stats", {})
     ideal_profile = state.get("ideal_profile")
     
-    prompt = f"""
-    Evaluate the strategic viability of this lead based on the following Ideal Customer Profile (ICP):
-    {ideal_profile.json() if hasattr(ideal_profile, 'json') else str(ideal_profile)}
-    
-    Use the provided analysis:
-    LinkedIn Analysis: {user_analysis}
-    Website Analysis: {website_analysis}
-    
-    Provide a concise viability assessment focusing on:
-    1. Demographic Fit (Industry, Size, Revenue)
-    2. Authority (Job Title/Role)
-    3. Strategic Alignment
-    """
+    prompt = VIABILITY_ASSESSMENT_PROMPT.format(
+        icp=ideal_profile.json() if hasattr(ideal_profile, 'json') else str(ideal_profile),
+        user_analysis=user_analysis,
+        website_analysis=website_analysis,
+        company_stats=json.dumps(company_stats)
+    )
+
     
     messages = [
         SystemMessage(content="You are a strategic sales consultant."),
@@ -38,17 +40,16 @@ def pain_point_node(state: AgentState):
     website_analysis = state.get("website_analysis", "")
     hiring_data = state.get("hiring_data", [])
     company_news = state.get("company_news", [])
+    company_stats = state.get("company_stats", {})
     
-    prompt = f"""
-    Identify 3-5 specific, actionable pain points for this lead.
-    Look for signals in:
-    - LinkedIn Analysis: {user_analysis}
-    - Website Analysis: {website_analysis}
-    - Hiring Trends: {json.dumps(hiring_data)}
-    - Company News: {json.dumps(company_news)}
-    
-    Focus on challenges related to operational efficiency, AI adoption, or scaling.
-    """
+    prompt = PAIN_POINT_DISCOVERY_PROMPT.format(
+        user_analysis=user_analysis,
+        website_analysis=website_analysis,
+        hiring_data=json.dumps(hiring_data),
+        company_news=json.dumps(company_news),
+        company_stats=json.dumps(company_stats)
+    )
+
     
     messages = [
         SystemMessage(content="You are an expert business analyst."),
@@ -64,16 +65,11 @@ def solution_node(state: AgentState):
     pain_points = state.get("target_pain_points", "")
     company_context = state.get("company_context", "")
     
-    prompt = f"""
-    Based on these identified pain points:
-    {pain_points}
-    
-    Map them to Innovize AI's specific solutions described here:
-    {company_context}
-    
-    Propose 2-3 tailored AI/Automation solutions that directly address the pain points.
-    Focus on ROI and efficiency gains.
-    """
+    prompt = STRATEGIC_SOLUTION_PROMPT.format(
+        pain_points=pain_points,
+        company_context=company_context
+    )
+
     
     messages = [
         SystemMessage(content="You are a technical solutions architect."),
@@ -90,19 +86,12 @@ def outreach_node(state: AgentState):
     solutions = state.get("strategic_solutions", "")
     engagements = state.get("post_engagements", [])
     
-    prompt = f"""
-    Craft a personalized outreach strategy.
-    
-    Intelligence:
-    - Profile Insights: {user_analysis}
-    - Recent Engagements: {json.dumps(engagements)}
-    - Proposed Solutions: {solutions}
-    
-    Deliver:
-    1. A 'Hook': A personalized opening based on a specific achievement or recent post.
-    2. A LinkedIn Message: Concise (under 300 characters).
-    3. A Hyper-personalized Email: Focus on the 'Value-First' approach, avoiding generic greetings.
-    """
+    prompt = OUTREACH_DESIGN_PROMPT.format(
+        user_analysis=user_analysis,
+        engagements=json.dumps(engagements),
+        solutions=solutions
+    )
+
     
     messages = [
         SystemMessage(content="You are a high-performance sales copywriter."),

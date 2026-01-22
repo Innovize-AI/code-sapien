@@ -261,10 +261,8 @@ async def _run_research_gen(linkedin_url, website, options, email):
         "company_linkedin_url": org_settings["company_linkedin_url"],
         "lead_company_linkedin_url": "",
         "input_lead_data": options,
-
-
         "extra_research_context": options.extra_metadata if options else None,
-        "user_profile_details": "",
+        "user_profile_details": {},
         "scraped_website_content": "",
         "user_profile_analysis": "",
         "website_analysis": "",

@@ -40,3 +40,6 @@ CSV upload of prospects (linkedin url and websites)
 # waterfall likeoutreach priority (comment, hiring, etc)
 
 # add competitor lead gen
+
+
+# identify patterns from competitors comments leads

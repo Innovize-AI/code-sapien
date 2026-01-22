@@ -12,6 +12,8 @@ from db.models import OrganizationSettings
 from services.email_service import EmailService, EmailConfig
 from workflow.state import AgentState
 
+from prompts.sales_prompts import INTENT_ANALYZER_PROMPT
+
 class IntentAnalysisResult(BaseModel):
     intent: str = Field(description="The primary intent of the lead (e.g., Interested, Not Interested, Pricing Query, Comparison, Cold)")
     summary: str = Field(description="A brief summary of the conversation history.")
@@ -48,23 +50,7 @@ def analyze_email_intent(email_history: List[Dict[str, Any]]) -> Dict[str, Any]:
     parser = JsonOutputParser(pydantic_object=IntentAnalysisResult)
     
     prompt = PromptTemplate(
-        template="""You are a senior sales strategist. Analyze the following email conversation history between a sales rep and a lead.
-        
-        Determine the lead's current Intent, summarize the interaction, suggest the Next Best Action, and gauge the Sentiment.
-        
-        If the 'Next Best Action' involves a follow-up or reply, draft a 'recommended_email' that is as human as possible. 
-        Rules for the email:
-        - No generic placeholders like [Your Name] unless absolutely necessary.
-        - Sound helpful and low-pressure.
-        - Reference specific points from the conversation.
-        - Keep it short (2-4 sentences).
-        
-        <conversation_history>
-        {conversation_history}
-        </conversation_history>
-        
-        {format_instructions}
-        """,
+        template=INTENT_ANALYZER_PROMPT,
         input_variables=["conversation_history"],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )

@@ -1,6 +1,24 @@
 from typing import Annotated, TypedDict, Optional, List, Union
 import operator
 
+def reduce_dict(left: dict, right: Union[dict, List[dict]]) -> dict:
+    """Merges dictionaries. Handles single dict or list of dicts (parallel updates)."""
+    if left is None:
+        left = {}
+    if not isinstance(left, dict):
+        left = {}
+
+    if isinstance(right, list):
+        new_dict = left.copy()
+        for item in right:
+             if isinstance(item, dict):
+                 new_dict.update(item)
+        return new_dict
+
+    if not isinstance(right, dict):
+        right = {}
+    return {**left, **right}
+
 def reduce_last(left: any, right: any):
     """Reducer that always takes the latest value. Handles list of updates from parallel nodes."""
     if isinstance(right, list):
@@ -30,18 +48,21 @@ class AgentState(TypedDict):
     website: str
     ideal_profile: IdealProfile
     input_lead_data: InputLeadData
-    user_profile_details: Annotated[str, operator.add]
+    user_profile_details: Annotated[dict, reduce_dict]
     scraped_website_content: Annotated[str, operator.add]
-    user_profile_analysis: Annotated[str, operator.add]
-    website_analysis: Annotated[str, operator.add]
-    lead_extracted_data: Annotated[str, operator.add]
+    user_profile_analysis: Annotated[dict, reduce_last]
+    website_analysis: Annotated[dict, reduce_last]
+    lead_extracted_data: Annotated[dict, reduce_last]
     sales_research_report: Annotated[str, operator.add]
     company_context: str
-    lead_score_analysis: Annotated[str, operator.add]
+    lead_score_analysis: Annotated[dict, reduce_last]
     email_history: List[dict]
+    meeting_notes: str
     intent_analysis: dict
+    buyer_journey_analysis: Annotated[dict, reduce_last]
     fullname: Optional[str]
     profile_picture_url: Optional[str]
+    lead_li_urn: Optional[str]
     extra_research_context: Optional[dict]
     
     # LinkedIn Subgraph Data
@@ -59,7 +80,7 @@ class AgentState(TypedDict):
 
     # Specialized Nodules
 
-    viability_analysis: Annotated[str, operator.add]
     target_pain_points: Annotated[str, operator.add]
     strategic_solutions: Annotated[str, operator.add]
     personalized_outreach: Annotated[str, operator.add]
+    follow_up_strategy: Annotated[str, operator.add]

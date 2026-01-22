@@ -7,7 +7,29 @@ from agents.website_agent import scrape_webpages, website_analyzer
 from agents.lead_scoring_agent import lead_data_extractor, lead_scorer
 from agents.report_agent import sales_research_report_generator
 from agents.intent_agent import email_history_node
-from agents.strategy_agent import viability_node, pain_point_node, solution_node, outreach_node
+from agents.strategy_agent import pain_point_node, solution_node, outreach_node
+from agents.recommender_agent import strategic_recommender_node
+from agents.follow_up_agent import follow_up_strategy_node
+
+
+def strategy_router(state: AgentState):
+    """
+    Decides between first-touch outreach and context-aware follow-up.
+    """
+    email_history = state.get("email_history", [])
+    meeting_notes = state.get("meeting_notes", "")
+    
+    # If there's any history/notes, it's a follow-up
+    if email_history or (meeting_notes and meeting_notes.strip()):
+        print("Routing to Follow-up Strategy Agent")
+        return "follow_up_strategy"
+    
+    print("Routing to First-touch Outreach Designer")
+    return "outreach_designer"
+
+def strategic_merger(state: AgentState):
+    """Synchronization node for parallel strategic branches."""
+    return state
 
 def collector(state: AgentState):
     print("WEBSITE COLLECTOR ", state["website"])
@@ -112,10 +134,12 @@ builder.add_node("lead_data_extractor", lead_data_extractor)
 builder.add_node("lead_scorer", lead_scorer)
 
 # Strategic Nodules
-builder.add_node("viability_check", viability_node)
 builder.add_node("pain_point_discovery", pain_point_node)
 builder.add_node("solution_mapping", solution_node)
 builder.add_node("outreach_designer", outreach_node)
+builder.add_node("follow_up_designer", follow_up_strategy_node)
+builder.add_node("strategic_recommender", strategic_recommender_node)
+builder.add_node("strategic_merger", strategic_merger)
 
 builder.add_node("report_generator", sales_research_report_generator)
 builder.add_node("enrich_linkedin", enrich_linkedin)
@@ -148,23 +172,32 @@ builder.add_edge("email_history_fetcher", "lead_data_extractor")
 # Sequential Logic
 builder.add_edge("lead_data_extractor", "lead_scorer")
 
-# Strategic Nodules (Parallel Fan-out)
-builder.add_edge("lead_scorer", "viability_check")
+# Strategic Parallel Fan-out
+builder.add_edge("lead_scorer", "strategic_recommender")
 builder.add_edge("lead_scorer", "pain_point_discovery")
 
-# Dependencies between nodules
+# Discovery Branch
 builder.add_edge("pain_point_discovery", "solution_mapping")
-builder.add_edge("solution_mapping", "outreach_designer")
+
+# Strategic Fan-in (Merger)
+builder.add_edge("strategic_recommender", "strategic_merger")
+builder.add_edge("solution_mapping", "strategic_merger")
+
+# Branching Logic (Conditional Router)
+builder.add_conditional_edges("strategic_merger", strategy_router, {
+    "outreach_designer": "outreach_designer",
+    "follow_up_strategy": "follow_up_designer"
+})
 
 # Convergence to Report
-builder.add_edge("viability_check", "report_generator")
 builder.add_edge("outreach_designer", "report_generator")
+builder.add_edge("follow_up_designer", "report_generator")
 
 builder.add_edge("report_generator", END)
 
 builder.add_conditional_edges("collector", research_router, {
     "enrich_linkedin": "enrich_linkedin",
-    "profile_fetcher": "linkedin_profile_fetcher",
+    "linkedin_profile_fetcher": "linkedin_profile_fetcher",
     "enrich_website": "enrich_website",
     "website_scraper": "website_scraper",
     "email_history_fetcher": "email_history_fetcher"
@@ -186,9 +219,10 @@ NODE_STATUS_MAPPING = {
     "linkedin_profile_analyzer": "Conducting deep social persona analysis...",
     "website_analyzer": "Analyzing company operations and market position...",
     "email_history_fetcher": "Reviewing past email interactions...",
-    "viability_check": "Evaluating Lead-to-ICP viability...",
     "pain_point_discovery": "Identifying specific business pain points...",
     "solution_mapping": "Mapping Innovize AI solutions to challenges...",
     "outreach_designer": "Designing personalized outreach strategy...",
+    "follow_up_designer": "Crafting context-aware follow-up strategy...",
+    "strategic_recommender": "Determining buyer journey stage & strategy...",
 }
 

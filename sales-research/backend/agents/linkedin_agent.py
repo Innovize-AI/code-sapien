@@ -30,6 +30,20 @@ class ProfileClassification(BaseModel):
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
     reasoning: str = Field(description="Brief explanation of the classification.")
 
+class LinkedInPostAnalysis(BaseModel):
+    post_title: str = Field(description="Title or main hook of the post")
+    summary: str = Field(description="Brief summary of the post content")
+    posted_date: str = Field(description="Approximate date or relative time of posting")
+    post_url: str = Field(description="URL of the specific post")
+
+class LinkedInAnalysis(BaseModel):
+    profile_summary: str = Field(description="Comprehensive summary of the candidate's professional profile.")
+    posts_analysis: List[LinkedInPostAnalysis] = Field(description="Analysis of recent posts.")
+    strategic_role_fit: str = Field(description="Assessment of role fit and decision-making power.")
+    company_signals: str = Field(description="Insights derived from company stats, hiring, and news.")
+    engagement_persona: str = Field(description="Analysis of topics they care about and communication style.")
+    pain_point_hypothesis: str = Field(description="Hypothesized pain points based on company and role context.")
+
 def batch_classify_profiles(profiles: List[Dict]):
     """
     Classifies a batch of profiles using LLM based on headline and company context.
@@ -130,13 +144,22 @@ def merge_json(json1, json2):
 def get_linkedin_profile(state: AgentState):
     """Fetches basic profile details."""
     # Check if we already have the profile data in state to avoid duplicate calls
-    user_details_str = state.get("user_profile_details")
-    if user_details_str and "\"id\"" in user_details_str:
+    # Check if we already have the profile data in state to avoid duplicate calls
+    user_details = state.get("user_profile_details")
+    
+    # Handle if it's already a dict (new state) or string (old state/transition)
+    if isinstance(user_details, str):
+        try:
+             user_details = json.loads(user_details)
+        except:
+             user_details = {}
+
+    if isinstance(user_details, dict) and "id" in user_details:
         # Even if lead_company_linkedin_url is missing as a separate state field, 
         # we can extract it from the cached detail if available.
         if not state.get("lead_company_linkedin_url"):
             try:
-                base_data = json.loads(user_details_str)
+                base_data = user_details
                 experience = base_data.get("experience", [])
                 if experience and len(experience) > 0:
                     current_job = experience[0]
@@ -154,7 +177,7 @@ def get_linkedin_profile(state: AgentState):
     
     linkedin_url = state.get("linkedin_url")
     if not linkedin_url:
-        return {"user_profile_details": json.dumps({"description": "No LinkedIn URL"})}
+        return {"user_profile_details": {"description": "No LinkedIn URL"}}
 
     profile_url = linkedin_base_url + "/profile/detail"
     user_name = get_username_from_url(linkedin_url)
@@ -172,12 +195,13 @@ def get_linkedin_profile(state: AgentState):
         if isinstance(profile_details, dict) and "message" in profile_details:
              if "exceeded the MONTHLY quota" in profile_details["message"]:
                 print(f"LinkedIn API Rate Limit: {profile_details['message']}")
-                return {"user_profile_details": json.dumps({"error": "Rate limit exceeded"})}
+                return {"user_profile_details": {"error": "Rate limit exceeded"}}
 
         base_data = profile_details.get("data", profile_details) if isinstance(profile_details, dict) else profile_details
         basic_info = base_data.get("basic_info", {})
         fullname = basic_info.get("fullname", "")
         profile_pic = basic_info.get("profile_picture_url", "")
+        urn = basic_info.get("urn", "")
 
         # Extract lead's current company URL if possible
         lead_company_linkedin_url = None
@@ -188,15 +212,16 @@ def get_linkedin_profile(state: AgentState):
                 lead_company_linkedin_url = current_job.get("company_linkedin_url") or current_job.get("url")
 
         return {
-            "user_profile_details": json.dumps(base_data),
+            "user_profile_details": base_data,
             "fullname": fullname,
             "profile_picture_url": profile_pic,
-            "lead_company_linkedin_url": lead_company_linkedin_url
+            "lead_company_linkedin_url": lead_company_linkedin_url,
+            "lead_li_urn": urn
         }
 
     except Exception as e:
         print(f"Error fetching LinkedIn profile: {e}")
-        return {"user_profile_details": json.dumps({"error": str(e)})}
+        return {"user_profile_details": {"error": str(e)}}
 
 def get_linkedin_posts(state: AgentState):
     """Fetches recent posts."""
@@ -205,7 +230,7 @@ def get_linkedin_posts(state: AgentState):
     
     linkedin_url = state.get("linkedin_url")
     if not linkedin_url:
-        return {"user_profile_details": ""} # Append nothing
+        return {"user_profile_details": {}} # Append nothing
 
     user_name = get_username_from_url(linkedin_url)
     posts_url = linkedin_base_url + "/profile/posts"
@@ -226,7 +251,7 @@ def get_linkedin_posts(state: AgentState):
             elif isinstance(posts_data["data"], dict) and "posts" in posts_data["data"]:
                 posts_list = posts_data["data"]["posts"]
         
-        return {"user_profile_details": json.dumps({"recent_posts": posts_list[:5]})}
+        return {"user_profile_details": {"recent_posts": posts_list[:5]}}
     except Exception as e:
         print(f"Error fetching LinkedIn posts: {e}")
         return {}
@@ -243,7 +268,7 @@ def get_linkedin_engagement(state: AgentState):
     if not lead_linkedin_url or (not user_linkedin_url and not company_linkedin_url):
         return {"post_engagements": []}
 
-    lead_username = get_username_from_url(lead_linkedin_url)
+    lead_urn = state["lead_li_urn"]
     targets = []
     if user_linkedin_url: targets.append(("user", get_username_from_url(user_linkedin_url)))
     if company_linkedin_url: targets.append(("company", get_username_from_url(company_linkedin_url)))
@@ -269,40 +294,49 @@ def get_linkedin_engagement(state: AgentState):
                 elif isinstance(posts_data["data"], dict): posts = posts_data["data"].get("posts", [])
             
             for post in posts[:10]:
-                post_id = post.get("post_id") or post.get("id")
-                if not post_id: continue
+                post_urn = post.get("urn").get("activity_urn", "")
+                post_text= post.get("text", "")
+                post_date = post.get("posted_at", "")
+                if not post_urn: continue
 
                 # Check reactions for this post
                 reactions_url = f"{linkedin_base_url}/post/reactions"
                 # Note: Some APIs use 'post_id' or 'url'. We'll assume post_id is enough for this RapidAPI.
-                r_params = {"post_id": post_id, "count": 100} 
+                r_params = {"post_url": post_urn.get("urn", ""), "count": 100} 
                 r_resp = requests.get(reactions_url, headers=headers, params=r_params)
                 r_data = r_resp.json()
                 
-                reactors = r_data.get("data", [])
-                for reactor in reactors:
-                    if reactor.get("username") == lead_username:
+                reactions = r_data.get("data", [])
+                for reaction in reactions:
+                    reaction_type = reaction.get("reaction_type", "LIKE")
+                    reactor = reaction.get("reactor", {})
+                    reactor_urn = reactor.get("urn", "")
+
+                    if reactor.get("urn") == lead_urn:
                         found_engagements.append({
                             "type": "reaction",
                             "target": target_type,
-                            "post_id": post_id,
-                            "content": post.get("text", "")[:100] + "...",
-                            "reaction_type": reactor.get("type", "like")
+                            "post_id": post_urn,
+                            "content": post_text[:100] + "...",
+                            "post_url":posts_url,
+                            "reaction_type": reaction_type,
+                            "reactor_urn": reactor.get("urn", "")
                         })
                 
                 # Check comments
                 comments_url = f"{linkedin_base_url}/post/comments"
-                c_params = {"post_id": post_id, "count": 50}
+                c_params = {"post_url": post_urn, "page_number": 1}
                 c_resp = requests.get(comments_url, headers=headers, params=c_params)
                 c_data = c_resp.json()
                 
                 comments = c_data.get("data", [])
                 for comment in comments:
-                    if comment.get("username") == lead_username:
+                    author = comment.get("author", {})
+                    if author.get("profile_url") == lead_linkedin_url:
                         found_engagements.append({
                             "type": "comment",
                             "target": target_type,
-                            "post_id": post_id,
+                            "post_id": post_urn,
                             "content": post.get("text", "")[:100] + "...",
                             "comment_text": comment.get("text", "")
                         })
@@ -373,23 +407,43 @@ def get_linkedin_company_data(state: AgentState):
 
 
 def linkedin_profile_analyzer(state: AgentState):
-    """Synthesizes all LinkedIn data into a deep profile analysis."""
-    # Combine all collected data for the analyzer
+    """Synthesizes all LinkedIn data into a deep profile analysis using Structured Output."""
+    
     content = {
-        "profile": state.get("user_profile_details", ""),
+        "profile": state.get("user_profile_details", {}),
         "engagements": state.get("post_engagements", []),
         "company_news": state.get("company_news", []),
+        "company_stats": state.get("company_stats", {}),
+        "company_industries": state.get("company_industries", []),
+        "company_description": state.get("company_description", {}),
+        "company_name": state.get("company_name", {}),
         "hiring": state.get("hiring_data", [])
     }
     
     messages = [
-        SystemMessage(content=LINKEDIN_ANALYZER_PROMPT + "\nConsider the company news, hiring status, and post engagements to provide a deeper strategic assessment."),
-        HumanMessage(content=json.dumps(content))
+        SystemMessage(content=LINKEDIN_ANALYZER_PROMPT),
+        HumanMessage(content=json.dumps(content, default=str))
     ]
     
-    model = get_open_ai(model="gpt-4o-mini", temperature=1)
-    response = model.invoke(messages)
-    return {"user_profile_analysis": response.content}
+    try:
+        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        structured_llm = model.with_structured_output(LinkedInAnalysis)
+        response = structured_llm.invoke(messages)
+        
+        # Format the output back into a Markdown string for the report to consume easily
+        # or return the dict if the downstream nodes expect that. 
+        # Checking graph: downstream is 'lead_data_extractor' and 'report_generator' which expect strings or generic dicts.
+        # Ideally, we format this back to a detailed markdown string so other agents can read it naturally.
+        
+        if not response:
+             return {"user_profile_analysis": {}}
+
+        # Return the structured analysis as a dictionary
+        return {"user_profile_analysis": response.dict()}
+
+    except Exception as e:
+        print(f"Error in linkedin_profile_analyzer: {e}")
+        return {"user_profile_analysis": "Error generating structured analysis."}
 
 def analyze_competitor_posts(competitor_urls: list[str]):
     """Fetches and analyzes posts from multiple competitor LinkedIn profiles."""

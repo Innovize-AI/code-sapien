@@ -1,5 +1,12 @@
-from typing import Annotated, TypedDict, Optional, List
+from typing import Annotated, TypedDict, Optional, List, Union
 import operator
+
+def reduce_last(left: any, right: any):
+    """Reducer that always takes the latest value. Handles list of updates from parallel nodes."""
+    if isinstance(right, list):
+        return right[-1]
+    return right
+
 from pydantic import BaseModel, Field
 
 class IdealProfile(BaseModel):
@@ -43,6 +50,12 @@ class AgentState(TypedDict):
     hiring_data: List[dict]
     user_linkedin_url: Optional[str]
     company_linkedin_url: Optional[str]
+    lead_company_linkedin_url: Annotated[Optional[str], reduce_last]
+    company_name: Annotated[Optional[str], reduce_last]
+    company_description: Annotated[Optional[str], reduce_last]
+    company_industries: Annotated[Optional[List[str]], reduce_last]
+    company_stats: Annotated[Optional[dict], reduce_last]
+
 
     # Specialized Nodules
 

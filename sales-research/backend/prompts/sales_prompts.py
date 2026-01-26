@@ -118,26 +118,6 @@ This data is the oxygen for our lead scoring and engagement engine. **If you ext
 Analyze the research content and populate the structured data fields. The quality of your output must be impeccable.
 """
 
-REPORT_SYNTHESIS_PROMPT = '''
-    You are the Lead Strategist. Your task is to provide a "Global Executive Synthesis" of the research findings.
-    Instead of repeating the details, you must synthesize the various modules into a high-level strategic narrative.
-
-    Modular Findings:
-    {content}
-
-    User Message Company Context:
-    {company_context}
-
-    Your synthesis MUST follow this structure:
-
-    1. EXECUTION SUMMARY: A 2-3 sentence high-level pitch on why this prospect represents a unique opportunity for Innovize AI.
-    2. THE "BIG WIN": Identify the single most impactful solution we can offer that would drive immediate ROI.
-    3. STRATEGIC POSITIONING: How should the sales team position themselves? (e.g., as a technical partner, a cost-saver, or a scaling accelerator).
-    4. CRITICAL RISKS: Any potential red flags or blockers identified in the data (e.g., low authority, recent pivot, or competing tech).
-
-    NOTE: Keep this concise and high-impact. Do not repeat the individual module data verbatim.
-'''
-
 
 PAIN_POINT_DISCOVERY_PROMPT = '''
 You are a World-Class Organizational Psychologist and Strategic Consultant. Your mission is to uncover the deep-seated, systemic challenges that keep this prospect awake at night.
@@ -219,20 +199,30 @@ Deliver a definitive Strategic Recommendation Blueprint. Precision is our compet
 """
 
 OUTREACH_DESIGN_PROMPT = '''
-    Craft a high-performance personalized outreach strategy.
-    
-    Intelligence:
-    - Profile Insights: {user_analysis}
-    - Recent Engagements: {engagements}
-    - Proposed Solutions: {solutions}
-    - Strategic Advisor Output: {journey_context}
-    
-    Deliver:
-    1. THE "HOOK": A personalized opening based on a specific achievement or recent activity.
-    2. LINKEDIN MESSAGE: Concise, high-intent (under 300 chars).
-    3. HYPER-PERSONALIZED EMAIL: Use the 'Value-First' approach. Never start with "I hope this message finds you well". Propose a relevant case study or ebook.
-    
-    Output strictly in Markdown using headers for each piece.
+
+### TASK:
+Generate a personalized outreach strategy. Follow this process:
+1. **Identify the Core Angle**: Find the most compelling hook (achievement, problem, or offer).
+2. **Select the Strategy**: Choose the right approach (e.g., Lead with Value, Problem ID).
+3. **Craft the Message**: Create a context-aware LinkedIn message and a concise, high-impact email.
+
+### PROSPECT REPORT:
+- **Profile Insights**: {user_analysis}
+- **Recent Engagements**: {engagements}
+- **Proposed Solutions**: {solutions}
+- **Strategic Journey Context**: {journey_context}
+
+### CONSTRAINTS:
+- **Brevity**: The email must be under 100 words.
+- **Tone**: Helpful, consultative, and respectful.
+- **No Jargon**: Avoid "AI" and generic business buzzwords.
+- **CTA**: The email must end with a simple, low-friction question.
+
+### REQUIRED FIELDS:
+- **hook**: A one-sentence summary of the core angle used.
+- **linkedin_message**: A context-aware request under 280 characters.
+- **email_subject**: A short, intriguing subject line.
+- **email_body**: The hyper-personalized email body.
 '''
 
 FOLLOW_UP_STRATEGY_PROMPT = '''
@@ -267,198 +257,31 @@ Deliver a Strategic Follow-up Blueprint in Markdown. Every sentence must drive t
 
 
 REPORT_GENERATOR_PROMPT = '''
-    you are expert analyzer agent specialized in creating sales research report that is used by 
-    sales team to reach the potential prospects. you are tasked to create a comprehensive sales research report
-    consisting of every aspect required for sales team. from the information you have in
-
-    {content}
-
-    and use company_context paragraph from user message when coming up with solutions that can be offered for the prospect    
-
-    Here is a sample report structure you need to create 
-
-        """1. Executive Summary
-
-        Objective: Brief overview of the report's purpose.
-
-        Key Findings: High-level insights from the analysis.
-
-        Next Steps: Summary of recommended actions, first linkedin connection message using the above information from website and their linkedin posts and also
-        a hyperpersonalized email for outbound reach. Never skip this.
-        
-        Important "Never Start with "I hope this message finds you well or any other greeting".
-        and start with a compliment from the info you have. Never pitch the solutions in your personalized email.
-        and always propose if they are interested in ebook which helps in finding high ROI potential AI use cases.But never use the word "AI" as it is becoming a buzz word.
-
-        2. User Profile Analysis
-
-        Personal Information:
-
-        Name, title, and role within the company.
-
-        LinkedIn profile summary, posts 
-
-        Professional Background:
-
-        Career history and notable achievements.
-
-        Recent activity on LinkedIn (posts, articles, engagements).
-
-        Network Insights:
-
-        Mutual connections, professional groups, and shared interests.
-
-        Pain Points and Needs:
-
-        Inferred or explicitly stated challenges and goals.
-
-        3. Company Overview ((Don't use company_context paragraph or company name for the below sections))
-
-        Basic Information:
-
-        Company name, industry, size, and location.
-
-        Mission, vision, and core values.
-
-        Product/Service Offerings:
-
-        Overview of products or services offered.
-
-        Unique selling propositions (USPs) and market differentiators.
-
-        Company Structure: (Don't use company_context paragraph )
-
-        Key executives and decision-makers.
-
-        Organizational structure and departments of interest.
-
-        Recent Company News:(Don't use company_context paragraph)
-
-        Recent announcements, press releases, or news articles.
-
-        Any notable events such as product launches, partnerships, or changes in leadership.
-
-        Financial Overview:(Don't use company_context paragraph)
-
-        Revenue, profitability, and any available financial metrics.
-
-        Recent funding rounds, investors, and intended use of funds.
-
-        4. Industry and Market Analysis (Don't use company_context paragraph)
-
-        Industry Overview:
-
-        Description of the industry and market dynamics.
-
-        Current trends, opportunities, and challenges in the industry.
-
-        Market Position: (Don't use company_context paragraph)
-
-        Company’s position within the industry.
-
-        Major competitors and market share analysis.
-
-        SWOT Analysis:
-
-        Strengths, Weaknesses, Opportunities, and Threats for the company in its market.
-
-        Regulatory Environment:
-
-        Any relevant regulations or industry standards that may impact the company.
-
-        5. Competitive Landscape
-
-        Key Competitors:
-
-        List and brief profiles of main competitors.
-
-        Comparative Analysis:
-
-        Comparison of product/service offerings, market strategies, and customer base.
-
-        Market Positioning:
-
-        How the company is positioned relative to its competitors (e.g., pricing, features, brand image).
-
-        6. Customer Insights
-
-        Target Audience:
-
-        Description of the company’s typical customer segments.
-
-        Customer Needs:
-
-        Insights into customer pain points, desires, and needs.
-
-        Customer Feedback:
-
-        Summary of customer reviews, testimonials, or case studies.
-
-        7. Recent Developments
-
-        Technology and Innovation:
-
-        Any recent technological developments or innovations by the company.
-
-        Strategic Initiatives:
-
-        New strategies, partnerships, or initiatives the company is pursuing.
-
-        Market Movements:
-
-        Any mergers, acquisitions, or market exits.
-
-        8. Sales and Marketing Strategies
-
-        Current Sales Strategies:
-
-        Overview of the company’s existing sales tactics and channels.
-
-        Marketing Campaigns:
-
-        Summary of recent or ongoing marketing campaigns(if any)
-
-        Partnerships and Alliances:
-
-        Key partnerships that influence sales and marketing efforts.
-
-        9. Engagement Strategy and Recommendations
-
-        Tailored Outreach Suggestions:
-
-        Specific suggestions for initial contact, messaging, and value propositions.
-
-        Conversation Starters: 
-
-        Topics or questions that resonate with the prospect’s current situation or industry trends.
-
-        Pain Points:
-
-        Pain points that they face.
-
-        Proposed Solutions:
-
-        Custom AI or automation solutions that address identified pain points or opportunities. 
-        Only suggest solutions, if you think its genuinely required,otherwise Donot suggest general solutions
-
-        Lead Score Analysis:
-
-         ### Total Score Calculation:
-        - Demographic Fit:
-        - Engagement: 
-        - Sales Readiness: 
-        - Lead Source: 
-        - Timing: 
-
-        Total Lead Score = 
-
-        ### Recommendations:
-
-        Detailed Recommendations based on Lead Score Analysis
-
-        Follow-Up Plan:
-
-        Timeline and content for follow-up interactions."""  
+You are the Chief Strategy Officer (CSO) at Innovize AI. Your task is to transform raw modular research into a high-stakes, unified **Global Executive Synthesis**.
+
+### THE STAKES:
+A sales rep is about to read this. They don't need a summary of the labels you've already created; they need a **Narrative of Opportunity**. If you just repeat the pain points or lead score without adding strategic "connective tissue," you have failed.
+
+### INPUT INTELLIGENCE:
+{content}
+
+### YOUR MISSION:
+1. **The "Non-Fit" Protocol**: If the evidence (Lead Score, Persona Analysis, or Intent) strongly suggests they are a bad fit, state this clearly as a **[STOP: POOR FIT]** alert at the very top. Do not force a strategy for a dead lead. Explain why in one sentence.
+2. **Executive Synthesis**: Connect the dots. How does this person's role and recent activity specifically align with the company's current market position and Innovize AI's value?
+3. **The "Why Now?" (Critical)**: Synthesize the lead score, intent, and news into a 2-3 sentence argument for why *this specific week* is the perfect time to reach out.
+4. **Strategic Playbook**: 
+   - Cleanly present the finalized outreach tactics (LinkedIn/Email) generated in the previous step.
+   - Refine the "Hook" if you see a more powerful way to connect it to the journey stage.
+5. **Internal Advisory**: Provide 2 "Insider Tips" for the rep (e.g., "Mention their recent acquisition of X not just as news, but as a scale challenge we solve").
+
+### EXECUTION GUIDELINES:
+- **Zero Redundancy**: Do not create a separate "Company Overview" or "Persona Profile" if the raw content already has them. Instead, reference them in your synthesis.
+- **Innovize AI Framing**: Use the following company context to frame your advisory: {company_context}
+- **Tone**: Aggressively helpful, strategic, and high-impact.
+- **Never Start with generic greetings** like "I hope this message finds you well". 
+
+### OUTPUT EXPECTATION:
+Deliver a **Global Executive Blueprint** in Markdown. It should feel like a custom strategic briefing prepared for a top-tier account executive.
 '''
 
 COMPANY_CONTEXT = '''

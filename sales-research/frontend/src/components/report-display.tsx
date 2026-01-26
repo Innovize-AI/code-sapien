@@ -9,10 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ReportDisplayProps {
     data: {
+        fullname?: string;
+        profile_picture_url?: string;
+        linkedin_url?: string;
+        website?: string;
+        lead_score?: number;
         sales_research_report: string;
-        lead_score_analysis: string;
-        user_profile_analysis: string;
-        website_analysis: string;
+        lead_score_analysis: any; // Can be string or structured object
+        user_profile_analysis: any;
+        website_analysis: any;
         intent_analysis?: {
             intent: string;
             summary: string;
@@ -33,7 +38,20 @@ interface ReportDisplayProps {
         viability_analysis?: string;
         target_pain_points?: string;
         strategic_solutions?: string;
-        personalized_outreach?: string;
+        personalized_outreach?: {
+            hook: string;
+            linkedin_message: string;
+            email_subject: string;
+            email_body: string;
+        } | string;
+        buyer_journey_analysis?: {
+            journey_stage: string;
+            optimal_play: string;
+            strategic_reasoning: string;
+            sentiment_score: number;
+            urgency_level: string;
+        } | any;
+        meeting_notes?: string;
         // LinkedIn Subgraph
         post_engagements?: Array<{
             type: string;
@@ -131,19 +149,33 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     const getIdentity = () => {
         // Prioritize explicit database fields if available
         if (data.fullname) {
-            const analysis = data.user_profile_analysis || "";
-            const headlineMatch = analysis.match(/(?:Headline|Title|Role):\s*\**([^\n\*]+)\**/i);
+            const analysis = data.user_profile_analysis;
+            let headline = "Target Profile Analysis";
+
+            if (typeof analysis === 'string') {
+                const headlineMatch = analysis.match(/(?:Headline|Title|Role):\s*\**([^\n\*]+)\**/i);
+                if (headlineMatch) headline = headlineMatch[1].trim();
+            } else if (analysis && typeof analysis === 'object') {
+                headline = analysis.profile_summary || analysis.headline || analysis.role || headline;
+            }
+
             return {
                 name: data.fullname,
-                headline: headlineMatch ? headlineMatch[1].trim() : "Target Profile Analysis"
+                headline: headline
             };
         }
 
-        const analysis = data.user_profile_analysis || "";
-        // Look for "Name: " or "**Name:**" or similar
-        const nameMatch = analysis.match(/(?:Name|Full Name):\s*\**([^\n\*]+)\**/i);
-        // Look for "Headline: " or "Title: " or similar
-        const headlineMatch = analysis.match(/(?:Headline|Title|Role):\s*\**([^\n\*]+)\**/i);
+        const analysis = data.user_profile_analysis;
+        if (analysis && typeof analysis === 'object') {
+            return {
+                name: analysis.name || analysis.fullname || "Prospect Identity",
+                headline: analysis.profile_summary || analysis.headline || analysis.role || "Target Profile Analysis"
+            };
+        }
+
+        const analysisStr = String(analysis || "");
+        const nameMatch = analysisStr.match(/(?:Name|Full Name):\s*\**([^\n\*]+)\**/i);
+        const headlineMatch = analysisStr.match(/(?:Headline|Title|Role):\s*\**([^\n\*]+)\**/i);
 
         return {
             name: nameMatch ? nameMatch[1].trim() : "Prospect Identity",
@@ -157,23 +189,26 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         id: string;
         title: string;
         icon: React.ReactNode;
-        content: string;
+        content: any;
         badge: string;
         isPrimary?: boolean;
         isActivity?: boolean;
         isIntent?: boolean;
+        isJourney?: boolean;
+        isOutreach?: boolean;
         tactical?: any[];
     }
 
     const sections: Section[] = [
-
-        { id: "profile", title: "Profile Intelligence", icon: <User className="h-4 w-4" />, content: data.user_profile_analysis, badge: "Intelligence", isPrimary: true },
-        { id: "viability", title: "ICP Viability", icon: <ShieldCheck className="h-4 w-4" />, content: data.viability_analysis || "", badge: "Strategic" },
+        { id: "synthesis", title: "Executive Blueprint", icon: <LayoutDashboard className="h-4 w-4" />, content: data.sales_research_report, badge: "CSO Briefing", isPrimary: true },
+        { id: "journey", title: "Buyer Journey", icon: <TrendingUp className="h-4 w-4" />, content: "", badge: "Strategy", isJourney: true },
+        { id: "profile", title: "Profile Intelligence", icon: <User className="h-4 w-4" />, content: data.user_profile_analysis, badge: "Intelligence" },
         { id: "activity", title: "Activity Board", icon: <BarChart3 className="h-4 w-4" />, content: "", badge: "Real-time", isActivity: true },
+        { id: "viability", title: "ICP Viability", icon: <ShieldCheck className="h-4 w-4" />, content: data.viability_analysis || "", badge: "Strategic" },
         { id: "pain-points", title: "Lead Pain Points", icon: <Zap className="h-4 w-4" />, content: data.target_pain_points || "", badge: "Discovery" },
         { id: "solutions", title: "Strategic Solutions", icon: <ArrowDown className="h-4 w-4" />, content: data.strategic_solutions || "", badge: "Matching" },
-        { id: "outreach", title: "Outreach Design", icon: <Target className="h-4 w-4" />, content: data.personalized_outreach || "", badge: "Tactical" },
-        { id: "lead-score", title: "Qualification", icon: <TrendingUp className="h-4 w-4" />, content: data.lead_score_analysis, badge: "AI Score" },
+        { id: "outreach", title: "Outreach Design", icon: <Target className="h-4 w-4" />, content: "", badge: "Tactical", isOutreach: true },
+        { id: "lead-score", title: "Qualification", icon: <BarChart3 className="h-4 w-4" />, content: data.lead_score_analysis, badge: "AI Score" },
         { id: "website-analysis", title: "Digital Footprint", icon: <Globe className="h-4 w-4" />, content: data.website_analysis, badge: "Technical" },
         // New Section for Intent & History
         ...((data.email_history && data.email_history.length > 0) || (data.post_engagements && data.post_engagements.length > 0) ? [{
@@ -189,11 +224,12 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
 
 
     // Helper to render content based on its type (JSON or Markdown) with support for "sloppy" and fragmented formats
-    const DynamicContent = ({ content, title, isSocial = false, className = "" }: { content: string, title?: string, isSocial?: boolean, className?: string }) => {
+    const DynamicContent = ({ content, title, isSocial = false, className = "" }: { content: any, title?: string, isSocial?: boolean, className?: string }) => {
         const [copied, setCopied] = React.useState(false);
 
         const handleCopy = () => {
-            navigator.clipboard.writeText(content);
+            const textToCopy = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+            navigator.clipboard.writeText(textToCopy);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         };
@@ -209,7 +245,79 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
             </div>
         );
 
-        let processedContent = content.trim();
+        if (content && typeof content === 'object' && !Array.isArray(content)) {
+            return (
+                <div className={cn("relative group space-y-8", className)}>
+                    <div className="absolute right-0 -top-14 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                        <Button variant="outline" size="sm" onClick={handleCopy} className="h-9 gap-2 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copied ? "Copied" : "Copy Section"}
+                        </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 p-12 rounded-[2.5rem] bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800/60 transition-all duration-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
+                        {Object.entries(content).map(([key, value]) => {
+                            if (key === 'posts_analysis' || key === 'recent_posts') return null;
+
+                            if (Array.isArray(value)) {
+                                return (
+                                    <div key={key} className="md:col-span-2 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-primary/40 shadow-sm shadow-primary/20" />
+                                            <h4 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">{key.replace(/_/g, ' ')}</h4>
+                                        </div>
+                                        <div className="pl-6 space-y-2">
+                                            {value.map((item, i) => (
+                                                <div key={i} className="flex gap-2 text-[15px] font-medium text-zinc-900 dark:text-zinc-100 leading-relaxed">
+                                                    <span className="text-primary mt-1.5">•</span>
+                                                    <div className="prose prose-zinc dark:prose-invert max-w-none text-[15px] text-zinc-900 dark:text-zinc-100 leading-relaxed font-medium">
+                                                        <ReactMarkdown>{String(item)}</ReactMarkdown>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            if (typeof value === 'object' && value !== null) {
+                                return (
+                                    <div key={key} className="md:col-span-2 space-y-4 pt-4 border-t border-dashed border-zinc-200 dark:border-zinc-800">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-primary/40 shadow-sm shadow-primary/20" />
+                                            <h4 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">{key.replace(/_/g, ' ')}</h4>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-4">
+                                            {Object.entries(value).map(([subKey, subValue]) => (
+                                                <div key={subKey} className="space-y-2">
+                                                    <h5 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{subKey.replace(/_/g, ' ')}</h5>
+                                                    <div className="prose prose-zinc dark:prose-invert max-w-none text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 leading-relaxed">
+                                                        <ReactMarkdown>{String(subValue)}</ReactMarkdown>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div key={key} className={cn("space-y-3", (String(value).length > 150) ? 'md:col-span-2' : '')}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-1.5 w-1.5 rounded-full bg-primary/40 shadow-sm shadow-primary/20" />
+                                        <h4 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">{key.replace(/_/g, ' ')}</h4>
+                                    </div>
+                                    <div className="prose prose-zinc dark:prose-invert max-w-none text-[16px] font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed pl-6 antialiased">
+                                        <ReactMarkdown>{String(value)}</ReactMarkdown>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        let processedContent = String(content || "").trim();
         if (processedContent.startsWith('```')) {
             processedContent = processedContent.replace(/^```(markdown)?\n?/i, '').replace(/\n?```$/i, '').trim();
         }
@@ -361,9 +469,11 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         );
     };
 
-    const tacticalActions = data.personalized_outreach ? [
-        { type: 'linkedin' as const, title: 'LinkedIn Hook', content: data.personalized_outreach, icon: <Linkedin className="h-4 w-4" /> },
-        { type: 'email' as const, title: 'Email Hook', content: data.personalized_outreach, icon: <Mail className="h-4 w-4" /> }
+    const outreach = data.personalized_outreach;
+    const tacticalActions = (typeof outreach === 'object' && outreach !== null) ? [
+        { type: 'linkedin' as const, title: 'LinkedIn Request', content: outreach.linkedin_message, icon: <Linkedin className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Subject', content: outreach.email_subject, icon: <Mail className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Body', content: outreach.email_body, icon: <FileText className="h-4 w-4" /> }
     ] : extractTacticalItems(data.sales_research_report);
 
     return (
@@ -417,15 +527,19 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-md">
-                        <div className="text-right pr-4 border-r border-white/10">
-                            <div className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-1">Lead Score</div>
-                            <div className="text-3xl font-black text-primary leading-none">{data.lead_score || 85}</div>
+                    <div className="flex items-center gap-6 bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-xl transition-all hover:bg-white/10">
+                        <div className="text-right pr-6 border-r border-white/10">
+                            <div className="text-zinc-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1.5 opacity-60">Lead Score</div>
+                            <div className="text-4xl font-black text-primary leading-none italic">{data.lead_score || (typeof data.lead_score_analysis === 'object' ? data.lead_score_analysis.total_lead_score : 85)}</div>
+                        </div>
+                        <div className="text-right pr-6 border-r border-white/10">
+                            <div className="text-zinc-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1.5 opacity-60">Heat Rating</div>
+                            <div className="text-4xl font-black text-amber-500 leading-none italic">{data.buyer_journey_analysis?.sentiment_score || 50}</div>
                         </div>
                         <div className="pl-2">
-                            <div className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-1">Intent</div>
-                            <Badge className="bg-emerald-500/20 text-emerald-400 border-none hover:bg-emerald-500/30 text-[10px] uppercase font-black">
-                                {data.post_engagements && data.post_engagements.length > 0 ? "High Interaction" : "Discovery Phase"}
+                            <div className="text-zinc-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1.5 opacity-60">Journey Stage</div>
+                            <Badge className="bg-primary/20 text-primary border border-primary/20 hover:bg-primary/30 text-[10px] uppercase font-black px-3 py-1 rounded-lg">
+                                {data.buyer_journey_analysis?.journey_stage || (data.post_engagements && data.post_engagements.length > 0 ? "Consideration" : "Awareness")}
                             </Badge>
                         </div>
                     </div>
@@ -562,17 +676,27 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                 "rounded-2xl overflow-hidden border border-zinc-200/60 dark:border-zinc-800/60 transition-all duration-700",
                                 section.isPrimary ? "bg-primary/[0.03]" : "bg-white dark:bg-zinc-950"
                             )}>
-                                <CardHeader className="px-12 pt-12 pb-8 flex flex-row items-center justify-between border-none">
-                                    <div className="flex items-center gap-6">
+                                <CardHeader className="px-12 pt-14 pb-10 flex flex-row items-center justify-between border-none relative overflow-hidden">
+                                    {section.id === 'synthesis' && (
+                                        <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.05] via-transparent to-transparent opacity-60" />
+                                    )}
+                                    <div className="flex items-center gap-8 relative z-10">
                                         <div className={cn(
-                                            "p-5 rounded-2xl border transition-transform hover:rotate-6",
-                                            section.isPrimary ? "bg-primary text-white border-primary" : "bg-primary/5 text-primary border-primary/10"
+                                            "p-6 rounded-[2rem] border transition-all duration-500 group-hover:scale-110",
+                                            section.isPrimary ? "bg-primary text-white border-primary shadow-xl shadow-primary/20" : "bg-primary/5 text-primary border-primary/10"
                                         )}>
-                                            {React.isValidElement(section.icon) && React.cloneElement(section.icon as React.ReactElement<any>, { className: "h-8 w-8" })}
+                                            {React.isValidElement(section.icon) && React.cloneElement(section.icon as React.ReactElement<any>, { className: "h-10 w-10 stroke-[2.5]" })}
                                         </div>
-                                        <div className="space-y-1">
-                                            <Badge variant="outline" className="text-[10px] uppercase font-black tracking-[0.25em] text-primary border-primary/20 h-6 px-3 rounded-full mb-1">{section.badge}</Badge>
-                                            <CardTitle className="text-3xl md:text-4xl font-black tracking-tighter text-zinc-950 dark:text-zinc-50 uppercase italic">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <Badge variant="outline" className="text-[10px] uppercase font-black tracking-[0.3em] text-primary border-primary/30 h-7 px-4 rounded-full bg-primary/5">{section.badge}</Badge>
+                                                {section.id === 'synthesis' && (
+                                                    <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">
+                                                        <ShieldCheck className="h-3.5 w-3.5" /> High Stakes Analysis
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <CardTitle className="text-4xl md:text-5xl font-black tracking-tighter text-zinc-950 dark:text-zinc-50 uppercase italic leading-none">
                                                 {section.title}
                                             </CardTitle>
                                         </div>
@@ -586,35 +710,153 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                 </CardHeader>
                                 <CardContent className="px-12 pb-16">
                                     {section.id === 'outreach' && tacticalActions.length > 0 && (
-                                        <div className="mb-12 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            {/* Action Cards for tactical extraction */}
-                                            {tacticalActions.map((action, i) => (
-                                                <div key={i} className="group relative p-8 rounded-2xl bg-zinc-900 text-white border border-zinc-800 overflow-hidden hover:scale-[1.01] transition-transform">
-
-                                                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Button
-                                                            variant="secondary"
-                                                            size="icon"
-                                                            className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 border-white/10 text-white"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                navigator.clipboard.writeText(action.content);
-                                                            }}
-                                                        >
-                                                            <Copy className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                    <div className="flex items-center gap-4 mb-4 font-black">
-                                                        <div className="p-3 rounded-2xl bg-primary/20 text-primary border border-primary/20">
-                                                            {action.icon}
+                                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                {/* Outreach Cards */}
+                                                {tacticalActions.map((action, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className={cn(
+                                                            "group relative p-10 rounded-3xl transition-all duration-500",
+                                                            action.type === 'email' ? "bg-zinc-900 text-white shadow-2xl" : "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800"
+                                                        )}
+                                                    >
+                                                        <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                                            <Button
+                                                                size="sm"
+                                                                variant={action.type === 'email' ? "secondary" : "outline"}
+                                                                className="h-9 px-4 rounded-xl gap-2 font-black uppercase tracking-tighter text-[10px]"
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(action.content);
+                                                                }}
+                                                            >
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                                Copy {action.title.split(' ')[1] || 'Draft'}
+                                                            </Button>
                                                         </div>
-                                                        <span className="text-xs uppercase tracking-widest text-zinc-300">{action.title}</span>
+
+                                                        <div className="flex items-center gap-4 mb-8">
+                                                            <div className={cn(
+                                                                "p-3 rounded-2xl border transition-transform group-hover:rotate-12",
+                                                                action.type === 'email' ? "bg-primary/20 text-primary border-primary/20 shadow-lg shadow-primary/10" : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-primary shadow-sm"
+                                                            )}>
+                                                                {action.icon}
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <span className={cn(
+                                                                    "text-[10px] uppercase font-black tracking-widest block",
+                                                                    action.type === 'email' ? "text-zinc-400" : "text-zinc-500"
+                                                                )}>{action.title}</span>
+                                                                <div className={cn(
+                                                                    "h-1 w-12 rounded-full",
+                                                                    action.type === 'email' ? "bg-primary" : "bg-primary/30"
+                                                                )} />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className={cn(
+                                                            "text-[16px] leading-[1.8] font-medium italic",
+                                                            action.type === 'email' ? "text-zinc-100 selection:bg-primary/30" : "text-zinc-800 dark:text-zinc-200 selection:bg-primary/10"
+                                                        )}>
+                                                            {action.content}
+                                                        </div>
+
+                                                        {action.type === 'email' && action.title.includes('Subject') && (
+                                                            <div className="mt-6 pt-6 border-t border-white/5 flex items-center gap-3">
+                                                                <ShieldCheck className="h-4 w-4 text-primary" />
+                                                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Optimized for High Open Rates</span>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <div className="text-[15px] font-medium leading-relaxed italic text-zinc-100">
-                                                        "{action.content}"
+                                                ))}
+                                            </div>
+
+                                            {typeof data.personalized_outreach === 'object' && data.personalized_outreach?.hook && (
+                                                <div className="p-10 rounded-3xl bg-primary/[0.03] border border-primary/10 space-y-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <Zap className="h-4 w-4 text-primary" />
+                                                        <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/70">Strategic Conversion Angle</h4>
+                                                    </div>
+                                                    <p className="text-[17px] font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed italic">
+                                                        "{data.personalized_outreach.hook}"
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {section.isJourney && data.buyer_journey_analysis && (
+                                        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                                <div className="p-10 rounded-3xl bg-zinc-900 text-white border border-white/5 space-y-6 shadow-2xl relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 w-48 h-48 bg-primary/20 blur-[80px] rounded-full -mr-24 -mt-24 pointer-events-none group-hover:bg-primary/30 transition-all duration-700" />
+                                                    <div className="flex items-center gap-4 relative">
+                                                        <div className="p-3 rounded-2xl bg-white/10 border border-white/10 text-primary">
+                                                            <Target className="h-6 w-6" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Pipeline Alpha</span>
+                                                            <h4 className="text-xl font-black italic">Journey Stage</h4>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-4xl font-black text-white tracking-tight uppercase italic relative">
+                                                        {data.buyer_journey_analysis.journey_stage || "Discovery"}
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden relative">
+                                                        <div
+                                                            className="h-full bg-primary shadow-[0_0_15px_rgba(37,99,235,0.5)] transition-all duration-1000"
+                                                            style={{ width: `${(data.buyer_journey_analysis.sentiment_score || 50)}%` }}
+                                                        />
                                                     </div>
                                                 </div>
-                                            ))}
+
+                                                <div className="p-10 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm hover:shadow-md transition-all duration-500">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/10">
+                                                            <Zap className="h-6 w-6" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Recommended Action</span>
+                                                            <h4 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 uppercase italic">The Optimal Play</h4>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[15px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 p-6 rounded-2xl border border-emerald-500/10 leading-relaxed italic">
+                                                        "{data.buyer_journey_analysis.optimal_play || "Initiate high-value outreach sequence"}"
+                                                    </p>
+                                                </div>
+
+                                                <div className="p-10 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm hover:shadow-md transition-all duration-500">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/10">
+                                                            <BarChart3 className="h-6 w-6" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Temp Check</span>
+                                                            <h4 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 uppercase italic">Heat Rating</h4>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-end gap-3">
+                                                        <span className="text-5xl font-black text-amber-500 italic">{(data.buyer_journey_analysis.sentiment_score || 50)}</span>
+                                                        <span className="text-zinc-400 font-black uppercase tracking-[0.1em] text-[15px] pb-1.5 font-sans">/ 100</span>
+                                                    </div>
+                                                    <Badge className={cn(
+                                                        "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-none",
+                                                        (data.buyer_journey_analysis.urgency_level === 'High' || (data.buyer_journey_analysis.sentiment_score || 0) > 70) ? "bg-rose-500 text-white" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                                                    )}>
+                                                        {data.buyer_journey_analysis.urgency_level || "Normal"} Urgency Detected
+                                                    </Badge>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-12 rounded-[2.5rem] bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800/60 space-y-8 relative overflow-hidden">
+                                                <div className="flex items-center gap-4 mb-2">
+                                                    <MessageSquareQuote className="h-5 w-5 text-primary/60" />
+                                                    <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-zinc-400">Strategic Reasoning</h4>
+                                                </div>
+                                                <p className="text-[19px] leading-[1.8] font-medium text-zinc-700 dark:text-zinc-300 antialiased italic max-w-4xl">
+                                                    {data.buyer_journey_analysis.strategic_reasoning || "Analysis based on profile seniority, recent hiring signals, and intent data points."}
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
 
@@ -654,6 +896,24 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                             <div className="space-y-6">
                                                 <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400">Interaction Timeline</h3>
                                                 <div className="relative pl-8 border-l border-white/10 space-y-8 ml-4">
+                                                    {/* Meeting Notes / Human Intelligence */}
+                                                    {data.meeting_notes && (
+                                                        <div className="relative group/note">
+                                                            <div className="absolute -left-[45px] top-0 p-2 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-500 shadow-lg shadow-amber-500/10">
+                                                                <MessageSquareQuote className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-4 p-8 rounded-3xl bg-amber-500/[0.02] border border-amber-500/10 hover:border-amber-500/20 transition-all duration-300">
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-[10px] font-black tracking-[0.2em] text-amber-600 uppercase">Human Intelligence (Meeting Notes)</span>
+                                                                    <Badge className="bg-amber-500 text-white border-none rounded-full px-2 py-0 text-[8px] font-black uppercase">Internal</Badge>
+                                                                </div>
+                                                                <p className="text-[17px] font-medium text-zinc-800 dark:text-zinc-200 leading-relaxed italic border-l-4 border-amber-500/30 pl-6">
+                                                                    {data.meeting_notes}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
                                                     {/* LinkedIn Engagements */}
                                                     {data.post_engagements?.map((eng, idx) => (
                                                         <div key={`social-${idx}`} className="relative">
@@ -715,8 +975,95 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                             </div>
                                                         </div>
                                                     )}
+
+                                                    {/* Company News */}
+                                                    {data.company_news?.map((news, idx) => (
+                                                        <div key={`news-${idx}`} className="relative">
+                                                            <div className="absolute -left-[45px] top-0 p-2 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-500">
+                                                                <Globe className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <span className="text-sm font-black text-white">Market Event: {news.source}</span>
+                                                                <p className="text-sm text-zinc-400 leading-relaxed">{news.title}</p>
+                                                                <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">{news.date}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    {/* Hiring Data */}
+                                                    {data.hiring_data?.map((job, idx) => (
+                                                        <div key={`hiring-${idx}`} className="relative">
+                                                            <div className="absolute -left-[45px] top-0 p-2 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-500">
+                                                                <ShieldCheck className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-black text-white">Hiring Signal: {job.role}</span>
+                                                                    <Badge variant="outline" className="text-[9px] uppercase border-purple-500/30 text-purple-500">Growth</Badge>
+                                                                </div>
+                                                                <p className="text-sm text-zinc-400">{job.location}</p>
+                                                                <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">Active Listing</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {section.id === 'lead-score' && data.lead_score_analysis && (
+                                        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                            {typeof data.lead_score_analysis === 'object' ? (
+                                                <>
+                                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                                                        {[
+                                                            { label: "Demographic", score: data.lead_score_analysis.demographic_fit_score, max: 25, color: "text-blue-500" },
+                                                            { label: "Engagement", score: data.lead_score_analysis.engagement_score, max: 20, color: "text-emerald-500" },
+                                                            { label: "Readiness", score: data.lead_score_analysis.sales_readiness_score, max: 25, color: "text-orange-500" },
+                                                            { label: "Source", score: data.lead_score_analysis.lead_source_score, max: 15, color: "text-purple-500" },
+                                                            { label: "Timing", score: data.lead_score_analysis.timing_score, max: 15, color: "text-rose-500" }
+                                                        ].map((item, idx) => (
+                                                            <div key={idx} className="p-8 rounded-[2rem] bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 flex flex-col items-center text-center space-y-4 hover:scale-105 transition-transform duration-500">
+                                                                <div className={cn("text-3xl font-black", item.color)}>
+                                                                    {item.score}
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">{item.label}</div>
+                                                                    <div className="h-1 w-8 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto" />
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="p-10 rounded-3xl bg-zinc-900 text-white border border-zinc-800 shadow-2xl relative overflow-hidden group">
+                                                        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50" />
+                                                        <div className="relative z-10 space-y-6">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="p-3 rounded-2xl bg-white/10 border border-white/10 text-primary">
+                                                                    <Info className="h-6 w-6" />
+                                                                </div>
+                                                                <h4 className="text-xl font-bold uppercase italic tracking-tight">Scoring Intelligence Analysis</h4>
+                                                            </div>
+                                                            <div className="text-[17px] leading-[1.8] font-medium text-zinc-300 italic max-w-4xl">
+                                                                {data.lead_score_analysis.analysis}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {data.lead_score_analysis.recommendations && data.lead_score_analysis.recommendations.length > 0 && (
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                            {data.lead_score_analysis.recommendations.map((rec: string, i: number) => (
+                                                                <div key={i} className="flex items-center gap-4 p-6 rounded-2xl bg-primary/5 border border-primary/10 group hover:translate-x-2 transition-transform duration-300">
+                                                                    <div className="h-2 w-2 rounded-full bg-primary" />
+                                                                    <span className="text-[15px] font-bold text-zinc-700 dark:text-zinc-300 antialiased italic">{rec}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <DynamicContent content={data.lead_score_analysis} />
+                                            )}
                                         </div>
                                     )}
 

@@ -53,7 +53,7 @@ class AgentState(TypedDict):
     user_profile_analysis: Annotated[dict, reduce_last]
     website_analysis: Annotated[dict, reduce_last]
     lead_extracted_data: Annotated[dict, reduce_last]
-    sales_research_report: Annotated[str, operator.add]
+    sales_research_report: Annotated[Union[dict, str], reduce_last]
     company_context: str
     lead_score_analysis: Annotated[dict, reduce_last]
     email_history: List[dict]
@@ -80,7 +80,7 @@ class AgentState(TypedDict):
 
     # Specialized Nodules
 
-    target_pain_points: Annotated[str, operator.add]
-    strategic_solutions: Annotated[str, operator.add]
-    personalized_outreach: Annotated[str, operator.add]
-    follow_up_strategy: Annotated[str, operator.add]
+    target_pain_points: Annotated[Union[dict, str], reduce_last]
+    strategic_solutions: Annotated[Union[dict, str], reduce_last]
+    personalized_outreach: Annotated[dict, reduce_last]
+    follow_up_strategy: Annotated[Union[dict, str], reduce_last]

@@ -284,7 +284,7 @@ def get_linkedin_engagement(state: AgentState):
         try:
             # Fetch latest 10 posts for the target (user or company)
             posts_url = f"{linkedin_base_url}/profile/posts"
-            querystring = {"username": username}
+            querystring = {"username": username, "page_number": 1}
             response = requests.get(posts_url, headers=headers, params=querystring)
             posts_data = response.json()
             
@@ -302,7 +302,7 @@ def get_linkedin_engagement(state: AgentState):
                 # Check reactions for this post
                 reactions_url = f"{linkedin_base_url}/post/reactions"
                 # Note: Some APIs use 'post_id' or 'url'. We'll assume post_id is enough for this RapidAPI.
-                r_params = {"post_url": post_urn.get("urn", ""), "count": 100} 
+                r_params = {"post_url": post_urn, "page_number": 1} 
                 r_resp = requests.get(reactions_url, headers=headers, params=r_params)
                 r_data = r_resp.json()
                 
@@ -366,10 +366,8 @@ def get_company_details(company_identifier: str):
 
     try:
         response = requests.get(company_url, headers=headers, params=querystring)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("data", data)
-        return None
+        data = response.json()
+        return data.get("data", data)
     except Exception as e:
         print(f"Error fetching company details: {e}")
         return None
@@ -492,10 +490,6 @@ def get_post_commenters(post_id: str):
     
     try:
         response = requests.get(comments_url, headers=headers, params=params)
-        if response.status_code != 200:
-            print(f"DEBUG: comments API error {response.status_code}: {response.text[:200]}")
-            raise Exception(f"LinkedIn Comments API error: {response.status_code} - {response.text[:100]}")
-            
         data = response.json()
         payload = data.get("data")
         if isinstance(payload, dict):
@@ -611,10 +605,6 @@ def discover_leads_from_competitor(competitor_url: str):
         print(f"DEBUG: Starting discovery for competitor: {competitor_url}")
         # 1. Fetch recent posts
         response = requests.get(posts_url, headers=headers, params={"username": user_name}, timeout=15)
-        if response.status_code != 200:
-            print(f"DEBUG: posts API error {response.status_code} for {user_name}: {response.text[:200]}")
-            raise Exception(f"LinkedIn Posts API error: {response.status_code} for {user_name}")
-            
         posts_data = response.json()
         
         posts = []

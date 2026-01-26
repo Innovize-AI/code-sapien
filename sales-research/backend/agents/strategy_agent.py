@@ -7,6 +7,9 @@ from prompts.sales_prompts import (
     OUTREACH_DESIGN_PROMPT
 )
 import json
+from models.structured_output import OutreachStrategy
+from pydantic import BaseModel, Field
+from typing import List
 
 
 def format_profile_analysis(analysis: dict) -> str:
@@ -65,6 +68,16 @@ COMPETITIVE ADVANTAGE:
     return md
 
 
+class PainPointAnalysis(BaseModel):
+    summary: str = Field(description="High-level overview of identified challenges.")
+    points: List[str] = Field(description="Specific, individual pain points discovered.")
+    impact: str = Field(description="The potential business impact if these are not addressed.")
+
+class StrategicSolutionProposal(BaseModel):
+    summary: str = Field(description="Overview of the proposed transformation.")
+    solutions: List[str] = Field(description="Specific AI/Service solutions proposed.")
+    value_proposition: str = Field(description="The core value delivered by these solutions.")
+
 def pain_point_node(state: AgentState):
     """Identifies specific, actionable pain points from the lead's profile and company footprint."""
     user_analysis_dict = state.get("user_profile_analysis", {})
@@ -83,38 +96,47 @@ def pain_point_node(state: AgentState):
         company_stats=json.dumps(company_stats)
     )
 
-    
     messages = [
-        SystemMessage(content="You are an expert business analyst."),
+        SystemMessage(content="You are an expert business analyst specializing in B2B pain point identification. You look for deeper organizational struggles, not just surface issues."),
         HumanMessage(content=prompt)
     ]
     
-    model = get_open_ai(model="gpt-4o-mini", temperature=1)
-    response = model.invoke(messages)
-    return {"target_pain_points": response.content}
+    try:
+        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        structured_llm = model.with_structured_output(PainPointAnalysis)
+        response = structured_llm.invoke(messages)
+        return {"target_pain_points": response.dict() if response else {}}
+    except Exception as e:
+        print(f"Error in pain_point_node: {e}")
+        return {"target_pain_points": {}}
 
 def solution_node(state: AgentState):
     """Maps identified pain points to Innovize AI's specific offerings."""
-    pain_points = state.get("target_pain_points", "")
+    pain_points_dict = state.get("target_pain_points", {})
+    pain_points_str = json.dumps(pain_points_dict)
     company_context = state.get("company_context", "")
     
     prompt = STRATEGIC_SOLUTION_PROMPT.format(
-        pain_points=pain_points,
+        pain_points=pain_points_str,
         company_context=company_context
     )
 
-    
     messages = [
-        SystemMessage(content="You are a Senior AI Solutions Architect and Value Engineer. Your task is to transform discovered pain points into high-impact, transformative AI solutions."),
+        SystemMessage(content="You are a Senior AI Solutions Architect and Value Engineer. Your task is to transform discovered pain points into high-impact, transformative AI solutions using Innovize AI's capabilities."),
         HumanMessage(content=prompt)
     ]
     
-    model = get_open_ai(model="gpt-4o-mini", temperature=1)
-    response = model.invoke(messages)
-    return {"strategic_solutions": response.content}
+    try:
+        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        structured_llm = model.with_structured_output(StrategicSolutionProposal)
+        response = structured_llm.invoke(messages)
+        return {"strategic_solutions": response.dict() if response else {}}
+    except Exception as e:
+        print(f"Error in solution_node: {e}")
+        return {"strategic_solutions": {}}
 
 def outreach_node(state: AgentState):
-    """Crafts the personalized "hook" and outbound message."""
+    """Crafts the personalized "hook" and outbound message using structured output."""
     user_analysis_dict = state.get("user_profile_analysis", {})
     user_analysis = format_profile_analysis(user_analysis_dict)
     solutions = state.get("strategic_solutions", "")
@@ -128,12 +150,12 @@ def outreach_node(state: AgentState):
         journey_context=json.dumps(journey_analysis)
     )
 
-    
     messages = [
-        SystemMessage(content="You are a high-performance sales copywriter."),
+        SystemMessage(content="### ROLE: You are a world-class direct response copywriter and cold email strategist. You have a deep understanding of sales psychology and can transform raw prospect data into a flawless, human-sounding message."),
         HumanMessage(content=prompt)
     ]
     
-    model = get_open_ai(model="gpt-4o-mini", temperature=1)
+    model = get_open_ai(model="gpt-4o-mini", temperature=0).with_structured_output(OutreachStrategy)
     response = model.invoke(messages)
-    return {"personalized_outreach": response.content}
+    
+    return {"personalized_outreach": response.model_dump()}

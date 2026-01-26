@@ -21,20 +21,25 @@ class ResearchReportBase(BaseModel):
     website_analysis: Optional[str] = None
     
     # Modular Nodules
-    viability_analysis: Optional[str] = None
     target_pain_points: Optional[str] = None
     strategic_solutions: Optional[str] = None
     personalized_outreach: Optional[str] = None
+    follow_up_strategy: Optional[str] = None
+    buyer_journey_analysis: Optional[str] = None
+    meeting_notes: Optional[str] = None
     
     # LinkedIn Subgraph Data
     post_engagements: Optional[str] = None # JSON string
     company_news: Optional[str] = None     # JSON string
     hiring_data: Optional[str] = None      # JSON string
+    lead_company_linkedin_url: Optional[str] = None
+    lead_li_urn: Optional[str] = None
 
     lead_score: Optional[int] = None
     project_urgency: Optional[int] = None
     email_history: Optional[str] = None  # JSON string
     intent_analysis: Optional[str] = None  # JSON string
+    extra_metadata: Optional[str] = None   # JSON string
 
 
 class ResearchReportCreate(ResearchReportBase):

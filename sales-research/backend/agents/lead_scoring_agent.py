@@ -37,6 +37,7 @@ class LeadScoreAnalysis(BaseModel):
     total_score: int = Field(description="The final calculated lead score.")
     score_breakdown: LeadScoreBreakdown = Field(description="Detailed breakdown of scores for each category.")
     analysis: str = Field(description="Detailed reasoning for the assigned score.")
+    viability_analysis: str = Field(description="Specific assessment of how well this lead fits the Ideal Customer Profile (ICP).")
     lead_score_recommendations: List[str] = Field(description="Strategic recommendations for next steps.")
 
 def lead_data_extractor(state: AgentState):
@@ -91,9 +92,13 @@ def lead_scorer(state: AgentState):
         response = structured_llm.invoke(messages)
         
         if not response:
-             return {"lead_score_analysis": {}}
+             return {"lead_score_analysis": {}, "viability_analysis": ""}
              
-        return {"lead_score_analysis": response.dict()}
+        res_dict = response.dict()
+        return {
+            "lead_score_analysis": res_dict,
+            "viability_analysis": res_dict.get("viability_analysis", "")
+        }
     except Exception as e:
         print(f"Error in lead_scorer: {e}")
         return {"lead_score_analysis": {}}

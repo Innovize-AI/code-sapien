@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date 
+
 class ViabilityAssessment(BaseModel):
     demographic_fit: str = Field(description="Assessment of industry, size, and revenue fit.")
     authority: str = Field(description="Assessment of the prospect's decision-making power.")
@@ -94,4 +95,14 @@ class SalesResearchReport(BaseModel):
     competitive_positioning: str = Field(description="How the prospect stands against competitors and how we help them win.")
     action_plan: List[str] = Field(description="A 3-step actionable plan for the sales representative.")
 
+class StrategicPlaybook(BaseModel):
+    outreach_tactics: str = Field(description="Cleanly presented finalized outreach tactics (LinkedIn/Email).")
+    refined_hook: str = Field(description="Refined Hook to connect to the journey stage.")
 
+class GlobalExecutiveBriefing(BaseModel):
+    fit_assessment: str = Field(description="The 'Non-Fit' Protocol status (e.g., '[STOP: POOR FIT]' or 'GOOD FIT').")
+    fit_reasoning: str = Field(description="One sentence explanation for the fit assessment.")
+    executive_synthesis: str = Field(description="Narrative connecting the person's role/activity to company position and Innovize AI value.")
+    why_now: str = Field(description="2-3 sentence argument for why this specific week is the perfect time to reach out.")
+    strategic_playbook: StrategicPlaybook = Field(description="Finalized outreach tactics and refined hook.")
+    internal_advisory: List[str] = Field(description="2 'Insider Tips' for the rep.")

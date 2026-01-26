@@ -1,6 +1,7 @@
 import re
 import json
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 from workflow.state import AgentState
 from agents.linkedin_agent import get_linkedin_profile, get_linkedin_posts, get_linkedin_engagement, get_linkedin_company_data, linkedin_profile_analyzer
 from agents.website_agent import scrape_webpages, website_analyzer
@@ -11,6 +12,20 @@ from agents.strategy_agent import pain_point_node, solution_node, outreach_node
 from agents.recommender_agent import strategic_recommender_node
 from agents.follow_up_agent import follow_up_strategy_node
 
+
+def discovery_router(state: AgentState):
+    """
+    Decides whether to re-run deep discovery (pain points/solutions).
+    Skips if target_pain_points exist and refresh is False.
+    """
+    input_data = state.get("input_lead_data")
+    refresh = getattr(input_data, 'refresh', False) if hasattr(input_data, 'refresh') else input_data.get('refresh', False) if isinstance(input_data, dict) else False
+    
+    if not refresh and state.get("target_pain_points"):
+        print("Skipping discovery/solution mapping - analysis already exists.")
+        return "strategic_merger"
+        
+    return "pain_point_discovery"
 
 def strategy_router(state: AgentState):
     """
@@ -37,30 +52,30 @@ def collector(state: AgentState):
 
 def research_router(state: AgentState):
     """
-    Router to decide which parallel branches to trigger from collector.
+    Decides which parallel research branches to trigger.
+    Skips if analysis exists and refresh is False.
     """
     next_nodes = []
-    
+    input_data = state.get("input_lead_data")
+    refresh = getattr(input_data, 'refresh', False) if hasattr(input_data, 'refresh') else input_data.get('refresh', False) if isinstance(input_data, dict) else False
+
     # Branch 1: LinkedIn
-    if not state.get("linkedin_url"):
-        next_nodes.append("enrich_linkedin")
-    else:
-        next_nodes.append("profile_fetcher")
-        
+    if refresh or not state.get("user_profile_analysis"):
+        if not state.get("linkedin_url"):
+            next_nodes.append("enrich_linkedin")
+        else:
+            next_nodes.append("linkedin_profile_fetcher")
+            
     # Branch 2: Website
-    if not state.get("website"):
-        next_nodes.append("enrich_website")
-    else:
-        next_nodes.append("website_scraper")
-        
+    if refresh or not state.get("website_analysis"):
+        if not state.get("website"):
+            next_nodes.append("enrich_website")
+        else:
+            next_nodes.append("website_scraper")
+            
     # Branch 3: Email History
     if state.get("email_id"):
         next_nodes.append("email_history_fetcher")
-    else:
-        # If no email, we must still connect to the merge node to avoid a dead end
-        # But LangGraph handles multiple branches merging. If we don't return 
-        # email_history_fetcher, the other branches will satisfy lead_data_extractor.
-        pass
         
     return next_nodes
 
@@ -88,9 +103,12 @@ def enrich_website(state: AgentState):
     if linkedin_url:
         from agents.linkedin_agent import get_linkedin_profile, get_company_details
         
-        # 1. Ensure we have the profile (and thus the lead company URL)
-        profile_res = get_linkedin_profile(state)
-        company_url = profile_res.get("lead_company_linkedin_url") or state.get("lead_company_linkedin_url")
+        if len(state.get("lead_company_linkedin_url", "")) > 0:
+            company_url = state.get("lead_company_linkedin_url")
+        else:
+            # 1. Ensure we have the profile (and thus the lead company URL)
+            profile_res = get_linkedin_profile(state)
+            company_url = profile_res.get("lead_company_linkedin_url") or state.get("lead_company_linkedin_url")
         
         if company_url:
             print(f"Enriching company info for: {company_url}")
@@ -174,7 +192,10 @@ builder.add_edge("lead_data_extractor", "lead_scorer")
 
 # Strategic Parallel Fan-out
 builder.add_edge("lead_scorer", "strategic_recommender")
-builder.add_edge("lead_scorer", "pain_point_discovery")
+builder.add_conditional_edges("lead_scorer", discovery_router, {
+    "pain_point_discovery": "pain_point_discovery",
+    "strategic_merger": "strategic_merger"
+})
 
 # Discovery Branch
 builder.add_edge("pain_point_discovery", "solution_mapping")
@@ -204,7 +225,8 @@ builder.add_conditional_edges("collector", research_router, {
 })
 
 
-graph = builder.compile()
+memory = MemorySaver()
+graph = builder.compile(checkpointer=memory)
 
 NODE_STATUS_MAPPING = {
     "lead_data_extractor": "Extracting combined lead intelligence...",

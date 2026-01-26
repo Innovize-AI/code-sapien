@@ -6,6 +6,7 @@ from models.openai_models import get_open_ai
 from pydantic import BaseModel, Field
 from typing import List
 import json
+from utils import add_https_if_missing
 
 class WebsiteAnalysis(BaseModel):
     summary: str = Field(description="High-level synthesis of company's value proposition and mission.")
@@ -17,7 +18,7 @@ class WebsiteAnalysis(BaseModel):
 
 def scrape_webpages(state: AgentState) -> dict:
     """Use requests and bs4 to scrape the provided web pages for detailed information."""
-    website = state["website"]
+    website = add_https_if_missing(state["website"])
     
     if not website:
         return {"scraped_website_content": "Could not scrape empty website"}

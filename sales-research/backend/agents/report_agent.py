@@ -4,6 +4,7 @@ import json
 
 from prompts.sales_prompts import REPORT_GENERATOR_PROMPT
 from models.openai_models import get_open_ai
+from models.structured_output import GlobalExecutiveBriefing
 
 def sales_research_report_generator(state: AgentState):
     user_profile_analysis_dict = state.get('user_profile_analysis', {})
@@ -71,14 +72,44 @@ def sales_research_report_generator(state: AgentState):
     outreach = state.get("personalized_outreach", "")
     
     # Strategy Section (Outreach vs Follow-up)
-    outreach = state.get("personalized_outreach", "")
+    outreach_data = state.get("personalized_outreach", "")
     follow_up = state.get("follow_up_strategy", "")
     
+    outreach_str = ""
+    if isinstance(outreach_data, dict) and outreach_data:
+        outreach_str = f"""
+        Hook: {outreach_data.get('hook')}
+        LinkedIn: {outreach_data.get('linkedin_message')}
+        Email Subject: {outreach_data.get('email_subject')}
+        Email Body: {outreach_data.get('email_body')}
+        """
+    else:
+        outreach_str = str(outreach_data)
+
     strategy_output = ""
     if follow_up:
         strategy_output = f"- High-Impact Follow-up Strategy: {follow_up}"
     else:
-        strategy_output = f"- Outreach Strategy Design: {outreach}"
+        strategy_output = f"- Outreach Strategy Design: {outreach_str}"
+
+    company_name = state.get("company_name", "")
+    company_description = state.get("company_description", "")
+    company_industries = state.get("company_industries", [])
+    company_stats = state.get("company_stats", {})
+    
+    # Strategic Recommendations
+    recommender_dict = state.get("buyer_journey_analysis", {})
+    strategic_recommendations = ""
+    if isinstance(recommender_dict, dict) and recommender_dict:
+        strategic_recommendations = f"""
+        - Journey Stage: {recommender_dict.get('journey_stage')}
+        - Optimal Play: {recommender_dict.get('optimal_play')}
+        - Strategic Reasoning: {recommender_dict.get('strategic_reasoning')}
+        - Sentiment/Heat Score: {recommender_dict.get('sentiment_score')}/100
+        - Urgency: {recommender_dict.get('urgency_level')}
+        """
+    else:
+        strategic_recommendations = str(recommender_dict)
 
     input_content = f"""
     1. COMPANY INTELLIGENCE:
@@ -106,13 +137,15 @@ def sales_research_report_generator(state: AgentState):
     messages = [
         SystemMessage(content=REPORT_GENERATOR_PROMPT.format(
             content=input_content,
+            company_context=company_context
         )),
-        HumanMessage(content=f"Synthesize the research for this prospect. Company context: {company_context}")
+        HumanMessage(content=f"Synthesize the research for this prospect.")
     ]
 
     llm = get_open_ai(model="gpt-4o", temperature=0.7) # GPT-4o for strategic synthesis
-    response = llm.invoke(messages)
+    structured_llm = llm.with_structured_output(GlobalExecutiveBriefing)
+    response = structured_llm.invoke(messages)
 
-    return {"sales_research_report": response.content}
+    return {"sales_research_report": response.model_dump()}
 
 

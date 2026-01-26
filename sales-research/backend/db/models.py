@@ -32,19 +32,26 @@ class ResearchReport(Base):
     target_pain_points = Column(Text, nullable=True)
     strategic_solutions = Column(Text, nullable=True)
     personalized_outreach = Column(Text, nullable=True)
+    follow_up_strategy = Column(Text, nullable=True)
+    buyer_journey_analysis = Column(Text, nullable=True) # JSON object
+    meeting_notes = Column(Text, nullable=True)
     
     # LinkedIn Subgraph Data
     post_engagements = Column(Text, nullable=True) # JSON array
     company_news = Column(Text, nullable=True)     # JSON array
     hiring_data = Column(Text, nullable=True)      # JSON array
+    company_stats = Column(Text, nullable=True)    # JSON object
+    lead_company_linkedin_url = Column(Text, nullable=True)
+    lead_li_urn = Column(Text, nullable=True)
     
     # Metrics
     lead_score = Column(Integer, nullable=True)
     project_urgency = Column(Integer, nullable=True)
     
     # Email & Intent Analysis
-    email_history = Column(Text, nullable=True)  # JSON array of email objects
-    intent_analysis = Column(Text, nullable=True)  # JSON object with intent data
+    email_history = Column(Text, nullable=True)    # JSON array
+    intent_analysis = Column(Text, nullable=True)  # JSON object
+    extra_metadata = Column(Text, nullable=True)   # JSON object
 
 
 class OrganizationSettings(Base):

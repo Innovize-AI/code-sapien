@@ -154,9 +154,9 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         email_id=final_state.get("email_id") or "",
         website=website or "",
         sales_research_report=final_state.get("sales_research_report"),
-        lead_score_analysis=score_analysis,
-        user_profile_analysis=final_state.get("user_profile_analysis"),
-        website_analysis=final_state.get("website_analysis"),
+        lead_score_analysis=json.dumps(final_state.get("lead_score_analysis") or {}),
+        user_profile_analysis=json.dumps(final_state.get("user_profile_analysis") or {}),
+        website_analysis=json.dumps(final_state.get("website_analysis") or {}),
         fullname=final_state.get("fullname"),
         profile_picture_url=final_state.get("profile_picture_url"),
         company_name=final_state.get("company_name"),
@@ -170,16 +170,21 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         extra_metadata=json.dumps(final_state.get("extra_research_context") or {}),
         
         # Modular Nodules
-        viability_analysis=final_state.get("viability_analysis"),
-        target_pain_points=final_state.get("target_pain_points"),
-        strategic_solutions=final_state.get("strategic_solutions"),
-        personalized_outreach=final_state.get("personalized_outreach"),
+        viability_analysis=final_state.get("viability_analysis") or "",
+        target_pain_points=json.dumps(final_state.get("target_pain_points") or {}),
+        strategic_solutions=json.dumps(final_state.get("strategic_solutions") or {}),
+        personalized_outreach=json.dumps(final_state.get("personalized_outreach") or {}),
+        follow_up_strategy=final_state.get("follow_up_strategy"),
+        buyer_journey_analysis=json.dumps(final_state.get("buyer_journey_analysis") or {}),
+        meeting_notes=final_state.get("meeting_notes"),
         
         # LinkedIn Subgraph Data
         post_engagements=json.dumps(final_state.get("post_engagements") or []),
         company_news=json.dumps(final_state.get("company_news") or []),
         hiring_data=json.dumps(final_state.get("hiring_data") or []),
-        company_stats=json.dumps(final_state.get("company_stats") or {})
+        company_stats=json.dumps(final_state.get("company_stats") or {}),
+        lead_li_urn=final_state.get("lead_li_urn"),
+        lead_company_linkedin_url=final_state.get("lead_company_linkedin_url")
     )
 
     
@@ -199,9 +204,9 @@ def _report_to_dict(report):
         "email_id": report.email_id,
         "website": report.website,
         "sales_research_report": report.sales_research_report,
-        "lead_score_analysis": report.lead_score_analysis,
-        "user_profile_analysis": report.user_profile_analysis,
-        "website_analysis": report.website_analysis,
+        "lead_score_analysis": json.loads(report.lead_score_analysis) if report.lead_score_analysis and report.lead_score_analysis.strip().startswith('{') else report.lead_score_analysis,
+        "user_profile_analysis": json.loads(report.user_profile_analysis) if report.user_profile_analysis and report.user_profile_analysis.strip().startswith('{') else report.user_profile_analysis,
+        "website_analysis": json.loads(report.website_analysis) if report.website_analysis and report.website_analysis.strip().startswith('{') else report.website_analysis,
         "fullname": report.fullname,
         "profile_picture_url": report.profile_picture_url,
         "company_name": report.company_name,
@@ -215,15 +220,20 @@ def _report_to_dict(report):
         
         # Modular Nodules
         "viability_analysis": report.viability_analysis,
-        "target_pain_points": report.target_pain_points,
-        "strategic_solutions": report.strategic_solutions,
-        "personalized_outreach": report.personalized_outreach,
+        "target_pain_points": json.loads(report.target_pain_points) if report.target_pain_points and report.target_pain_points.strip().startswith('{') else report.target_pain_points,
+        "strategic_solutions": json.loads(report.strategic_solutions) if report.strategic_solutions and report.strategic_solutions.strip().startswith('{') else report.strategic_solutions,
+        "personalized_outreach": json.loads(report.personalized_outreach) if report.personalized_outreach else {},
+        "follow_up_strategy": report.follow_up_strategy,
+        "buyer_journey_analysis": json.loads(report.buyer_journey_analysis) if report.buyer_journey_analysis else {},
+        "meeting_notes": report.meeting_notes,
         
         # LinkedIn Subgraph Results
         "post_engagements": json.loads(report.post_engagements) if report.post_engagements else [],
         "company_news": json.loads(report.company_news) if report.company_news else [],
         "hiring_data": json.loads(report.hiring_data) if report.hiring_data else [],
-        "company_stats": json.loads(report.company_stats) if report.company_stats else {}
+        "company_stats": json.loads(report.company_stats) if report.company_stats else {},
+        "lead_li_urn": report.lead_li_urn,
+        "lead_company_linkedin_url": report.lead_company_linkedin_url
     }
 
 
@@ -242,44 +252,64 @@ def _prepare_state_for_json(state):
             cleaned[k] = v
     return cleaned
 
-async def _run_research_gen(linkedin_url, website, options, email):
+async def _run_research_gen(linkedin_url, website, options: InputLeadData, email):
     """Core generator that runs the research graph and yields updates."""
     website = add_https_if_missing(website)
-    thread_id = str(uuid.uuid4())
+    thread_id = email if email else (linkedin_url if linkedin_url else str(uuid.uuid4()))
     thread = {"configurable": {"thread_id": thread_id}}
     
     org_settings = await _get_organization_settings()
     ideal_profile = org_settings["icp"]
 
+    # --- Persistent Agentic Memory: Load existing data from DB ---
+    existing_state = {}
+
+    if not options.refresh:
+        async with SessionLocal() as db:
+            existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
+            if existing:
+                print(f"Loading persistent memory for {email or linkedin_url}")
+                existing_state = _report_to_dict(existing)
+
     initial_state = {
         "email_id": email,
-        "linkedin_url": linkedin_url,
-        "website": website,
+        "linkedin_url": linkedin_url or existing_state.get("linkedin_url"),
+        "website": website or existing_state.get("website"),
         "company_context": COMPANY_CONTEXT,
         "ideal_profile": ideal_profile,
         "user_linkedin_url": org_settings["user_linkedin_url"],
         "company_linkedin_url": org_settings["company_linkedin_url"],
-        "lead_company_linkedin_url": "",
+        "lead_company_linkedin_url": existing_state.get("lead_company_linkedin_url", ""),
         "input_lead_data": options,
-        "extra_research_context": options.extra_metadata if options else None,
-        "user_profile_details": {},
-        "scraped_website_content": "",
-        "user_profile_analysis": "",
-        "website_analysis": "",
-        "lead_extracted_data": "",
-        "sales_research_report": "",
-        "lead_score_analysis": "",
-        "viability_analysis": "",
-        "target_pain_points": "",
-        "strategic_solutions": "",
-        "personalized_outreach": "",
-        "post_engagements": [],
-        "company_news": [],
-        "hiring_data": [],
-        "company_name": "",
-        "company_description": "",
-        "company_industries": [],
-        "company_stats": {}
+        "extra_research_context": options.extra_metadata if options else existing_state.get("extra_metadata"),
+        
+        "user_profile_details": existing_state.get("user_profile_details", {}),
+        "scraped_website_content": existing_state.get("scraped_website_content", ""),
+        
+        "user_profile_analysis": existing_state.get("user_profile_analysis", ""),
+        "website_analysis": existing_state.get("website_analysis", ""),
+        "lead_score_analysis": existing_state.get("lead_score_analysis", ""),
+        "target_pain_points": existing_state.get("target_pain_points", ""),
+        "strategic_solutions": existing_state.get("strategic_solutions", ""),
+        "personalized_outreach": existing_state.get("personalized_outreach", ""),
+        "follow_up_strategy": existing_state.get("follow_up_strategy", ""),
+        "buyer_journey_analysis": existing_state.get("buyer_journey_analysis", {}),
+        "intent_analysis": existing_state.get("intent_analysis", {}),
+        "email_history": existing_state.get("email_history", []),
+        
+        "post_engagements": existing_state.get("post_engagements", []),
+        "company_news": existing_state.get("company_news", []),
+        "hiring_data": existing_state.get("hiring_data", []),
+        "company_stats": existing_state.get("company_stats", {}),
+        
+        "company_name": existing_state.get("company_name", ""),
+        "company_description": existing_state.get("company_description", ""),
+        "company_industries": existing_state.get("company_industries", []),
+        "fullname": existing_state.get("fullname", ""),
+        "profile_picture_url": existing_state.get("profile_picture_url", ""),
+        
+        "sales_research_report": existing_state.get("sales_research_report", ""),
+        "meeting_notes": getattr(options, 'meeting_notes', '') if hasattr(options, 'meeting_notes') else options.get('meeting_notes', '') if isinstance(options, dict) else ''
     }
 
 
@@ -301,14 +331,7 @@ async def run_single_research(
     email: Optional[str] = None,
     progress_callback=None
 ):
-    # Check for existing report if refresh is not requested
-    if options and not options.refresh:
-        async with SessionLocal() as db:
-            existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
-            if existing:
-                if progress_callback:
-                    await progress_callback(linkedin_url, "Using existing report...")
-                return {"linkedin_url": linkedin_url, "result": _report_to_dict(existing)}
+    # Logic moved to graph routers for intelligent skipping
 
     final_state = {}
     try:
@@ -392,13 +415,7 @@ async def run_research(
     db: AsyncSession = Depends(get_db)
 ):
     async def event_generator():
-        # Check for existing report if refresh is not requested
-        if not options.refresh:
-            existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
-            if existing:
-                yield f"data: {json.dumps({'status': 'Using existing report...'})}\n\n"
-                yield f"data: {json.dumps({'status': 'Done', 'result': _report_to_dict(existing)})}\n\n"
-                return
+        # Logic moved to graph routers for intelligent skipping
 
         final_state = {}
         try:

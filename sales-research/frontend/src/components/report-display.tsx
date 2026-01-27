@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X } from "lucide-react";
+import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ interface ReportDisplayProps {
         linkedin_url?: string;
         website?: string;
         lead_score?: number;
-        sales_research_report: string;
+        sales_research_report: any;
         lead_score_analysis: any; // Can be string or structured object
         user_profile_analysis: any;
         website_analysis: any;
@@ -57,6 +57,7 @@ interface ReportDisplayProps {
             type: string;
             target: string;
             post_id: string;
+            post_url?: string;
             content: string;
             reaction_type?: string;
             comment_text?: string;
@@ -105,8 +106,17 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     }
 
     // Helper to extract specific tactical items from markdown strategy
-    const extractTacticalItems = (content: string) => {
+    const extractTacticalItems = (content: any) => {
         const items: { type: 'linkedin' | 'email' | 'pain-point', title: string, content: string, icon: React.ReactNode }[] = [];
+
+        if (typeof content !== 'string') {
+            // If it's the structured GlobalExecutiveBriefing object, try to extract from tactical playbook
+            if (content && typeof content === 'object' && content.strategic_playbook) {
+                const tactics = content.strategic_playbook.outreach_tactics;
+                if (typeof tactics === 'string') return extractTacticalItems(tactics);
+            }
+            return items;
+        }
 
         // Extract LinkedIn Message
         const linkedinMatch = content.match(/LinkedIn Connection Message:\s*\*?\"?([\s\S]*?)\"?\*?(\n\n|(?=\d\.|$))/i);
@@ -130,7 +140,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
             });
         }
 
-        // Extract Pain Points (Attempt to find "Pain Points" section)
+        // Extract Pain Points
         const painMatch = content.match(/Pain Points:\s*([\s\S]*?)(\n\n|(?=\d\.|$))/i);
         if (painMatch) {
             items.push({
@@ -208,7 +218,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         { id: "pain-points", title: "Lead Pain Points", icon: <Zap className="h-4 w-4" />, content: data.target_pain_points || "", badge: "Discovery" },
         { id: "solutions", title: "Strategic Solutions", icon: <ArrowDown className="h-4 w-4" />, content: data.strategic_solutions || "", badge: "Matching" },
         { id: "outreach", title: "Outreach Design", icon: <Target className="h-4 w-4" />, content: "", badge: "Tactical", isOutreach: true },
-        { id: "lead-score", title: "Qualification", icon: <BarChart3 className="h-4 w-4" />, content: data.lead_score_analysis, badge: "AI Score" },
+        { id: "lead-score", title: "Qualification", icon: <BarChart3 className="h-4 w-4" />, content: "", badge: "AI Score" },
         { id: "website-analysis", title: "Digital Footprint", icon: <Globe className="h-4 w-4" />, content: data.website_analysis, badge: "Technical" },
         // New Section for Intent & History
         ...((data.email_history && data.email_history.length > 0) || (data.post_engagements && data.post_engagements.length > 0) ? [{
@@ -256,7 +266,116 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 p-12 rounded-[2.5rem] bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800/60 transition-all duration-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
                         {Object.entries(content).map(([key, value]) => {
-                            if (key === 'posts_analysis' || key === 'recent_posts') return null;
+                            if (key === 'fit_assessment') {
+                                const isPoorFit = String(value).includes('STOP') || String(value).includes('POOR');
+                                return (
+                                    <div key={key} className="md:col-span-2">
+                                        <div className={cn(
+                                            "p-6 rounded-2xl flex items-center justify-between gap-4 border",
+                                            isPoorFit ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                        )}>
+                                            <div className="flex items-center gap-4">
+                                                <div className={cn("p-2 rounded-xl", isPoorFit ? "bg-rose-500 text-white" : "bg-emerald-500 text-white")}>
+                                                    {isPoorFit ? <ShieldAlert className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+                                                </div>
+                                                <div className="space-y-0.5">
+                                                    <div className="text-[10px] font-black uppercase tracking-widest opacity-60">Strategic Fit Assessment</div>
+                                                    <div className="text-lg font-black italic uppercase tracking-tight">{String(value)}</div>
+                                                </div>
+                                            </div>
+                                            {content.fit_reasoning && (
+                                                <div className="hidden md:block max-w-[50%] text-sm font-semibold italic opacity-80 text-right">
+                                                    "{content.fit_reasoning}"
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            if (key === 'fit_reasoning') return null;
+
+                            if (key === 'advanced_next_steps') {
+                                return (
+                                    <div key={key} className="md:col-span-2 space-y-8 pt-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-8 w-8 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
+                                                <Zap className="h-4 w-4" />
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                <span className="text-[10px] font-black text-primary uppercase tracking-[0.25em]">Strategic Command</span>
+                                                <h4 className="text-xl font-black italic text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">Advanced Next Steps</h4>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-6 relative pl-4">
+                                            <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-primary via-primary/20 to-transparent" />
+                                            {Array.isArray(value) && value.map((step: any, i: number) => (
+                                                <div key={i} className="relative pl-10 group/step">
+                                                    <div className="absolute left-[-11px] top-4 h-5 w-5 rounded-full bg-white dark:bg-zinc-950 border-2 border-primary flex items-center justify-center text-[10px] font-black text-primary shadow-sm group-hover:scale-110 transition-transform">
+                                                        {i + 1}
+                                                    </div>
+                                                    <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:border-primary/30 transition-all hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
+                                                        <div className="prose prose-zinc dark:prose-invert max-w-none text-[17px] font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed italic antialiased">
+                                                            <ReactMarkdown>{String(step)}</ReactMarkdown>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            if (key === 'profile_summary') {
+                                return (
+                                    <div key={key} className="md:col-span-2 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-2 w-2 rounded-full bg-primary shadow-sm" />
+                                            <h4 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">Professional Summary</h4>
+                                        </div>
+                                        <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                            <ProseWrapper>
+                                                <ReactMarkdown>{String(value)}</ReactMarkdown>
+                                            </ProseWrapper>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            if (key === 'posts_analysis') {
+                                return (
+                                    <div key={key} className="md:col-span-2 space-y-6 pt-10 border-t border-dashed border-zinc-200 dark:border-zinc-800">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-2 w-2 rounded-full bg-primary shadow-sm" />
+                                            <h4 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">Recent Post Intelligence</h4>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-4">
+                                            {Array.isArray(value) && value.map((post: any, i: number) => (
+                                                <div key={i} className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-primary/20 transition-all group relative overflow-hidden">
+                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 blur-[40px] rounded-full -mr-12 -mt-12 pointer-events-none" />
+                                                    <div className="flex justify-between items-start mb-4 relative z-10">
+                                                        <Badge variant="outline" className="text-[9px] uppercase border-primary/20 text-primary bg-primary/5 px-2 py-0 h-5">
+                                                            {post.posted_date || "Recent Activity"}
+                                                        </Badge>
+                                                        {post.post_url && (
+                                                            <a href={post.post_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 text-zinc-400 hover:text-primary transition-all">
+                                                                <ExternalLink className="h-3 w-3" />
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                    <h5 className="text-[15px] font-black text-zinc-900 dark:text-zinc-100 mb-3 line-clamp-2 leading-tight">
+                                                        {post.post_title}
+                                                    </h5>
+                                                    <p className="text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium italic line-clamp-4 relative pl-4 border-l-2 border-primary/10">
+                                                        "{post.summary}"
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            if (key === 'recent_posts' || key === 'posts' || key === 'name' || key === 'fullname' || key === 'headline') return null;
 
                             if (Array.isArray(value)) {
                                 return (
@@ -291,7 +410,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                 <div key={subKey} className="space-y-2">
                                                     <h5 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{subKey.replace(/_/g, ' ')}</h5>
                                                     <div className="prose prose-zinc dark:prose-invert max-w-none text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 leading-relaxed">
-                                                        <ReactMarkdown>{String(subValue)}</ReactMarkdown>
+                                                        <ReactMarkdown>{typeof subValue === 'object' ? JSON.stringify(subValue) : String(subValue)}</ReactMarkdown>
                                                     </div>
                                                 </div>
                                             ))}
@@ -300,14 +419,16 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                 );
                             }
 
+                            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
                             return (
-                                <div key={key} className={cn("space-y-3", (String(value).length > 150) ? 'md:col-span-2' : '')}>
+                                <div key={key} className={cn("space-y-3", (String(value).length > 200) ? 'md:col-span-2' : '')}>
                                     <div className="flex items-center gap-3">
                                         <div className="h-1.5 w-1.5 rounded-full bg-primary/40 shadow-sm shadow-primary/20" />
-                                        <h4 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">{key.replace(/_/g, ' ')}</h4>
+                                        <h4 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">{displayKey}</h4>
                                     </div>
                                     <div className="prose prose-zinc dark:prose-invert max-w-none text-[16px] font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed pl-6 antialiased">
-                                        <ReactMarkdown>{String(value)}</ReactMarkdown>
+                                        <ReactMarkdown>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</ReactMarkdown>
                                     </div>
                                 </div>
                             );
@@ -402,18 +523,21 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                             </ProseWrapper>
                         </div>
                     ) : (
-                        <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 p-10 rounded-2xl bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800/60">
-                            {Object.entries(segment.data).map(([key, value]) => (
-                                <div key={key} className={cn("space-y-2", (String(value).length > 100) ? 'md:col-span-2' : '')}>
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-1 w-4 bg-primary/20 rounded-full" />
-                                        <h4 className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.15em]">{key.replace(/_/g, ' ')}</h4>
+                        <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 p-12 rounded-[2.5rem] bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800/60 transition-all duration-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
+                            {Object.entries(segment.data).map(([key, value]) => {
+                                const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                return (
+                                    <div key={key} className={cn("space-y-4", (String(value).length > 200) ? 'md:col-span-2' : '')}>
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-primary/40 shadow-sm shadow-primary/20" />
+                                            <h4 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">{displayKey}</h4>
+                                        </div>
+                                        <div className="prose prose-zinc dark:prose-invert max-w-none text-[15px] font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed pl-6 antialiased">
+                                            <ReactMarkdown>{String(value)}</ReactMarkdown>
+                                        </div>
                                     </div>
-                                    <div className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 leading-relaxed pl-6">
-                                        {String(value)}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )
                 ))}
@@ -470,11 +594,11 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     };
 
     const outreach = data.personalized_outreach;
-    const tacticalActions = (typeof outreach === 'object' && outreach !== null) ? [
-        { type: 'linkedin' as const, title: 'LinkedIn Request', content: outreach.linkedin_message, icon: <Linkedin className="h-4 w-4" /> },
-        { type: 'email' as const, title: 'Email Subject', content: outreach.email_subject, icon: <Mail className="h-4 w-4" /> },
-        { type: 'email' as const, title: 'Email Body', content: outreach.email_body, icon: <FileText className="h-4 w-4" /> }
-    ] : extractTacticalItems(data.sales_research_report);
+    const tacticalActions = (outreach && typeof outreach === 'object') ? [
+        { type: 'linkedin' as const, title: 'LinkedIn Request', content: outreach.linkedin_message || (outreach as any).hook || "", icon: <Linkedin className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Subject', content: outreach.email_subject || "", icon: <Mail className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Body', content: outreach.email_body || "", icon: <FileText className="h-4 w-4" /> }
+    ].filter(a => a.content) : extractTacticalItems(data.sales_research_report);
 
     return (
         <div className="relative min-h-screen bg-zinc-50 dark:bg-zinc-950/50">
@@ -600,7 +724,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                 )}
                                             >
                                                 <div className="flex items-center gap-4">
-                                                    {React.cloneElement(section.icon as React.ReactElement, { className: cn("h-4 w-4 transition-transform group-hover:scale-110", activeSection === idx ? "text-white" : "text-zinc-400 group-hover:text-primary") })}
+                                                    {React.cloneElement(section.icon as any, { className: cn("h-4 w-4 transition-transform group-hover:scale-110", activeSection === idx ? "text-white" : "text-zinc-400 group-hover:text-primary") })}
                                                     {section.title}
                                                 </div>
                                                 <ChevronRight className={cn("h-3 w-3 transition-all duration-500", activeSection === idx ? "rotate-90" : "opacity-0 -translate-x-2")} />
@@ -654,7 +778,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                         )}
                                         title={section.title}
                                     >
-                                        {React.cloneElement(section.icon as React.ReactElement, {
+                                        {React.cloneElement(section.icon as any, {
                                             className: cn("h-5 w-5 mx-auto", activeSection === idx ? "text-white" : "")
                                         })}
                                     </button>
@@ -787,8 +911,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
 
                                     {section.isJourney && data.buyer_journey_analysis && (
                                         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                                <div className="p-10 rounded-3xl bg-zinc-900 text-white border border-white/5 space-y-6 shadow-2xl relative overflow-hidden group">
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                                                <div className="p-6 rounded-3xl bg-zinc-900 text-white border border-white/5 space-y-6 shadow-2xl relative overflow-hidden group">
                                                     <div className="absolute top-0 right-0 w-48 h-48 bg-primary/20 blur-[80px] rounded-full -mr-24 -mt-24 pointer-events-none group-hover:bg-primary/30 transition-all duration-700" />
                                                     <div className="flex items-center gap-4 relative">
                                                         <div className="p-3 rounded-2xl bg-white/10 border border-white/10 text-primary">
@@ -810,7 +934,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                     </div>
                                                 </div>
 
-                                                <div className="p-10 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm hover:shadow-md transition-all duration-500">
+                                                <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm hover:shadow-md transition-all duration-500">
                                                     <div className="flex items-center gap-4">
                                                         <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/10">
                                                             <Zap className="h-6 w-6" />
@@ -825,7 +949,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                     </p>
                                                 </div>
 
-                                                <div className="p-10 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm hover:shadow-md transition-all duration-500">
+                                                <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm hover:shadow-md transition-all duration-500">
                                                     <div className="flex items-center gap-4">
                                                         <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/10">
                                                             <BarChart3 className="h-6 w-6" />
@@ -867,21 +991,21 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                     {section.isActivity && (
                                         <div className="space-y-8">
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                                <Card className="bg-white/5 border-white/10">
+                                                <Card className="bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-white/10">
                                                     <CardHeader className="pb-2">
-                                                        <CardDescription className="uppercase text-[10px] font-black">Social Intent</CardDescription>
+                                                        <CardDescription className="uppercase text-[10px] font-black text-zinc-500 dark:text-zinc-400">Social Intent</CardDescription>
                                                         <CardTitle className="text-2xl font-black text-primary">{data.post_engagements?.length || 0}</CardTitle>
                                                     </CardHeader>
                                                 </Card>
-                                                <Card className="bg-white/5 border-white/10">
+                                                <Card className="bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-white/10">
                                                     <CardHeader className="pb-2">
-                                                        <CardDescription className="uppercase text-[10px] font-black">Emails Scanned</CardDescription>
+                                                        <CardDescription className="uppercase text-[10px] font-black text-zinc-500 dark:text-zinc-400">Emails Scanned</CardDescription>
                                                         <CardTitle className="text-2xl font-black text-emerald-500">{data.email_history?.length || 0}</CardTitle>
                                                     </CardHeader>
                                                 </Card>
-                                                <Card className="bg-white/5 border-white/10">
+                                                <Card className="bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-white/10">
                                                     <CardHeader className="pb-2">
-                                                        <CardDescription className="uppercase text-[10px] font-black">Conversion Events</CardDescription>
+                                                        <CardDescription className="uppercase text-[10px] font-black text-zinc-500 dark:text-zinc-400">Conversion Events</CardDescription>
                                                         <CardTitle className="text-2xl font-black text-amber-500">
                                                             {[
                                                                 data.extra_metadata?.download_marketing_material,
@@ -895,7 +1019,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
 
                                             <div className="space-y-6">
                                                 <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400">Interaction Timeline</h3>
-                                                <div className="relative pl-8 border-l border-white/10 space-y-8 ml-4">
+                                                <div className="relative pl-8 border-l border-zinc-200 dark:border-white/10 space-y-8 ml-4">
                                                     {/* Meeting Notes / Human Intelligence */}
                                                     {data.meeting_notes && (
                                                         <div className="relative group/note">
@@ -922,13 +1046,25 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-sm font-black text-white capitalize">{eng.type} on {eng.target} post</span>
+                                                                    <span className="text-sm font-black text-zinc-900 dark:text-white capitalize">{eng.type} on {eng.target} post</span>
                                                                     <Badge variant="outline" className="text-[9px] uppercase border-primary/30 text-primary">Intent High</Badge>
                                                                 </div>
-                                                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                                                <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
                                                                     {eng.reaction_type ? `Reacted with ${eng.reaction_type}` : `Commented: "${eng.comment_text}"`}
                                                                 </p>
-                                                                <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">Recent Activity</div>
+                                                                <div className="flex items-center justify-between pt-1">
+                                                                    <div className="text-[10px] text-zinc-500 uppercase font-bold">Recent Activity</div>
+                                                                    {eng.post_url && (
+                                                                        <a 
+                                                                            href={eng.post_url} 
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer" 
+                                                                            className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary hover:underline hover:scale-105 transition-transform"
+                                                                        >
+                                                                            View Post <ExternalLink className="h-2.5 w-2.5" />
+                                                                        </a>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     ))}
@@ -941,10 +1077,10 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-sm font-black text-white">Email {email.direction}</span>
+                                                                    <span className="text-sm font-black text-zinc-900 dark:text-white">Email {email.direction}</span>
                                                                     <Badge variant="outline" className="text-[9px] uppercase border-emerald-500/30 text-emerald-500">{email.direction}</Badge>
                                                                 </div>
-                                                                <p className="text-sm text-zinc-400 line-clamp-1">{email.subject}</p>
+                                                                <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-1">{email.subject}</p>
                                                                 <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">{new Date(email.date).toLocaleDateString()}</div>
                                                             </div>
                                                         </div>
@@ -957,8 +1093,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                                 <FileText className="h-4 w-4" />
                                                             </div>
                                                             <div className="space-y-1">
-                                                                <span className="text-sm font-black text-white">Converted: Marketing Download</span>
-                                                                <p className="text-sm text-zinc-400">Lead downloaded resource from website/portal.</p>
+                                                                <span className="text-sm font-black text-zinc-900 dark:text-white">Converted: Marketing Download</span>
+                                                                <p className="text-sm text-zinc-600 dark:text-zinc-400">Lead downloaded resource from website/portal.</p>
                                                                 <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">Historical Data</div>
                                                             </div>
                                                         </div>
@@ -969,8 +1105,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                                 <Zap className="h-4 w-4" />
                                                             </div>
                                                             <div className="space-y-1">
-                                                                <span className="text-sm font-black text-white">Converted: Demo Requested</span>
-                                                                <p className="text-sm text-zinc-400">Direct high-intent request for a product demonstration.</p>
+                                                                <span className="text-sm font-black text-zinc-900 dark:text-white">Converted: Demo Requested</span>
+                                                                <p className="text-sm text-zinc-600 dark:text-zinc-400">Direct high-intent request for a product demonstration.</p>
                                                                 <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">Priority Event</div>
                                                             </div>
                                                         </div>
@@ -983,8 +1119,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                                 <Globe className="h-4 w-4" />
                                                             </div>
                                                             <div className="space-y-1">
-                                                                <span className="text-sm font-black text-white">Market Event: {news.source}</span>
-                                                                <p className="text-sm text-zinc-400 leading-relaxed">{news.title}</p>
+                                                                <span className="text-sm font-black text-zinc-900 dark:text-white">Market Event: {news.source}</span>
+                                                                <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{news.title}</p>
                                                                 <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">{news.date}</div>
                                                             </div>
                                                         </div>
@@ -998,10 +1134,10 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-sm font-black text-white">Hiring Signal: {job.role}</span>
+                                                                    <span className="text-sm font-black text-zinc-900 dark:text-white">Hiring Signal: {job.role}</span>
                                                                     <Badge variant="outline" className="text-[9px] uppercase border-purple-500/30 text-purple-500">Growth</Badge>
                                                                 </div>
-                                                                <p className="text-sm text-zinc-400">{job.location}</p>
+                                                                <p className="text-sm text-zinc-600 dark:text-zinc-400">{job.location}</p>
                                                                 <div className="text-[10px] text-zinc-500 uppercase font-bold pt-1">Active Listing</div>
                                                             </div>
                                                         </div>
@@ -1017,11 +1153,11 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                 <>
                                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                                                         {[
-                                                            { label: "Demographic", score: data.lead_score_analysis.demographic_fit_score, max: 25, color: "text-blue-500" },
-                                                            { label: "Engagement", score: data.lead_score_analysis.engagement_score, max: 20, color: "text-emerald-500" },
-                                                            { label: "Readiness", score: data.lead_score_analysis.sales_readiness_score, max: 25, color: "text-orange-500" },
-                                                            { label: "Source", score: data.lead_score_analysis.lead_source_score, max: 15, color: "text-purple-500" },
-                                                            { label: "Timing", score: data.lead_score_analysis.timing_score, max: 15, color: "text-rose-500" }
+                                                            { label: "Demographic", score: data.lead_score_analysis.score_breakdown?.demographic_fit?.score || 0, max: 25, color: "text-blue-500" },
+                                                            { label: "Engagement", score: data.lead_score_analysis.score_breakdown?.engagement?.score || 0, max: 20, color: "text-emerald-500" },
+                                                            { label: "Readiness", score: data.lead_score_analysis.score_breakdown?.sales_readiness?.score || 0, max: 25, color: "text-orange-500" },
+                                                            { label: "Source", score: data.lead_score_analysis.score_breakdown?.lead_source?.score || 0, max: 15, color: "text-purple-500" },
+                                                            { label: "Timing", score: data.lead_score_analysis.score_breakdown?.timing?.score || 0, max: 15, color: "text-rose-500" }
                                                         ].map((item, idx) => (
                                                             <div key={idx} className="p-8 rounded-[2rem] bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 flex flex-col items-center text-center space-y-4 hover:scale-105 transition-transform duration-500">
                                                                 <div className={cn("text-3xl font-black", item.color)}>
@@ -1050,9 +1186,9 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                         </div>
                                                     </div>
 
-                                                    {data.lead_score_analysis.recommendations && data.lead_score_analysis.recommendations.length > 0 && (
+                                                    {data.lead_score_analysis.lead_score_recommendations && data.lead_score_analysis.lead_score_recommendations.length > 0 && (
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                            {data.lead_score_analysis.recommendations.map((rec: string, i: number) => (
+                                                            {data.lead_score_analysis.lead_score_recommendations.map((rec: string, i: number) => (
                                                                 <div key={i} className="flex items-center gap-4 p-6 rounded-2xl bg-primary/5 border border-primary/10 group hover:translate-x-2 transition-transform duration-300">
                                                                     <div className="h-2 w-2 rounded-full bg-primary" />
                                                                     <span className="text-[15px] font-bold text-zinc-700 dark:text-zinc-300 antialiased italic">{rec}</span>
@@ -1144,27 +1280,73 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                     Conversation Timeline
                                                 </h3>
                                                 <div className="relative pl-8 border-l-2 border-zinc-200 dark:border-zinc-800 space-y-8 ml-3">
-                                                    {data.email_history?.map((email, idx) => (
+                                                    {/* Merged Timeline: Engagements + Emails */}
+                                                    {[
+                                                        ...(data.post_engagements?.map(eng => ({ ...eng, timelineType: 'social' as const })) || []),
+                                                        ...(data.email_history?.map(email => ({ ...email, timelineType: 'email' as const })) || [])
+                                                    ].sort((a: any, b: any) => {
+                                                        const dateA = a.timelineType === 'email' ? new Date(a.date).getTime() : Infinity;
+                                                        const dateB = b.timelineType === 'email' ? new Date(b.date).getTime() : Infinity;
+                                                        return dateB - dateA;
+                                                    }).map((item: any, idx) => (
                                                         <div key={idx} className="relative">
-                                                            <div className={cn(
-                                                                "absolute -left-[41px] top-0 p-1.5 rounded-full border-2 z-10 bg-white dark:bg-zinc-950",
-                                                                email.direction === 'sent' ? "border-zinc-200 dark:border-zinc-700" : "border-primary bg-primary text-white"
-                                                            )}>
-                                                                {email.direction === 'sent' ? <ArrowRight className="h-3 w-3 text-zinc-400" /> : <Mail className="h-3 w-3" />}
-                                                            </div>
-                                                            <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:border-primary/20 transition-all">
-                                                                <div className="flex items-center justify-between mb-4">
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{email.from}</span>
-                                                                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{new Date(email.date).toLocaleDateString()}</span>
+                                                            {item.timelineType === 'social' ? (
+                                                                <>
+                                                                    <div className="absolute -left-[41px] top-0 p-1.5 rounded-full border-2 z-10 bg-primary text-white border-primary shadow-lg shadow-primary/20 animate-pulse">
+                                                                        <Linkedin className="h-3 w-3" />
                                                                     </div>
-                                                                    <Badge variant="secondary" className="text-[10px] uppercase font-bold">{email.direction}</Badge>
-                                                                </div>
-                                                                <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">{email.subject}</div>
-                                                                <div className="text-sm text-zinc-500 leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">
-                                                                    {email.text}
-                                                                </div>
-                                                            </div>
+                                                                    <div className="p-6 rounded-2xl bg-primary/[0.02] border border-primary/10 shadow-sm hover:border-primary/30 transition-all hover:bg-primary/[0.04] group/timenode">
+                                                                        <div className="flex items-center justify-between mb-3">
+                                                                            <div className="flex flex-col">
+                                                                                <span className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">Social Engagement</span>
+                                                                                <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">LinkedIn Signal</span>
+                                                                            </div>
+                                                                            <Badge variant="outline" className="text-[9px] uppercase border-primary/30 text-primary bg-primary/5">High Intent</Badge>
+                                                                        </div>
+                                                                        <div className="text-sm font-bold text-zinc-800 dark:text-zinc-200 mb-2 italic">
+                                                                            {item.type === 'reaction' ? `Lead reacted with ${item.reaction_type} to your post` : `Lead commented: "${item.comment_text}"`}
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between pt-2 border-t border-primary/5">
+                                                                            <span className="text-[10px] text-zinc-400 font-medium">Recent Activity</span>
+                                                                            {item.post_url && (
+                                                                                <a 
+                                                                                    href={item.post_url} 
+                                                                                    target="_blank" 
+                                                                                    rel="noopener noreferrer" 
+                                                                                    className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary hover:underline"
+                                                                                >
+                                                                                    View Original Post <ExternalLink className="h-2.5 w-2.5" />
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <div className={cn(
+                                                                        "absolute -left-[41px] top-0 p-1.5 rounded-full border-2 z-10 bg-white dark:bg-zinc-950",
+                                                                        item.direction === 'sent' ? "border-zinc-200 dark:border-zinc-700" : "border-emerald-500 bg-emerald-500 text-white"
+                                                                    )}>
+                                                                        {item.direction === 'sent' ? <ArrowRight className="h-3 w-3 text-zinc-400" /> : <Mail className="h-3 w-3" />}
+                                                                    </div>
+                                                                    <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
+                                                                        <div className="flex items-center justify-between mb-4">
+                                                                            <div className="flex flex-col">
+                                                                                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{item.from}</span>
+                                                                                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{new Date(item.date).toLocaleDateString()}</span>
+                                                                            </div>
+                                                                            <Badge variant="secondary" className={cn(
+                                                                                "text-[10px] uppercase font-bold",
+                                                                                item.direction === 'received' ? "bg-emerald-500/10 text-emerald-500" : ""
+                                                                            )}>{item.direction}</Badge>
+                                                                        </div>
+                                                                        <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">{item.subject}</div>
+                                                                        <div className="text-sm text-zinc-500 leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">
+                                                                            {item.text}
+                                                                        </div>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>

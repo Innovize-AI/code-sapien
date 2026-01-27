@@ -5,10 +5,11 @@ import time
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, COMPANY_CONTEXT
 from models.openai_models import get_open_ai
+from models.structured_output import LinkedInAnalysis
 
 load_dotenv()
 
@@ -30,19 +31,7 @@ class ProfileClassification(BaseModel):
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
     reasoning: str = Field(description="Brief explanation of the classification.")
 
-class LinkedInPostAnalysis(BaseModel):
-    post_title: str = Field(description="Title or main hook of the post")
-    summary: str = Field(description="Brief summary of the post content")
-    posted_date: str = Field(description="Approximate date or relative time of posting")
-    post_url: str = Field(description="URL of the specific post")
-
-class LinkedInAnalysis(BaseModel):
-    profile_summary: str = Field(description="Comprehensive summary of the candidate's professional profile.")
-    posts_analysis: List[LinkedInPostAnalysis] = Field(description="Analysis of recent posts.")
-    strategic_role_fit: str = Field(description="Assessment of role fit and decision-making power.")
-    company_signals: str = Field(description="Insights derived from company stats, hiring, and news.")
-    engagement_persona: str = Field(description="Analysis of topics they care about and communication style.")
-    pain_point_hypothesis: str = Field(description="Hypothesized pain points based on company and role context.")
+# Using LinkedInAnalysis from models.structured_output
 
 def batch_classify_profiles(profiles: List[Dict]):
     """
@@ -53,8 +42,8 @@ def batch_classify_profiles(profiles: List[Dict]):
         return {}
         
     try:
-        # Reverting to gpt-4o-mini as gpt-5-mini is not a valid model
-        llm = get_open_ai(temperature=0, model="gpt-4.1-mini")
+        # Reverting to gpt-4o-mini as gpt-4.1-mini is not a valid model
+        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
         structured_llm = llm.with_structured_output(BatchProfileClassification)
         
         # Format profiles for prompt
@@ -73,7 +62,7 @@ def batch_classify_profiles(profiles: List[Dict]):
         results_map = {}
         if response and response.classifications:
             for res in response.classifications:
-                results_map[res.id] = res.dict()
+                results_map[res.id] = res.model_dump()
                 
         return results_map
 
@@ -105,7 +94,7 @@ def classify_profile(name: str, headline: str):
         ])
         
         if response:
-            return response.dict()
+            return response.model_dump()
         else:
              return {"is_competitor": False, "is_fit": False, "is_decision_maker": False, "reasoning": "Empty response from LLM"}
 
@@ -296,7 +285,7 @@ def get_linkedin_engagement(state: AgentState):
             for post in posts[:10]:
                 post_urn = post.get("urn").get("activity_urn", "")
                 post_text= post.get("text", "")
-                post_date = post.get("posted_at", "")
+                post_date = post.get("posted_at", {})
                 if not post_urn: continue
 
                 # Check reactions for this post
@@ -306,13 +295,14 @@ def get_linkedin_engagement(state: AgentState):
                 r_resp = requests.get(reactions_url, headers=headers, params=r_params)
                 r_data = r_resp.json()
                 
-                reactions = r_data.get("data", [])
-                for reaction in reactions:
+                data = r_data.get("data", {})
+                for reaction in data.get("reactions", []):
                     reaction_type = reaction.get("reaction_type", "LIKE")
                     reactor = reaction.get("reactor", {})
                     reactor_urn = reactor.get("urn", "")
 
                     if reactor.get("urn") == lead_urn:
+                        print(f"Found engagement for {target_type}: {reaction_type}")
                         found_engagements.append({
                             "type": "reaction",
                             "target": target_type,
@@ -329,8 +319,8 @@ def get_linkedin_engagement(state: AgentState):
                 c_resp = requests.get(comments_url, headers=headers, params=c_params)
                 c_data = c_resp.json()
                 
-                comments = c_data.get("data", [])
-                for comment in comments:
+                data = c_data.get("data", {})
+                for comment in data.get("comments", []):
                     author = comment.get("author", {})
                     if author.get("profile_url") == lead_linkedin_url:
                         found_engagements.append({
@@ -398,23 +388,25 @@ def get_linkedin_company_data(state: AgentState):
         "company_name": basic_info.get("name"),
         "company_description": basic_info.get("description"),
         "company_industries": basic_info.get("industries", []),
-        "company_stats": basic_info.get("stats", {}),
+        "company_stats": company_data.get("stats", {}),
         "company_news": news[:5],
         "hiring_data": hiring[:5],
     }
 
-
 def linkedin_profile_analyzer(state: AgentState):
-    """Synthesizes all LinkedIn data into a deep profile analysis using Structured Output."""
-    
+    """Analyzes a profile using LLM based on headline and company context."""
+    user_profile = state.get("user_profile_details", {})
+    recent_posts = user_profile.get("recent_posts", []) if isinstance(user_profile, dict) else []
+
     content = {
-        "profile": state.get("user_profile_details", {}),
+        "profile": user_profile,
+        "recent_posts": recent_posts,
         "engagements": state.get("post_engagements", []),
-        "company_news": state.get("company_news", []),
-        "company_stats": state.get("company_stats", {}),
-        "company_industries": state.get("company_industries", []),
-        "company_description": state.get("company_description", {}),
         "company_name": state.get("company_name", {}),
+        "company_description": state.get("company_description", {}),
+        "company_industries": state.get("company_industries", []),
+        "company_stats": state.get("company_stats", {}),
+        "company_news": state.get("company_news", []),
         "hiring": state.get("hiring_data", [])
     }
     
@@ -437,7 +429,7 @@ def linkedin_profile_analyzer(state: AgentState):
              return {"user_profile_analysis": {}}
 
         # Return the structured analysis as a dictionary
-        return {"user_profile_analysis": response.dict()}
+        return {"user_profile_analysis": response.model_dump()}
 
     except Exception as e:
         print(f"Error in linkedin_profile_analyzer: {e}")
@@ -687,7 +679,7 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
         return {}
         
     try:
-        llm = get_open_ai(temperature=0, model="gpt-4.1-mini")
+        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
         structured_llm = llm.with_structured_output(BatchProfileClassification)
         
         # Format profiles for prompt

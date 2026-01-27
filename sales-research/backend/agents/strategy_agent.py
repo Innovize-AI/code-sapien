@@ -105,7 +105,7 @@ def pain_point_node(state: AgentState):
         model = get_open_ai(model="gpt-4o-mini", temperature=0)
         structured_llm = model.with_structured_output(PainPointAnalysis)
         response = structured_llm.invoke(messages)
-        return {"target_pain_points": response.dict() if response else {}}
+        return {"target_pain_points": response.model_dump() if response else {}}
     except Exception as e:
         print(f"Error in pain_point_node: {e}")
         return {"target_pain_points": {}}
@@ -130,7 +130,7 @@ def solution_node(state: AgentState):
         model = get_open_ai(model="gpt-4o-mini", temperature=0)
         structured_llm = model.with_structured_output(StrategicSolutionProposal)
         response = structured_llm.invoke(messages)
-        return {"strategic_solutions": response.dict() if response else {}}
+        return {"strategic_solutions": response.model_dump() if response else {}}
     except Exception as e:
         print(f"Error in solution_node: {e}")
         return {"strategic_solutions": {}}

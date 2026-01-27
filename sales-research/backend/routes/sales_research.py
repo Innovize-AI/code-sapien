@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query, Depends, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedin, batch_upsert_identified_profiles
+from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedin, batch_upsert_identified_profiles, _report_to_dict, _safe_deserialize
 from db.schemas import ResearchReportCreate
 from utils import add_https_if_missing
 from workflow.state import IdealProfile, InputLeadData
@@ -139,21 +139,31 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
 
     # Extract numeric lead score if possible
     lead_score = None
-    score_analysis = final_state.get("lead_score_analysis", "")
+    score_analysis = final_state.get("lead_score_analysis")
     if score_analysis:
-        import re
-        match = re.search(r"Score:\s*(\d+)", score_analysis)
-        if match:
-            try:
-                lead_score = int(match.group(1))
-            except:
-                pass
+        if isinstance(score_analysis, dict):
+            lead_score = score_analysis.get("total_score")
+        elif isinstance(score_analysis, str):
+            import re
+            match = re.search(r"Score:\s*(\d+)", score_analysis)
+            if match:
+                try:
+                    lead_score = int(match.group(1))
+                except:
+                    pass
+
+    # _safe_serialize helper remains local as it's only for writing
+    def _safe_serialize(val):
+        if isinstance(val, (dict, list)):
+            return json.dumps(val)
+        return val or ""
 
     report_data = ResearchReportCreate(
         linkedin_url=linkedin_url or "",
         email_id=final_state.get("email_id") or "",
         website=website or "",
-        sales_research_report=final_state.get("sales_research_report"),
+        sales_research_report=_safe_serialize(final_state.get("sales_research_report")),
+        viability_analysis=_safe_serialize(final_state.get("viability_analysis")),
         lead_score_analysis=json.dumps(final_state.get("lead_score_analysis") or {}),
         user_profile_analysis=json.dumps(final_state.get("user_profile_analysis") or {}),
         website_analysis=json.dumps(final_state.get("website_analysis") or {}),
@@ -170,11 +180,10 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         extra_metadata=json.dumps(final_state.get("extra_research_context") or {}),
         
         # Modular Nodules
-        viability_analysis=final_state.get("viability_analysis") or "",
         target_pain_points=json.dumps(final_state.get("target_pain_points") or {}),
         strategic_solutions=json.dumps(final_state.get("strategic_solutions") or {}),
         personalized_outreach=json.dumps(final_state.get("personalized_outreach") or {}),
-        follow_up_strategy=final_state.get("follow_up_strategy"),
+        follow_up_strategy=_safe_serialize(final_state.get("follow_up_strategy")),
         buyer_journey_analysis=json.dumps(final_state.get("buyer_journey_analysis") or {}),
         meeting_notes=final_state.get("meeting_notes"),
         
@@ -196,45 +205,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
     else:
         return None
 
-def _report_to_dict(report):
-    """Helper to convert ResearchReport model to final_state dictionary."""
-    return {
-        "id": str(report.id),
-        "linkedin_url": report.linkedin_url,
-        "email_id": report.email_id,
-        "website": report.website,
-        "sales_research_report": report.sales_research_report,
-        "lead_score_analysis": json.loads(report.lead_score_analysis) if report.lead_score_analysis and report.lead_score_analysis.strip().startswith('{') else report.lead_score_analysis,
-        "user_profile_analysis": json.loads(report.user_profile_analysis) if report.user_profile_analysis and report.user_profile_analysis.strip().startswith('{') else report.user_profile_analysis,
-        "website_analysis": json.loads(report.website_analysis) if report.website_analysis and report.website_analysis.strip().startswith('{') else report.website_analysis,
-        "fullname": report.fullname,
-        "profile_picture_url": report.profile_picture_url,
-        "company_name": report.company_name,
-        "company_description": report.company_description,
-        "company_industries": json.loads(report.company_industries) if report.company_industries else [],
-
-        "lead_score": report.lead_score,
-        "email_history": json.loads(report.email_history) if report.email_history else [],
-        "intent_analysis": json.loads(report.intent_analysis) if report.intent_analysis else {},
-        "extra_metadata": json.loads(report.extra_metadata) if report.extra_metadata else {},
-        
-        # Modular Nodules
-        "viability_analysis": report.viability_analysis,
-        "target_pain_points": json.loads(report.target_pain_points) if report.target_pain_points and report.target_pain_points.strip().startswith('{') else report.target_pain_points,
-        "strategic_solutions": json.loads(report.strategic_solutions) if report.strategic_solutions and report.strategic_solutions.strip().startswith('{') else report.strategic_solutions,
-        "personalized_outreach": json.loads(report.personalized_outreach) if report.personalized_outreach else {},
-        "follow_up_strategy": report.follow_up_strategy,
-        "buyer_journey_analysis": json.loads(report.buyer_journey_analysis) if report.buyer_journey_analysis else {},
-        "meeting_notes": report.meeting_notes,
-        
-        # LinkedIn Subgraph Results
-        "post_engagements": json.loads(report.post_engagements) if report.post_engagements else [],
-        "company_news": json.loads(report.company_news) if report.company_news else [],
-        "hiring_data": json.loads(report.hiring_data) if report.hiring_data else [],
-        "company_stats": json.loads(report.company_stats) if report.company_stats else {},
-        "lead_li_urn": report.lead_li_urn,
-        "lead_company_linkedin_url": report.lead_company_linkedin_url
-    }
+# _report_to_dict and _safe_deserialize removed as they are now in db/crud.py
 
 
 def _prepare_state_for_json(state):
@@ -244,10 +215,10 @@ def _prepare_state_for_json(state):
     
     cleaned = {}
     for k, v in state.items():
-        if hasattr(v, 'dict'):
-            cleaned[k] = v.dict()
-        elif hasattr(v, 'model_dump'):
+        if hasattr(v, 'model_dump'):
             cleaned[k] = v.model_dump()
+        elif hasattr(v, 'dict'):
+            cleaned[k] = v.dict()
         else:
             cleaned[k] = v
     return cleaned
@@ -286,13 +257,13 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "user_profile_details": existing_state.get("user_profile_details", {}),
         "scraped_website_content": existing_state.get("scraped_website_content", ""),
         
-        "user_profile_analysis": existing_state.get("user_profile_analysis", ""),
-        "website_analysis": existing_state.get("website_analysis", ""),
-        "lead_score_analysis": existing_state.get("lead_score_analysis", ""),
-        "target_pain_points": existing_state.get("target_pain_points", ""),
-        "strategic_solutions": existing_state.get("strategic_solutions", ""),
-        "personalized_outreach": existing_state.get("personalized_outreach", ""),
-        "follow_up_strategy": existing_state.get("follow_up_strategy", ""),
+        "user_profile_analysis": existing_state.get("user_profile_analysis", {}),
+        "website_analysis": existing_state.get("website_analysis", {}),
+        "lead_score_analysis": existing_state.get("lead_score_analysis", {}),
+        "target_pain_points": existing_state.get("target_pain_points", {}),
+        "strategic_solutions": existing_state.get("strategic_solutions", {}),
+        "personalized_outreach": existing_state.get("personalized_outreach", {}),
+        "follow_up_strategy": existing_state.get("follow_up_strategy", {}),
         "buyer_journey_analysis": existing_state.get("buyer_journey_analysis", {}),
         "intent_analysis": existing_state.get("intent_analysis", {}),
         "email_history": existing_state.get("email_history", []),
@@ -308,7 +279,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "fullname": existing_state.get("fullname", ""),
         "profile_picture_url": existing_state.get("profile_picture_url", ""),
         
-        "sales_research_report": existing_state.get("sales_research_report", ""),
+        "sales_research_report": existing_state.get("sales_research_report", {}),
         "meeting_notes": getattr(options, 'meeting_notes', '') if hasattr(options, 'meeting_notes') else options.get('meeting_notes', '') if isinstance(options, dict) else ''
     }
 

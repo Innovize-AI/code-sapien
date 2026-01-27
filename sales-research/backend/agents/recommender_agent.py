@@ -53,7 +53,7 @@ def strategic_recommender_node(state: AgentState):
         if not response:
              return {"buyer_journey_analysis": {}}
              
-        return {"buyer_journey_analysis": response.dict()}
+        return {"buyer_journey_analysis": response.model_dump()}
     except Exception as e:
         print(f"Error in strategic_recommender_node: {e}")
         return {"buyer_journey_analysis": {}}

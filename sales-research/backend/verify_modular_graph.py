@@ -48,8 +48,9 @@ async def test_modular_graph():
     }
     
     print("Compiling and running graph stream...")
+    config = {"configurable": {"thread_id": "test-thread"}}
     try:
-        async for event in graph.astream(initial_state, stream_mode="updates"):
+        async for event in graph.astream(initial_state, config=config, stream_mode="updates"):
             for node_name, state_update in event.items():
                 print(f"Node completed: {node_name}")
                 # We don't need to check values here as LLM calls will fail without API keys in environment

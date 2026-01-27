@@ -9,6 +9,64 @@ from sqlalchemy import Table
 from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile
 from db.schemas import ResearchReportCreate
 
+def _safe_deserialize(val):
+    if val and isinstance(val, str) and val.strip().startswith(('{', '[')):
+        try:
+            return json.loads(val)
+        except:
+            return val
+    return val
+
+def _safe_json_load(val, default):
+    if not val:
+        return default
+    if isinstance(val, (dict, list)):
+        return val
+    try:
+        return json.loads(val)
+    except:
+        return default
+
+def _report_to_dict(report):
+    """Helper to convert ResearchReport model to final_state dictionary."""
+    return {
+        "id": str(report.id),
+        "linkedin_url": report.linkedin_url,
+        "email_id": report.email_id,
+        "website": report.website,
+        "sales_research_report": _safe_deserialize(report.sales_research_report),
+        "lead_score_analysis": _safe_deserialize(report.lead_score_analysis),
+        "user_profile_analysis": _safe_deserialize(report.user_profile_analysis),
+        "website_analysis": _safe_deserialize(report.website_analysis),
+        "fullname": report.fullname,
+        "profile_picture_url": report.profile_picture_url,
+        "company_name": report.company_name,
+        "company_description": report.company_description,
+        "company_industries": _safe_json_load(report.company_industries, []),
+
+        "lead_score": report.lead_score,
+        "email_history": _safe_json_load(report.email_history, []),
+        "intent_analysis": _safe_json_load(report.intent_analysis, {}),
+        "extra_metadata": _safe_json_load(report.extra_metadata, {}),
+        
+        # Modular Nodules
+        "viability_analysis": _safe_deserialize(report.viability_analysis),
+        "target_pain_points": _safe_deserialize(report.target_pain_points),
+        "strategic_solutions": _safe_deserialize(report.strategic_solutions),
+        "personalized_outreach": _safe_json_load(report.personalized_outreach, {}),
+        "follow_up_strategy": _safe_deserialize(report.follow_up_strategy),
+        "buyer_journey_analysis": _safe_json_load(report.buyer_journey_analysis, {}),
+        "meeting_notes": report.meeting_notes,
+        
+        # LinkedIn Subgraph Results
+        "post_engagements": _safe_json_load(report.post_engagements, []),
+        "company_news": _safe_json_load(report.company_news, []),
+        "hiring_data": _safe_json_load(report.hiring_data, []),
+        "company_stats": _safe_json_load(report.company_stats, {}),
+        "lead_li_urn": report.lead_li_urn,
+        "lead_company_linkedin_url": report.lead_company_linkedin_url
+    }
+
 async def batch_upsert(
     session: AsyncSession,
     table: Table,
@@ -342,7 +400,7 @@ async def count_identified_profiles(db: AsyncSession):
     return result.scalar()
 
 async def save_report(db: AsyncSession, report_data: ResearchReportCreate):
-    db_report = ResearchReport(**report_data.dict())
+    db_report = ResearchReport(**report_data.model_dump())
     db.add(db_report)
     await db.commit()
     await db.refresh(db_report)

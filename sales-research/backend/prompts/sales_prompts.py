@@ -34,9 +34,18 @@ Analyze this holistic view and generate a structured strategic summary.
 5. **Engagement Persona**:
    - Based on `engagements` and `profile`: What topics do they care about? What is their communication style?
 
-6. **Pain Point Hypothesis**:
+6. **Pain Point Hypothesis**: 
    - Combine "Company Challenges" (inferred from news/hiring) with "Personal Responsibilities".
    - What keeps them up at night?
+
+### OUTPUT FORMAT:
+You MUST return ONLY a JSON object with the following keys:
+- `profile_summary`: string
+- `posts_analysis`: list of objects, each with `post_title`, `summary`, `posted_date`, and `post_url` (must be a valid URL string)
+- `strategic_role_fit`: string
+- `company_signals`: string
+- `engagement_persona`: string
+- `pain_point_hypothesis`: string
 """
 
 WEBSITE_ANALYZER_PROMPT = """
@@ -272,7 +281,10 @@ A sales rep is about to read this. They don't need a summary of the labels you'v
 4. **Strategic Playbook**: 
    - Cleanly present the finalized outreach tactics (LinkedIn/Email) generated in the previous step.
    - Refine the "Hook" if you see a more powerful way to connect it to the journey stage.
-5. **Internal Advisory**: Provide 2 "Insider Tips" for the rep (e.g., "Mention their recent acquisition of X not just as news, but as a scale challenge we solve").
+5. **Advanced Next Steps (Unified Strategy)**:
+   - This is the most important part. Create a 3-5 step high-level strategy that synthesizes EVERYTHING.
+   - Don't just list CRM tasks. List strategic moves (e.g., "Step 1: Reference the [Recent News] in a LinkedIn comment to establish authority. Step 2: Send the [Personalized Email] 2 hours later...").
+6. **Internal Advisory**: Provide 2 "Insider Tips" for the rep (e.g., "Mention their recent acquisition of X not just as news, but as a scale challenge we solve").
 
 ### EXECUTION GUIDELINES:
 - **Zero Redundancy**: Do not create a separate "Company Overview" or "Persona Profile" if the raw content already has them. Instead, reference them in your synthesis.
@@ -281,7 +293,7 @@ A sales rep is about to read this. They don't need a summary of the labels you'v
 - **Never Start with generic greetings** like "I hope this message finds you well". 
 
 ### OUTPUT EXPECTATION:
-Deliver a **Global Executive Blueprint** in Markdown. It should feel like a custom strategic briefing prepared for a top-tier account executive.
+Deliver a **Global Executive Blueprint** as a JSON object matching the `GlobalExecutiveBriefing` schema. Ensure `advanced_next_steps` is a list of strings.
 '''
 
 COMPANY_CONTEXT = '''

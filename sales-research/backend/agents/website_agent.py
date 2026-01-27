@@ -43,7 +43,7 @@ def website_analyzer(state: AgentState):
         if not response:
             return {"website_analysis": {}}
             
-        return {"website_analysis": response.dict()}
+        return {"website_analysis": response.model_dump()}
     except Exception as e:
         print(f"Error in website_analyzer: {e}")
         return {"website_analysis": {}}

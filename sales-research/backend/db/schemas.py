@@ -16,6 +16,7 @@ class ResearchReportBase(BaseModel):
     company_stats: Optional[str] = None      # JSON string
 
     sales_research_report: Optional[str] = None
+    viability_analysis: Optional[str] = None
     lead_score_analysis: Optional[str] = None
     user_profile_analysis: Optional[str] = None
     website_analysis: Optional[str] = None

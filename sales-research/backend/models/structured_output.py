@@ -63,20 +63,19 @@ class LeadScoreResponse(BaseModel):
     analysis: str = Field(description="Detailed breakdown of the scoring.")
     recommendations: List[str] = Field(description="Recommended next steps.")
 
-class Post(BaseModel):
-    post_summary: str =Field(description="summary of the post")
-    post_date: date =Field(description= "Date of post")
-    post_title: str =Field(description= "Post title")
+class LinkedInPostAnalysis(BaseModel):
+    post_title: str = Field(description="Title or main hook of the post")
+    summary: str = Field(description="Brief summary of the post content")
+    posted_date: str = Field(description="Approximate date or relative time of posting")
+    post_url: str = Field(description="URL of the specific post")
 
 class LinkedInAnalysis(BaseModel):
-    archetype: str = Field(description="The professional persona or archetype.")
-    summary: str = Field(description="A professional summary.")
-    key_themes: List[str] = Field(description="Main topics and themes in their content.")
-    recent_sentiment: str = Field(description="Sentiment and focus of recent activity.")
-    communication_style: str = Field(description="Tone and style of their communication (e.g., 'Direct and Data-Driven').")
-    professional_intelligence: str = Field(description="Deeper insights into their expertise, influence, and professional focus.")
-    strategic_value: str = Field(description="Why this profile is strategically interesting for Innovize AI.")
-    recent_posts: List[Post]= Field(description="List of recent posts")
+    profile_summary: str = Field(default="", description="Comprehensive summary of the candidate's professional profile.")
+    posts_analysis: List[LinkedInPostAnalysis] = Field(default_factory=list, description="Analysis of recent posts.")
+    strategic_role_fit: Optional[str] = Field(default=None, description="Assessment of role fit and decision-making power.")
+    company_signals: Optional[str] = Field(default=None, description="Insights derived from company stats, hiring, and news.")
+    engagement_persona: Optional[str] = Field(default=None, description="Analysis of topics they care about and communication style.")
+    pain_point_hypothesis: Optional[str] = Field(default=None, description="Hypothesized pain points based on company and role context.")
 
 class WebsiteAnalysis(BaseModel):
     mission: str = Field(description="The company's core mission and values.")
@@ -96,13 +95,14 @@ class SalesResearchReport(BaseModel):
     action_plan: List[str] = Field(description="A 3-step actionable plan for the sales representative.")
 
 class StrategicPlaybook(BaseModel):
-    outreach_tactics: str = Field(description="Cleanly presented finalized outreach tactics (LinkedIn/Email).")
-    refined_hook: str = Field(description="Refined Hook to connect to the journey stage.")
+    outreach_tactics: str = Field(default="", description="Cleanly presented finalized outreach tactics (LinkedIn/Email).")
+    refined_hook: str = Field(default="", description="Refined Hook to connect to the journey stage.")
 
 class GlobalExecutiveBriefing(BaseModel):
-    fit_assessment: str = Field(description="The 'Non-Fit' Protocol status (e.g., '[STOP: POOR FIT]' or 'GOOD FIT').")
-    fit_reasoning: str = Field(description="One sentence explanation for the fit assessment.")
-    executive_synthesis: str = Field(description="Narrative connecting the person's role/activity to company position and Innovize AI value.")
-    why_now: str = Field(description="2-3 sentence argument for why this specific week is the perfect time to reach out.")
-    strategic_playbook: StrategicPlaybook = Field(description="Finalized outreach tactics and refined hook.")
-    internal_advisory: List[str] = Field(description="2 'Insider Tips' for the rep.")
+    fit_assessment: str = Field(default="[NEEDS REVIEW]", description="The 'Non-Fit' Protocol status (e.g., '[STOP: POOR FIT]' or 'GOOD FIT').")
+    fit_reasoning: str = Field(default="", description="One sentence explanation for the fit assessment.")
+    executive_synthesis: str = Field(default="", description="Narrative connecting the person's role/activity to company position and Innovize AI value.")
+    why_now: str = Field(default="", description="2-3 sentence argument for why this specific week is the perfect time to reach out.")
+    strategic_playbook: StrategicPlaybook = Field(default_factory=StrategicPlaybook, description="Finalized outreach tactics and refined hook.")
+    internal_advisory: List[str] = Field(default_factory=list, description="2 'Insider Tips' for the rep.")
+    advanced_next_steps: List[str] = Field(default_factory=list, description="A unified, multi-step sequence synthesizing all agent intelligence into a clear path forward.")

@@ -54,7 +54,7 @@ def lead_data_extractor(state: AgentState):
         "website_intelligence": website_analysis_dict,
         "company_metrics": company_stats,
         "interaction_history": email_history,
-        "input_metadata": input_lead_data.dict() if hasattr(input_lead_data, 'dict') else input_lead_data
+        "input_metadata": input_lead_data.model_dump() if hasattr(input_lead_data, 'model_dump') else input_lead_data
     }
 
     messages = [
@@ -70,7 +70,7 @@ def lead_data_extractor(state: AgentState):
         if not response:
              return {"lead_extracted_data": {}}
              
-        return {"lead_extracted_data": response.dict()}
+        return {"lead_extracted_data": response.model_dump()}
     except Exception as e:
         print(f"Error in lead_data_extractor: {e}")
         return {"lead_extracted_data": {}}
@@ -79,7 +79,7 @@ def lead_scorer(state: AgentState):
     """Scores the lead based on the extracted data and ICP."""
     lead_extracted_dict = state.get("lead_extracted_data", {})
     ideal_profile = state["ideal_profile"]
-    ideal_profile_json = ideal_profile.json() if hasattr(ideal_profile, 'json') else str(ideal_profile)
+    ideal_profile_json = ideal_profile.model_dump_json() if hasattr(ideal_profile, 'model_dump_json') else str(ideal_profile)
 
     messages = [
         SystemMessage(content=LEAD_SCORER_SYSTEM_PROMPT.format(content=ideal_profile_json)),
@@ -94,7 +94,7 @@ def lead_scorer(state: AgentState):
         if not response:
              return {"lead_score_analysis": {}, "viability_analysis": ""}
              
-        res_dict = response.dict()
+        res_dict = response.model_dump()
         return {
             "lead_score_analysis": res_dict,
             "viability_analysis": res_dict.get("viability_analysis", "")

@@ -22,6 +22,8 @@ def reduce_dict(left: dict, right: Union[dict, List[dict]]) -> dict:
 def reduce_last(left: any, right: any):
     """Reducer that always takes the latest value. Handles list of updates from parallel nodes."""
     if isinstance(right, list):
+        if not right:
+            return left
         return right[-1]
     return right
 
@@ -50,7 +52,7 @@ class AgentState(TypedDict):
     input_lead_data: InputLeadData
     user_profile_details: Annotated[dict, reduce_dict]
     scraped_website_content: Annotated[str, operator.add]
-    user_profile_analysis: Annotated[dict, reduce_last]
+    user_profile_analysis: Annotated[dict, reduce_dict]
     website_analysis: Annotated[dict, reduce_last]
     lead_extracted_data: Annotated[dict, reduce_last]
     sales_research_report: Annotated[Union[dict, str], reduce_last]
@@ -84,3 +86,4 @@ class AgentState(TypedDict):
     strategic_solutions: Annotated[Union[dict, str], reduce_last]
     personalized_outreach: Annotated[dict, reduce_last]
     follow_up_strategy: Annotated[Union[dict, str], reduce_last]
+    viability_analysis: Annotated[str, reduce_last]

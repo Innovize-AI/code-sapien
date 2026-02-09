@@ -66,8 +66,11 @@ async def get_integrations(db: AsyncSession = Depends(get_db)):
         email_config=settings.email_config,
         integrations_config=settings.integrations_config,
         kit_api_key=settings.kit_api_key,
-        kit_api_secret=settings.kit_api_secret
+        kit_api_secret=settings.kit_api_secret,
+        user_linkedin_url=settings.user_linkedin_url,
+        company_linkedin_url=settings.company_linkedin_url,
     )
+
 
 @settings_router.post("/settings/integrations", response_model=IntegrationSettings)
 async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depends(get_db)):
@@ -80,6 +83,8 @@ async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depend
     if settings:
         settings.tavily_api_key = data.tavily_api_key
         settings.apollo_api_key = data.apollo_api_key
+        settings.user_linkedin_url = data.user_linkedin_url
+        settings.company_linkedin_url = data.company_linkedin_url
         settings.email_config = data.email_config
         settings.integrations_config = data.integrations_config
         settings.kit_api_key = data.kit_api_key
@@ -91,9 +96,12 @@ async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depend
             email_config=data.email_config,
             integrations_config=data.integrations_config,
             kit_api_key=data.kit_api_key,
-            kit_api_secret=data.kit_api_secret
+            kit_api_secret=data.kit_api_secret,
+            user_linkedin_url=data.user_linkedin_url,
+            company_linkedin_url=data.company_linkedin_url,
         )
         db.add(settings)
+
         
     await db.commit()
     await db.refresh(settings)

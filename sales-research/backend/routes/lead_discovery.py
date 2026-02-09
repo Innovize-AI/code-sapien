@@ -14,7 +14,8 @@ class LeadDiscoveryInput(BaseModel):
     job_title: str = Field(..., description="Target job title, e.g., 'CTO', 'VP of Sales'")
     location: Optional[str] = Field(None, description="Target location, e.g., 'San Francisco', 'New York'")
     company_size: Optional[str] = Field(None, description="Target company size")
-    provider: Optional[str] = Field("tavily", description="Search provider: 'tavily' or 'apollo'")
+    provider: Optional[str] = Field("tavily", description="Search provider: 'tavily', 'apollo', or 'linkedin_keyword'")
+    keywords: Optional[List[str]] = Field(None, description="Keywords for LinkedIn post search")
 
 def generate_search_query(input_data: LeadDiscoveryInput) -> str:
     """

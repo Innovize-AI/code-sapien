@@ -1,17 +1,19 @@
 import json
 import uuid
 from typing import Optional, List
-from fastapi import APIRouter, Query, Depends, Body
+from fastapi import APIRouter, Query, Depends, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedin
+from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedin, batch_upsert_identified_profiles, _report_to_dict, _safe_deserialize
 from db.schemas import ResearchReportCreate
 from utils import add_https_if_missing
 from workflow.state import IdealProfile, InputLeadData
 from workflow.graph import graph, NODE_STATUS_MAPPING
 from prompts.sales_prompts import COMPANY_CONTEXT
 from .lead_discovery import LeadDiscoveryInput, find_leads_tavily, find_leads_apollo
+from agents.linkedin_agent import discover_leads_from_keywords
+from services.classification_service import run_classification_and_update
 from pydantic import BaseModel
 
 sales_router = APIRouter(tags=['Sales Research'], responses={404: {"description": "Not found"}},)
@@ -24,26 +26,39 @@ class BulkLeadInput(BaseModel):
     leads: List[LeadItem]
     options: InputLeadData
 
-async def _get_organization_icp() -> IdealProfile:
-    """Helper to fetch ICP from database settings."""
+async def _get_organization_settings() -> dict:
+    """Helper to fetch settings from database."""
     async with SessionLocal() as db:
         from sqlalchemy import select
         from db.models import OrganizationSettings
         result = await db.execute(select(OrganizationSettings).limit(1))
         settings = result.scalars().first()
-        if settings and settings.ideal_profile:
-            try:
-                return IdealProfile(**json.loads(settings.ideal_profile))
-            except Exception as e:
-                print(f"Error parsing ICP settings: {e}")
-    
-    # Fallback default
-    return IdealProfile(
-        industry="Finance",
-        company_size="10-50",
-        revenue="$10M+",
-        job_title="CTO, CEO"
-    )
+        
+        icp = IdealProfile(
+            industry="Finance",
+            company_size="10-50",
+            revenue="$10M+",
+            job_title="CTO, CEO"
+        )
+        
+        user_linkedin = None
+        company_linkedin = None
+
+        if settings:
+            if settings.icp_json:
+                try:
+                    icp = IdealProfile(**json.loads(settings.icp_json))
+                except Exception as e:
+                    print(f"Error parsing ICP settings: {e}")
+            user_linkedin = settings.user_linkedin_url
+            company_linkedin = settings.company_linkedin_url
+            
+        return {
+            "icp": icp,
+            "user_linkedin_url": user_linkedin,
+            "company_linkedin_url": company_linkedin
+        }
+
 
 class CheckReportsInput(BaseModel):
     leads: List[dict] # [{linkedin_url: str, email: str}]
@@ -54,21 +69,66 @@ async def check_existing_reports(
     db: AsyncSession = Depends(get_db)
 ):
     results = {}
+    if not input_data.leads:
+        return results
+
+    # Optimize with batch query
+    from sqlalchemy import select, or_
+    from db.models import ResearchReport
+    
+    conditions = []
+    
+    # Collect all emails and linkedin_urls to query in bulk
+    emails = set()
+    linkedin_urls = set()
+    
+    for lead in input_data.leads:
+        l_url = lead.get("linkedin_url") or lead.get("url")
+        email = lead.get("email")
+        if l_url: linkedin_urls.add(l_url)
+        if email: emails.add(email)
+        
+    # Build query
+    query_conditions = []
+    if linkedin_urls:
+         query_conditions.append(ResearchReport.linkedin_url.in_(linkedin_urls))
+    if emails:
+         query_conditions.append(ResearchReport.email_id.in_(emails))
+    
+    if not query_conditions:
+        return results
+        
+    stmt = select(ResearchReport).where(or_(*query_conditions))
+    db_results = await db.execute(stmt)
+    existing_reports = db_results.scalars().all()
+    
+    # Map results for fast lookup
+    report_map = {} # Key: url or email -> Report
+    for report in existing_reports:
+        if report.linkedin_url:
+            report_map[report.linkedin_url] = report
+        if report.email_id:
+            report_map[report.email_id] = report
+            
+    # Build response
     for lead in input_data.leads:
         linkedin_url = lead.get("linkedin_url") or lead.get("url")
         email = lead.get("email")
-        existing = await get_report_by_email_or_linkedin(
-            db, 
-            email_id=email, 
-            linkedin_url=linkedin_url
-        )
+        
+        found_report = None
+        if linkedin_url and linkedin_url in report_map:
+            found_report = report_map[linkedin_url]
+        elif email and email in report_map:
+            found_report = report_map[email]
+            
         key = linkedin_url or email
-        if existing and key:
-            results[key] = {
+        if found_report and key:
+             results[key] = {
                 "exists": True,
-                "report_id": str(existing.id),
-                "data": _report_to_dict(existing)
+                "report_id": str(found_report.id),
+                "data": _report_to_dict(found_report)
             }
+
     return results
 
 async def _persist_results(db, linkedin_url, website, final_state, options):
@@ -77,66 +137,76 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         print("Skipping database save: No research report generated.")
         return None
 
-    print(f"DEBUG: Final state keys: {list(final_state.keys())}")
-    
     # Extract numeric lead score if possible
     lead_score = None
-    score_analysis = final_state.get("lead_score_analysis", "")
+    score_analysis = final_state.get("lead_score_analysis")
     if score_analysis:
-        import re
-        match = re.search(r"Score:\s*(\d+)", score_analysis)
-        if match:
-            try:
-                lead_score = int(match.group(1))
-            except:
-                pass
+        if isinstance(score_analysis, dict):
+            lead_score = score_analysis.get("total_score")
+        elif isinstance(score_analysis, str):
+            import re
+            match = re.search(r"Score:\s*(\d+)", score_analysis)
+            if match:
+                try:
+                    lead_score = int(match.group(1))
+                except:
+                    pass
+
+    # _safe_serialize helper remains local as it's only for writing
+    def _safe_serialize(val):
+        if isinstance(val, (dict, list)):
+            return json.dumps(val)
+        return val or ""
 
     report_data = ResearchReportCreate(
         linkedin_url=linkedin_url or "",
         email_id=final_state.get("email_id") or "",
         website=website or "",
-        sales_research_report=final_state.get("sales_research_report"),
-        lead_score_analysis=score_analysis,
-        user_profile_analysis=final_state.get("user_profile_analysis"),
-        website_analysis=final_state.get("website_analysis"),
+        sales_research_report=_safe_serialize(final_state.get("sales_research_report")),
+        viability_analysis=_safe_serialize(final_state.get("viability_analysis")),
+        lead_score_analysis=json.dumps(final_state.get("lead_score_analysis") or {}),
+        user_profile_analysis=json.dumps(final_state.get("user_profile_analysis") or {}),
+        website_analysis=json.dumps(final_state.get("website_analysis") or {}),
         fullname=final_state.get("fullname"),
         profile_picture_url=final_state.get("profile_picture_url"),
+        company_name=final_state.get("company_name"),
+        company_description=final_state.get("company_description"),
+        company_industries=json.dumps(final_state.get("company_industries") or []),
+
         lead_score=lead_score,
         project_urgency=options.project_urgency if options else None,
         email_history=json.dumps(final_state.get("email_history") or []),
         intent_analysis=json.dumps(final_state.get("intent_analysis") or {}),
-        extra_metadata=json.dumps(final_state.get("extra_research_context") or {})
+        extra_metadata=json.dumps(final_state.get("extra_research_context") or {}),
+        
+        # Modular Nodules
+        target_pain_points=json.dumps(final_state.get("target_pain_points") or {}),
+        strategic_solutions=json.dumps(final_state.get("strategic_solutions") or {}),
+        personalized_outreach=json.dumps(final_state.get("personalized_outreach") or {}),
+        follow_up_strategy=_safe_serialize(final_state.get("follow_up_strategy")),
+        buyer_journey_analysis=json.dumps(final_state.get("buyer_journey_analysis") or {}),
+        meeting_notes=final_state.get("meeting_notes"),
+        
+        # LinkedIn Subgraph Data
+        post_engagements=json.dumps(final_state.get("post_engagements") or []),
+        company_news=json.dumps(final_state.get("company_news") or []),
+        hiring_data=json.dumps(final_state.get("hiring_data") or []),
+        company_stats=json.dumps(final_state.get("company_stats") or {}),
+        lead_li_urn=final_state.get("lead_li_urn"),
+        lead_company_linkedin_url=final_state.get("lead_company_linkedin_url")
     )
+
     
-    print(f"DEBUG: Saving report with email_history length: {len(final_state.get('email_history') or [])}")
     saved_report = await save_report(db, report_data)
     
     if saved_report:
-        print(f"DEBUG: Saved report with ID: {saved_report.id}")
         final_state["id"] = str(saved_report.id)
         return saved_report
     else:
-        print("DEBUG: Failed to save report or no object returned.")
         return None
 
-def _report_to_dict(report):
-    """Helper to convert ResearchReport model to final_state dictionary."""
-    return {
-        "id": str(report.id),
-        "linkedin_url": report.linkedin_url,
-        "email_id": report.email_id,
-        "website": report.website,
-        "sales_research_report": report.sales_research_report,
-        "lead_score_analysis": report.lead_score_analysis,
-        "user_profile_analysis": report.user_profile_analysis,
-        "website_analysis": report.website_analysis,
-        "fullname": report.fullname,
-        "profile_picture_url": report.profile_picture_url,
-        "lead_score": report.lead_score,
-        "email_history": json.loads(report.email_history) if report.email_history else [],
-        "intent_analysis": json.loads(report.intent_analysis) if report.intent_analysis else {},
-        "extra_metadata": json.loads(report.extra_metadata) if report.extra_metadata else {}
-    }
+# _report_to_dict and _safe_deserialize removed as they are now in db/crud.py
+
 
 def _prepare_state_for_json(state):
     """Helper to convert Pydantic models in the state to dicts for JSON serialization."""
@@ -145,31 +215,74 @@ def _prepare_state_for_json(state):
     
     cleaned = {}
     for k, v in state.items():
-        if hasattr(v, 'dict'):
-            cleaned[k] = v.dict()
-        elif hasattr(v, 'model_dump'):
+        if hasattr(v, 'model_dump'):
             cleaned[k] = v.model_dump()
+        elif hasattr(v, 'dict'):
+            cleaned[k] = v.dict()
         else:
             cleaned[k] = v
     return cleaned
 
-async def _run_research_gen(linkedin_url, website, options, email):
+async def _run_research_gen(linkedin_url, website, options: InputLeadData, email):
     """Core generator that runs the research graph and yields updates."""
     website = add_https_if_missing(website)
-    thread_id = str(uuid.uuid4())
+    thread_id = email if email else (linkedin_url if linkedin_url else str(uuid.uuid4()))
     thread = {"configurable": {"thread_id": thread_id}}
     
-    ideal_profile = await _get_organization_icp()
+    org_settings = await _get_organization_settings()
+    ideal_profile = org_settings["icp"]
+
+    # --- Persistent Agentic Memory: Load existing data from DB ---
+    existing_state = {}
+
+    if not options.refresh:
+        async with SessionLocal() as db:
+            existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
+            if existing:
+                print(f"Loading persistent memory for {email or linkedin_url}")
+                existing_state = _report_to_dict(existing)
 
     initial_state = {
         "email_id": email,
-        "linkedin_url": linkedin_url,
-        "website": website,
+        "linkedin_url": linkedin_url or existing_state.get("linkedin_url"),
+        "website": website or existing_state.get("website"),
         "company_context": COMPANY_CONTEXT,
         "ideal_profile": ideal_profile,
+        "user_linkedin_url": org_settings["user_linkedin_url"],
+        "company_linkedin_url": org_settings["company_linkedin_url"],
+        "lead_company_linkedin_url": existing_state.get("lead_company_linkedin_url", ""),
         "input_lead_data": options,
-        "extra_research_context": options.extra_metadata if options else None
+        "extra_research_context": options.extra_metadata if options else existing_state.get("extra_metadata"),
+        
+        "user_profile_details": existing_state.get("user_profile_details", {}),
+        "scraped_website_content": existing_state.get("scraped_website_content", ""),
+        
+        "user_profile_analysis": existing_state.get("user_profile_analysis", {}),
+        "website_analysis": existing_state.get("website_analysis", {}),
+        "lead_score_analysis": existing_state.get("lead_score_analysis", {}),
+        "target_pain_points": existing_state.get("target_pain_points", {}),
+        "strategic_solutions": existing_state.get("strategic_solutions", {}),
+        "personalized_outreach": existing_state.get("personalized_outreach", {}),
+        "follow_up_strategy": existing_state.get("follow_up_strategy", {}),
+        "buyer_journey_analysis": existing_state.get("buyer_journey_analysis", {}),
+        "intent_analysis": existing_state.get("intent_analysis", {}),
+        "email_history": existing_state.get("email_history", []),
+        
+        "post_engagements": existing_state.get("post_engagements", []),
+        "company_news": existing_state.get("company_news", []),
+        "hiring_data": existing_state.get("hiring_data", []),
+        "company_stats": existing_state.get("company_stats", {}),
+        
+        "company_name": existing_state.get("company_name", ""),
+        "company_description": existing_state.get("company_description", ""),
+        "company_industries": existing_state.get("company_industries", []),
+        "fullname": existing_state.get("fullname", ""),
+        "profile_picture_url": existing_state.get("profile_picture_url", ""),
+        
+        "sales_research_report": existing_state.get("sales_research_report", {}),
+        "meeting_notes": getattr(options, 'meeting_notes', '') if hasattr(options, 'meeting_notes') else options.get('meeting_notes', '') if isinstance(options, dict) else ''
     }
+
 
     final_state = initial_state.copy()
     
@@ -189,14 +302,7 @@ async def run_single_research(
     email: Optional[str] = None,
     progress_callback=None
 ):
-    # Check for existing report if refresh is not requested
-    if options and not options.refresh:
-        async with SessionLocal() as db:
-            existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
-            if existing:
-                if progress_callback:
-                    await progress_callback(linkedin_url, "Using existing report...")
-                return {"linkedin_url": linkedin_url, "result": _report_to_dict(existing)}
+    # Logic moved to graph routers for intelligent skipping
 
     final_state = {}
     try:
@@ -215,7 +321,7 @@ async def run_single_research(
         raise e
 
 @sales_router.post("/discover")
-async def discover_leads(input_data: LeadDiscoveryInput, db: AsyncSession = Depends(get_db)):
+async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     Endpoint to discover/find new leads based on criteria.
     """
@@ -231,10 +337,41 @@ async def discover_leads(input_data: LeadDiscoveryInput, db: AsyncSession = Depe
         apollo_key = settings.apollo_api_key if settings else None
         
         if input_data.provider == "apollo":
-            print(f"Discovering leads using Apollo for: {input_data}")
             leads = find_leads_apollo(input_data, api_key=apollo_key)
+        elif input_data.provider == "linkedin_keyword":
+            if not input_data.keywords:
+                return {"error": "Keywords are required for this provider."}
+            leads_data = await discover_leads_from_keywords(input_data.keywords)
+            
+            # Prepare for DB and Frontend
+            leads = []
+            raw_leads_to_save = []
+            
+            for l in leads_data:
+                # Map fields for consistency
+                l['comment'] = l.get('comment_text', '')
+                
+                raw_leads_to_save.append({
+                    "linkedin_url": l["linkedin_url"],
+                    "name": l["name"],
+                    "headline": l.get("headline"),
+                    "comment": l["comment"], 
+                    "source_post": l.get("source_post"),
+                    "source_post_url": l.get("source_post_url"),
+                    "competitor": l.get("competitor"),
+                    # Defaults
+                    "is_fit": False,
+                    "is_competitor": False,
+                    "is_decision_maker": False,
+                    "fit_reasoning": ""
+                })
+                leads.append(l)
+
+            # Upsert and trigger background task
+            if raw_leads_to_save:
+                 await batch_upsert_identified_profiles(db, raw_leads_to_save)
+                 background_tasks.add_task(run_classification_and_update, raw_leads_to_save)
         else:
-            print(f"Discovering leads using Tavily for: {input_data}")
             leads = find_leads_tavily(input_data, api_key=tavily_key)
         return {"leads": leads}
     except Exception as e:
@@ -249,13 +386,7 @@ async def run_research(
     db: AsyncSession = Depends(get_db)
 ):
     async def event_generator():
-        # Check for existing report if refresh is not requested
-        if not options.refresh:
-            existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
-            if existing:
-                yield f"data: {json.dumps({'status': 'Using existing report...'})}\n\n"
-                yield f"data: {json.dumps({'status': 'Done', 'result': _report_to_dict(existing)})}\n\n"
-                return
+        # Logic moved to graph routers for intelligent skipping
 
         final_state = {}
         try:

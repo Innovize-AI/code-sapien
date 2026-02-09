@@ -37,7 +37,7 @@ CSV upload of prospects (linkedin url and websites)
 
 # focus on report itself (use tavily deep agents or langraph depp agents)
 
-# waterfall likeoutreach priority (comment, hiring, etc)
+# waterfall like outreach priority (comment, hiring, etc)
 
 # add competitor lead gen
 

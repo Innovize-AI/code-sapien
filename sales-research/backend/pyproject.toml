@@ -7,14 +7,14 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-langgraph = "^0.2.0"
+langgraph = ">=1.0.7"
 langgraph-cli = "^0.1.58"
 langgraph-sdk = "^0.3.0"
 ipython = "^8.26.0"
 langchain = "^0.3.0"
 langchain-community = "^0.3.0"
 langchain-openai = "^0.2.0"
-langchain-core = "^0.3.0"
+langchain-core = ">=1.2.7"
 fastapi = "^0.112.2"
 uvicorn = "^0.30.6"
 python-dotenv = "^1.0.1"
@@ -27,6 +27,7 @@ imap-tools = "^1.5.0"
 pydantic-settings = "^2.2.1"
 apscheduler = "^3.11.2"
 ipykernel = "^6.29.0"
+
 
 
 [build-system]

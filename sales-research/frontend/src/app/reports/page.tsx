@@ -10,6 +10,7 @@ import { Search } from "lucide-react"
 
 function ReportPageContent() {
     const searchParams = useSearchParams()
+    const isPrintMode = searchParams.get("print") === "true"
     const idParam = searchParams.get("id")
     const [researchData, setResearchData] = useState(null)
     const [loading, setLoading] = useState(false)
@@ -32,6 +33,10 @@ function ReportPageContent() {
         }
         loadReport()
     }, [idParam])
+
+    if (isPrintMode && researchData) {
+        return <ReportDisplay data={researchData} printMode={true} />
+    }
 
     return (
         <div className="grid grid-cols-1 gap-8">

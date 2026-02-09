@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X } from "lucide-react";
+import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -79,9 +79,11 @@ interface ReportDisplayProps {
             [key: string]: any;
         };
         [key: string]: any;
+        id?: string; // Added for SSR download
     } | null;
 
     onRerun?: () => void;
+    printMode?: boolean;
 }
 
 type ActivityType = 'email' | 'linkedin_reaction' | 'linkedin_comment' | 'conversion' | 'discovery';
@@ -97,9 +99,26 @@ interface Activity {
 }
 
 
-export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
+export function ReportDisplay({ data, onRerun, printMode = false }: ReportDisplayProps) {
     const [activeSection, setActiveSection] = React.useState<number>(0);
     const [isNavVisible, setIsNavVisible] = React.useState<boolean>(true);
+    const reportRef = React.useRef<HTMLDivElement>(null);
+    const [isGenerating, setIsGenerating] = React.useState(false);
+
+    const downloadPDF = async () => {
+        if (!data?.id) return;
+        
+        setIsGenerating(true);
+        try {
+            // New SSR Download flow: just open the API endpoint in a new tab or trigger download
+            const downloadUrl = `/api/reports/${data.id}/pdf`;
+            window.location.assign(downloadUrl);
+        } catch (error) {
+            console.error('PDF download initiation failed:', error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     if (!data) {
         return null;
@@ -258,12 +277,14 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         if (content && typeof content === 'object' && !Array.isArray(content)) {
             return (
                 <div className={cn("relative group space-y-8", className)}>
-                    <div className="absolute right-0 -top-14 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                        <Button variant="outline" size="sm" onClick={handleCopy} className="h-9 gap-2 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
-                            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-                            {copied ? "Copied" : "Copy Section"}
-                        </Button>
-                    </div>
+                    {!printMode && (
+                        <div className="absolute right-0 -top-14 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                            <Button variant="outline" size="sm" onClick={handleCopy} className="h-9 gap-2 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                                {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                                {copied ? "Copied" : "Copy Section"}
+                            </Button>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 p-12 rounded-[2.5rem] bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800/60 transition-all duration-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
                         {Object.entries(content).map(([key, value]) => {
                             if (key === 'fit_assessment') {
@@ -507,12 +528,14 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
 
         return (
             <div className={cn("relative group space-y-8", className)}>
-                <div className="absolute right-0 -top-14 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                    <Button variant="outline" size="sm" onClick={handleCopy} className="h-9 gap-2 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
-                        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-                        {copied ? "Copied" : "Copy Section"}
-                    </Button>
-                </div>
+                {!printMode && (
+                    <div className="absolute right-0 -top-14 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                        <Button variant="outline" size="sm" onClick={handleCopy} className="h-9 gap-2 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copied ? "Copied" : "Copy Section"}
+                        </Button>
+                    </div>
+                )}
 
                 {/* Render non-activity segments first */}
                 {otherSegments.map((segment, idx) => (
@@ -668,127 +691,151 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                         </div>
                     </div>
 
-                    {onRerun && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={onRerun}
-                            className="bg-white/10 hover:bg-white/20 border-white/20 text-white gap-2"
-                        >
-                            <Zap className="h-4 w-4" />
-                            Re-run Analysis
-                        </Button>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {onRerun && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onRerun}
+                                className="bg-white/10 hover:bg-white/20 border-white/20 text-white gap-2"
+                            >
+                                <Zap className="h-4 w-4" />
+                                Re-run Analysis
+                            </Button>
+                        )}
+                        {!printMode && (
+                            <Button
+                                variant="outline"
+                                onClick={downloadPDF}
+                                disabled={isGenerating || !data?.id}
+                                className="rounded-xl border-zinc-200 dark:border-zinc-800"
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                                        Preparing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Download PDF
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-12 items-start">
-                <div className={cn(
-                    "sticky top-24 shrink-0 space-y-8 transition-all duration-300",
-                    isNavVisible ? "w-80" : "w-16"
-                )}>
+                {!printMode && (
                     <div className={cn(
-                        "rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-8 relative transition-all duration-300",
-                        isNavVisible ? "p-8" : "p-3"
+                        "sticky top-24 shrink-0 space-y-8 transition-all duration-300",
+                        isNavVisible ? "w-80" : "w-16"
                     )}>
-                        {/* Toggle Button - Top Right Corner */}
-                        <button
-                            onClick={() => setIsNavVisible(!isNavVisible)}
-                            className="absolute -right-3 top-4 p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all shadow-sm z-10"
-                            title={isNavVisible ? "Close sidebar" : "Open sidebar"}
-                        >
-                            {isNavVisible ? <ChevronRight className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-                        </button>
+                        <div className={cn(
+                            "rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-8 relative transition-all duration-300",
+                            isNavVisible ? "p-8" : "p-3"
+                        )}>
+                            {/* Toggle Button - Top Right Corner */}
+                            <button
+                                onClick={() => setIsNavVisible(!isNavVisible)}
+                                className="absolute -right-3 top-4 p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all shadow-sm z-10"
+                                title={isNavVisible ? "Close sidebar" : "Open sidebar"}
+                            >
+                                {isNavVisible ? <ChevronRight className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                            </button>
 
-                        {isNavVisible ? (
-                            <div>
+                            {isNavVisible ? (
                                 <div>
-                                    <div className="flex items-center gap-2 mb-6 px-1">
-                                        <LayoutDashboard className="h-4 w-4 text-primary" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Navigation</span>
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-6 px-1">
+                                            <LayoutDashboard className="h-4 w-4 text-primary" />
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Navigation</span>
+                                        </div>
+                                        <nav className="space-y-2">
+                                            {sections.map((section, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => {
+                                                        setActiveSection(idx);
+                                                        const el = document.getElementById(section.id);
+                                                        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                    }}
+                                                    className={cn(
+                                                        "w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-black transition-all duration-500 group border border-transparent",
+                                                        activeSection === idx
+                                                            ? "bg-primary text-white border-primary translate-x-3"
+                                                            : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        {React.cloneElement(section.icon as any, { className: cn("h-4 w-4 transition-transform group-hover:scale-110", activeSection === idx ? "text-white" : "text-zinc-400 group-hover:text-primary") })}
+                                                        {section.title}
+                                                    </div>
+                                                    <ChevronRight className={cn("h-3 w-3 transition-all duration-500", activeSection === idx ? "rotate-90" : "opacity-0 -translate-x-2")} />
+                                                </button>
+                                            ))}
+                                        </nav>
                                     </div>
-                                    <nav className="space-y-2">
-                                        {sections.map((section, idx) => (
-                                            <button
-                                                key={idx}
-                                                onClick={() => {
-                                                    setActiveSection(idx);
-                                                    const el = document.getElementById(section.id);
-                                                    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                }}
-                                                className={cn(
-                                                    "w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-black transition-all duration-500 group border border-transparent",
-                                                    activeSection === idx
-                                                        ? "bg-primary text-white border-primary translate-x-3"
-                                                        : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
-                                                )}
-                                            >
-                                                <div className="flex items-center gap-4">
-                                                    {React.cloneElement(section.icon as any, { className: cn("h-4 w-4 transition-transform group-hover:scale-110", activeSection === idx ? "text-white" : "text-zinc-400 group-hover:text-primary") })}
-                                                    {section.title}
-                                                </div>
-                                                <ChevronRight className={cn("h-3 w-3 transition-all duration-500", activeSection === idx ? "rotate-90" : "opacity-0 -translate-x-2")} />
-                                            </button>
-                                        ))}
-                                    </nav>
-                                </div>
 
-                                <div className="pt-8 border-t border-zinc-100 dark:border-zinc-900">
-                                    <div className="flex items-center gap-2 mb-4 px-1">
-                                        <Zap className="h-4 w-4 text-emerald-500" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Tactical actions</span>
-                                    </div>
-                                    <div className="space-y-4">
-                                        {tacticalActions.map((action, i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => {
-                                                    const el = document.getElementById('strategy');
-                                                    el?.scrollIntoView({ behavior: 'smooth' });
-                                                }}
-                                                className="w-full flex items-center gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-transparent hover:border-primary/20 transition-all text-left"
-                                            >
-                                                <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                                                    {action.icon}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="text-[11px] font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">{action.title}</div>
-                                                    <div className="text-[10px] font-bold text-zinc-500 tracking-tighter">Draft Ready</div>
-                                                </div>
-                                            </button>
-                                        ))}
+                                    <div className="pt-8 border-t border-zinc-100 dark:border-zinc-900">
+                                        <div className="flex items-center gap-2 mb-4 px-1">
+                                            <Zap className="h-4 w-4 text-emerald-500" />
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Tactical actions</span>
+                                        </div>
+                                        <div className="space-y-4">
+                                            {tacticalActions.map((action, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => {
+                                                        const el = document.getElementById('strategy');
+                                                        el?.scrollIntoView({ behavior: 'smooth' });
+                                                    }}
+                                                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-transparent hover:border-primary/20 transition-all text-left"
+                                                >
+                                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                                        {action.icon}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="text-[11px] font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">{action.title}</div>
+                                                        <div className="text-[10px] font-bold text-zinc-500 tracking-tighter">Draft Ready</div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <nav className="space-y-3">
-                                {sections.map((section, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => {
-                                            setActiveSection(idx);
-                                            const el = document.getElementById(section.id);
-                                            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                        }}
-                                        className={cn(
-                                            "w-full p-3 rounded-xl transition-all duration-300 group",
-                                            activeSection === idx
-                                                ? "bg-primary text-white"
-                                                : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-primary"
-                                        )}
-                                        title={section.title}
-                                    >
-                                        {React.cloneElement(section.icon as any, {
-                                            className: cn("h-5 w-5 mx-auto", activeSection === idx ? "text-white" : "")
-                                        })}
-                                    </button>
-                                ))}
-                            </nav>
-                        )}
+                            ) : (
+                                <nav className="space-y-3">
+                                    {sections.map((section, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                setActiveSection(idx);
+                                                const el = document.getElementById(section.id);
+                                                el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }}
+                                            className={cn(
+                                                "w-full p-3 rounded-xl transition-all duration-300 group",
+                                                activeSection === idx
+                                                    ? "bg-primary text-white"
+                                                    : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-primary"
+                                            )}
+                                            title={section.title}
+                                        >
+                                            {React.cloneElement(section.icon as any, {
+                                                className: cn("h-5 w-5 mx-auto", activeSection === idx ? "text-white" : "")
+                                            })}
+                                        </button>
+                                    ))}
+                                </nav>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
-                <div className="flex-1 space-y-12 min-w-0 pb-32">
+                <div className="flex-1 space-y-12 min-w-0 pb-32" ref={reportRef}>
                     {sections.map((section, index) => (
                         <div
                             key={index}
@@ -845,19 +892,21 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                             action.type === 'email' ? "bg-zinc-900 text-white shadow-2xl" : "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800"
                                                         )}
                                                     >
-                                                        <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                                                            <Button
-                                                                size="sm"
-                                                                variant={action.type === 'email' ? "secondary" : "outline"}
-                                                                className="h-9 px-4 rounded-xl gap-2 font-black uppercase tracking-tighter text-[10px]"
-                                                                onClick={() => {
-                                                                    navigator.clipboard.writeText(action.content);
-                                                                }}
-                                                            >
-                                                                <Copy className="h-3.5 w-3.5" />
-                                                                Copy {action.title.split(' ')[1] || 'Draft'}
-                                                            </Button>
-                                                        </div>
+                                                        {!printMode && (
+                                                            <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant={action.type === 'email' ? "secondary" : "outline"}
+                                                                    className="h-9 px-4 rounded-xl gap-2 font-black uppercase tracking-tighter text-[10px]"
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(action.content);
+                                                                    }}
+                                                                >
+                                                                    <Copy className="h-3.5 w-3.5" />
+                                                                    Copy {action.title.split(' ')[1] || 'Draft'}
+                                                                </Button>
+                                                            </div>
+                                                        )}
 
                                                         <div className="flex items-center gap-4 mb-8">
                                                             <div className={cn(
@@ -1237,17 +1286,19 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                             <Mail className="h-4 w-4 text-primary" />
                                                             Recommended Follow-up Email
                                                         </h3>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 gap-2 group"
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(data.intent_analysis?.recommended_email || "");
-                                                            }}
-                                                        >
-                                                            <Copy className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
-                                                            Copy Email
-                                                        </Button>
+                                                        {!printMode && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 gap-2 group"
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(data.intent_analysis?.recommended_email || "");
+                                                                }}
+                                                            >
+                                                                <Copy className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+                                                                Copy Email
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                     <div className="relative group p-8 rounded-2xl bg-zinc-900 text-white border border-zinc-800 shadow-xl overflow-hidden">
                                                         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] rounded-full -mr-16 -mt-16 pointer-events-none" />

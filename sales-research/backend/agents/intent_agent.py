@@ -11,6 +11,7 @@ from db.database import SessionLocal
 from db.models import OrganizationSettings
 from services.email_service import EmailService, EmailConfig
 from workflow.state import AgentState
+from utils.activity_helper import log_activity_and_notify
 
 from prompts.sales_prompts import INTENT_ANALYZER_PROMPT
 
@@ -103,6 +104,18 @@ async def email_history_node(state: AgentState):
                     print("Incomplete email config in DB.")
             except Exception as e:
                 print(f"Error parsing email config or fetching emails: {e}")
+            
+            # 1.1 Log Activity if new incoming emails found
+            incoming_emails = [e for e in email_history if e.get('direction') == 'incoming']
+            if incoming_emails:
+                latest_email = incoming_emails[0] # Assuming first is latest
+                await log_activity_and_notify(
+                    db,
+                    type="email",
+                    title=f"New Email Interaction: {email_id}",
+                    description=f"Received: {latest_email.get('subject')}",
+                    metadata={"email": email_id, "subject": latest_email.get('subject')}
+                )
         else:
             print("No email config found in settings.")
 

@@ -4,6 +4,7 @@ from typing import List
 from db.database import SessionLocal
 from db import batch_upsert_identified_profiles
 from agents.linkedin_agent import batch_classify_profiles_async
+from utils.activity_helper import log_activity_and_notify
 
 class EventStreamManager:
     def __init__(self):
@@ -74,7 +75,15 @@ async def run_classification_and_update(raw_leads: List[dict]):
                             "is_fit": c.get("is_fit"),
                             "is_competitor": c.get("is_competitor"),
                             "is_decision_maker": c.get("is_decision_maker"),
-                            "fit_reasoning": c.get("reasoning")
+                            "fit_reasoning": c.get("reasoning"),
+                            "intent": c.get("intent"),
+                            "sentiment": c.get("sentiment"),
+                            # Carry over metadata from raw lead
+                            "name": lead.get("name"),
+                            "comment": lead.get("comment"),
+                            "source_post": lead.get("source_post"),
+                            "source_post_url": lead.get("source_post_url"),
+                            "competitor": lead.get("competitor")
                         }
                         leads_to_update_batch.append(updated_data)
                         event_leads_batch.append(updated_data)
@@ -83,9 +92,22 @@ async def run_classification_and_update(raw_leads: List[dict]):
             if leads_to_update_batch:
                 async with SessionLocal() as session:
                     async with session.begin():
-                         await batch_upsert_identified_profiles(session, leads_to_update_batch)
+                        await batch_upsert_identified_profiles(session, leads_to_update_batch)
                 
                 print(f"DEBUG: Batch {i//batch_size + 1} - Updated {len(leads_to_update_batch)} profiles")
+                
+                # D. Trigger Individual Notifications for Hot Leads or Pain Points
+                for lu in leads_to_update_batch:
+                    if lu.get("is_fit") or lu.get("intent") == "pain_point":
+                        async with SessionLocal() as session:
+                            # We don't use session.begin() here because log_activity_and_notify handles its own commits via CRUD
+                            await log_activity_and_notify(
+                                session,
+                                type="high_potential" if lu.get("is_fit") else "comment",
+                                title=f"Hot Lead: {lu.get('name') or 'Someone'} linked to {lu.get('competitor') or 'competitor'}",
+                                description=f"Intent: {lu.get('intent')} | Sentiment: {lu.get('sentiment')}\nComment: {lu.get('comment')}",
+                                metadata=lu
+                            )
                 
                 await event_manager.broadcast({
                     "type": "classification_update",

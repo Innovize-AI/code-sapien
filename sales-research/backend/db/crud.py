@@ -6,7 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy import desc, or_, func, text
 from sqlalchemy.dialects.postgresql import insert, JSONB
 from sqlalchemy import Table
-from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile
+from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile, Activity, OrganizationSettings
 from db.schemas import ResearchReportCreate
 
 def _safe_deserialize(val):
@@ -130,6 +130,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "is_competitor": l.get("is_competitor"),
                 "is_decision_maker": l.get("is_decision_maker"),
                 "fit_reasoning": l.get("fit_reasoning"),
+                "intent": l.get("intent"),
+                "sentiment": l.get("sentiment"),
                 "interactions": []
             }
         elif l.get("headline") and not batch_map[url].get("headline"):
@@ -141,6 +143,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
         if l.get("is_decision_maker"): batch_map[url]["is_decision_maker"] = True
         if l.get("fit_reasoning") and not batch_map[url].get("fit_reasoning"):
             batch_map[url]["fit_reasoning"] = l.get("fit_reasoning")
+        if l.get("intent"): batch_map[url]["intent"] = l.get("intent")
+        if l.get("sentiment"): batch_map[url]["sentiment"] = l.get("sentiment")
         
         # Helper for URL normalization (strip query and trailing slash)
         n_source_url = normalize(l.get("source_post_url"))
@@ -232,6 +236,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "is_competitor": data.get("is_competitor") or p.is_competitor,
                 "is_decision_maker": data.get("is_decision_maker") or p.is_decision_maker,
                 "fit_reasoning": data.get("fit_reasoning") or p.fit_reasoning,
+                "intent": data.get("intent") or p.intent,
+                "sentiment": data.get("sentiment") or p.sentiment,
                 "comment_history": json.dumps(db_comments),
                 "source_posts": json.dumps(db_sources),
                 "interaction_history": json.dumps(db_history),
@@ -280,6 +286,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "is_competitor": data.get("is_competitor"),
                 "is_decision_maker": data.get("is_decision_maker"),
                 "fit_reasoning": data.get("fit_reasoning"),
+                "intent": data.get("intent"),
+                "sentiment": data.get("sentiment"),
                 "comment_history": json.dumps(legacy_comments),
                 "source_posts": json.dumps(legacy_sources),
                 "interaction_history": json.dumps(new_history),
@@ -369,12 +377,25 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict):
     await db.refresh(db_profile)
     return db_profile
 
-async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100):
+async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100, search_query: str = None):
     # Sort by number of touchpoints (length of source_posts array)
     # Join with ResearchReport to check if report exists
     query = select(IdentifiedProfile, ResearchReport.id.label("report_id")).outerjoin(
         ResearchReport, IdentifiedProfile.linkedin_url == ResearchReport.linkedin_url
-    ).order_by(
+    )
+    
+    if search_query:
+        search = f"%{search_query}%"
+        query = query.where(
+            or_(
+                IdentifiedProfile.name.ilike(search),
+                IdentifiedProfile.headline.ilike(search),
+                IdentifiedProfile.fit_reasoning.ilike(search),
+                IdentifiedProfile.intent.ilike(search)
+            )
+        )
+        
+    query = query.order_by(
         desc(func.jsonb_array_length(func.cast(func.coalesce(IdentifiedProfile.source_posts, '[]'), JSONB))),
         desc(IdentifiedProfile.last_interaction_at)
     ).offset(skip).limit(limit)
@@ -394,8 +415,18 @@ async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 
         
     return profiles
 
-async def count_identified_profiles(db: AsyncSession):
+async def count_identified_profiles(db: AsyncSession, search_query: str = None):
     query = select(func.count()).select_from(IdentifiedProfile)
+    if search_query:
+        search = f"%{search_query}%"
+        query = query.where(
+            or_(
+                IdentifiedProfile.name.ilike(search),
+                IdentifiedProfile.headline.ilike(search),
+                IdentifiedProfile.fit_reasoning.ilike(search),
+                IdentifiedProfile.intent.ilike(search)
+            )
+        )
     result = await db.execute(query)
     return result.scalar()
 
@@ -470,3 +501,25 @@ async def delete_competitor(db: AsyncSession, competitor_id: str):
         await db.commit()
         return True
     return False
+
+async def create_activity(db: AsyncSession, type: str, title: str, description: str = None, metadata_json: str = None, intent: str = None, sentiment: str = None):
+    activity = Activity(
+        type=type,
+        title=title,
+        description=description,
+        metadata_json=metadata_json,
+        intent=intent,
+        sentiment=sentiment
+    )
+    db.add(activity)
+    await db.commit()
+    await db.refresh(activity)
+    return activity
+
+async def get_activities(db: AsyncSession, limit: int = 50):
+    result = await db.execute(select(Activity).order_by(desc(Activity.created_at)).limit(limit))
+    return result.scalars().all()
+
+async def get_org_settings(db: AsyncSession):
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    return result.scalars().first()

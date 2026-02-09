@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fetchDashboardStats, fetchHistory, DashboardStats, getOnboardingStatus } from "@/lib/api";
+import { ActivityBoard } from "@/components/dashboard/activity-board";
 
 export default function Home() {
     const router = useRouter();
@@ -62,9 +63,9 @@ export default function Home() {
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-primary">Innovize AI</h1>
                         <p className="text-muted-foreground mt-1">
-                            Welcome back. Here's what's happening with your sales research.
+                            Welcome back. Here's your revenue intelligence overview.
                         </p>
                     </div>
                     <div className="flex gap-2">
@@ -149,8 +150,13 @@ export default function Home() {
                         </CardContent>
                     </Card>
 
-                    {/* Recent History - Spans 3 columns */}
-                    <Card className="col-span-3">
+                    {/* Activity Board - Spans 3 columns */}
+                    <ActivityBoard className="col-span-3" />
+                </div>
+
+                <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">
+                    {/* Recent History - Spans 3 columns (now increased or full width) */}
+                    <Card className="col-span-7">
                         <CardHeader>
                             <CardTitle>Recent Reports</CardTitle>
                             <CardDescription>

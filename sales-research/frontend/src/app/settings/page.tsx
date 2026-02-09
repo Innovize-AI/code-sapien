@@ -37,6 +37,7 @@ const keysFormSchema = z.object({
     user_linkedin_url: z.string().optional().refine(val => !val || val.includes("linkedin.com"), "Must be a valid LinkedIn URL"),
     company_linkedin_url: z.string().optional().refine(val => !val || val.includes("linkedin.com"), "Must be a valid LinkedIn URL"),
     email_config: z.string().optional(),
+    slack_webhook_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 })
 
 
@@ -68,6 +69,7 @@ export default function SettingsPage() {
             user_linkedin_url: "",
             company_linkedin_url: "",
             email_config: "",
+            slack_webhook_url: "",
         },
 
     })
@@ -320,6 +322,22 @@ export default function SettingsPage() {
                                                         <Input placeholder="https://linkedin.com/company/yourcompany" {...field} />
                                                     </FormControl>
                                                     <FormDescription>Used to track lead engagement with company posts.</FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                    <div className="grid gap-4 mt-4">
+                                        <FormField
+                                            control={keysForm.control}
+                                            name="slack_webhook_url"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Slack Webhook URL (Optional)</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="https://hooks.slack.com/services/..." {...field} />
+                                                    </FormControl>
+                                                    <FormDescription>Used for real-time activity notifications.</FormDescription>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}

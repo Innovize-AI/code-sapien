@@ -297,7 +297,7 @@ Deliver a **Global Executive Blueprint** as a JSON object matching the `GlobalEx
 '''
 
 COMPANY_CONTEXT = '''
-    Innovize AI is a cutting-edge AI company specializing in customizable AI automation solutions designed to empower businesses without the need for extensive technical knowledge.
+    Innovize AI is a cutting-edge Revenue Intelligence Platform specializing in AI-driven sales research and customizable automation solutions designed to empower revenue teams.
 
     With Innovize AI, companies can automate complex, human-dependent processes across various departments, including sales, marketing, and IT, by seamlessly integrating AI-driven workflows into their daily operations.
 
@@ -387,6 +387,12 @@ For EACH profile, determine:
 1. Is this person a COMPETITOR? (Works for a company offering similar AI automation/sales solutions, or is a direct rival).
 2. Is this person a POTENTIAL FIT? (Ideally matches the ICP interaction: e.g., Founder, Sales Leader, Operations, etc. who could BUY the solution).
 3. Is this person a DECISION MAKER? (C-Level, VP, Director, Founder, Head of Dept).
+4. What is their INTENT? 
+    - 'interested': Expressing interest, asking for price/info.
+    - 'pain_point': Complaining about a competitor or expressing a struggle.
+    - 'curious': Generic engagement.
+    - 'competitor': They are a competitor.
+5. What is the SENTIMENT? (positive, neutral, negative).
 
 Output strictly in JSON format as a list of objects:
 {{
@@ -396,7 +402,9 @@ Output strictly in JSON format as a list of objects:
       "is_competitor": boolean,
       "is_fit": boolean,
       "is_decision_maker": boolean,
-      "reasoning": "Brief explanation."
+      "reasoning": "Brief explanation.",
+      "intent": "string (interested, pain_point, curous, or competitor)",
+      "sentiment": "string (positive, neutral, negative)"
     }},
     ...
   ]

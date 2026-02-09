@@ -111,6 +111,7 @@ class OrganizationSettings(Base):
     onboarding_complete = Column(Integer, server_default=text("0"), nullable=False) # 0 or 1
     kit_api_key = Column(String, nullable=True) # Public Key for v3
     kit_api_secret = Column(String, nullable=True) # Secret Key for v3
+    slack_webhook_url = Column(String, nullable=True)
 
 class CompetitorAnalysis(Base):
     __tablename__ = "competitor_analysis"
@@ -145,6 +146,8 @@ class IdentifiedProfile(Base):
     is_competitor = Column(Boolean, default=False)
     is_decision_maker = Column(Boolean, default=False)
     fit_reasoning = Column(Text, nullable=True)
+    intent = Column(String, nullable=True) # 'interested', 'pain_point', 'curious'
+    sentiment = Column(String, nullable=True) # 'positive', 'neutral', 'negative'
 
     # Aggregated Data
     comment_history = Column(Text, nullable=True) # JSON array of comments
@@ -154,3 +157,16 @@ class IdentifiedProfile(Base):
     # Status/Metadata
     last_interaction_at = Column(DateTime(timezone=True), server_default=text("now()"))
     profile_metadata = Column(Text, nullable=True)         # JSON for flexibility
+
+class Activity(Base):
+    __tablename__ = "activities"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    type = Column(String, nullable=False) # 'meeting', 'email', 'comment', 'analysis', 'high_potential'
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    metadata_json = Column(Text, nullable=True) # JSON object for extra details
+    intent = Column(String, nullable=True)
+    sentiment = Column(String, nullable=True)

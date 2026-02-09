@@ -42,6 +42,11 @@ class InputLeadData(BaseModel):
     referral_partner_introduction: Optional[bool] = None
     project_urgency: Optional[int] = None
     refresh: bool = False
+    
+    # Discovery Context (New)
+    discovery_source: Optional[str] = None # 'competitor_comment', 'keyword_search', 'form_fill'
+    discovery_context: Optional[dict] = None # { "comment": "...", "post_url": "...", "keyword": "..." }
+    
     extra_metadata: Optional[dict] = None # For webhook/form extras
 
 class AgentState(TypedDict):
@@ -78,6 +83,7 @@ class AgentState(TypedDict):
     company_description: Annotated[Optional[str], reduce_last]
     company_industries: Annotated[Optional[List[str]], reduce_last]
     company_stats: Annotated[Optional[dict], reduce_last]
+    discovery_interaction_history: Annotated[List[dict], reduce_last]
 
 
     # Specialized Nodules

@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X } from "lucide-react";
+import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -73,6 +73,12 @@ interface ReportDisplayProps {
         }>;
         extra_metadata?: {
             lead_source?: string;
+            lead_extracted_data?: {
+                discovery_insights?: string;
+                [key: string]: any;
+            };
+            discovery_source?: string;
+            discovery_context?: any;
             download_marketing_material?: boolean;
             demo_requested?: boolean;
             referral_partner_introduction?: boolean;
@@ -209,8 +215,30 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         tactical?: any[];
     }
 
+    const extraMetadata = data.extra_metadata || {};
+    const inputLeadData = (data as any).input_lead_data || {};
+    
+    const discoverySource = extraMetadata.discovery_source || inputLeadData.discovery_source;
+    const discoveryContext = extraMetadata.discovery_context || inputLeadData.discovery_context;
+    const discoveryInsights = extraMetadata.lead_extracted_data?.discovery_insights || 
+                             inputLeadData.lead_extracted_data?.discovery_insights || 
+                             (data as any).lead_extracted_data?.discovery_insights;
+
     const sections: Section[] = [
         { id: "synthesis", title: "Executive Blueprint", icon: <LayoutDashboard className="h-4 w-4" />, content: data.sales_research_report, badge: "CSO Briefing", isPrimary: true },
+        // Discovery Intelligence (New) - ONLY for competitor posts
+        ...(discoverySource === 'competitor_comment' ? [{
+            id: "discovery",
+            title: "Discovery Intelligence",
+            icon: <Search className="h-4 w-4" />,
+            content: {
+                "source_analysis": discoveryInsights,
+                "original_context": discoveryContext,
+                "discovery_source": discoverySource
+            },
+            badge: "Origin"
+        }] : []),
+
         { id: "journey", title: "Buyer Journey", icon: <TrendingUp className="h-4 w-4" />, content: "", badge: "Strategy", isJourney: true },
         { id: "profile", title: "Profile Intelligence", icon: <User className="h-4 w-4" />, content: data.user_profile_analysis, badge: "Intelligence" },
         { id: "activity", title: "Activity Board", icon: <BarChart3 className="h-4 w-4" />, content: "", badge: "Real-time", isActivity: true },
@@ -833,6 +861,72 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                     )}
                                 </CardHeader>
                                 <CardContent className="px-12 pb-16">
+                                    {/* Discovery Intelligence Rendering */}
+                                    {section.id === "discovery" && (
+                                        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                            {/* Pattern Analysis Card */}
+                                            <div className="relative group">
+                                                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-primary/5 rounded-[3rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                                                <div className="relative p-10 rounded-[2.5rem] bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-white/5 shadow-2xl shadow-primary/5">
+                                                    <div className="flex flex-wrap items-center justify-between gap-6 mb-8 pb-6 border-b border-zinc-100 dark:border-white/5">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
+                                                                <TrendingUp className="h-6 w-6 text-primary" />
+                                                            </div>
+                                                            <div>
+                                                                <h3 className="text-xl font-black text-zinc-900 dark:text-white">Behavioral Pattern Analysis</h3>
+                                                                <p className="text-[11px] font-bold text-primary uppercase tracking-[0.2em] mt-1">AI-Synthesized Insights</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Interaction Origin</span>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <Badge variant="secondary" className="text-[10px] font-black uppercase bg-primary/10 text-primary border-none">
+                                                                        {(section.content as any).discovery_source || "Manual Discovery"}
+                                                                    </Badge>
+                                                                    <span className="text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300">
+                                                                        • {(section.content as any).original_context?.comments?.length || 0} Key Signals
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="prose prose-zinc dark:prose-invert max-w-none text-[17px] leading-[1.8] font-medium text-zinc-700 dark:text-zinc-300 antialiased italic">
+                                                        <ReactMarkdown>
+                                                            {(section.content as any).source_analysis || "No patterns identified yet."}
+                                                        </ReactMarkdown>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Contextual History */}
+                                            <div className="p-8 rounded-[2.5rem] bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-white/5">
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <MessageSquare className="h-4 w-4 text-zinc-400" />
+                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Original Discovery Context</h4>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {(section.content as any).original_context?.comments ? (
+                                                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {(section.content as any).original_context.comments.map((c: string, i: number) => (
+                                                                <li key={i} className="text-[15px] text-zinc-600 dark:text-zinc-400 leading-relaxed italic border-l-2 border-primary/30 pl-5 py-3 bg-white dark:bg-zinc-950/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors rounded-r-2xl border border-zinc-100 dark:border-white/5">
+                                                                    "{c}"
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : (
+                                                        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                                                            <Info className="h-5 w-5 text-zinc-300 mb-2" />
+                                                            <p className="text-sm text-zinc-400 italic">No specific comments recorded.</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     {section.id === 'outreach' && tacticalActions.length > 0 && (
                                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1354,11 +1448,13 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                         </div>
                                     )}
 
-                                    <DynamicContent
-                                        content={section.content}
-                                        title={section.title}
-                                        isSocial={section.id === 'profile'}
-                                    />
+                                    {!(section.isActivity || section.isIntent || section.isOutreach || section.isJourney || section.id === 'discovery' || section.id === 'lead-score') && (
+                                        <DynamicContent
+                                            content={section.content}
+                                            title={section.title}
+                                            isSocial={section.id === 'profile'}
+                                        />
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>

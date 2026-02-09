@@ -4,7 +4,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy import select
 
 from db.database import SessionLocal
@@ -12,11 +12,14 @@ from db.models import OrganizationSettings
 from services.email_service import EmailService, EmailConfig
 from workflow.state import AgentState
 
+from prompts.sales_prompts import INTENT_ANALYZER_PROMPT
+
 class IntentAnalysisResult(BaseModel):
     intent: str = Field(description="The primary intent of the lead (e.g., Interested, Not Interested, Pricing Query, Comparison, Cold)")
     summary: str = Field(description="A brief summary of the conversation history.")
     next_steps: str = Field(description="Recommended next steps for the sales rep.")
     sentiment: str = Field(description="Overall sentiment: Positive, Negative, or Neutral")
+    recommended_email: Optional[str] = Field(None, description="A ready-to-send, human-like email draft if the next step involves a follow-up. Keep it concise, professional, and personalized.")
 
 def analyze_email_intent(email_history: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
@@ -27,7 +30,8 @@ def analyze_email_intent(email_history: List[Dict[str, Any]]) -> Dict[str, Any]:
             "intent": "No Data",
             "summary": "No email history found.",
             "next_steps": "Initiate first contact.",
-            "sentiment": "Neutral"
+            "sentiment": "Neutral",
+            "recommended_email": "Hi, I noticed we haven't connected yet. I'd love to chat about how we can help with your goals. Let me know if you have time this week."
         }
 
     # Format history for the prompt
@@ -46,16 +50,7 @@ def analyze_email_intent(email_history: List[Dict[str, Any]]) -> Dict[str, Any]:
     parser = JsonOutputParser(pydantic_object=IntentAnalysisResult)
     
     prompt = PromptTemplate(
-        template="""You are a senior sales strategist. Analyze the following email conversation history between a sales rep and a lead.
-        
-        Determine the lead's current Intent, summarize the interaction, suggest the Next Best Action, and gauge the Sentiment.
-        
-        <conversation_history>
-        {conversation_history}
-        </conversation_history>
-        
-        {format_instructions}
-        """,
+        template=INTENT_ANALYZER_PROMPT,
         input_variables=["conversation_history"],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
@@ -71,7 +66,8 @@ def analyze_email_intent(email_history: List[Dict[str, Any]]) -> Dict[str, Any]:
             "intent": "Error",
             "summary": f"Failed to analyze conversation: {e}",
             "next_steps": "Check logs.",
-            "sentiment": "Unknown"
+            "sentiment": "Unknown",
+            "recommended_email": None
         }
 
 async def email_history_node(state: AgentState):

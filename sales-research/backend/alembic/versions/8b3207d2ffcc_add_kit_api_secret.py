@@ -1,7 +1,7 @@
 """Add kit api secret
 
 Revision ID: 8b3207d2ffcc
-Revises: 2c20b9318e35
+Revises: 913e2401f88e
 Create Date: 2026-01-05 00:08:51.682910
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '8b3207d2ffcc'
-down_revision: Union[str, Sequence[str], None] = '2c20b9318e35'
+down_revision: Union[str, Sequence[str], None] = '913e2401f88e'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

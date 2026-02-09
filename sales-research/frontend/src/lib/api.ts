@@ -92,7 +92,8 @@ export interface LeadDiscoveryInput {
     job_title: string;
     location?: string;
     company_size?: string;
-    provider?: 'tavily' | 'apollo';
+    provider?: 'tavily' | 'apollo' | 'competitor' | 'linkedin_keyword';
+    keywords?: string[];
 }
 
 export const discoverLeads = async (data: LeadDiscoveryInput) => {
@@ -209,11 +210,14 @@ export const fetchDashboardStats = async (): Promise<DashboardStats | null> => {
 export interface IntegrationSettings {
     tavily_api_key?: string;
     apollo_api_key?: string;
+    user_linkedin_url?: string;
+    company_linkedin_url?: string;
     email_config?: string;
     integrations_config?: string;
     kit_api_key?: string;
     kit_api_secret?: string;
 }
+
 
 export const getIntegrations = async (): Promise<IntegrationSettings | null> => {
     try {
@@ -241,5 +245,76 @@ export const setOnboardingComplete = async () => {
 
 export const fetchKitForms = async () => {
     const response = await axios.get(`${API_URL}/api/integrations/kit/forms`);
+    return response.data;
+};
+    
+export const analyzeCompetitors = async (urls: string[]) => {
+    const response = await axios.post(`${API_URL}/api/competitor-analysis/analyze`, { urls });
+    return response.data;
+};
+
+export interface Competitor {
+    id: string;
+    name?: string;
+    linkedin_url: string;
+    created_at: string;
+}
+
+export const getCompetitors = async (): Promise<Competitor[]> => {
+    const response = await axios.get(`${API_URL}/api/competitors/`);
+    return response.data;
+};
+
+export const addCompetitor = async (data: { name?: string, linkedin_url: string }) => {
+    const response = await axios.post(`${API_URL}/api/competitors/`, data);
+    return response.data;
+};
+
+export const deleteCompetitor = async (id: string) => {
+    const response = await axios.delete(`${API_URL}/api/competitors/${id}`);
+    return response.data;
+};
+
+export interface CompetitorLead {
+    name: string;
+    linkedin_url: string | null;
+    comment_text: string;
+    source_post: string;
+    source_post_url?: string;
+    competitor: string;
+    headline?: string;
+    is_fit?: boolean;
+    is_competitor?: boolean;
+    is_decision_maker?: boolean;
+    fit_reasoning?: string;
+}
+
+export const discoverCompetitorLeads = async (urls: string[]): Promise<{ leads: CompetitorLead[] }> => {
+    const response = await axios.post(`${API_URL}/api/competitor-analysis/leads`, { urls });
+    return response.data;
+};
+
+export interface IdentifiedProfile {
+    id: string;
+    name?: string;
+    headline?: string;
+    linkedin_url: string;
+
+    // Classification
+    is_fit?: boolean;
+    is_competitor?: boolean;
+    is_decision_maker?: boolean;
+    fit_reasoning?: string;
+
+    comment_history?: string; // JSON string
+    source_posts?: string;    // JSON string
+    interaction_history?: string; // JSON string
+    last_interaction_at: string;
+    profile_metadata?: string;
+    latest_report_id?: string;
+}
+
+export const getIdentifiedProfiles = async (skip: number = 0, limit: number = 100): Promise<{ profiles: IdentifiedProfile[], total: number }> => {
+    const response = await axios.get(`${API_URL}/api/competitor-analysis/profiles?skip=${skip}&limit=${limit}`);
     return response.data;
 };

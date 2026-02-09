@@ -29,7 +29,7 @@ CSV upload of prospects (linkedin url and websites)
 
 # add predicive analytics to see the lead score and next best action
 
-# get past conversation history from CRM or emails
+# get past conversation history from CRM or emails - Done
 
 # get reactions to posts and comments to see if the lead is interested in the product/service
 
@@ -38,3 +38,8 @@ CSV upload of prospects (linkedin url and websites)
 # focus on report itself (use tavily deep agents or langraph depp agents)
 
 # waterfall likeoutreach priority (comment, hiring, etc)
+
+# add competitor lead gen
+
+
+# identify patterns from competitors comments leads

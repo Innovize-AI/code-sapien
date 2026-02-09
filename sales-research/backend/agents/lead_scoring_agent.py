@@ -21,6 +21,7 @@ class ExtractedLeadData(BaseModel):
     referral_source: str = Field(description="How the lead was generated (Referral, Inbound, etc.)")
     purchase_timeline: str = Field(description="Estimated timeline for purchase")
     project_urgency: str = Field(description="Level of urgency for the project (High, Medium, Low)")
+    discovery_insights: str = Field(description="Analysis of HOW the lead was found (e.g., intent behind their competitor comment, relevance of search keywords). patterns detected.")
 
 class CategoricalScore(BaseModel):
     score: int = Field(description="Numerical score for this category")
@@ -47,6 +48,7 @@ def lead_data_extractor(state: AgentState):
     input_lead_data = state["input_lead_data"]
     company_stats = state.get("company_stats", {})
     email_history = state.get("email_history", [])
+    post_engagements = state.get("post_engagements", [])
     
     # Bundle research into a structured description for the extractor
     research_context = {
@@ -54,9 +56,11 @@ def lead_data_extractor(state: AgentState):
         "website_intelligence": website_analysis_dict,
         "company_metrics": company_stats,
         "interaction_history": email_history,
+        "current_session_engagements": post_engagements,
+        "discovery_interaction_history": state.get("discovery_interaction_history", []),
         "input_metadata": input_lead_data.model_dump() if hasattr(input_lead_data, 'model_dump') else input_lead_data
     }
-
+    
     messages = [
         SystemMessage(content=LEAD_DATA_EXTRACTOR_PROMPT),
         HumanMessage(content=f"EXTRACT LEAD DATA FROM RESEARCH: {json.dumps(research_context)}")

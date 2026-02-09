@@ -104,7 +104,12 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         project_urgency=options.project_urgency if options else None,
         email_history=json.dumps(final_state.get("email_history") or []),
         intent_analysis=json.dumps(final_state.get("intent_analysis") or {}),
-        extra_metadata=json.dumps(final_state.get("extra_research_context") or {}),
+        extra_metadata=json.dumps({
+            **(final_state.get("extra_research_context") or {}),
+            "discovery_source": options.discovery_source if options else None,
+            "discovery_context": options.discovery_context if options else None,
+            "lead_extracted_data": final_state.get("lead_extracted_data").model_dump() if hasattr(final_state.get("lead_extracted_data"), 'model_dump') else (final_state.get("lead_extracted_data") or {})
+        }),
         
         # Modular Nodules
         target_pain_points=json.dumps(final_state.get("target_pain_points") or {}),
@@ -159,8 +164,70 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     org_settings = await _get_organization_settings()
     ideal_profile = org_settings["icp"]
 
+    if options is None:
+        options = InputLeadData()
+
+    # --- Context Injection: Load Discovery Data from DB ---
+    # Only if not already provided in options/request
+    if linkedin_url and not options.discovery_source:
+        try:
+            async with SessionLocal() as db:
+                from sqlalchemy import select
+                from db.models import IdentifiedProfile
+                
+                result = await db.execute(select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url == linkedin_url))
+                profile = result.scalars().first()
+                
+                if profile:
+                    print(f"DEBUG: Found identified profile for {linkedin_url}. Injecting context.")
+                    
+                    try:
+                        import json
+                        comments = json.loads(profile.comment_history or "[]")
+                        sources = json.loads(profile.source_posts or "[]")
+                        interactions = json.loads(profile.interaction_history or "[]")
+                    except Exception as e:
+                        print(f"Error parsing profile data: {e}")
+                        comments = []
+                        sources = []
+                        interactions = []
+                    
+                    # Deduplicate comments with normalization to avoid visible duplicates in UI
+                    seen = set()
+                    unique_comments = []
+                    for c in (comments or []):
+                        if not c: continue
+                        normalized = c.strip()
+                        if normalized not in seen:
+                            unique_comments.append(c) # Keep original casing/spacing for display
+                            seen.add(normalized)
+                    
+                    # Store for initial_state injection
+                    discovery_history = interactions
+                    
+                    if sources:
+                        options.discovery_source = "competitor_comment"
+                        options.discovery_context = {
+                            "comments": unique_comments,
+                            "source_posts": sources,
+                            # Removed redundant interaction_history here as it's passed at top level now
+                            "fit_reasoning": profile.fit_reasoning,
+                            "intent": profile.intent
+                        }
+                    else:
+                        options.discovery_source = "keyword_search"
+                        options.discovery_context = {
+                            "fit_reasoning": profile.fit_reasoning,
+                            "intent": profile.intent,
+                            "profile_metadata": profile.profile_metadata
+                        }
+
+        except Exception as e:
+            print(f"Error loading identified profile context in _run_research_gen: {e}")
+
     # --- Persistent Agentic Memory: Load existing data from DB ---
     existing_state = {}
+    discovery_history = []
 
     options_refresh = options.refresh if options else False
 
@@ -212,7 +279,8 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "profile_picture_url": existing_state.get("profile_picture_url", ""),
         
         "sales_research_report": existing_state.get("sales_research_report", {}),
-        "meeting_notes": getattr(options, 'meeting_notes', '') if hasattr(options, 'meeting_notes') else options.get('meeting_notes', '') if isinstance(options, dict) else ''
+        "meeting_notes": getattr(options, 'meeting_notes', '') if hasattr(options, 'meeting_notes') else options.get('meeting_notes', '') if isinstance(options, dict) else '',
+        "discovery_interaction_history": discovery_history or existing_state.get("discovery_interaction_history", [])
     }
 
 
@@ -237,6 +305,9 @@ async def run_single_research(
     """
     Runs a single research workflow.
     """
+    if options is None:
+        options = InputLeadData()
+
     final_state = {}
     try:
         async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):

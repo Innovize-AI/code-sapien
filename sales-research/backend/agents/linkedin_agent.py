@@ -259,7 +259,7 @@ def get_linkedin_engagement(state: AgentState):
     if not lead_linkedin_url or (not user_linkedin_url and not company_linkedin_url):
         return {"post_engagements": []}
 
-    lead_urn = state["lead_li_urn"]
+    lead_urn = state.get("lead_li_urn")
     targets = []
     if user_linkedin_url: targets.append(("user", get_username_from_url(user_linkedin_url)))
     if company_linkedin_url: targets.append(("company", get_username_from_url(company_linkedin_url)))
@@ -291,29 +291,27 @@ def get_linkedin_engagement(state: AgentState):
                 if not post_urn: continue
 
                 # Check reactions for this post
-                reactions_url = f"{linkedin_base_url}/post/reactions"
-                # Note: Some APIs use 'post_id' or 'url'. We'll assume post_id is enough for this RapidAPI.
-                r_params = {"post_url": post_urn, "page_number": 1} 
-                r_resp = requests.get(reactions_url, headers=headers, params=r_params)
-                r_data = r_resp.json()
-                
-                data = r_data.get("data", {})
-                for reaction in data.get("reactions", []):
-                    reaction_type = reaction.get("reaction_type", "LIKE")
-                    reactor = reaction.get("reactor", {})
-                    reactor_urn = reactor.get("urn", "")
-
-                    if reactor.get("urn") == lead_urn:
-                        print(f"Found engagement for {target_type}: {reaction_type}")
-                        found_engagements.append({
-                            "type": "reaction",
-                            "target": target_type,
-                            "post_id": post_urn,
-                            "content": post_text[:100] + "...",
-                            "post_url":posts_url,
-                            "reaction_type": reaction_type,
-                            "reactor_urn": reactor.get("urn", "")
-                        })
+                if lead_urn:
+                    reactions_url = f"{linkedin_base_url}/post/reactions"
+                    r_params = {"post_url": post_urn, "page_number": 1} 
+                    r_resp = requests.get(reactions_url, headers=headers, params=r_params)
+                    r_data = r_resp.json()
+                    
+                    data = r_data.get("data", {})
+                    for reaction in data.get("reactions", []):
+                        reactor = reaction.get("reactor", {})
+                        if reactor.get("urn") == lead_urn:
+                            reaction_type = reaction.get("reaction_type", "LIKE")
+                            print(f"Found engagement for {target_type}: {reaction_type}")
+                            found_engagements.append({
+                                "type": "reaction",
+                                "target": target_type,
+                                "post_id": post_urn,
+                                "content": post_text[:100] + "...",
+                                "post_url":posts_url,
+                                "reaction_type": reaction_type,
+                                "reactor_urn": reactor.get("urn", "")
+                            })
                 
                 # Check comments
                 comments_url = f"{linkedin_base_url}/post/comments"

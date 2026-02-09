@@ -181,9 +181,11 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             
             # Flatten comments from interactions for legacy support
             new_comments = [i["comment"] for i in data["interactions"] if i["comment"]]
+            db_comments_normalized = [c.strip() for c in db_comments]
             for c in new_comments:
-                if c not in db_comments:
+                if c.strip() not in db_comments_normalized:
                     db_comments.append(c)
+                    db_comments_normalized.append(c.strip())
 
             try:
                 db_sources = json.loads(p.source_posts or "[]")

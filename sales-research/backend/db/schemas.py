@@ -92,6 +92,7 @@ class IntegrationSettings(BaseModel):
     integrations_config: Optional[str] = None
     kit_api_key: Optional[str] = None
     kit_api_secret: Optional[str] = None
+    slack_webhook_url: Optional[str] = None
 
 
 class OrganizationSettingsBase(BaseModel):
@@ -101,6 +102,7 @@ class OrganizationSettingsBase(BaseModel):
     user_linkedin_url: Optional[str] = None
     company_linkedin_url: Optional[str] = None
     email_config: Optional[str] = None
+    slack_webhook_url: Optional[str] = None
 
     crm_config: Optional[str] = None
     integrations_config: Optional[str] = None
@@ -142,6 +144,8 @@ class IdentifiedProfileBase(BaseModel):
     is_competitor: bool = False
     is_decision_maker: bool = False
     fit_reasoning: Optional[str] = None
+    intent: Optional[str] = None
+    sentiment: Optional[str] = None
     
     comment_history: Optional[str] = None
     source_posts: Optional[str] = None
@@ -156,6 +160,24 @@ class IdentifiedProfile(IdentifiedProfileBase):
     created_at: datetime
     last_interaction_at: Optional[datetime] = None
     latest_report_id: Optional[UUID] = None  # New field for linking
+
+    class Config:
+        from_attributes = True
+
+class ActivityBase(BaseModel):
+    type: str
+    title: str
+    description: Optional[str] = None
+    metadata_json: Optional[str] = None
+    intent: Optional[str] = None
+    sentiment: Optional[str] = None
+
+class ActivityCreate(ActivityBase):
+    pass
+
+class Activity(ActivityBase):
+    id: UUID
+    created_at: datetime
 
     class Config:
         from_attributes = True

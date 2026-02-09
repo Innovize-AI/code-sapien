@@ -5,6 +5,7 @@ from db import get_db, save_lead_submission, get_db_session
 from db.schemas import LeadSubmissionCreate
 from routes.sales_research import run_single_research
 from workflow.state import InputLeadData
+from utils.activity_helper import log_activity_and_notify
 import asyncio
 
 webhooks_router = APIRouter(tags=['Webhooks'], prefix="/webhooks")
@@ -60,6 +61,16 @@ async def calendly_webhook(
             payload=json.dumps(payload)
         )
         saved = await save_lead_submission(db, submission)
+        
+        # Log Activity
+        await log_activity_and_notify(
+            db, 
+            type="meeting", 
+            title="New Meeting Booked (Calendly)", 
+            description=f"Meeting scheduled by {email}",
+            metadata={"email": email, "source": "calendly", "payload": payload}
+        )
+        
         asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, payload))
         return {"status": "processed"}
         
@@ -82,6 +93,16 @@ async def cal_webhook(
             payload=json.dumps(payload)
         )
         saved = await save_lead_submission(db, submission)
+        
+        # Log Activity
+        await log_activity_and_notify(
+            db, 
+            type="meeting", 
+            title="New Meeting Booked (Cal.com)", 
+            description=f"Meeting scheduled by {email}",
+            metadata={"email": email, "source": "cal", "payload": payload}
+        )
+        
         asyncio.create_task(process_webhook_lead(saved.id, email, None, payload))
         return {"status": "processed"}
     

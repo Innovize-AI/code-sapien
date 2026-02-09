@@ -21,6 +21,8 @@ class ProfileClassificationResult(BaseModel):
     is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
     reasoning: str = Field(description="Brief explanation of the classification.")
+    intent: Optional[str] = Field(None, description="The person's intent (interested, pain_point, curious, competitor)")
+    sentiment: Optional[str] = Field(None, description="The sentiment of their interaction (positive, neutral, negative)")
 
 class BatchProfileClassification(BaseModel):
     classifications: List[ProfileClassificationResult] = Field(description="List of profile classifications")

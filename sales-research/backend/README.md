@@ -43,3 +43,6 @@ CSV upload of prospects (linkedin url and websites)
 
 
 # identify patterns from competitors comments leads
+
+
+# identify relevant leads in a company if current profile is not a fit

@@ -216,6 +216,7 @@ export interface IntegrationSettings {
     integrations_config?: string;
     kit_api_key?: string;
     kit_api_secret?: string;
+    slack_webhook_url?: string;
 }
 
 
@@ -247,7 +248,7 @@ export const fetchKitForms = async () => {
     const response = await axios.get(`${API_URL}/api/integrations/kit/forms`);
     return response.data;
 };
-    
+
 export const analyzeCompetitors = async (urls: string[]) => {
     const response = await axios.post(`${API_URL}/api/competitor-analysis/analyze`, { urls });
     return response.data;
@@ -314,7 +315,30 @@ export interface IdentifiedProfile {
     latest_report_id?: string;
 }
 
-export const getIdentifiedProfiles = async (skip: number = 0, limit: number = 100): Promise<{ profiles: IdentifiedProfile[], total: number }> => {
-    const response = await axios.get(`${API_URL}/api/competitor-analysis/profiles?skip=${skip}&limit=${limit}`);
+export const getIdentifiedProfiles = async (skip: number = 0, limit: number = 100, search: string = ""): Promise<{ profiles: IdentifiedProfile[], total: number }> => {
+    let url = `${API_URL}/api/competitor-analysis/profiles?skip=${skip}&limit=${limit}`;
+    if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
+    }
+    const response = await axios.get(url);
     return response.data;
+};
+
+export interface Activity {
+    id: string;
+    type: string;
+    title: string;
+    description?: string;
+    metadata_json?: string;
+    created_at: string;
+}
+
+export const fetchActivities = async (limit: number = 50): Promise<Activity[]> => {
+    try {
+        const response = await axios.get(`${API_URL}/api/activities?limit=${limit}`);
+        return response.data;
+    } catch (e) {
+        console.error("Failed to fetch activities", e);
+        return [];
+    }
 };

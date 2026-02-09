@@ -69,6 +69,7 @@ async def get_integrations(db: AsyncSession = Depends(get_db)):
         kit_api_secret=settings.kit_api_secret,
         user_linkedin_url=settings.user_linkedin_url,
         company_linkedin_url=settings.company_linkedin_url,
+        slack_webhook_url=settings.slack_webhook_url,
     )
 
 
@@ -89,6 +90,7 @@ async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depend
         settings.integrations_config = data.integrations_config
         settings.kit_api_key = data.kit_api_key
         settings.kit_api_secret = data.kit_api_secret
+        settings.slack_webhook_url = data.slack_webhook_url
     else:
         settings = OrganizationSettings(
             tavily_api_key=data.tavily_api_key, 
@@ -99,6 +101,7 @@ async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depend
             kit_api_secret=data.kit_api_secret,
             user_linkedin_url=data.user_linkedin_url,
             company_linkedin_url=data.company_linkedin_url,
+            slack_webhook_url=data.slack_webhook_url,
         )
         db.add(settings)
 

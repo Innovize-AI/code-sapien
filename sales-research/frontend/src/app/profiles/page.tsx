@@ -4,9 +4,10 @@ import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { getIdentifiedProfiles, IdentifiedProfile } from "@/lib/api"
-import { Loader2, ExternalLink, MessageSquare, History, UserCheck, Globe, Users, ChevronLeft, ChevronRight, Play, BarChart3, CheckCircle2, Eye, FileText } from "lucide-react"
+import { Loader2, ExternalLink, MessageSquare, History, UserCheck, Globe, Users, ChevronLeft, ChevronRight, Play, BarChart3, CheckCircle2, Eye, FileText, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useBulkAnalysis } from "@/context/bulk-analysis-context"
 import { BulkAnalysisModal } from "@/components/bulk-analysis-modal"
@@ -31,6 +32,7 @@ export default function ProfilesPage() {
     const [total, setTotal] = useState(0)
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [activeTab, setActiveTab] = useState("all")
+    const [searchQuery, setSearchQuery] = useState("")
 
     // Bulk Analysis Context
     const {
@@ -46,22 +48,26 @@ export default function ProfilesPage() {
     } = useBulkAnalysis()
 
     useEffect(() => {
-        async function loadProfiles() {
-            setIsLoading(true)
-            try {
-                const skip = page * PAGE_SIZE
-                const data = await getIdentifiedProfiles(skip, PAGE_SIZE)
-                setProfiles(data.profiles || [])
-                setTotal(data.total || 0)
-            } catch (err) {
-                setError("Failed to load identified profiles")
-                console.error(err)
-            } finally {
-                setIsLoading(false)
+        const timeoutId = setTimeout(() => {
+            async function loadProfiles() {
+                setIsLoading(true)
+                try {
+                    const skip = page * PAGE_SIZE
+                    const data = await getIdentifiedProfiles(skip, PAGE_SIZE, searchQuery)
+                    setProfiles(data.profiles || [])
+                    setTotal(data.total || 0)
+                } catch (err) {
+                    setError("Failed to load identified profiles")
+                    console.error(err)
+                } finally {
+                    setIsLoading(false)
+                }
             }
-        }
-        loadProfiles()
-    }, [page])
+            loadProfiles()
+        }, 500) // Debounce search
+
+        return () => clearTimeout(timeoutId)
+    }, [page, searchQuery])
 
     // SSE Listener for Real-Time Updates
     useEffect(() => {
@@ -434,8 +440,25 @@ export default function ProfilesPage() {
                         <p className="text-destructive font-semibold">{error}</p>
                     </div>
                 ) : (
-                    <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                        <TabsList className="mb-4">
+                    <>
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="relative w-full max-w-sm">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="search"
+                                    placeholder="Search by name, headline, or keyword..."
+                                    className="pl-9"
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value)
+                                        setPage(0) // Reset to first page on search
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <TabsList className="mb-4">
                             <TabsTrigger value="all">All ({profiles.length})</TabsTrigger>
                             <TabsTrigger value="keyword">Keywords ({keywordProfiles.length})</TabsTrigger>
                             <TabsTrigger value="competitor">Competitors ({competitorProfiles.length})</TabsTrigger>
@@ -444,6 +467,7 @@ export default function ProfilesPage() {
                         <TabsContent value="keyword">{renderProfileGrid(keywordProfiles)}</TabsContent>
                         <TabsContent value="competitor">{renderProfileGrid(competitorProfiles)}</TabsContent>
                     </Tabs>
+                    </>
                 )}
             </div>
             <BulkAnalysisModal

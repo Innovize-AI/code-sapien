@@ -64,7 +64,7 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
             <div className="p-6 border-b border-sidebar-border">
                 <div className="flex items-center gap-2 font-semibold text-xl tracking-tight">
                     <BarChart3 className="w-6 h-6 text-primary" />
-                    <span>SalesAgent<span className="text-primary">.ai</span></span>
+                    <span>Innovize AI</span>
                 </div>
             </div>
 

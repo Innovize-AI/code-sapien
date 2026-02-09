@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "backend"
+version = "0.1.0"
+description = ""
+authors = ["saipavan4391 <pavan.kumar@innovizeai.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.128.5"
+uvicorn = "^0.40.0"
+python-dotenv = "^1.2.1"
+supabase = "^2.27.3"
+pydantic = "^2.12.5"
+python-digitalocean = "^1.17.0"
+boto3 = "^1.42.44"
+google-cloud-compute = "^1.43.0"
+sqlalchemy = "^2.0.46"
+alembic = "^1.18.3"
+asyncpg = "^0.31.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,6 +1,6 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from prompts.sales_prompts import (
     PAIN_POINT_DISCOVERY_PROMPT, 
     STRATEGIC_SOLUTION_PROMPT, 
@@ -106,7 +106,7 @@ def pain_point_node(state: AgentState):
     ]
     
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(PainPointAnalysis)
         response = structured_llm.invoke(messages)
         return {"target_pain_points": response.model_dump() if response else {}}
@@ -131,6 +131,8 @@ def solution_node(state: AgentState):
     else:
         mapping_logic = "- If Sales -> Use Glial.\n    - If Logistics -> Use IDP.\n    - If Internal -> Use Agentic KB."
 
+    rag_briefing = state.get("strategic_rag_briefing", "No RAG context available.")
+    
     # Build the Prompt with Agentic RAG context
     prompt = STRATEGIC_SOLUTION_PROMPT.format(
         pain_points=pain_points_str,
@@ -147,7 +149,7 @@ def solution_node(state: AgentState):
     ]
     
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        model = get_gemini_model(model="gemini-3-pro-preview", temperature=0)
         structured_llm = model.with_structured_output(StrategicSolutionProposal)
         response = structured_llm.invoke(messages)
         return {"strategic_solutions": response.model_dump() if response else {}}
@@ -163,6 +165,9 @@ def outreach_node(state: AgentState):
     engagements = state.get("post_engagements", [])
     lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
     
+    journey_analysis = state.get("buyer_journey_analysis", {})
+    cso_briefing = state.get("cso_strategic_briefing", {})
+
     prompt = OUTREACH_DESIGN_PROMPT.format(
         user_analysis=user_analysis,
         lead_segment=lead_segment,
@@ -177,7 +182,7 @@ def outreach_node(state: AgentState):
         HumanMessage(content=prompt)
     ]
     
-    model = get_open_ai(model="gpt-4o-mini", temperature=0).with_structured_output(OutreachStrategy)
+    model = get_gemini_model(model="gemini-3-pro-preview", temperature=0).with_structured_output(OutreachStrategy)
     response = model.invoke(messages)
     
     return {"personalized_outreach": response.model_dump()}

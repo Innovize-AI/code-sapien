@@ -23,7 +23,8 @@ async def sync_db():
             "viability_analysis": "TEXT",
             "target_pain_points": "TEXT",
             "strategic_solutions": "TEXT",
-            "personalized_outreach": "TEXT"
+            "personalized_outreach": "TEXT",
+            "cso_strategic_briefing": "TEXT"
         }
 
         for col, col_type in research_cols_to_add.items():

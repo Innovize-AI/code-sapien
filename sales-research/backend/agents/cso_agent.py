@@ -1,6 +1,6 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from services.knowledge_service import KnowledgeService
 from models.structured_output_cso import GlobalCSOBriefing
 import json
@@ -15,13 +15,13 @@ Your mission is to synthesize multiple streams of intelligence into a SINGLE pre
 
 ### STRATEGIC CLASSIFICATION:
 You will receive a `lead_segment` (DIRECT_COMPETITOR, ADJACENT_PARTNER, POTENTIAL_CLIENT).
-- **IF DIRECT_COMPETITOR**: DO NOT PITCH BASE PRODUCTS. Focus on **Differentiators** or **Partnerships**. Use our playbooks to find "Anti-Competitor" narratives.
-- **IF POTENTIAL_CLIENT**: Standard direct pitch for ROI.
+- **IF DIRECT_COMPETITOR**: DO NOT PITCH BASE FEATURES. Focus on **Glial as Strategic Infrastructure**—the "Operational Intelligence Layer" they need to solve their internal 'Complexity of Scale' and scaling bottlenecks. We are selling them the infrastructure to manage their own AI velocity.
+- **IF POTENTIAL_CLIENT**: Standard direct pitch for ROI using our product suite.
 
 CRITICAL ROLE:
 1. ARBITRATOR: Resolve conflicts between agents.
 2. STRATEGIST: Choose the optimal Messaging Framework (AIDA, PAS, BAB).
-3. COMMANDER: Provide a one-sentence "Unified Command" and specify the exact product from our suite ({selling_products_list}) to lead with.
+3. COMMANDER: Provide a one-sentence "Unified Command" and specify the exact product from our suite ({selling_products_list}) to lead with. FOR COMPETITORS: Always lead with **Glial** (Intelligence Infrastructure) or **Strategic Consulting**.
 
 ZERO TOLERANCE: Never use generic product terms. Use ONLY the validated product names from our portfolio.
 """
@@ -73,7 +73,7 @@ def narrative_arbitrator_node(state: AgentState):
 
     try:
         # Using GPT-4o for high-fidelity strategic synthesis
-        model = get_open_ai(model="gpt-4o", temperature=0).with_structured_output(GlobalCSOBriefing)
+        model = get_gemini_model(model="gemini-3-pro-preview", temperature=0).with_structured_output(GlobalCSOBriefing)
         response = model.invoke(messages)
         
         return {"cso_strategic_briefing": response.model_dump() if response else {}}

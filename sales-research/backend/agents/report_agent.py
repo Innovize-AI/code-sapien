@@ -3,7 +3,7 @@ from workflow.state import AgentState
 import json
 
 from prompts.sales_prompts import REPORT_GENERATOR_PROMPT
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from models.structured_output import GlobalExecutiveBriefing
 
 def sales_research_report_generator(state: AgentState):
@@ -142,15 +142,22 @@ def sales_research_report_generator(state: AgentState):
     - Unified Command: {json.dumps(state.get('cso_strategic_briefing', {}))}
     """
     
+    selling_profile = state.get("selling_company_profile")
+    selling_company_name = selling_profile.name if selling_profile else "Innovize AI"
+    selling_company_context = f"{selling_company_name} specializes in {selling_profile.description if selling_profile else 'AI automation'}."
+    lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
+
     messages = [
         SystemMessage(content=REPORT_GENERATOR_PROMPT.format(
             content=input_content,
-            company_context=company_context
+            selling_company_name=selling_company_name,
+            selling_company_context=selling_company_context,
+            lead_segment=lead_segment
         )),
-        HumanMessage(content=f"Synthesize the research for this prospect.")
+        HumanMessage(content=f"Synthesize the research for this prospect. LEAD SEGMENT: {lead_segment}")
     ]
 
-    llm = get_open_ai(model="gpt-4o", temperature=0.7) # GPT-4o for strategic synthesis
+    llm = get_gemini_model(model="gemini-3-pro-preview", temperature=0.7) # Gemini Pro for strategic synthesis
     structured_llm = llm.with_structured_output(GlobalExecutiveBriefing)
     response = structured_llm.invoke(messages)
 

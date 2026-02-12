@@ -20,6 +20,7 @@ class ResearchReportBase(BaseModel):
     lead_score_analysis: Optional[str] = None
     user_profile_analysis: Optional[str] = None
     website_analysis: Optional[str] = None
+    cso_strategic_briefing: Optional[str] = None
     
     # Modular Nodules
     target_pain_points: Optional[str] = None

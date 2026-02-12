@@ -116,6 +116,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         strategic_solutions=json.dumps(final_state.get("strategic_solutions") or {}),
         personalized_outreach=json.dumps(final_state.get("personalized_outreach") or {}),
         follow_up_strategy=_safe_serialize(final_state.get("follow_up_strategy")),
+        cso_strategic_briefing=json.dumps(final_state.get("cso_strategic_briefing") or {}),
         buyer_journey_analysis=json.dumps(final_state.get("buyer_journey_analysis") or {}),
         meeting_notes=final_state.get("meeting_notes"),
         
@@ -246,7 +247,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     # Define default Innovize AI profile
     default_selling_profile = SellingCompanyProfile(
         name="Innovize AI",
-        description="advanced Revenue Intelligence and Process Automation",
+        description="Specialized AI Transformation and Autonomous Agent Orchestration",
         products=[
             Product(
                 name="Glial",
@@ -254,14 +255,24 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                 target_pain_points=["Sales", "Revenue", "GTM", "Outreach", "Marketing"]
             ),
             Product(
-                name="Intelligent Document Processing (IDP)",
-                description="Specialized automation engine for extracting structured data from unstructured documents like invoices and bills of lading.",
-                target_pain_points=["Logistics", "Finance", "Healthcare", "Supply Chain", "Legal"]
+                name="Sales Development Agent",
+                description="Autonomous role-based agent for lead qualification, objection handling, and appointment scheduling.",
+                target_pain_points=["Lead Gen", "SDR", "Meeting Scheduling", "Qualification"]
             ),
             Product(
-                name="Agentic Knowledge Base",
-                description="Enterprise-grade RAG system that transforms static documentation into an interactive intelligence layer.",
-                target_pain_points=["HR", "Support", "Internal Ops", "Customer Success", "Onboarding"]
+                name="Intelligent Document Processing (IDP)",
+                description="Specialized OCR and Document Intelligence engine for extracting structured data from unstructured files (Invoices, Logistics, Claims).",
+                target_pain_points=["IDP", "OCR", "Logistics", "Document Processing", "Invoices"]
+            ),
+            Product(
+                name="Customer Success Agent",
+                description="Resolves 80% of common inquiries and conducts knowledge search for seamless escalation.",
+                target_pain_points=["Customer Success", "Support", "Retention", "Inquiries"]
+            ),
+            Product(
+                name="AI Strategy & Consulting",
+                description="Strategic roadmaps, feasibility assessments, and performance analytics with a 90-day ROI guarantee.",
+                target_pain_points=["ROI", "Strategy", "Transformation", "AI Roadmap"]
             )
         ]
     )
@@ -290,6 +301,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "personalized_outreach": existing_state.get("personalized_outreach", {}),
         "follow_up_strategy": existing_state.get("follow_up_strategy", {}),
         "buyer_journey_analysis": existing_state.get("buyer_journey_analysis", {}),
+        "cso_strategic_briefing": existing_state.get("cso_strategic_briefing", {}),
         "intent_analysis": existing_state.get("intent_analysis", {}),
         "email_history": existing_state.get("email_history", []),
         

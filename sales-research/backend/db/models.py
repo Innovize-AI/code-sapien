@@ -26,6 +26,7 @@ class ResearchReport(Base):
     lead_score_analysis = Column(Text, nullable=True)
     user_profile_analysis = Column(Text, nullable=True)
     website_analysis = Column(Text, nullable=True)
+    cso_strategic_briefing = Column(Text, nullable=True)
     
     # Modular Nodules
     viability_analysis = Column(Text, nullable=True)

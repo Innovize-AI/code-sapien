@@ -2,7 +2,7 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
 from prompts.sales_prompts import WEBSITE_ANALYZER_PROMPT
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import json
@@ -35,12 +35,23 @@ def scrape_webpages(state: AgentState) -> dict:
 
 def website_analyzer(state: AgentState):
     """Analyzes scraped website content using Structured Output."""
+    selling_profile = state.get("selling_company_profile")
+    if selling_profile:
+        products_summary = "\n".join([f"- {p.name}: {p.description}" for p in selling_profile.products])
+        products_keywords = ", ".join([p.name for p in selling_profile.products])
+    else:
+        products_summary = "Glial (Revenue Intelligence), IDP (Document Automation), Agentic KB (Internal RAG)"
+        products_keywords = "Glial, IDP, Knowledge Base, RAG"
+
     messages = [
-        SystemMessage(content=WEBSITE_ANALYZER_PROMPT), 
+        SystemMessage(content=WEBSITE_ANALYZER_PROMPT.format(
+            selling_products_summary=products_summary,
+            selling_products_keywords=products_keywords
+        )), 
         HumanMessage(content=state['scraped_website_content'])
     ]
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(WebsiteAnalysis)
         response = structured_llm.invoke(messages)
         

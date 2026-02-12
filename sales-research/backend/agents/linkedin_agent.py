@@ -8,7 +8,7 @@ from workflow.state import AgentState
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, COMPANY_CONTEXT
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from models.structured_output import LinkedInAnalysis
 
 load_dotenv()
@@ -45,7 +45,7 @@ def batch_classify_profiles(profiles: List[Dict]):
         
     try:
         # Reverting to gpt-4o-mini as gpt-4.1-mini is not a valid model
-        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
+        llm = get_gemini_model(temperature=0, model="gemini-3-flash-preview")
         structured_llm = llm.with_structured_output(BatchProfileClassification)
         
         # Format profiles for prompt
@@ -81,7 +81,7 @@ def classify_profile(name: str, headline: str):
         return {"is_competitor": False, "is_fit": False, "is_decision_maker": False, "reasoning": "No headline provided."}
         
     try:
-        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
+        llm = get_gemini_model(temperature=0, model="gemini-3-flash-preview")
         structured_llm = llm.with_structured_output(ProfileClassification)
         
         prompt = PROFILE_CLASSIFIER_PROMPT.format(
@@ -416,7 +416,7 @@ def linkedin_profile_analyzer(state: AgentState):
     ]
     
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(LinkedInAnalysis)
         response = structured_llm.invoke(messages)
         
@@ -463,7 +463,7 @@ def analyze_competitor_posts(competitor_urls: list[str]):
         HumanMessage(content=json.dumps(all_competitor_data))
     ]
     
-    model = get_open_ai(model="gpt-4o-mini", temperature=1)
+    model = get_gemini_model(model="gemini-3-flash-preview", temperature=1)
     response = model.invoke(messages)
     return response.content
 
@@ -496,7 +496,7 @@ def get_post_commenters(post_id: str):
 def analyze_lead_with_ai(lead: dict, icp_data: dict):
     """Evaluates a single lead against the ICP using AI."""
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0) # Use 0 temp for consistent scoring
+        model = get_gemini_model(model="gemini-1.5-flash", temperature=0) # Use 0 temp for consistent scoring
         
         prompt = AI_LEAD_EVALUATOR_PROMPT.format(
             name=lead.get("name"),
@@ -679,7 +679,7 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
         return {}
         
     try:
-        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
+        llm = get_gemini_model(temperature=0, model="gemini-3-flash-preview")
         structured_llm = llm.with_structured_output(BatchProfileClassification)
         
         # Format profiles for prompt

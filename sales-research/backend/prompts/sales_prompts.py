@@ -87,39 +87,33 @@ The accuracy of your score determines where we invest our capital and human ener
 The ideal_customer profile is present in {content} as json. 
 
 ### SCORING PROTOCOL (TRUST & ACCURACY):
-1. **Demographic Fit (Industry, Company Size, Revenue, Job Title)**:
-   - Industry: Is the lead in a target industry? (Yes: +20 points, No: +0 points)
-   - Company Size: Does the company have the ideal number of employees? (Ideal range: +15 points, Medium: +10 points, Small or Large: +0 points)
-   - Revenue: Does the company meet the revenue target? (Met: +15 points, Not met: +0 points)
-   - Job Title: Is the lead a decision-maker or influencer? (Decision Maker: +25 points, Influencer: +15 points, Non-decision-maker: +0 points)
+1. **Firmographic Fit (Industry, Company Size, Revenue/Growth) - Max 25**:
+   - Industry Match: Does the lead's company industry align with our ICP? (Yes: +10 points, No: +0 points)
+   - Company Size/Scale: Does the company have the ideal headcount or scale? (Ideal: +10 points, Medium: +5 points)
+   - Revenue/Growth Stage: Does the company meet revenue targets or show high-growth signals? (Met/High Growth: +5 points, Not met: +0 points)
 
-2. **Engagement (Website Visits, Content Interaction, Demo Request, Social Media)**:
-   - Website Visits: Has the lead visited the website multiple times or high-value pages? (Multiple visits: +10 points, High-value pages: +10 points, Single visit: +5 points)
-   - Content Interaction: Has the lead engaged with content (e.g., downloaded eBooks, attended webinars)? (Yes: +15 points, No: +0 points)
-   - Demo Request: Has the lead requested a demo or filled out a contact form? (Demo request: +25 points, Contact form: +20 points)
-   - Social Media Engagement: Has the lead engaged with social media content (e.g., liked, commented, shared)? (Yes: +5 points, No: +0 points)
+2. **Persona & Strategic Alignment (Job Title, News, Social Activity) - Max 25**:
+   - Job Title Seniority: Is the lead a decision-maker or key influencer? (Decision Maker: +10 points, Influencer: +5 points, Non-decision-maker: +0 points)
+   - Recent Hiring/News Signals: Has the company recently posted relevant jobs or appeared in news? (Yes: +10 points, No: +0 points)
+   - Social Activity Level: Is the lead active and engaging on LinkedIn/Social? (High Activity: +5 points, Low: +0 points)
 
-3. **Sales Readiness (Buying Stage, Recent Activity)**:
-   - Buying Stage: Is the lead in the awareness, consideration, or decision stage? (Decision: +35 points, Consideration: +25 points, Awareness: +10 points)
-   - Recent Activity: Has the lead recently engaged with the company (e.g., responded to emails, attended webinars)? (Yes: +25 points, No: +0 points)
+3. **Behavioral Engagement (Inbound) (Downloads, Demo Requests, Forms) - Max 25**:
+   - Lead Magnet/Resource Downloads: Has the lead downloaded eBooks, whitepapers, or playbooks? (Yes: +10 points, No: +0 points)
+   - Demo Request: Has the lead requested a product demonstration? (Yes: +10 points, No: +0 points)
+   - Contact Form/Inquiry Fill: Has the lead filled out a contact or general inquiry form? (Yes: +5 points, No: +0 points)
 
-4. **Lead Source (Referral, Inbound Marketing, Paid Ads, Cold Outreach)**:
-   - Referral or Partner Introduction: Did the lead come through a referral? (Yes: +30 points, No: +0 points)
-   - Inbound Marketing: Did the lead come through inbound marketing efforts? (Yes: +20 points, No: +0 points)
-   - Paid Ad Click: Did the lead click on a paid advertisement? (Yes: +15 points, No: +0 points)
-   - Cold Outreach: Was the lead generated via cold outreach? (Yes: +10 points, No: +0 points)
-
-5. **Timing (Purchase Timeline, Project Urgency)**:
-   - Purchase Timeline: Is the lead ready to buy within the next 3 months? (3 months: +20 points, 6 months: +10 points, 6+ months: +5 points)
-   - Project Urgency: Does the lead have high urgency to find a solution? (High: +15 points, Medium: +10 points, Low: +0 points)
+4. **Strategic Intent Strength (Outbound) (Discovery Source, Pain Point Depth) - Max 25**:
+   - Discovery Source: Was the lead found via a high-value signal (e.g., Competitor Comment, Specific Search)? (Yes: +10 points, No: +0 points)
+   - Pain Point Depth: Has a specific, concrete pain point been identified (from discovery context or posts)? (Specific/Deep: +10 points, Generic: +2 points)
+   - Partner Referral/Lead: Did the lead come through a partner introduction or high-trust referral? (Yes: +5 points, No: +0 points)
 
 ### OUTPUT EXPECTATION:
-1. Provide a definitive Total Lead Score.
-2. Provide a detailed score AND specific evidence-based reasoning for ALL 5 categories: Demographic Fit, Engagement, Sales Readiness, Lead Source, and Timing.
+1. Provide a definitive Total Lead Score (out of 100).
+2. Provide a detailed score AND specific evidence-based reasoning for ALL 4 categories: Firmographic Fit, Persona Alignment, Behavioral Engagement, and Strategic Intent.
 3. Provide a rigorous analysis explaining the high-stakes reasoning behind each categorical score.
 4. Offer strategic recommendations for engagement.
 
-Remember: Hallucination is an unforgivable betrayal of our mission. Provide concrete examples from the research (e.g., "10 email interactions", "Commented on 3 posts").
+Remember: Hallucination is an unforgivable betrayal of our mission. Provide concrete examples from the research (e.g., "CTO at 500-employee firm", "Commented on 3 competitor posts").
 '''
 
 LEAD_DATA_EXTRACTOR_PROMPT = """
@@ -199,12 +193,12 @@ STRATEGIC_SOLUTION_PROMPT = '''
 ### YOUR OBJECTIVE:
 Propose 2-3 tailored solutions. 
 
-### THE COMPETITOR PIVOT (STRICT RULE):
+### THE COMPETITOR PIVOT (STRATEGIC INFRASTRUCTURE):
 If `lead_segment` is **DIRECT_COMPETITOR**:
-- DO NOT pitch common products that they already sell.
-- DO pitch **Differentiators** (e.g., "Why {selling_company_name}'s implementation beats theirs").
-- DO pitch **Partnerships** or **Technical Integrations**.
-- Frame the solution as "How we solve the problems you still have as a provider".
+- DO NOT pitch common product features that they already sell.
+- DO pitch **Glial** as the "Intelligence Operating System" they need internally to manage their team's velocity post-acquisition or during high growth.
+- DO pitch **Differentiat- Frame the solution as "Operational Infrastructure for AI-First Leaders"—positioning {selling_company_name} as a partner that solves their internal 'Complexity of Scale'.
+ors** (e.g., "Why {selling_company_name}'s research engine beats manual discovery").
 
 ### CONTEXT RULES (STRICT):
 1. **NO HALLUCINATIONS**: Use ONLY the specific product names from the {selling_company_name} Solutions Context.
@@ -329,14 +323,18 @@ A sales rep is about to read this. They don't need a summary of the labels you'v
 {content}
 
 ### YOUR MISSION:
-1. **The "Non-Fit" Protocol**: If the evidence (Lead Score, Persona Analysis, or Intent) strongly suggests they are a bad fit, state this clearly as a **[STOP: POOR FIT]** alert at the very top. Do not force a strategy for a dead lead. Explain why in one sentence.
+1. **The "Non-Fit" Protocol**:
+   - If `lead_segment` is **DIRECT_COMPETITOR**: Assign **[ALERT: DIRECT COMPETITOR]** to `fit_assessment`. Explain that while they are a competitor, they represent a strategic partnership or "Internal Efficiency" play.
+   - If the evidence (Lead Score, Persona Analysis, or Intent) strongly suggests they are a bad fit, state this clearly as a **[STOP: POOR FIT]** alert.
+   - Explain the reasoning in one concise sentence.
 2. **Executive Synthesis**: Connect the dots. How does this person's role and recent activity specifically align with the company's current market position and {selling_company_name}'s value?
 3. **The "Why Now?" (Critical)**: Synthesize the lead score, intent, and news into a 2-3 sentence argument for why *this specific week* is the perfect time to reach out.
 4. **Strategic Playbook**: 
-   - Cleanly present the finalized outreach tactics (LinkedIn/Email) generated in the previous step.
-   - Refine the "Hook" if you see a more powerful way to connect it to the journey stage.
+   - Cleanly present the finalized outreach tactics (LinkedIn/Email).
+   - **Pivot Rule**: If `lead_segment` is DIRECT_COMPETITOR, ensure the outreach focuses on **Glial as Intelligence Infrastructure** or **Partnership/Moat**, and NOT cold selling of competing features.
+   - Refine the "Hook" to connect the lead's own public theories (e.g., 'AI Teammates') to their internal operational gaps.
 5. **Advanced Next Steps (Unified Strategy)**:
-   - This is the most important part. Create a 3-5 step high-level strategy that synthesizes EVERYTHING.
+   - Create a 3-5 step high-level strategy that synthesizes EVERYTHING.
 6. **Internal Advisory**: Provide 2 "Insider Tips" for the rep.
 
 ### EXECUTION GUIDELINES:
@@ -350,13 +348,16 @@ Deliver a **Global Executive Blueprint** as a JSON object matching the `GlobalEx
 '''
 
 COMPANY_CONTEXT = '''
-    Innovize AI specializes in high-stakes Revenue Intelligence and Process Automation. Our product ecosystem includes:
+    Innovize AI is an elite AI Transformation and Consulting firm for high-growth companies. We specialize in building custom, high-stakes AI Agents that automate entire roles and mission-critical workflows. Our ecosystem includes:
     
-    1. **Glial**: An Advanced Revenue Intelligence Platform for sales teams. It automates deep prospect research, identifies "Narratives of Opportunity" from social signals, and generates authority-first outreach. Best for Sales, GTM, and Revenue Operations.
-    2. **Intelligent Document Processing (IDP)**: A specialized automation engine for extracting structured data from unstructured documents. Best for Logistics (bills of lading), Finance (invoices), and Healthcare.
-    3. **Agentic Knowledge Base**: An enterprise-grade RAG system that transforms static company documentation into an interactive, agentic intelligence layer. Best for Onboarding, Support, and Internal Knowledge Management.
+    1. **Glial**: The Advanced Revenue Intelligence "Operating System" for high-growth sales teams. It provides the strategic infrastructure needed to manage complex GTM cycles, automating deep prospect research and identifying "Narratives of Opportunity" from social signals to drive high-velocity outreach.
+    2. **Specialized AI Agents (Role Automation)**:
+        - **Sales & GTM Agents**: Handle lead qualification, scoring, and automated scheduling.
+        - **Operations & CX Agents**: Monitor workflows, optimize processes, and resolve 80% of customer inquiries.
+        - **Data & Research Agents**: Provide predictive modeling, web scraping, and document synthesis.
+    3. **AI Consulting & 9-Phase Framework**: We provide Strategic Roadmaps and Feasibility Assessments to ensure a guaranteed ROI within 90 days.
     
-    Our clients have achieved up to 4x operational efficiency gains. We focus on high-ROI AI implementation that replaces manual, human-dependent bottlenecks with secure, custom-tuned AI workflows.
+    Our proprietary "TRUST Framework" ensures 90%+ user adoption of AI tools within 30 days. We focus on human-AI collaboration—amplifying human productivity rather than replacing it.
 '''
 
 

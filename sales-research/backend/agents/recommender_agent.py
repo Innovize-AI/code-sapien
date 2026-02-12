@@ -2,7 +2,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 import json
 from workflow.state import AgentState
 from prompts.sales_prompts import GLOBAL_STRATEGY_ADVISOR_PROMPT
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from enum import Enum
@@ -48,7 +48,7 @@ def strategic_recommender_node(state: AgentState):
     ]
 
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(StrategicRecommendation)
         response = structured_llm.invoke(messages)
         

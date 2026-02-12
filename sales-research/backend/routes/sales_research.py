@@ -258,3 +258,40 @@ async def run_bulk_research(
         await producer_task
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@sales_router.put("/reports/{report_id}/outreach")
+async def update_outreach(
+    report_id: str,
+    outreach_data: dict = Body(...),
+    db: AsyncSession = Depends(get_db)
+):
+    from db.crud import update_report_outreach
+    updated_report = await update_report_outreach(db, report_id, outreach_data)
+    if not updated_report:
+        return {"error": "Report not found"}
+    return {"status": "success", "data": _report_to_dict(updated_report)}
+
+@sales_router.put("/reports/{report_id}/cso-outreach")
+async def update_cso_outreach(
+    report_id: str,
+    cso_data: dict = Body(...),
+    db: AsyncSession = Depends(get_db)
+):
+    from db.crud import update_report_cso_outreach
+    updated_report = await update_report_cso_outreach(db, report_id, cso_data)
+    if not updated_report:
+        return {"error": "Report not found or update failed"}
+    return {"status": "success", "data": _report_to_dict(updated_report)}
+
+@sales_router.put("/reports/{report_id}/intent-email")
+async def update_intent_email(
+    report_id: str,
+    email_data: dict = Body(...),
+    db: AsyncSession = Depends(get_db)
+):
+    from db.crud import update_report_intent_email
+    email_text = email_data.get('email_text', '')
+    updated_report = await update_report_intent_email(db, report_id, email_text)
+    if not updated_report:
+        return {"error": "Report not found or update failed"}
+    return {"status": "success", "data": _report_to_dict(updated_report)}

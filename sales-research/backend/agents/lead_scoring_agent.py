@@ -2,7 +2,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 import json
 from workflow.state import AgentState
 from prompts.sales_prompts import LEAD_SCORER_SYSTEM_PROMPT, LEAD_DATA_EXTRACTOR_PROMPT
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
 
@@ -28,11 +28,10 @@ class CategoricalScore(BaseModel):
     reasoning: str = Field(description="Specific, evidence-based reason for this score (e.g., 'CTO at a 500-employee tech firm', '3 website visits and 1 demo request')")
 
 class LeadScoreBreakdown(BaseModel):
-    demographic_fit: CategoricalScore = Field(description="Score and reasoning for Industry, Company Size, Revenue, Job Title")
-    engagement: CategoricalScore = Field(description="Score and reasoning for Website Visits, Content Interaction, Demo Request, Social Media")
-    sales_readiness: CategoricalScore = Field(description="Score and reasoning for Buying Stage, Recent Activity")
-    lead_source: CategoricalScore = Field(description="Score and reasoning for Referral, Inbound Marketing, Paid Ads, Cold Outreach")
-    timing: CategoricalScore = Field(description="Score and reasoning for Purchase Timeline, Project Urgency")
+    firmographic_fit: CategoricalScore = Field(description="Score and reasoning for Industry Match, Company Size/Scale, and Revenue/Growth Stage.")
+    persona_alignment: CategoricalScore = Field(description="Score and reasoning for Job Title Seniority, Recent Hiring/News Signals, and Social Activity Level.")
+    behavioral_engagement: CategoricalScore = Field(description="Score and reasoning for Lead Magnet Downloads, Demo Requests, and Contact Form fills (Inbound).")
+    strategic_intent: CategoricalScore = Field(description="Score and reasoning for Discovery Source (e.g. Competitor Comment), Pain Point Depth, and Partner Referrals (Outbound).")
 
 class LeadScoreAnalysis(BaseModel):
     total_score: int = Field(description="The final calculated lead score.")
@@ -67,7 +66,7 @@ def lead_data_extractor(state: AgentState):
     ]
 
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(ExtractedLeadData)
         response = structured_llm.invoke(messages)
         
@@ -91,7 +90,7 @@ def lead_scorer(state: AgentState):
     ]
 
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(LeadScoreAnalysis)
         response = structured_llm.invoke(messages)
         

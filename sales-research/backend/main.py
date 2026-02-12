@@ -30,6 +30,7 @@ from routes.competitor_analysis import competitor_router
 from routes.competitors import router as competitors_crud_router
 from routes.activities import activities_router
 from routes.slack_interactions import slack_interactions_router
+from routes.knowledge import router as knowledge_router
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -62,6 +63,7 @@ app.include_router(kit_router, prefix="/api")
 app.include_router(competitor_router, prefix="/api/competitor-analysis")
 app.include_router(competitors_crud_router, prefix="/api")
 app.include_router(activities_router, prefix="/api")
+app.include_router(knowledge_router, prefix="/api/knowledge")
 app.include_router(slack_interactions_router)
 
 @app.on_event("startup")

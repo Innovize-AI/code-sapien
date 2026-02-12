@@ -7,7 +7,14 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-const sidebarItems = [
+interface SidebarItem {
+    title: string;
+    href: string;
+    icon: any;
+    comingSoon?: boolean;
+}
+
+const sidebarItems: SidebarItem[] = [
     {
         title: "Dashboard",
         href: "/",
@@ -45,9 +52,8 @@ const sidebarItems = [
     },
     {
         title: "Knowledge Base",
-        href: "#",
+        href: "/knowledge-base",
         icon: BookOpen,
-        comingSoon: true
     },
     {
         title: "Settings",

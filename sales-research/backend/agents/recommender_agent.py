@@ -28,6 +28,7 @@ def strategic_recommender_node(state: AgentState):
     email_history = state.get("email_history", [])
     meeting_notes = state.get("meeting_notes", "No meeting notes available.")
     intent_analysis = state.get("intent_analysis", {})
+    cso_briefing = state.get("cso_strategic_briefing", {})
 
     # Package intelligence for the recommender
     intelligence_context = {
@@ -37,7 +38,8 @@ def strategic_recommender_node(state: AgentState):
         },
         "social_persona": user_profile_analysis,
         "email_history": email_history,
-        "meeting_notes": meeting_notes
+        "meeting_notes": meeting_notes,
+        "cso_guidance": cso_briefing
     }
 
     messages = [

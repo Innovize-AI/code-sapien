@@ -10,6 +10,10 @@ import json
 from models.structured_output import OutreachStrategy
 from pydantic import BaseModel, Field
 from typing import List
+from services.knowledge_service import KnowledgeService
+
+# Initialize KnowledgeService
+knowledge_service = KnowledgeService(index_name="glial-index")
 
 
 def format_profile_analysis(analysis: dict) -> str:
@@ -111,19 +115,35 @@ def pain_point_node(state: AgentState):
         return {"target_pain_points": {}}
 
 def solution_node(state: AgentState):
-    """Maps identified pain points to Innovize AI's specific offerings."""
+    """Maps identified pain points to Innovize AI's specific offerings using verified RAG intelligence."""
     pain_points_dict = state.get("target_pain_points", {})
     pain_points_str = json.dumps(pain_points_dict)
-    company_context = state.get("company_context", "")
+    lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
+    selling_profile = state.get("selling_company_profile")
     
+    # Defaults for backward compatibility
+    selling_company_name = selling_profile.name if selling_profile else "Innovize AI"
+    selling_company_context = f"{selling_company_name} specializes in {selling_profile.description if selling_profile else 'AI automation'}."
+    
+    # Build mapping logic string
+    if selling_profile:
+        mapping_logic = "\n".join([f"    - If {', '.join(p.target_pain_points)} -> Use **{p.name}**." for p in selling_profile.products])
+    else:
+        mapping_logic = "- If Sales -> Use Glial.\n    - If Logistics -> Use IDP.\n    - If Internal -> Use Agentic KB."
+
+    # Build the Prompt with Agentic RAG context
     prompt = STRATEGIC_SOLUTION_PROMPT.format(
         pain_points=pain_points_str,
-        company_context=company_context
+        lead_segment=lead_segment,
+        selling_company_name=selling_company_name,
+        selling_company_context=selling_company_context,
+        solution_context=rag_briefing,
+        selling_mapping_logic=mapping_logic
     )
 
     messages = [
-        SystemMessage(content="You are a Senior AI Solutions Architect and Value Engineer. Your task is to transform discovered pain points into high-impact, transformative AI solutions using Innovize AI's capabilities."),
-        HumanMessage(content=prompt)
+        SystemMessage(content=f"You are a Senior AI Solutions Architect for {selling_company_name}. Your task is to transform discovered pain points into high-impact AI solutions."),
+        HumanMessage(content=f"STRATEGIC RAG BRIEFING: {rag_briefing}\n\nPROMPT: {prompt}")
     ]
     
     try:
@@ -141,17 +161,19 @@ def outreach_node(state: AgentState):
     user_analysis = format_profile_analysis(user_analysis_dict)
     solutions = state.get("strategic_solutions", "")
     engagements = state.get("post_engagements", [])
-    journey_analysis = state.get("buyer_journey_analysis", {})
+    lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
     
     prompt = OUTREACH_DESIGN_PROMPT.format(
         user_analysis=user_analysis,
+        lead_segment=lead_segment,
         engagements=json.dumps(engagements),
         solutions=solutions,
-        journey_context=json.dumps(journey_analysis)
+        journey_context=json.dumps(journey_analysis),
+        cso_context=json.dumps(cso_briefing)
     )
 
     messages = [
-        SystemMessage(content="### ROLE: You are a world-class direct response copywriter and cold email strategist. You have a deep understanding of sales psychology and can transform raw prospect data into a flawless, human-sounding message."),
+        SystemMessage(content="### ROLE: You are a world-class direct response copywriter and cold email strategist."),
         HumanMessage(content=prompt)
     ]
     

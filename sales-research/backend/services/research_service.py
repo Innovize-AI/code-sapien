@@ -241,11 +241,37 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                 from db.crud import _report_to_dict
                 existing_state = _report_to_dict(existing)
 
+    from workflow.state import SellingCompanyProfile, Product
+    
+    # Define default Innovize AI profile
+    default_selling_profile = SellingCompanyProfile(
+        name="Innovize AI",
+        description="advanced Revenue Intelligence and Process Automation",
+        products=[
+            Product(
+                name="Glial",
+                description="Advanced Revenue Intelligence Platform for sales teams. Automates prospect research and identifies narratives of opportunity.",
+                target_pain_points=["Sales", "Revenue", "GTM", "Outreach", "Marketing"]
+            ),
+            Product(
+                name="Intelligent Document Processing (IDP)",
+                description="Specialized automation engine for extracting structured data from unstructured documents like invoices and bills of lading.",
+                target_pain_points=["Logistics", "Finance", "Healthcare", "Supply Chain", "Legal"]
+            ),
+            Product(
+                name="Agentic Knowledge Base",
+                description="Enterprise-grade RAG system that transforms static documentation into an interactive intelligence layer.",
+                target_pain_points=["HR", "Support", "Internal Ops", "Customer Success", "Onboarding"]
+            )
+        ]
+    )
+
     initial_state = {
         "email_id": email,
         "linkedin_url": linkedin_url or existing_state.get("linkedin_url"),
         "website": website or existing_state.get("website"),
         "company_context": COMPANY_CONTEXT,
+        "selling_company_profile": default_selling_profile, # new dynamic context
         "ideal_profile": ideal_profile,
         "user_linkedin_url": org_settings["user_linkedin_url"],
         "company_linkedin_url": org_settings["company_linkedin_url"],

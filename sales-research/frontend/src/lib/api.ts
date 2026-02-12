@@ -342,3 +342,39 @@ export const fetchActivities = async (limit: number = 50): Promise<Activity[]> =
         return [];
     }
 };
+
+export interface NamespaceInfo {
+    name: string;
+    description: string;
+    count: number;
+}
+
+export const fetchKnowledgeNamespaces = async (): Promise<NamespaceInfo[]> => {
+    const response = await axios.get(`${API_URL}/api/knowledge/namespaces`);
+    return response.data;
+};
+
+export const syncKnowledgeBase = async () => {
+    const response = await axios.post(`${API_URL}/api/knowledge/sync-defaults`);
+    return response.data;
+};
+
+export interface KnowledgeFile {
+    name: string;
+    path: string;
+    size: number;
+    modified: number;
+}
+
+export const fetchKnowledgeFiles = async (): Promise<KnowledgeFile[]> => {
+    const response = await axios.get(`${API_URL}/api/knowledge/list-files`);
+    return response.data.files;
+};
+
+export const ingestKnowledgeFile = async (filePath: string, namespace: string) => {
+    const response = await axios.post(`${API_URL}/api/knowledge/ingest`, {
+        file_path: filePath,
+        namespace
+    });
+    return response.data;
+};

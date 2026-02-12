@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X, Search } from "lucide-react";
+import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X, Search, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CSOCommandCard } from "./cso-command-card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 interface ReportDisplayProps {
     data: {
@@ -84,6 +86,17 @@ interface ReportDisplayProps {
             referral_partner_introduction?: boolean;
             [key: string]: any;
         };
+        cso_strategic_briefing?: {
+            unified_command: {
+                verdict: string;
+                framework_selected: string;
+                timing_advice: string;
+                strategic_reasoning: string;
+                objection_preemption: string[];
+                sources: Array<{ source: string; snippet: string }>;
+            };
+            executive_blueprint_summary: string;
+        };
         [key: string]: any;
     } | null;
 
@@ -106,6 +119,7 @@ interface Activity {
 export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     const [activeSection, setActiveSection] = React.useState<number>(0);
     const [isNavVisible, setIsNavVisible] = React.useState<boolean>(true);
+    const [isProofOpen, setIsProofOpen] = useState(false);
 
     if (!data) {
         return null;
@@ -225,7 +239,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                              (data as any).lead_extracted_data?.discovery_insights;
 
     const sections: Section[] = [
-        { id: "synthesis", title: "Executive Blueprint", icon: <LayoutDashboard className="h-4 w-4" />, content: data.sales_research_report, badge: "CSO Briefing", isPrimary: true },
+        { id: "cso-verdict", title: "CSO Verdict", icon: <ShieldCheck className="h-4 w-4" />, content: data.cso_strategic_briefing, badge: "Unified Command", isPrimary: true },
+        { id: "synthesis", title: "Executive Blueprint", icon: <LayoutDashboard className="h-4 w-4" />, content: data.sales_research_report, badge: "CSO Briefing" },
         // Discovery Intelligence (New) - ONLY for competitor posts
         ...(discoverySource === 'competitor_comment' ? [{
             id: "discovery",
@@ -861,6 +876,13 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                     )}
                                 </CardHeader>
                                 <CardContent className="px-12 pb-16">
+                                    {/* CSO Verdict Rendering */}
+                                    {section.id === "cso-verdict" && data.cso_strategic_briefing && (
+                                        <div onClick={() => setIsProofOpen(true)} className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-100">
+                                            <CSOCommandCard data={data.cso_strategic_briefing.unified_command} />
+                                        </div>
+                                    )}
+
                                     {/* Discovery Intelligence Rendering */}
                                     {section.id === "discovery" && (
                                         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -1461,6 +1483,44 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                     ))}
                 </div>
             </div>
+
+            {/* Knowledge Proof Sidebar */}
+            <Sheet open={isProofOpen} onOpenChange={setIsProofOpen}>
+                <SheetContent side="right" className="sm:max-w-2xl w-full h-full overflow-y-auto bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-l border-zinc-200 dark:border-zinc-800 p-0 shadow-2xl">
+                    <div className="p-12 space-y-12">
+                        <SheetHeader className="space-y-6">
+                            <div className="h-16 w-16 rounded-[2rem] bg-amber-500/10 text-amber-500 flex items-center justify-center shadow-inner">
+                                <BookOpen className="h-8 w-8" />
+                            </div>
+                            <div>
+                                <SheetTitle className="text-4xl font-black italic uppercase tracking-tighter mb-2">Knowledge Proofs</SheetTitle>
+                                <SheetDescription className="text-zinc-500 font-bold text-base leading-relaxed">
+                                    Strategic assets and playbooks synthesized by our CSO to validate this command.
+                                </SheetDescription>
+                            </div>
+                        </SheetHeader>
+
+                        <div className="space-y-10">
+                            {data.cso_strategic_briefing?.unified_command.sources.map((source, i) => (
+                                <div key={i} className="group relative">
+                                    <div className="absolute -inset-1 bg-gradient-to-r from-primary/5 to-transparent rounded-[2rem] blur opacity-0 group-hover:opacity-100 transition duration-500" />
+                                    <div className="relative space-y-6 p-10 rounded-[2.5rem] bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 hover:border-primary/20 transition-all duration-300">
+                                        <div className="flex items-center justify-between">
+                                            <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-primary/20 text-primary bg-primary/5 px-3 py-1">
+                                                Asset: {source.source}
+                                            </Badge>
+                                            <div className="h-1.5 w-1.5 rounded-full bg-primary/40" />
+                                        </div>
+                                        <div className="prose prose-zinc dark:prose-invert max-w-none text-[16px] font-medium text-zinc-800 dark:text-zinc-200 leading-relaxed italic border-l-4 border-primary/10 pl-8 py-2">
+                                            <ReactMarkdown>{source.snippet}</ReactMarkdown>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div >
     );
 }

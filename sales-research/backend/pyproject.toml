@@ -6,7 +6,7 @@ authors = ["pavan kumar.v <pavan.kumar@the10xacademy.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.14"
 langgraph = "^1.0.8"
 langgraph-cli = "^0.4.12"
 langgraph-sdk = "^0.3.0"
@@ -28,6 +28,8 @@ pydantic-settings = "^2.2.1"
 apscheduler = "^3.11.2"
 ipykernel = "^6.29.0"
 python-multipart = "^0.0.12"
+langchain-pinecone = "^0.2.13"
+langgraph-prebuilt = "^1.0.7"
 
 
 

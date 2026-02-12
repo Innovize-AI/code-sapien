@@ -74,14 +74,19 @@ def sales_research_report_generator(state: AgentState):
     # Strategy Section (Outreach vs Follow-up)
     outreach_data = state.get("personalized_outreach", "")
     follow_up = state.get("follow_up_strategy", "")
+    cso_briefing = state.get("cso_strategic_briefing", {})
     
     outreach_str = ""
     if isinstance(outreach_data, dict) and outreach_data:
+        # Use CSO Refined content if available
+        li_msg = cso_briefing.get("refined_linkedin_message") or outreach_data.get('linkedin_message')
+        email_body = cso_briefing.get("refined_email_body") or outreach_data.get('email_body')
+        
         outreach_str = f"""
         Hook: {outreach_data.get('hook')}
-        LinkedIn: {outreach_data.get('linkedin_message')}
+        LinkedIn: {li_msg}
         Email Subject: {outreach_data.get('email_subject')}
-        Email Body: {outreach_data.get('email_body')}
+        Email Body: {email_body}
         """
     else:
         outreach_str = str(outreach_data)
@@ -132,6 +137,9 @@ def sales_research_report_generator(state: AgentState):
     - Proposed Strategic Solutions: {solutions}
     {strategy_output}
     - Strategic Recommendations: {strategic_recommendations}
+    
+    6. CHIEF STRATEGY OFFICER (CSO) VERDICT:
+    - Unified Command: {json.dumps(state.get('cso_strategic_briefing', {}))}
     """
     
     messages = [
@@ -146,6 +154,14 @@ def sales_research_report_generator(state: AgentState):
     structured_llm = llm.with_structured_output(GlobalExecutiveBriefing)
     response = structured_llm.invoke(messages)
 
-    return {"sales_research_report": response.model_dump()}
+    return {
+        "sales_research_report": {
+            **response.model_dump(),
+            "strategic_playbook": {
+                **response.strategic_playbook.model_dump(),
+                "strategic_proof_points": cso_briefing.get("strategic_proof_points", [])
+            }
+        }
+    }
 
 

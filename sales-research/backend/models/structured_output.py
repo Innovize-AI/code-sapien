@@ -97,6 +97,7 @@ class SalesResearchReport(BaseModel):
 class StrategicPlaybook(BaseModel):
     outreach_tactics: str = Field(default="", description="Cleanly presented finalized outreach tactics (LinkedIn/Email).")
     refined_hook: str = Field(default="", description="Refined Hook to connect to the journey stage.")
+    strategic_proof_points: List[str] = Field(default_factory=list, description="Specific snippets/insights from playbooks used for validation.")
 
 class GlobalExecutiveBriefing(BaseModel):
     fit_assessment: str = Field(default="[NEEDS REVIEW]", description="The 'Non-Fit' Protocol status (e.g., '[STOP: POOR FIT]' or 'GOOD FIT').")

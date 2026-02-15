@@ -144,6 +144,10 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     const [isEditingIntentEmail, setIsEditingIntentEmail] = useState(false);
     const [isSavingIntentEmail, setIsSavingIntentEmail] = useState(false);
     const [editedIntentEmail, setEditedIntentEmail] = useState('');
+    
+    // --- Multi-Campaign State ---
+    const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+
 
     const { toast } = useToast();
 
@@ -781,12 +785,20 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         );
     };
 
-    const outreach = data.personalized_outreach;
-    const tacticalActions = (outreach && typeof outreach === 'object') ? [
-        { type: 'linkedin' as const, title: 'LinkedIn Request', content: outreach.linkedin_message || (outreach as any).hook || "", icon: <Linkedin className="h-4 w-4" /> },
-        { type: 'email' as const, title: 'Email Subject', content: outreach.email_subject || "", icon: <Mail className="h-4 w-4" /> },
-        { type: 'email' as const, title: 'Email Body', content: outreach.email_body || "", icon: <FileText className="h-4 w-4" /> }
+    // --- Multi-Campaign Logic ---
+    const campaignVariants = data.sales_research_report?.campaign_variants || [];
+    const hasVariants = campaignVariants.length > 0;
+    
+    const activeOutreach = hasVariants 
+        ? campaignVariants[selectedVariantIndex] 
+        : data.personalized_outreach;
+
+    const tacticalActions = (activeOutreach && typeof activeOutreach === 'object') ? [
+        { type: 'linkedin' as const, title: 'LinkedIn Request', content: activeOutreach.linkedin_message || (activeOutreach as any).hook || "", icon: <Linkedin className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Subject', content: activeOutreach.email_subject || "", icon: <Mail className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Body', content: activeOutreach.email_body || "", icon: <FileText className="h-4 w-4" /> }
     ].filter(a => a.content) : extractTacticalItems(data.sales_research_report);
+
 
     const briefing = data.cso_strategic_briefing;
     const strategicActions = (briefing && typeof briefing === 'object') ? [
@@ -1158,7 +1170,49 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                 </div>
                                             </div>
 
+                                            {/* Campaign Variant Selector */}
+                                            {hasVariants && (
+                                                <div className="mb-8 space-y-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Select Campaign Strategy</span>
+                                                        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                                                    </div>
+                                                    <div className="p-1 bg-zinc-100 dark:bg-zinc-900 rounded-xl flex flex-wrap gap-2 border border-zinc-200 dark:border-zinc-800">
+                                                        {campaignVariants.map((variant: any, idx: number) => (
+                                                            <button
+                                                                key={idx}
+                                                                onClick={() => setSelectedVariantIndex(idx)}
+                                                                className={cn(
+                                                                    "px-4 py-2.5 rounded-lg text-[11px] font-black uppercase tracking-tight transition-all flex-1 md:flex-none text-center",
+                                                                    selectedVariantIndex === idx
+                                                                        ? "bg-white dark:bg-zinc-800 text-primary shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 font-black"
+                                                                        : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
+                                                                )}
+                                                            >
+                                                                {variant.variant_name || `Variant ${idx + 1}`}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* Strategic Reasoning Block */}
+                                                    {activeOutreach && (activeOutreach as any).fit_reasoning && (
+                                                        <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-500 mt-0.5">
+                                                                <Zap className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-500">Why this strategy?</h4>
+                                                                <p className="text-[14px] font-medium text-zinc-700 dark:text-zinc-300 leading-relaxed italic">
+                                                                    "{(activeOutreach as any).fit_reasoning}"
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             <Tabs defaultValue="tactical" className="w-full" onValueChange={(val) => setActiveOutreachTab(val as 'tactical' | 'strategic')}>
+
                                                 <div className="flex items-center justify-between mb-8 border-b border-zinc-100 dark:border-zinc-800 pb-1">
                                                     <TabsList className="bg-transparent h-12 p-0 gap-8">
                                                         <TabsTrigger 
@@ -1346,7 +1400,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                             </Tabs>
 
                                             {/* Hook / Strategic Angle */}
-                                            {typeof data.personalized_outreach === 'object' && (data.personalized_outreach?.hook || editedOutreach.hook) && activeOutreachTab === 'tactical' && (
+                                            {/* Check if activeOutreach exists OR edited hook exists, AND we are in tactical mode */}
+                                            {((activeOutreach && typeof activeOutreach === 'object' && ((activeOutreach as any).hook || (activeOutreach as any).strategic_hook)) || editedOutreach.hook) && activeOutreachTab === 'tactical' && (
                                                 <div className="max-w-4xl mx-auto pt-4">
                                                     <div className="p-8 rounded-[2.5rem] bg-zinc-100 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 flex items-start gap-8 group hover:shadow-xl transition-all duration-500">
                                                         <div className="p-4 rounded-3xl bg-white dark:bg-zinc-950 text-amber-500 shadow-sm border border-amber-100 dark:border-amber-900/30 group-hover:scale-110 transition-transform">
@@ -1363,7 +1418,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                                 />
                                                             ) : (
                                                                 <p className="text-[17px] font-black text-zinc-900 dark:text-white leading-relaxed tracking-tight italic">
-                                                                    "{editedOutreach.hook || (data.personalized_outreach as any).hook}"
+                                                                    "{editedOutreach.hook || (activeOutreach as any).hook || (activeOutreach as any).strategic_hook}"
                                                                 </p>
                                                             )}
                                                             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pt-2">The Psychological Engagement Hook</p>

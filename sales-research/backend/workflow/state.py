@@ -39,6 +39,10 @@ class Product(BaseModel):
     name: str
     description: str
     target_pain_points: List[str]
+    is_strategic_pivot: bool = False
+    target_roles: List[str] = []
+    rag_context: Optional[str] = None
+
 
 class SellingCompanyProfile(BaseModel):
     name: str
@@ -108,3 +112,8 @@ class AgentState(TypedDict):
     viability_analysis: Annotated[str, reduce_last]
     cso_strategic_briefing: Annotated[dict, reduce_last]
     signal_leverage_score: Annotated[int, reduce_last]
+    is_strategic_pivot_fit: Annotated[bool, reduce_last]
+    pivot_product_name: Annotated[str, reduce_last]
+    campaign_outreach_variants: Annotated[List[dict], reduce_last]
+
+

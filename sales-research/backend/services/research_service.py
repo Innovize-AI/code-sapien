@@ -36,11 +36,21 @@ async def _get_organization_settings() -> dict:
                     icp = IdealProfile(**json.loads(settings.icp_json))
                 except Exception as e:
                     print(f"Error parsing ICP settings: {e}")
+            
+            selling_profile = None
+            if settings.selling_profile_json:
+                try:
+                    from db.schemas import SellingProfileConfig
+                    selling_profile = SellingProfileConfig(**json.loads(settings.selling_profile_json))
+                except Exception as e:
+                    print(f"Error parsing Selling Profile: {e}")
+
             user_linkedin = settings.user_linkedin_url
             company_linkedin = settings.company_linkedin_url
             
         return {
             "icp": icp,
+            "selling_profile": selling_profile,
             "user_linkedin_url": user_linkedin,
             "company_linkedin_url": company_linkedin
         }
@@ -244,45 +254,32 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
 
     from workflow.state import SellingCompanyProfile, Product
     
-    # Define default Innovize AI profile
-    default_selling_profile = SellingCompanyProfile(
-        name="Innovize AI",
-        description="Specialized AI Transformation and Autonomous Agent Orchestration",
-        products=[
-            Product(
-                name="Glial",
-                description="Advanced Revenue Intelligence Platform for sales teams. Automates prospect research and identifies narratives of opportunity.",
-                target_pain_points=["Sales", "Revenue", "GTM", "Outreach", "Marketing"]
-            ),
-            Product(
-                name="Sales Development Agent",
-                description="Autonomous role-based agent for lead qualification, objection handling, and appointment scheduling.",
-                target_pain_points=["Lead Gen", "SDR", "Meeting Scheduling", "Qualification"]
-            ),
-            Product(
-                name="Intelligent Document Processing (IDP)",
-                description="Specialized OCR and Document Intelligence engine for extracting structured data from unstructured files (Invoices, Logistics, Claims).",
-                target_pain_points=["IDP", "OCR", "Logistics", "Document Processing", "Invoices"]
-            ),
-            Product(
-                name="Customer Success Agent",
-                description="Resolves 80% of common inquiries and conducts knowledge search for seamless escalation.",
-                target_pain_points=["Customer Success", "Support", "Retention", "Inquiries"]
-            ),
-            Product(
-                name="AI Strategy & Consulting",
-                description="Strategic roadmaps, feasibility assessments, and performance analytics with a 90-day ROI guarantee.",
-                target_pain_points=["ROI", "Strategy", "Transformation", "AI Roadmap"]
-            )
-        ]
-    )
+    # Load Selling Profile from Settings OR Default
+    selling_profile_data = org_settings.get("selling_profile")
+    
+    if selling_profile_data:
+        # Convert Schema Schema to State Schema (if different, but they look compatible)
+        # Using the loaded profile directly
+        selling_company_profile = selling_profile_data
+    else:
+        # Fallback Default
+        selling_company_profile = SellingCompanyProfile(
+            name="Innovize AI",
+            description="Specialized AI Transformation and Autonomous Agent Orchestration",
+            products=[
+                Product(name="Glial", description="Revenue Intelligence", target_pain_points=["Sales"]),
+                Product(name="AI Consulting", description="Strategy", target_pain_points=["Strategy"])
+            ]
+        )
 
     initial_state = {
         "email_id": email,
         "linkedin_url": linkedin_url or existing_state.get("linkedin_url"),
         "website": website or existing_state.get("website"),
         "company_context": COMPANY_CONTEXT,
-        "selling_company_profile": default_selling_profile, # new dynamic context
+        "company_context": COMPANY_CONTEXT,
+        "selling_company_profile": selling_company_profile, # dynamic context
+        "ideal_profile": ideal_profile,
         "ideal_profile": ideal_profile,
         "user_linkedin_url": org_settings["user_linkedin_url"],
         "company_linkedin_url": org_settings["company_linkedin_url"],

@@ -7,10 +7,14 @@ from prompts.sales_prompts import (
     OUTREACH_DESIGN_PROMPT
 )
 import json
-from models.structured_output import OutreachStrategy
+from models.structured_output import OutreachStrategy, CampaignVariant
 from pydantic import BaseModel, Field
 from typing import List
 from services.knowledge_service import KnowledgeService
+
+class MultiCampaignResponse(BaseModel):
+    variants: List[CampaignVariant] = Field(description="List of distinct outreach campaigns (e.g., Best Fit vs Strategic Pivot).")
+
 
 # Initialize KnowledgeService
 knowledge_service = KnowledgeService(index_name="glial-index")
@@ -122,12 +126,13 @@ def solution_node(state: AgentState):
     selling_profile = state.get("selling_company_profile")
     
     # Defaults for backward compatibility
-    selling_company_name = selling_profile.name if selling_profile else "Innovize AI"
-    selling_company_context = f"{selling_company_name} specializes in {selling_profile.description if selling_profile else 'AI automation'}."
+    selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
+    selling_company_context = f"{selling_company_name} specializes in {getattr(selling_profile, 'description', 'AI automation') if selling_profile else 'AI automation'}."
     
     # Build mapping logic string
     if selling_profile:
-        mapping_logic = "\n".join([f"    - If {', '.join(p.target_pain_points)} -> Use **{p.name}**." for p in selling_profile.products])
+        # Use description for dynamic mapping since target_pain_points is not in schema
+        mapping_logic = "\n".join([f"    - If needs relate to '{getattr(p, 'description', '')}' -> Use **{p.name}**." for p in selling_profile.products])
     else:
         mapping_logic = "- If Sales -> Use Glial.\n    - If Logistics -> Use IDP.\n    - If Internal -> Use Agentic KB."
 
@@ -142,6 +147,12 @@ def solution_node(state: AgentState):
         solution_context=rag_briefing,
         selling_mapping_logic=mapping_logic
     )
+    
+    # Inject Pivot Context if Fit
+    if state.get("is_strategic_pivot_fit"):
+        pivot_name = state.get("pivot_product_name")
+        prompt += f"\n\nIMPORTANT: The lead has been identified as a STRICT FIT for the Strategic Pivot Product: '{pivot_name}'.\nYou MUST include a solution mapping that leverages '{pivot_name}' as a primary or alternative option."
+
 
     messages = [
         SystemMessage(content=f"You are a Senior AI Solutions Architect for {selling_company_name}. Your task is to transform discovered pain points into high-impact AI solutions."),
@@ -182,7 +193,68 @@ def outreach_node(state: AgentState):
         HumanMessage(content=prompt)
     ]
     
-    model = get_gemini_model(model="gemini-3-pro-preview", temperature=0).with_structured_output(OutreachStrategy)
-    response = model.invoke(messages)
+    # Determine if we need multi-campaign generation
+    is_pivot_fit = state.get("is_strategic_pivot_fit", False)
+    pivot_name = state.get("pivot_product_name", "")
     
-    return {"personalized_outreach": response.model_dump()}
+    if is_pivot_fit:
+        prompt += f"""
+
+TASK MODIFICATION: You MUST generate EXACTLY TWO distinct campaign variants:
+Variant 1: "Best Fit - [Product Name]" -> The standard approach based on strongest pain points.
+Variant 2: "Strategic Pivot - {pivot_name}" -> A campaign specifically pitching '{pivot_name}' as the solution, using the RAG context provided.
+"""
+    else:
+        prompt += """
+
+TASK MODIFICATION: You MUST generate EXACTLY ONE campaign variant:
+Variant 1: "Best Fit - [Product Name]" -> The standard approach based on strongest pain points.
+DO NOT generate a second variant.
+"""
+
+    messages = [
+        SystemMessage(content="### ROLE: You are a world-class direct response copywriter and cold email strategist."),
+        HumanMessage(content=prompt)
+    ]
+    
+    try:
+        model = get_gemini_model(model="gemini-3-pro-preview", temperature=0.2) # Slightly higher temp for creativity
+        structured_llm = model.with_structured_output(MultiCampaignResponse)
+        response = structured_llm.invoke(messages)
+        
+        variants = response.variants if response else []
+        
+        # Fallback if empty or failed - Construct a default variant from legacy parsing if possible, or just fail gracefully
+        if not variants:
+            # Attempt to rescue by asking for a single non-structured response? 
+            # For now, let's just ensure we return what we have or empty.
+            # But better: if we have a legacy path, we could wrap it. 
+            # Since we are enforcing structured output, let's trust it or return empty.
+            return {"personalized_outreach": {}, "campaign_outreach_variants": []}
+
+        # Select primary (Best Fit) for backward compatibility
+        primary_variant = variants[0]
+        # Attempt to find 'Best Fit' or use first
+        for v in variants:
+            if "Best Fit" in v.variant_name:
+                primary_variant = v
+                break
+        
+        # Convert CampaignVariant to OutreachStrategy format for backward compatibility
+        legacy_outreach = {
+            "hook": primary_variant.hook,
+            "linkedin_message": primary_variant.linkedin_message,
+            "email_subject": primary_variant.email_subject,
+            "email_body": primary_variant.email_body
+        }
+        
+        # ALWAYS return the variants list
+        return {
+            "personalized_outreach": legacy_outreach,
+            "campaign_outreach_variants": [v.dict() for v in variants]
+        }
+
+    except Exception as e:
+        print(f"Error in outreach_node: {e}")
+        return {"personalized_outreach": {}, "campaign_outreach_variants": []}
+

@@ -96,6 +96,10 @@ class OrganizationSettings(Base):
     # Store ICP as JSON
     icp_json = Column(Text, nullable=True) # Storing JSON string for flexibility
     
+    # Store Selling Profile (Strategic Pivot Config)
+    selling_profile_json = Column(Text, nullable=True) 
+
+    
     # Integration Keys
     tavily_api_key = Column(String, nullable=True)
     apollo_api_key = Column(String, nullable=True)

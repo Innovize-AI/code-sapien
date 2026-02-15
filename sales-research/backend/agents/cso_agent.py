@@ -40,7 +40,7 @@ def narrative_arbitrator_node(state: AgentState):
     # 2. Build the Strategic Synthesis Prompt
     lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
     selling_profile = state.get("selling_company_profile")
-    selling_company_name = selling_profile.name if selling_profile else "Innovize AI"
+    selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
     selling_products_list = ", ".join([p.name for p in selling_profile.products]) if selling_profile else "Glial, IDP, Agentic KB"
     
     synthesis_input = f"""

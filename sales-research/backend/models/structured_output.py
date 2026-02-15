@@ -99,6 +99,15 @@ class StrategicPlaybook(BaseModel):
     refined_hook: str = Field(default="", description="Refined Hook to connect to the journey stage.")
     strategic_proof_points: List[str] = Field(default_factory=list, description="Specific snippets/insights from playbooks used for validation.")
 
+class CampaignVariant(BaseModel):
+    variant_name: str = Field(description="Name of the campaign variant (e.g., 'Best Fit - AI Automation', 'Strategic Pivot - Glial').")
+    fit_reasoning: str = Field(description="Why this specific campaign was chosen for this lead.")
+    hook: str = Field(description="The strategic hook specific to this product/angle.")
+    linkedin_message: str = Field(description="The LinkedIn message.")
+    email_subject: str = Field(description="The Email subject.")
+    email_body: str = Field(description="The Email body.")
+
+
 class GlobalExecutiveBriefing(BaseModel):
     fit_assessment: str = Field(default="[NEEDS REVIEW]", description="The 'Non-Fit' Protocol status (e.g., '[STOP: POOR FIT]' or 'GOOD FIT').")
     fit_reasoning: str = Field(default="", description="One sentence explanation for the fit assessment.")
@@ -107,3 +116,5 @@ class GlobalExecutiveBriefing(BaseModel):
     strategic_playbook: StrategicPlaybook = Field(default_factory=StrategicPlaybook, description="Finalized outreach tactics and refined hook.")
     internal_advisory: List[str] = Field(default_factory=list, description="2 'Insider Tips' for the rep.")
     advanced_next_steps: List[str] = Field(default_factory=list, description="A unified, multi-step sequence synthesizing all agent intelligence into a clear path forward.")
+    campaign_variants: List[CampaignVariant] = Field(default_factory=list, description="Generated outreach campaigns (e.g. Best Fit vs Strategic Pivot).")
+

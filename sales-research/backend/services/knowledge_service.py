@@ -96,3 +96,30 @@ class KnowledgeService:
                 aggregated_context.append(f"=== KNOWLEDGE TYPE: {ns.upper()} ===\n{context}")
         
         return "\n\n".join(aggregated_context)
+
+    def retrieve_from_files(self, filenames: List[str], query: str, k: int = 5) -> str:
+        """
+        Retrieves context specifically from a list of files across all namespaces.
+        """
+        namespaces = ["playbooks", "case-studies", "solutions"]
+        aggregated_context = []
+        
+        for ns in namespaces:
+            try:
+                vectorstore = self._get_vectorstore(ns)
+                # Filter by source filename
+                filter_dict = {"source": {"$in": filenames}}
+                
+                docs = vectorstore.similarity_search(query, k=k, filter=filter_dict)
+                
+                if docs:
+                    aggregated_context.append(f"=== MATCHES IN {ns.upper()} ===")
+                    for doc in docs:
+                        source = doc.metadata.get("source", "Unknown")
+                        header = doc.metadata.get("Header 1") or doc.metadata.get("Header 2") or ""
+                        aggregated_context.append(f"--- [Source: {source} | {header}] ---\n{doc.page_content}")
+            except Exception as e:
+                logger.warning(f"Error searching namespace {ns} with filter: {e}")
+                continue
+                
+        return "\n\n".join(aggregated_context)

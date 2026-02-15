@@ -5,14 +5,51 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Book, FileText, Award, Terminal, RefreshCw, CheckCircle2, AlertCircle, Loader2, ArrowUpRight, Plus, FolderOpen } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Book, FileText, Award, Terminal, RefreshCw, CheckCircle2, AlertCircle, Loader2, ArrowUpRight, Plus, FolderOpen, Star, UploadCloud } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { StrategyModal, StrategyConfig } from "@/components/knowledge/StrategyModal";
+import { ProductModal, ProductConfig } from "@/components/knowledge/ProductModal";
 import { fetchKnowledgeNamespaces, syncKnowledgeBase, fetchKnowledgeFiles, ingestKnowledgeFile, NamespaceInfo, KnowledgeFile } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+
+// Add API function placeholders (assuming these are in @/lib/api or will be added)
+// import { configureStrategy, fetchStrategy, uploadKnowledgeFile } from "@/lib/api";
+
+// Helper to simulate API call if not exists yet
+const configureStrategy = async (config: StrategyConfig) => {
+    const res = await fetch('/api/knowledge/configure-strategy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+    });
+    if (!res.ok) throw new Error('Failed to save strategy');
+    return res.json();
+};
+
+const fetchStrategy = async () => {
+   const res = await fetch('/api/knowledge/strategy');
+    if (!res.ok) return { products: [] };
+    return res.json();
+};
+
+const uploadKnowledgeFile = async (file: File, namespace: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('namespace', namespace);
+    
+    const res = await fetch('/api/knowledge/upload', {
+        method: 'POST',
+        body: formData
+    });
+    if (!res.ok) throw new Error('Upload failed');
+    return res.json();
+};
 
 export default function KnowledgeBasePage() {
     const [namespaces, setNamespaces] = useState<NamespaceInfo[]>([]);
@@ -22,20 +59,31 @@ export default function KnowledgeBasePage() {
     const [activeTab, setActiveTab] = useState("playbooks");
     const { toast } = useToast();
 
+    // Strategy State
+    const [strategyProfile, setStrategyProfile] = useState<any>(null);
+    const [selectedFileForStrategy, setSelectedFileForStrategy] = useState<KnowledgeFile | null>(null);
+    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+    const [editingProduct, setEditingProduct] = useState<ProductConfig | undefined>(undefined);
+
     // Form state for ingestion
     const [newFilePath, setNewFilePath] = useState("");
     const [newNamespace, setNewNamespace] = useState("playbooks");
     const [isIngesting, setIsIngesting] = useState(false);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    
+    // Upload State
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const loadData = async () => {
         try {
-            const [nsData, filesData] = await Promise.all([
+            const [nsData, filesData, strategyData] = await Promise.all([
                 fetchKnowledgeNamespaces(),
-                fetchKnowledgeFiles()
+                fetchKnowledgeFiles(),
+                fetchStrategy()
             ]);
             setNamespaces(nsData);
             setKnowledgeFiles(filesData);
+            setStrategyProfile(strategyData);
         } catch (e) {
             console.error("Failed to load knowledge base data", e);
         } finally {
@@ -90,6 +138,60 @@ export default function KnowledgeBasePage() {
         }
     };
 
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
+        const file = e.target.files[0];
+        setIsIngesting(true);
+        try {
+            await uploadKnowledgeFile(file, newNamespace);
+            toast({ title: "File Uploaded", description: "Successfully added and ingested." });
+            setIsSheetOpen(false);
+            loadData();
+        } catch (e) {
+            toast({ title: "Upload Failed", description: "Something went wrong.", variant: "destructive" });
+        } finally {
+            setIsIngesting(false);
+        }
+    };
+
+    const handleSaveStrategy = async (config: StrategyConfig) => {
+        try {
+            await configureStrategy(config);
+            toast({ title: "Strategy Updated", description: "Pivot configuration saved." });
+            loadData();
+        } catch (e) {
+            toast({ title: "Error", description: "Failed to save strategy.", variant: "destructive" });
+        }
+    };
+
+    const handleSaveProduct = async (config: ProductConfig) => {
+        try {
+            // Adapt ProductConfig to StrategyConfig for backend compatibility
+            const strategyConfig: StrategyConfig = {
+                filename: config.relevant_files[0] || "", // Backend uses this as ID if no product name, but we have product name
+                is_strategic_pivot: config.is_strategic_pivot,
+                target_roles: config.target_roles,
+                product_name: config.product_name,
+                relevant_files: config.relevant_files
+            };
+
+            await configureStrategy(strategyConfig);
+            toast({ title: "Product Saved", description: `${config.product_name} configuration updated.` });
+            loadData();
+        } catch (e) {
+            toast({ title: "Error", description: "Failed to save product.", variant: "destructive" });
+        }
+    };
+
+    const handleStrategyClick = (file: KnowledgeFile) => {
+        setSelectedFileForStrategy(file);
+    };
+
+    const getPivotInfo = (filename: string) => {
+        if (!strategyProfile?.products) return null;
+        return strategyProfile.products.find((p: any) => p.rag_context === filename && p.is_strategic_pivot);
+    };
+
     if (isLoading) {
         return (
             <DashboardLayout>
@@ -101,8 +203,16 @@ export default function KnowledgeBasePage() {
     }
 
     const playbooks = knowledgeFiles.filter(f => !f.name.includes("one-pager") && !f.name.includes("offerings"));
-    const solutions = knowledgeFiles.filter(f => f.name.includes("one-pager") || f.name.includes("offerings"));
+    // Solutions are now driven by DB products, not files
+    const products = strategyProfile?.products || [];
     const caseStudies = knowledgeFiles.filter(f => f.name.includes("case-study"));
+    
+    // Categorize files for modal selection
+    const availableFilesForModal = knowledgeFiles.map(f => ({
+        name: f.name,
+        path: f.path,
+        type: f.name.includes("case-study") ? 'case-studies' : 'playbooks' as 'playbooks' | 'case-studies'
+    }));
 
     return (
         <DashboardLayout>
@@ -125,21 +235,12 @@ export default function KnowledgeBasePage() {
                             </SheetTrigger>
                             <SheetContent>
                                 <SheetHeader>
-                                    <SheetTitle>Ingest New Asset</SheetTitle>
+                                    <SheetTitle>Add Knowledge Asset</SheetTitle>
                                     <SheetDescription>
-                                        Add a markdown file to your strategic knowledge base.
+                                        Upload a markdown file or provide a server path.
                                     </SheetDescription>
                                 </SheetHeader>
-                                <div className="grid gap-4 py-8">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="path">File Path (Relative to root)</Label>
-                                        <Input 
-                                            id="path" 
-                                            placeholder="market_validation/innovize-ai/example.md" 
-                                            value={newFilePath}
-                                            onChange={(e) => setNewFilePath(e.target.value)}
-                                        />
-                                    </div>
+                                <div className="grid gap-6 py-8">
                                     <div className="grid gap-2">
                                         <Label htmlFor="namespace">Target Namespace</Label>
                                         <Select value={newNamespace} onValueChange={setNewNamespace}>
@@ -153,11 +254,43 @@ export default function KnowledgeBasePage() {
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                    
+                                    <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                        <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
+                                        <p className="text-sm font-medium">Click to Upload File</p>
+                                        <p className="text-xs text-muted-foreground">Markdown files (.md) supported</p>
+                                        <input 
+                                            type="file" 
+                                            ref={fileInputRef} 
+                                            className="hidden" 
+                                            accept=".md" 
+                                            onChange={handleFileUpload}
+                                        />
+                                    </div>
+
+                                    <div className="relative">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <span className="w-full border-t" />
+                                        </div>
+                                        <div className="relative flex justify-center text-xs uppercase">
+                                            <span className="bg-background px-2 text-muted-foreground">Or ingets from path</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="path">Server File Path</Label>
+                                        <Input 
+                                            id="path" 
+                                            placeholder="market_validation/innovize-ai/example.md" 
+                                            value={newFilePath}
+                                            onChange={(e) => setNewFilePath(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
                                 <SheetFooter>
                                     <Button onClick={handleIngest} disabled={isIngesting || !newFilePath} className="w-full">
                                         {isIngesting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                        Start Ingestion
+                                        Run Ingestion
                                     </Button>
                                 </SheetFooter>
                             </SheetContent>
@@ -198,7 +331,7 @@ export default function KnowledgeBasePage() {
                                         {ns.count} Vectors
                                     </Badge>
                                 </div>
-                                <CardTitle className="capitalize">{ns.name.replace('-', ' ')}</CardTitle>
+                                <CardTitle className="capitalize">{ns.name === 'solutions' ? 'Products & Services' : ns.name.replace('-', ' ')}</CardTitle>
                                 <CardDescription>{ns.description}</CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -223,7 +356,7 @@ export default function KnowledgeBasePage() {
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                             <TabsList className="grid w-full grid-cols-3 max-w-md mb-8">
                                 <TabsTrigger value="playbooks">Playbooks</TabsTrigger>
-                                <TabsTrigger value="solutions">Solutions</TabsTrigger>
+                                <TabsTrigger value="solutions">Products & Services</TabsTrigger>
                                 <TabsTrigger value="case-studies">Case Studies</TabsTrigger>
                             </TabsList>
                             
@@ -243,16 +376,56 @@ export default function KnowledgeBasePage() {
                             </TabsContent>
                             
                             <TabsContent value="solutions" className="space-y-4">
-                                <div className="grid gap-4">
-                                    {solutions.length > 0 ? solutions.map(f => (
-                                        <DocumentItem 
-                                            key={f.path}
-                                            name={f.name} 
-                                            status="Available" 
-                                            date={`Size: ${(f.size / 1024).toFixed(1)} KB`}
-                                        />
+                                <div className="flex justify-between items-center bg-muted/20 p-4 rounded-lg border border-dashed">
+                                    <div className="space-y-1">
+                                        <h3 className="font-semibold text-primary">Define Your Offerings</h3>
+                                        <p className="text-sm text-muted-foreground">Create products/services and link them to your knowledge assets.</p>
+                                    </div>
+                                    <Button onClick={() => { setEditingProduct(undefined); setIsProductModalOpen(true); }} className="gap-2">
+                                        <Plus className="w-4 h-4" /> New Product
+                                    </Button>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {products.length > 0 ? products.map((p: any) => (
+                                        <Card key={p.name} className="relative overflow-hidden hover:border-primary/50 transition-colors group cursor-pointer" onClick={() => {
+                                             setEditingProduct({
+                                                product_name: p.name,
+                                                description: p.description,
+                                                is_strategic_pivot: p.is_strategic_pivot,
+                                                target_roles: p.target_roles,
+                                                relevant_files: p.relevant_files || []
+                                             });
+                                             setIsProductModalOpen(true);
+                                        }}>
+                                            <CardHeader className="pb-2">
+                                                <div className="flex justify-between items-start">
+                                                    <CardTitle className="text-lg">{p.name}</CardTitle>
+                                                    {p.is_strategic_pivot && (
+                                                        <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20">
+                                                            <Star className="w-3 h-3 mr-1 fill-amber-600" /> Hero Product
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <CardDescription className="line-clamp-2">{p.description}</CardDescription>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                                    <span className="flex items-center gap-1">
+                                                        <FileText className="w-3 h-3" /> {(p.relevant_files || []).length} Linked Assets
+                                                    </span>
+                                                    {(p.target_roles || []).length > 0 && (
+                                                        <span className="flex items-center gap-1">
+                                                            <CheckCircle2 className="w-3 h-3" /> {(p.target_roles || []).length} Roles
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
                                     )) : (
-                                        <EmptyState message="No Solutions listed in strategic directory." />
+                                        <div className="col-span-2">
+                                            <EmptyState message="No products defined. Create one to organize your knowledge." />
+                                        </div>
                                     )}
                                 </div>
                             </TabsContent>
@@ -279,12 +452,23 @@ export default function KnowledgeBasePage() {
                         </Tabs>
                     </CardContent>
                 </Card>
+
+                {isProductModalOpen && (
+                    <ProductModal 
+                        isOpen={isProductModalOpen}
+                        onClose={() => setIsProductModalOpen(false)}
+                        onSave={handleSaveProduct}
+                        initialConfig={editingProduct}
+                        availableFiles={availableFilesForModal}
+                    />
+                )}
+
             </div>
         </DashboardLayout>
     );
 }
 
-function DocumentItem({ name, status, date }: { name: string, status: string, date: string }) {
+function DocumentItem({ name, status, date, onStrategyClick, pivotInfo }: { name: string, status: string, date: string, onStrategyClick?: () => void, pivotInfo?: any }) {
     return (
         <div className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors cursor-pointer group">
             <div className="flex items-center gap-4">
@@ -292,7 +476,15 @@ function DocumentItem({ name, status, date }: { name: string, status: string, da
                     <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                    <h4 className="font-medium group-hover:text-primary transition-colors">{name}</h4>
+                    <h4 className="font-medium group-hover:text-primary transition-colors flex items-center gap-2">
+                        {name}
+                        {pivotInfo && (
+                            <Badge variant="default" className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/20 text-[10px] px-1 py-0 h-5">
+                                <Star className="w-3 h-3 mr-1 fill-amber-600" />
+                                Hero Product
+                            </Badge>
+                        )}
+                    </h4>
                     <p className="text-xs text-muted-foreground">{date}</p>
                 </div>
             </div>
@@ -301,6 +493,19 @@ function DocumentItem({ name, status, date }: { name: string, status: string, da
                     <CheckCircle2 className="w-3 h-3" />
                     {status}
                 </Badge>
+                
+                {onStrategyClick && (
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className={`h-8 w-8 transition-all ${pivotInfo ? 'text-amber-500 opacity-100' : 'text-muted-foreground opacity-20 group-hover:opacity-100'}`}
+                        onClick={(e) => { e.stopPropagation(); onStrategyClick(); }}
+                        title="Configure Strategic Pivot"
+                    >
+                        <Star className={`w-4 h-4 ${pivotInfo ? 'fill-current' : ''}`} />
+                    </Button>
+                )}
+
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
                     <ArrowUpRight className="w-4 h-4" />
                 </Button>

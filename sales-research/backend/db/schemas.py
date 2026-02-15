@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
@@ -84,6 +84,20 @@ class IdealProfileData(BaseModel):
     job_title: str
     value_proposition: Optional[str] = None
 
+class ProductConfig(BaseModel):
+    name: str = Field(description="Name of the product or service")
+    description: str = Field(description="Short description for the AI")
+    is_strategic_pivot: bool = Field(default=False, description="Is this the 'Hero Product' to pivot to?")
+    target_roles: List[str] = Field(default_factory=list, description="Job titles that qualify for this pivot (e.g. 'Founder')")
+    relevant_files: List[str] = Field(default_factory=list, description="List of file paths relevant to this product")
+    rag_context: Optional[str] = None # Deprecated, kept for backward compatibility if needed
+
+class SellingProfileConfig(BaseModel):
+    company_name: str = "Innovize AI"
+    description: str = "AI Automation and Sales Intelligence"
+    products: List[ProductConfig] = Field(default_factory=list)
+
+
 class IntegrationSettings(BaseModel):
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
@@ -98,6 +112,8 @@ class IntegrationSettings(BaseModel):
 
 class OrganizationSettingsBase(BaseModel):
     icp_json: Optional[str] = None
+    selling_profile_json: Optional[str] = None
+
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
     user_linkedin_url: Optional[str] = None

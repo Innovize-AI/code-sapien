@@ -145,6 +145,33 @@ export default function ProfilesPage() {
 
     const { list: activeList } = getActiveConfig();
 
+    // Auto-deselect leads that are being processed
+    useEffect(() => {
+        if (selectedIds.size > 0 && leadsStatus.length > 0) {
+            const processingUrls = new Set(
+                leadsStatus
+                    .filter(s => s.status === 'analyzing' || s.status === 'pending')
+                    .map(s => s.url)
+            );
+            
+            if (processingUrls.size > 0) {
+                // Find IDs of profiles that are now processing
+                const idsToRemove: string[] = [];
+                activeList.forEach(p => {
+                    if (selectedIds.has(p.id) && processingUrls.has(p.linkedin_url)) {
+                        idsToRemove.push(p.id);
+                    }
+                });
+
+                if (idsToRemove.length > 0) {
+                    const nextSelected = new Set(selectedIds);
+                    idsToRemove.forEach(id => nextSelected.delete(id));
+                    setSelectedIds(nextSelected);
+                }
+            }
+        }
+    }, [leadsStatus, selectedIds, activeList]);
+
     const toggleSelectAll = () => {
         if (selectedIds.size === activeList.length) {
             setSelectedIds(new Set())
@@ -163,14 +190,15 @@ export default function ProfilesPage() {
 
         setBulkLeads(bulkPayload)
         setIsBulkModalOpen(true)
-        if (!isProcessing) {
-            startBulkAnalysis(bulkPayload, {
-                // Default options for identified profiles
-                project_urgency: 2,
-                lead_source: "Competitor Analysis",
-                refresh: false
-            })
-        }
+        
+        // Always trigger startBulkAnalysis. 
+        // The context handles deduplication and appending to the queue even if processing is active.
+        startBulkAnalysis(bulkPayload, {
+            // Default options for identified profiles
+            project_urgency: 2,
+            lead_source: "Competitor Analysis",
+            refresh: false
+        })
     }
 
     const renderProfileGrid = (profileList: IdentifiedProfile[]) => {
@@ -203,6 +231,7 @@ export default function ProfilesPage() {
                                 <Checkbox
                                     checked={selectedIds.has(profile.id)}
                                     onCheckedChange={() => toggleSelection(profile.id)}
+                                    disabled={leadsStatus?.find(s => s.url === profile.linkedin_url)?.status === 'analyzing' || leadsStatus?.find(s => s.url === profile.linkedin_url)?.status === 'pending'}
                                 />
                             </div>
                             <div className="h-1 bg-muted group-hover:bg-primary/50 transition-colors" />
@@ -228,7 +257,26 @@ export default function ProfilesPage() {
                                             </p>
                                         )}
                                         <div className="flex flex-wrap gap-2 mt-2">
-                                            {(!profile.fit_reasoning && !profile.is_fit && !profile.is_competitor) && (
+                                            {(() => {
+                                                const status = leadsStatus?.find(s => s.url === profile.linkedin_url)?.status;
+                                                if (status === 'analyzing') {
+                                                    return (
+                                                        <Badge variant="secondary" className="text-[9px] h-5 px-1.5 bg-blue-100 text-blue-700 animate-pulse border-blue-200">
+                                                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                            Researching...
+                                                        </Badge>
+                                                    );
+                                                }
+                                                if (status === 'pending') {
+                                                    return (
+                                                        <Badge variant="secondary" className="text-[9px] h-5 px-1.5 bg-gray-100 text-gray-500 border-gray-200">
+                                                            Queued
+                                                        </Badge>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                            {(!profile.fit_reasoning && !profile.is_fit && !profile.is_competitor && !leadsStatus?.find(s => s.url === profile.linkedin_url)) && (
                                                 <Badge variant="secondary" className="text-[9px] h-5 px-1.5 bg-gray-100 text-gray-500 animate-pulse">
                                                     AI Analyzing...
                                                 </Badge>
@@ -266,17 +314,29 @@ export default function ProfilesPage() {
                                 </div>
                             </CardHeader>
                             <CardContent className="flex-1 flex flex-col space-y-6">
-                                {profile.latest_report_id && (
-                                    <a href={`/reports?id=${profile.latest_report_id}`} className="group/report flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors cursor-pointer">
-                                        <div className="flex items-center gap-2">
-                                            <div className="bg-primary/10 text-primary p-1.5 rounded-md">
-                                                <FileText className="w-3.5 h-3.5" />
-                                            </div>
-                                            <span className="text-xs font-semibold text-primary">View Research Report</span>
-                                        </div>
-                                        <Eye className="w-3.5 h-3.5 text-primary opacity-60 group-hover/report:opacity-100 transition-opacity" />
-                                    </a>
-                                )}
+                                {(() => {
+                                    const status = leadsStatus?.find(s => s.url === profile.linkedin_url)?.status;
+                                    const result = leadsStatus?.find(s => s.url === profile.linkedin_url)?.result;
+                                    
+                                    // Use the fresh result ID if available (completed this session), otherwise fallback to stored ID
+                                    // Ensure we strictly use the ID and never 'latest' to avoid race conditions
+                                    const reportId = (status === 'completed' && result?.id) ? result.id : profile.latest_report_id;
+                                    
+                                    if (reportId) {
+                                        return (
+                                            <a href={`/reports?id=${reportId}`} className="group/report flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors cursor-pointer">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="bg-primary/10 text-primary p-1.5 rounded-md">
+                                                        <FileText className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <span className="text-xs font-semibold text-primary">View Research Report</span>
+                                                </div>
+                                                <Eye className="w-3.5 h-3.5 text-primary opacity-60 group-hover/report:opacity-100 transition-opacity" />
+                                            </a>
+                                        )
+                                    }
+                                    return null;
+                                })()}
                                 {profile.interaction_history ? (
                                     <div className="space-y-4">
                                         {JSON.parse(profile.interaction_history).map((comp: any, ci: number) => (

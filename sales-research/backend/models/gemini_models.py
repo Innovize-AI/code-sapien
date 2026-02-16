@@ -8,7 +8,7 @@ def get_gemini_model(temperature=0, model='gemini-3-flash-preview'):
     """
     Factory function for Gemini models.
     Use 'gemini-3-flash-preview' for standard tasks.
-    Use 'gemini-3-pro-preview' for tasks requiring high reasoning.
+    Use 'gemini-3-flash-preview' for tasks requiring high reasoning.
     """
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     

@@ -380,8 +380,8 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     const sections: Section[] = [
         { id: "cso-verdict", title: "CSO Verdict", icon: <ShieldCheck className="h-4 w-4" />, content: data.cso_strategic_briefing, badge: "Unified Command", isPrimary: true },
         { id: "synthesis", title: "Executive Blueprint", icon: <LayoutDashboard className="h-4 w-4" />, content: data.sales_research_report, badge: "CSO Briefing" },
-        // Discovery Intelligence (New) - ONLY for competitor posts
-        ...(discoverySource === 'competitor_comment' ? [{
+        // Discovery Intelligence (New) - For competitor posts or high-intent keyword matches
+        ...(discoverySource === 'competitor_comment' || discoverySource === 'keyword_search' ? [{
             id: "discovery",
             title: "Discovery Intelligence",
             icon: <Search className="h-4 w-4" />,

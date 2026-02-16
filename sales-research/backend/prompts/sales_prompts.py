@@ -130,18 +130,22 @@ Check `discovery_interaction_history` (historical context) and `current_session_
     - If found via **Competitor Comments**, analyze the specific `comment` in `discovery_context` for immediate intent.
     - If found via **Keywords**, note the alignment with their role.
 
-- **Hyper-Detailed Behavioral & Comment Patterns (CRITICAL - ONLY IF `discovery_source` is 'competitor_comment')**:
     - **IF finding source is 'competitor_comment'**: You MUST perform a deep psychological and technical audit of the `discovery_interaction_history` (the primary historical context from the discovery phase) and any relevant `current_session_engagements`. 
+    - **IF finding source is 'keyword_search'**: You MUST analyze the alignment between the `matched_keywords` and the lead's professional role/company mission. 
+        - **Intent Signal**: Does their post about these keywords indicate a specific project, a pain point, or general thought leadership?
+        - **Relevance**: How central are these keywords to their current job functions?
+        - **Avoid Competitor Narrative**: Do NOT mention competitor engagement unless it is explicitly present in the data. If they were found by keywords, focus on the TOPIC, not a competitor.
+
     - **Avoid Generic Fluff**: Do not use vague phrases like "focused on efficiency" or "proactive approach".
     - **Identify High-Signal Patterns**: 
         - **Specific Pain Points**: Do they consistently complain about a specific technical limitation (e.g., "Always asks about API rate limits", "Consistently mentions lack of dark mode")?
         - **Psychological Triggers**: Are they a "Technical Skeptic" (challenging claims with data), a "Visionary Champion" (excited about future roadmaps), or a "Value Hunter" (focused on ROI/pricing)?
         - **Recurring Sentiment**: How has their sentiment evolved? Is there a trend in their skepticism?
-        - **Competitive Positioning**: Which specific competitors are they engaging with, and what is the tone? (e.g., "Critical of Competitor A's pricing but praises their UI").
-    - **Output Expectation**: Provide a granular, multi-sentence analysis that links specific behaviors to potential sales opportunities. Show us the *why* behind their engagement.
+        - **Competitive Positioning**: (ONLY for `competitor_comment`) Which specific competitors are they engaging with, and what is the tone?
+    - **Output Expectation**: Provide a granular, multi-sentence analysis that links specific behaviors/discovery context to potential sales opportunities. Show us the *why* behind their engagement.
 
     - Synthesize these patterns into the `discovery_insights` field.
-    - **IF finding source is NOT 'competitor_comment'**: Keep it brief and focus on the primary discovery context.
+    - **IF finding source is others (e.g. 'manual', 'form')**: Keep it brief and focus on the primary discovery context.
 
 ### EXECUTION GUIDELINES (BEYOND PRECISION):
 - **Zero Hallucination**: If a detail is not present in the research, report "Inferred mapping unavailable". Guessing is an unforgivable betrayal of our mission.
@@ -196,9 +200,9 @@ Propose 2-3 tailored solutions.
 ### THE COMPETITOR PIVOT (STRATEGIC INFRASTRUCTURE):
 If `lead_segment` is **DIRECT_COMPETITOR**:
 - DO NOT pitch common product features that they already sell.
-- DO pitch **Glial** as the "Intelligence Operating System" they need internally to manage their team's velocity post-acquisition or during high growth.
-- DO pitch **Differentiat- Frame the solution as "Operational Infrastructure for AI-First Leaders"—positioning {selling_company_name} as a partner that solves their internal 'Complexity of Scale'.
-ors** (e.g., "Why {selling_company_name}'s research engine beats manual discovery").
+- DO pitch **Glial** as the **"Internal Intelligence Infrastructure"** their own GTM team needs to automate deep research and remove the manual bottleneck from their discovery process.
+- Frame the solution as **"Research-as-a-Service (RaaS)"**—positioning {selling_company_name} as a provider of the underlying engine that saves their team thousands of hours of manual profiling.
+- DO pitch **Unbiased Intelligence** (e.g., "Why using third-party automated profiling provides a more objective lead score than internal gut feeling").
 
 ### CONTEXT RULES (STRICT):
 1. **NO HALLUCINATIONS**: Use ONLY the specific product names from the {selling_company_name} Solutions Context.
@@ -206,6 +210,11 @@ ors** (e.g., "Why {selling_company_name}'s research engine beats manual discover
 3. **GENERICISM IS A FAILURE**: BANNED names: "AI Workflow Optimizer", "Smart Automation Tool". 
 4. **MAPPING LOGIC**:
     {selling_mapping_logic}
+
+5. **STRICT PRODUCT GROUNDING (CRITICAL)**:
+    - You MUST NOT propose solutions that involve technical operations (e.g., "log analysis", "telematics", "IT infrastructure monitoring").
+    - **Glial** solves the **"Narrative Gap"** and **"Discovery Friction"** by automating sales research.
+    - If a lead has a technical pain point, solve it by leveraging **intelligence** (e.g., "Finding the exact decision makers who care about X") rather than performing the technical task itself.
 
 For each solution, provide:
 1. **The Solution Concept**: The exact product name from our suite or a "Strategic Pivot" move.
@@ -265,8 +274,19 @@ You MUST categorize the prospect into ONE of these 6 Strategic Angles and use th
 3. **NO FILLER VALUE**: BANNED phrases: "Leverage AI for strategic growth," "Operational efficiency," "Strategic alignment," "Drive innovation," "Unlock potential," "Transform your business."
 4. **AUTHORITY-FIRST CTA**: Never ask "can we chat?". Ask for validation: "Would love to get your 'Founding CEO' perspective on our synthesis logic."
 5. **THE "NARRATIVE OF OPPORTUNITY"**: Treat the outreach as if you are sharing a missed intelligence signal, not trying to sell a tool.
+6. **STRICT PRODUCT GROUNDING (CRITICAL)**:
+    - You MUST NOT invent technical capabilities.
+    - **Glial** is a **Revenue Intelligence & Prospect Research Engine**. 
+    - It automates **Lead Discovery** and **Deep Prospect Profiling**.
+    - It DOES NOT automate technical operations (e.g., "log synthesis," "telematics monitoring," "product engineering").
+    - If you use the word "Synthesis," it refers ONLY to synthesizing **market signals and human behaviors** into sales research.
 
-### PROSPECT DATA:
+    - **CSO OBJECTION PREEMPTION**: 
+    - Check the `CSO_STRATEGIC_BRIEFING` -> `unified_command` -> `objection_preemption`.
+    - You MUST subtlety weave at least one of these potential objections into your message to "disarm" the prospect before they can even think it. (e.g., "You might think this is just another wrapper...").
+    - **Use the `CSO_STRATEGIC_BRIEFING` -> `unified_command` -> `strategic_proof_points` to validate your claims.**
+
+    ### PROSPECT DATA:
 - **Profile Insights**: {user_analysis}
 - **Lead Segment**: {lead_segment}
 - **Recent Engagements**: {engagements}
@@ -340,6 +360,10 @@ A sales rep is about to read this. They don't need a summary of the labels you'v
 ### EXECUTION GUIDELINES:
 - **Zero Redundancy**: Do not create a separate "Company Overview" or "Persona Profile" if the raw content already has them. Instead, reference them in your synthesis.
 - **{selling_company_name} Framing**: Use the following company context to frame your advisory: {selling_company_context}
+- **STRICT PRODUCT GROUNDING**: 
+    - The Global Executive Synthesis must remain technically accurate to the provided company context.
+    - Do NOT claim the product automates internal technical operations (logs, devops, etc.) unless explicitly stated in the context. 
+    - Focus the "Narrative of Opportunity" on GTM and Sales strategic advantages.
 - **Tone**: Aggressively helpful, strategic, and high-impact.
 - **Never Start with generic greetings** like "I hope this message finds you well". 
 

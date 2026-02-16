@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
@@ -20,6 +20,7 @@ class ResearchReportBase(BaseModel):
     lead_score_analysis: Optional[str] = None
     user_profile_analysis: Optional[str] = None
     website_analysis: Optional[str] = None
+    cso_strategic_briefing: Optional[str] = None
     
     # Modular Nodules
     target_pain_points: Optional[str] = None
@@ -46,6 +47,28 @@ class ResearchReportBase(BaseModel):
 class ResearchReportCreate(ResearchReportBase):
     pass
 
+class LeadSubmissionBase(BaseModel):
+    email: str
+    linkedin_url: Optional[str] = None
+    source: str
+    payload: Optional[str] = None
+    action_type: Optional[str] = "form_submission"
+    action_metadata: Optional[str] = None
+    external_form_id: Optional[str] = None
+    external_form_name: Optional[str] = None
+
+class LeadSubmissionCreate(LeadSubmissionBase):
+    pass
+
+class LeadSubmission(LeadSubmissionBase):
+    id: UUID
+    created_at: datetime
+    processed_at: Optional[datetime] = None
+    research_id: Optional[UUID] = None
+
+    class Config:
+        from_attributes = True
+
 class ResearchReport(ResearchReportBase):
     id: UUID
     created_at: datetime
@@ -61,23 +84,46 @@ class IdealProfileData(BaseModel):
     job_title: str
     value_proposition: Optional[str] = None
 
+class ProductConfig(BaseModel):
+    name: str = Field(description="Name of the product or service")
+    description: str = Field(description="Short description for the AI")
+    is_strategic_pivot: bool = Field(default=False, description="Is this the 'Hero Product' to pivot to?")
+    target_roles: List[str] = Field(default_factory=list, description="Job titles that qualify for this pivot (e.g. 'Founder')")
+    relevant_files: List[str] = Field(default_factory=list, description="List of file paths relevant to this product")
+    rag_context: Optional[str] = None # Deprecated, kept for backward compatibility if needed
+
+class SellingProfileConfig(BaseModel):
+    company_name: str = "Innovize AI"
+    description: str = "AI Automation and Sales Intelligence"
+    products: List[ProductConfig] = Field(default_factory=list)
+
+
 class IntegrationSettings(BaseModel):
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
     user_linkedin_url: Optional[str] = None
     company_linkedin_url: Optional[str] = None
     email_config: Optional[str] = None
+    integrations_config: Optional[str] = None
+    kit_api_key: Optional[str] = None
+    kit_api_secret: Optional[str] = None
+    slack_webhook_url: Optional[str] = None
 
 
 class OrganizationSettingsBase(BaseModel):
     icp_json: Optional[str] = None
+    selling_profile_json: Optional[str] = None
+
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
     user_linkedin_url: Optional[str] = None
     company_linkedin_url: Optional[str] = None
     email_config: Optional[str] = None
+    slack_webhook_url: Optional[str] = None
 
     crm_config: Optional[str] = None
+    integrations_config: Optional[str] = None
+    onboarding_complete: Optional[int] = 0
 
 class OrganizationSettingsCreate(OrganizationSettingsBase):
     pass
@@ -115,6 +161,8 @@ class IdentifiedProfileBase(BaseModel):
     is_competitor: bool = False
     is_decision_maker: bool = False
     fit_reasoning: Optional[str] = None
+    intent: Optional[str] = None
+    sentiment: Optional[str] = None
     
     comment_history: Optional[str] = None
     source_posts: Optional[str] = None
@@ -129,6 +177,24 @@ class IdentifiedProfile(IdentifiedProfileBase):
     created_at: datetime
     last_interaction_at: Optional[datetime] = None
     latest_report_id: Optional[UUID] = None  # New field for linking
+
+    class Config:
+        from_attributes = True
+
+class ActivityBase(BaseModel):
+    type: str
+    title: str
+    description: Optional[str] = None
+    metadata_json: Optional[str] = None
+    intent: Optional[str] = None
+    sentiment: Optional[str] = None
+
+class ActivityCreate(ActivityBase):
+    pass
+
+class Activity(ActivityBase):
+    id: UUID
+    created_at: datetime
 
     class Config:
         from_attributes = True

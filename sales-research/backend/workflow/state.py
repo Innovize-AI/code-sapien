@@ -35,6 +35,20 @@ class IdealProfile(BaseModel):
     revenue: Optional[str] = Field(None, description="Annual revenue of the lead's company in millions")
     job_title: str = Field(..., description="Job title of the lead")
 
+class Product(BaseModel):
+    name: str
+    description: str
+    target_pain_points: List[str]
+    is_strategic_pivot: bool = False
+    target_roles: List[str] = []
+    rag_context: Optional[str] = None
+
+
+class SellingCompanyProfile(BaseModel):
+    name: str
+    description: str
+    products: List[Product]
+
 class InputLeadData(BaseModel):
     lead_source: Optional[str] = None
     download_marketing_material: Optional[bool] = None
@@ -42,6 +56,11 @@ class InputLeadData(BaseModel):
     referral_partner_introduction: Optional[bool] = None
     project_urgency: Optional[int] = None
     refresh: bool = False
+    
+    # Discovery Context (New)
+    discovery_source: Optional[str] = None # 'competitor_comment', 'keyword_search', 'form_fill'
+    discovery_context: Optional[dict] = None # { "comment": "...", "post_url": "...", "keyword": "..." }
+    
     extra_metadata: Optional[dict] = None # For webhook/form extras
 
 class AgentState(TypedDict):
@@ -49,6 +68,7 @@ class AgentState(TypedDict):
     linkedin_url: str
     website: str
     ideal_profile: IdealProfile
+    selling_company_profile: SellingCompanyProfile
     input_lead_data: InputLeadData
     user_profile_details: Annotated[dict, reduce_dict]
     scraped_website_content: Annotated[str, operator.add]
@@ -78,12 +98,22 @@ class AgentState(TypedDict):
     company_description: Annotated[Optional[str], reduce_last]
     company_industries: Annotated[Optional[List[str]], reduce_last]
     company_stats: Annotated[Optional[dict], reduce_last]
+    discovery_interaction_history: Annotated[List[dict], reduce_last]
 
 
     # Specialized Nodules
 
     target_pain_points: Annotated[Union[dict, str], reduce_last]
+    strategic_rag_briefing: Annotated[str, reduce_last]
+    lead_segment: Annotated[str, reduce_last] # new field
     strategic_solutions: Annotated[Union[dict, str], reduce_last]
     personalized_outreach: Annotated[dict, reduce_last]
     follow_up_strategy: Annotated[Union[dict, str], reduce_last]
     viability_analysis: Annotated[str, reduce_last]
+    cso_strategic_briefing: Annotated[dict, reduce_last]
+    signal_leverage_score: Annotated[int, reduce_last]
+    is_strategic_pivot_fit: Annotated[bool, reduce_last]
+    pivot_product_name: Annotated[str, reduce_last]
+    campaign_outreach_variants: Annotated[List[dict], reduce_last]
+
+

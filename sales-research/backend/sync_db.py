@@ -1,5 +1,7 @@
 
 import asyncio
+from dotenv import load_dotenv
+load_dotenv()
 from sqlalchemy import text, inspect
 from db.database import engine
 from db.models import Base
@@ -7,11 +9,10 @@ from db.models import Base
 async def sync_db():
     print("Starting database sync...")
     async with engine.connect() as conn:
-        inspector = await asyncio.get_event_loop().run_in_executor(None, inspect, engine)
-        
         # 1. Sync ResearchReport table
         print("Checking research_reports table...")
-        cols = [c['name'] for c in await conn.run_sync(inspector.get_columns, "research_reports")]
+        res = await conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'research_reports'"))
+        cols = [r[0] for r in res.fetchall()]
         
         research_cols_to_add = {
             "extra_metadata": "TEXT",
@@ -22,7 +23,8 @@ async def sync_db():
             "viability_analysis": "TEXT",
             "target_pain_points": "TEXT",
             "strategic_solutions": "TEXT",
-            "personalized_outreach": "TEXT"
+            "personalized_outreach": "TEXT",
+            "cso_strategic_briefing": "TEXT"
         }
 
         for col, col_type in research_cols_to_add.items():
@@ -35,7 +37,8 @@ async def sync_db():
         
         # 2. Sync OrganizationSettings table
         print("Checking organization_settings table...")
-        cols = [c['name'] for c in await conn.run_sync(inspector.get_columns, "organization_settings")]
+        res = await conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'organization_settings'"))
+        cols = [r[0] for r in res.fetchall()]
         
         to_add = {
             "user_linkedin_url": "TEXT",
@@ -45,7 +48,8 @@ async def sync_db():
             "integrations_config": "TEXT",
             "onboarding_complete": "INTEGER DEFAULT 0",
             "kit_api_key": "VARCHAR",
-            "kit_api_secret": "VARCHAR"
+            "kit_api_secret": "VARCHAR",
+            "slack_webhook_url": "TEXT"
         }
         
         for col, col_type in to_add.items():
@@ -56,14 +60,37 @@ async def sync_db():
                 except Exception as e:
                     print(f"Failed to add {col}: {e}")
 
-        # 3. Create LeadSubmission table if missing
-        print("Checking lead_submissions table...")
-        tables = await conn.run_sync(inspector.get_table_names)
-        if "lead_submissions" not in tables:
-            print("Creating lead_submissions table...")
-            # We can use the model directly to create the table
-            await conn.run_sync(Base.metadata.create_all, tables=[Base.metadata.tables['lead_submissions']])
-            print("Created lead_submissions table")
+        # 3. Sync Activities table
+        print("Checking activities table...")
+        res = await conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'activities'"))
+        cols = [r[0] for r in res.fetchall()]
+        for col in ["intent", "sentiment"]:
+            if col not in cols:
+                await conn.execute(text(f"ALTER TABLE activities ADD COLUMN {col} TEXT"))
+                print(f"Added {col} to activities")
+
+        # 4. Sync IdentifiedProfile table
+        print("Checking identified_profiles table...")
+        res = await conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'identified_profiles'"))
+        cols = [r[0] for r in res.fetchall()]
+        for col in ["intent", "sentiment"]:
+            if col not in cols:
+                await conn.execute(text(f"ALTER TABLE identified_profiles ADD COLUMN {col} TEXT"))
+                print(f"Added {col} to identified_profiles")
+
+        # 5. Create tables if missing
+        print("Checking tables...")
+        res = await conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"))
+        existing_tables = [r[0] for r in res.fetchall()]
+        
+        for table_name in ["lead_submissions", "activities", "identified_profiles"]:
+            if table_name not in existing_tables:
+                print(f"Creating {table_name} table...")
+                # Use synchronous-looking Base.metadata.create_all via run_sync
+                def create_table(sync_conn):
+                    Base.metadata.create_all(sync_conn, tables=[Base.metadata.tables[table_name]])
+                await conn.run_sync(create_table)
+                print(f"Created {table_name} table")
         
         await conn.commit()
     print("Database sync complete.")

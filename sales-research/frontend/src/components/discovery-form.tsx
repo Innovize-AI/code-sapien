@@ -75,12 +75,13 @@ type FindFormValues = {
 export function DiscoveryForm({
     onSelect,
     onBulkSelect,
+    leadsStatus = []
 }: {
     onSelect?: (lead: { url: string, website: string, result?: any }) => void,
     onBulkSelect?: (leads: { url: string, website: string }[], options?: { refresh: boolean }) => void,
+    leadsStatus?: LeadStatus[]
 }) {
     const [keywordInput, setKeywordInput] = useState("")
-    const [leadsStatus, setLeadsStatus] = useState<LeadStatus[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [results, setResults] = useState<{ url: string, website: string, name?: string, comment?: string, metadata?: any, fit_score?: number, fit_reasoning?: string, source_post_url?: string }[]>([])
     const [selectedUrls, setSelectedUrls] = useState<string[]>([])
@@ -534,9 +535,11 @@ export function DiscoveryForm({
                                     if (onBulkSelect) {
                                         const selectedLeads = results.filter(r => selectedUrls.includes(r.url));
                                         onBulkSelect(selectedLeads, { refresh: refreshAll });
+                                        setSelectedUrls([]); // Clear selection to allow new additions immediately
+                                        setRefreshAll(false);
                                     }
                                 }}>
-                                    Bulk Analyze ({selectedUrls.length})
+                                    Analyze Selected ({selectedUrls.length})
                                 </Button>
                             </div>
                         )}
@@ -548,53 +551,90 @@ export function DiscoveryForm({
                             const status = leadsStatus?.find(s => s.url === lead.url)?.status
                             return (
                                 <Card key={i} className={`overflow-hidden transition-colors ${status === 'completed' ? 'border-green-500/50 bg-green-50/10' : 'hover:border-primary/50'}`}>
-                                    <CardContent className="p-4 flex items-center gap-4">
+                                    <CardContent className="p-4 flex items-start gap-4">
                                         <Checkbox
                                             checked={selectedUrls.includes(lead.url)}
                                             onCheckedChange={() => toggleUrl(lead.url)}
+                                            className="mt-1"
                                         />
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <a
-                                                    href={lead.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="font-medium truncate text-sm hover:underline hover:text-primary transition-colors"
-                                                >
-                                                    {lead.name || lead.url}
-                                                </a>
-                                                <div className="flex flex-wrap gap-1.5 ml-2">
-                                                    {(!lead.metadata?.fit_reasoning && !lead.metadata?.is_fit && !lead.metadata?.is_competitor) && (
-                                                        <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-gray-100 text-gray-500 animate-pulse">
-                                                            AI Analyzing...
-                                                        </Badge>
-                                                    )}
-                                                    {lead.metadata?.is_competitor && (
-                                                        <Badge variant="destructive" className="text-[9px] h-4 px-1">Competitor</Badge>
-                                                    )}
-                                                    {lead.metadata?.is_fit && (
-                                                        <Badge variant="outline" className="text-[9px] h-4 px-1 bg-green-50 text-green-700 border-green-200" title={lead.metadata?.fit_reasoning}>
-                                                            Fit
-                                                        </Badge>
-                                                    )}
-                                                    {lead.metadata?.is_decision_maker && (
-                                                        <Badge variant="outline" className="text-[9px] h-4 px-1 bg-blue-50 text-blue-700 border-blue-200">
-                                                            Decision Maker
-                                                        </Badge>
-                                                    )}
-                                                    {lead.metadata?.competitor && (
-                                                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground shrink-0 border border-muted-foreground/10">
-                                                            vs {lead.metadata.competitor}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {lead.metadata?.fit_reasoning && (
-                                                    <div className="mt-2 text-[10px] text-muted-foreground bg-muted/40 p-2 rounded border border-muted/50 italic leading-relaxed">
-                                                        <span className="font-semibold not-italic text-primary/70 mr-1">AI Reasoning:</span>
-                                                        {lead.metadata.fit_reasoning}
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    <a
+                                                        href={lead.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="font-medium truncate text-sm hover:underline hover:text-primary transition-colors"
+                                                    >
+                                                        {lead.name || lead.url}
+                                                    </a>
+                                                    <div className="flex flex-wrap gap-1.5 ml-2">
+                                                        {status === 'analyzing' && (
+                                                            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-blue-100 text-blue-700 animate-pulse border-blue-200">
+                                                                <Loader2 className="w-2 h-2 mr-1 animate-spin" />
+                                                                Researching...
+                                                            </Badge>
+                                                        )}
+                                                        {status === 'pending' && (
+                                                            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-gray-100 text-gray-500 border-gray-200">
+                                                                Queued
+                                                            </Badge>
+                                                        )}
+                                                        {(!lead.metadata?.fit_reasoning && !lead.metadata?.is_fit && !lead.metadata?.is_competitor && status !== 'analyzing' && status !== 'pending') && (
+                                                            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-gray-100 text-gray-500 animate-pulse">
+                                                                AI Analyzing...
+                                                            </Badge>
+                                                        )}
+                                                        {lead.metadata?.is_competitor && (
+                                                            <Badge variant="destructive" className="text-[9px] h-4 px-1">Competitor</Badge>
+                                                        )}
+                                                        {lead.metadata?.is_fit && (
+                                                            <Badge variant="outline" className="text-[9px] h-4 px-1 bg-green-50 text-green-700 border-green-200" title={lead.metadata?.fit_reasoning}>
+                                                                Fit
+                                                            </Badge>
+                                                        )}
+                                                        {lead.metadata?.is_decision_maker && (
+                                                            <Badge variant="outline" className="text-[9px] h-4 px-1 bg-blue-50 text-blue-700 border-blue-200">
+                                                                Decision Maker
+                                                            </Badge>
+                                                        )}
+                                                        {lead.metadata?.competitor && (
+                                                            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground shrink-0 border border-muted-foreground/10">
+                                                                vs {lead.metadata.competitor}
+                                                            </span>
+                                                        )}
                                                     </div>
+                                                </div>
+                                                
+                                                {status === 'completed' && onSelect && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        className="h-7 text-xs px-2 ml-2 hover:bg-primary/5 hover:text-primary transition-colors shrink-0"
+                                                        onClick={() => {
+                                                            const leadResult = leadsStatus?.find(s => s.url === lead.url);
+                                                            if (leadResult && leadResult.result) {
+                                                                onSelect({ ...lead, result: leadResult.result });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <ExternalLink className="w-3 h-3 mr-1.5" />
+                                                        View Report
+                                                    </Button>
                                                 )}
                                             </div>
+
+                                            <div className="text-xs text-muted-foreground truncate mt-0.5">
+                                                {lead.website}
+                                            </div>
+
+                                            {lead.metadata?.fit_reasoning && (
+                                                <div className="mt-2 text-[10px] text-muted-foreground bg-muted/40 p-2 rounded border border-muted/50 italic leading-relaxed">
+                                                    <span className="font-semibold not-italic text-primary/70 mr-1">AI Reasoning:</span>
+                                                    {lead.metadata.fit_reasoning}
+                                                </div>
+                                            )}
+
                                             {lead.comment ? (
                                                 <div className="space-y-2 mt-1">
                                                     <p className="text-[10px] text-muted-foreground italic line-clamp-4 opacity-70 whitespace-pre-line">

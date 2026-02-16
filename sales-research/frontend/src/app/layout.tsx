@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sales Research Agent",
-  description: "AI-powered sales research and lead discovery",
+  title: "Innovize AI | Revenue Intelligence Platform",
+  description: "AI-powered revenue intelligence and sales research",
 };
 
 export default function RootLayout({
@@ -30,6 +31,7 @@ export default function RootLayout({
       >
         <Providers>
           {children}
+          <Toaster />
         </Providers>
       </body>
     </html>

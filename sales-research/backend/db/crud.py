@@ -6,7 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy import desc, or_, func, text
 from sqlalchemy.dialects.postgresql import insert, JSONB
 from sqlalchemy import Table
-from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile
+from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile, Activity, OrganizationSettings
 from db.schemas import ResearchReportCreate
 
 def _safe_deserialize(val):
@@ -38,6 +38,7 @@ def _report_to_dict(report):
         "lead_score_analysis": _safe_deserialize(report.lead_score_analysis),
         "user_profile_analysis": _safe_deserialize(report.user_profile_analysis),
         "website_analysis": _safe_deserialize(report.website_analysis),
+        "cso_strategic_briefing": _safe_deserialize(report.cso_strategic_briefing),
         "fullname": report.fullname,
         "profile_picture_url": report.profile_picture_url,
         "company_name": report.company_name,
@@ -130,6 +131,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "is_competitor": l.get("is_competitor"),
                 "is_decision_maker": l.get("is_decision_maker"),
                 "fit_reasoning": l.get("fit_reasoning"),
+                "intent": l.get("intent"),
+                "sentiment": l.get("sentiment"),
                 "interactions": []
             }
         elif l.get("headline") and not batch_map[url].get("headline"):
@@ -141,6 +144,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
         if l.get("is_decision_maker"): batch_map[url]["is_decision_maker"] = True
         if l.get("fit_reasoning") and not batch_map[url].get("fit_reasoning"):
             batch_map[url]["fit_reasoning"] = l.get("fit_reasoning")
+        if l.get("intent"): batch_map[url]["intent"] = l.get("intent")
+        if l.get("sentiment"): batch_map[url]["sentiment"] = l.get("sentiment")
         
         # Helper for URL normalization (strip query and trailing slash)
         n_source_url = normalize(l.get("source_post_url"))
@@ -177,9 +182,11 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             
             # Flatten comments from interactions for legacy support
             new_comments = [i["comment"] for i in data["interactions"] if i["comment"]]
+            db_comments_normalized = [c.strip() for c in db_comments]
             for c in new_comments:
-                if c not in db_comments:
+                if c.strip() not in db_comments_normalized:
                     db_comments.append(c)
+                    db_comments_normalized.append(c.strip())
 
             try:
                 db_sources = json.loads(p.source_posts or "[]")
@@ -232,6 +239,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "is_competitor": data.get("is_competitor") or p.is_competitor,
                 "is_decision_maker": data.get("is_decision_maker") or p.is_decision_maker,
                 "fit_reasoning": data.get("fit_reasoning") or p.fit_reasoning,
+                "intent": data.get("intent") or p.intent,
+                "sentiment": data.get("sentiment") or p.sentiment,
                 "comment_history": json.dumps(db_comments),
                 "source_posts": json.dumps(db_sources),
                 "interaction_history": json.dumps(db_history),
@@ -280,6 +289,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "is_competitor": data.get("is_competitor"),
                 "is_decision_maker": data.get("is_decision_maker"),
                 "fit_reasoning": data.get("fit_reasoning"),
+                "intent": data.get("intent"),
+                "sentiment": data.get("sentiment"),
                 "comment_history": json.dumps(legacy_comments),
                 "source_posts": json.dumps(legacy_sources),
                 "interaction_history": json.dumps(new_history),
@@ -369,12 +380,25 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict):
     await db.refresh(db_profile)
     return db_profile
 
-async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100):
+async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100, search_query: str = None):
     # Sort by number of touchpoints (length of source_posts array)
     # Join with ResearchReport to check if report exists
     query = select(IdentifiedProfile, ResearchReport.id.label("report_id")).outerjoin(
         ResearchReport, IdentifiedProfile.linkedin_url == ResearchReport.linkedin_url
-    ).order_by(
+    )
+    
+    if search_query:
+        search = f"%{search_query}%"
+        query = query.where(
+            or_(
+                IdentifiedProfile.name.ilike(search),
+                IdentifiedProfile.headline.ilike(search),
+                IdentifiedProfile.fit_reasoning.ilike(search),
+                IdentifiedProfile.intent.ilike(search)
+            )
+        )
+        
+    query = query.order_by(
         desc(func.jsonb_array_length(func.cast(func.coalesce(IdentifiedProfile.source_posts, '[]'), JSONB))),
         desc(IdentifiedProfile.last_interaction_at)
     ).offset(skip).limit(limit)
@@ -394,8 +418,18 @@ async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 
         
     return profiles
 
-async def count_identified_profiles(db: AsyncSession):
+async def count_identified_profiles(db: AsyncSession, search_query: str = None):
     query = select(func.count()).select_from(IdentifiedProfile)
+    if search_query:
+        search = f"%{search_query}%"
+        query = query.where(
+            or_(
+                IdentifiedProfile.name.ilike(search),
+                IdentifiedProfile.headline.ilike(search),
+                IdentifiedProfile.fit_reasoning.ilike(search),
+                IdentifiedProfile.intent.ilike(search)
+            )
+        )
     result = await db.execute(query)
     return result.scalar()
 
@@ -430,6 +464,62 @@ async def get_report(db: AsyncSession, report_id: str):
     result = await db.execute(query)
     return result.scalar_one_or_none()
 
+async def update_report_outreach(db: AsyncSession, report_id: str, outreach_data: dict):
+    query = select(ResearchReport).where(ResearchReport.id == report_id)
+    result = await db.execute(query)
+    db_report = result.scalar_one_or_none()
+    if db_report:
+        db_report.personalized_outreach = json.dumps(outreach_data)
+        await db.commit()
+        await db.refresh(db_report)
+        return db_report
+    return None
+
+async def update_report_cso_outreach(db: AsyncSession, report_id: str, cso_data: dict):
+    query = select(ResearchReport).where(ResearchReport.id == report_id)
+    result = await db.execute(query)
+    db_report = result.scalar_one_or_none()
+    if db_report:
+        try:
+            current_cso = json.loads(db_report.cso_strategic_briefing) if db_report.cso_strategic_briefing else {}
+            if 'refined_linkedin_message' in cso_data:
+                current_cso['refined_linkedin_message'] = cso_data['refined_linkedin_message']
+            if 'refined_email_body' in cso_data:
+                current_cso['refined_email_body'] = cso_data['refined_email_body']
+            
+            db_report.cso_strategic_briefing = json.dumps(current_cso)
+            await db.commit()
+            await db.refresh(db_report)
+            return db_report
+        except Exception as e:
+            print(f"Error updating CSO outreach: {e}")
+            return None
+    return None
+
+async def update_report_intent_email(db: AsyncSession, report_id: str, email_text: str):
+    query = select(ResearchReport).where(ResearchReport.id == report_id)
+    result = await db.execute(query)
+    db_report = result.scalar_one_or_none()
+    if db_report:
+        try:
+            intent_data = json.loads(db_report.intent_analysis) if db_report.intent_analysis else {}
+            intent_data['recommended_email'] = email_text
+            db_report.intent_analysis = json.dumps(intent_data)
+            await db.commit()
+            await db.refresh(db_report)
+            return db_report
+        except Exception as e:
+            print(f"Error updating intent email: {e}")
+            return None
+    return None
+
+async def save_lead_submission(db: AsyncSession, submission: ResearchReportCreate):
+    from db.models import LeadSubmission
+    db_item = LeadSubmission(**submission.dict())
+    db.add(db_item)
+    await db.commit()
+    await db.refresh(db_item)
+    return db_item
 async def save_competitor_analysis(db: AsyncSession, competitor_urls: str, analysis_report: str):
     db_analysis = CompetitorAnalysis(competitor_urls=competitor_urls, analysis_report=analysis_report)
     db.add(db_analysis)
@@ -463,3 +553,25 @@ async def delete_competitor(db: AsyncSession, competitor_id: str):
         await db.commit()
         return True
     return False
+
+async def create_activity(db: AsyncSession, type: str, title: str, description: str = None, metadata_json: str = None, intent: str = None, sentiment: str = None):
+    activity = Activity(
+        type=type,
+        title=title,
+        description=description,
+        metadata_json=metadata_json,
+        intent=intent,
+        sentiment=sentiment
+    )
+    db.add(activity)
+    await db.commit()
+    await db.refresh(activity)
+    return activity
+
+async def get_activities(db: AsyncSession, limit: int = 50):
+    result = await db.execute(select(Activity).order_by(desc(Activity.created_at)).limit(limit))
+    return result.scalars().all()
+
+async def get_org_settings(db: AsyncSession):
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    return result.scalars().first()

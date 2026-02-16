@@ -2,12 +2,19 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Search, Settings, Home, History, Plus, Users, UserCheck, BookOpen } from "lucide-react"
+import { BarChart3, Search, Settings, Home, History, Plus, Users,Link2, UserCheck, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-const sidebarItems = [
+interface SidebarItem {
+    title: string;
+    href: string;
+    icon: any;
+    comingSoon?: boolean;
+}
+
+const sidebarItems: SidebarItem[] = [
     {
         title: "Dashboard",
         href: "/",
@@ -34,15 +41,19 @@ const sidebarItems = [
         icon: History,
     },
     {
+        title: "Integrations",
+        href: "/integrations",
+        icon: Link2,
+    },
+    {
         title: "Competitors",
         href: "/competitors",
         icon: Users,
     },
     {
         title: "Knowledge Base",
-        href: "#",
+        href: "/knowledge-base",
         icon: BookOpen,
-        comingSoon: true
     },
     {
         title: "Settings",
@@ -59,7 +70,7 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
             <div className="p-6 border-b border-sidebar-border">
                 <div className="flex items-center gap-2 font-semibold text-xl tracking-tight">
                     <BarChart3 className="w-6 h-6 text-primary" />
-                    <span>SalesAgent<span className="text-primary">.ai</span></span>
+                    <span>Innovize AI</span>
                 </div>
             </div>
 

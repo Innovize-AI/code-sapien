@@ -398,7 +398,7 @@ WORKING_DIRECTORY = Path(_TEMP_DIRECTORY.name)
 
 from typing import List, Optional
 
-from langchain.agents import AgentExecutor, create_openai_functions_agent
+from langchain_classic.agents import AgentExecutor, create_openai_functions_agent
 from langchain.output_parsers.openai_functions import JsonOutputFunctionsParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI

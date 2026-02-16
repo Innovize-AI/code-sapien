@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { saveICP, IdealProfileData } from "@/lib/api"
+import { saveICP, IdealProfileData, getOnboardingStatus, setOnboardingComplete, getICP } from "@/lib/api"
 
 const icpFormSchema = z.object({
     industry: z.string().min(2, "Industry is required"),
@@ -35,6 +35,7 @@ const icpFormSchema = z.object({
 export default function OnboardingPage() {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
+    const [isChecking, setIsChecking] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
     const form = useForm<IdealProfileData>({
@@ -48,18 +49,49 @@ export default function OnboardingPage() {
         },
     })
 
+    useState(() => {
+        async function checkStatus() {
+            try {
+                const status = await getOnboardingStatus()
+                if (status.complete) {
+                    router.push("/")
+                    return
+                }
+
+                const existingIcp = await getICP()
+                if (existingIcp) {
+                    form.reset(existingIcp)
+                }
+            } catch (e) {
+                console.error("Failed to check status", e)
+            } finally {
+                setIsChecking(false)
+            }
+        }
+        checkStatus()
+    }, [])
+
     async function onSubmit(values: IdealProfileData) {
         setIsLoading(true)
         setError(null)
         try {
             await saveICP(values)
-            // Redirect to find-leads or dashboard after saving
-            router.push("/find-leads")
+            await setOnboardingComplete()
+            // Redirect to dashboard after saving
+            router.push("/")
         } catch (e: any) {
             setError("Failed to save settings. Please try again.")
         } finally {
             setIsLoading(false)
         }
+    }
+
+    if (isChecking) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
     }
 
     return (

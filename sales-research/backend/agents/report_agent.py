@@ -3,7 +3,7 @@ from workflow.state import AgentState
 import json
 
 from prompts.sales_prompts import REPORT_GENERATOR_PROMPT
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from models.structured_output import GlobalExecutiveBriefing
 
 def sales_research_report_generator(state: AgentState):
@@ -74,14 +74,19 @@ def sales_research_report_generator(state: AgentState):
     # Strategy Section (Outreach vs Follow-up)
     outreach_data = state.get("personalized_outreach", "")
     follow_up = state.get("follow_up_strategy", "")
+    cso_briefing = state.get("cso_strategic_briefing", {})
     
     outreach_str = ""
     if isinstance(outreach_data, dict) and outreach_data:
+        # Use CSO Refined content if available
+        li_msg = cso_briefing.get("refined_linkedin_message") or outreach_data.get('linkedin_message')
+        email_body = cso_briefing.get("refined_email_body") or outreach_data.get('email_body')
+        
         outreach_str = f"""
         Hook: {outreach_data.get('hook')}
-        LinkedIn: {outreach_data.get('linkedin_message')}
+        LinkedIn: {li_msg}
         Email Subject: {outreach_data.get('email_subject')}
-        Email Body: {outreach_data.get('email_body')}
+        Email Body: {email_body}
         """
     else:
         outreach_str = str(outreach_data)
@@ -132,20 +137,39 @@ def sales_research_report_generator(state: AgentState):
     - Proposed Strategic Solutions: {solutions}
     {strategy_output}
     - Strategic Recommendations: {strategic_recommendations}
+    
+    6. CHIEF STRATEGY OFFICER (CSO) VERDICT:
+    - Unified Command: {json.dumps(state.get('cso_strategic_briefing', {}))}
     """
     
+    selling_profile = state.get("selling_company_profile")
+    selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
+    selling_company_context = f"{selling_company_name} specializes in {selling_profile.description if selling_profile else 'AI automation'}."
+    lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
+
     messages = [
         SystemMessage(content=REPORT_GENERATOR_PROMPT.format(
             content=input_content,
-            company_context=company_context
+            selling_company_name=selling_company_name,
+            selling_company_context=selling_company_context,
+            lead_segment=lead_segment
         )),
-        HumanMessage(content=f"Synthesize the research for this prospect.")
+        HumanMessage(content=f"Synthesize the research for this prospect. LEAD SEGMENT: {lead_segment}")
     ]
 
-    llm = get_open_ai(model="gpt-4o", temperature=0.7) # GPT-4o for strategic synthesis
+    llm = get_gemini_model(model="gemini-3-flash-preview", temperature=0.7) # Gemini Pro for strategic synthesis
     structured_llm = llm.with_structured_output(GlobalExecutiveBriefing)
     response = structured_llm.invoke(messages)
 
-    return {"sales_research_report": response.model_dump()}
+    return {
+        "sales_research_report": {
+            **response.model_dump(),
+            "campaign_variants": state.get("campaign_outreach_variants", []),
+            "strategic_playbook": {
+                **response.strategic_playbook.model_dump(),
+                "strategic_proof_points": cso_briefing.get("strategic_proof_points", [])
+            }
+        }
+    }
 
 

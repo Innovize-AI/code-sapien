@@ -11,6 +11,7 @@ from db.database import SessionLocal
 from db.models import OrganizationSettings
 from services.email_service import EmailService, EmailConfig
 from workflow.state import AgentState
+from utils.activity_helper import log_activity_and_notify
 
 from prompts.sales_prompts import INTENT_ANALYZER_PROMPT
 
@@ -70,20 +71,15 @@ def analyze_email_intent(email_history: List[Dict[str, Any]]) -> Dict[str, Any]:
             "recommended_email": None
         }
 
-async def email_history_node(state: AgentState):
+async def email_history_fetcher_node(state: AgentState):
     """
-    LangGraph node to fetch email history and analyze intent.
+    Early LangGraph node to fetch raw email history.
     """
     email_id = state.get("email_id")
-    print(f"DEBUG email_history_node: email_id = {email_id}")
-    
     if not email_id:
-        print("No email_id in state, skipping email history fetch.")
-        return {"email_history": [], "intent_analysis": {}}
+        return {"email_history": []}
 
     email_history = []
-    
-    # 1. Fetch Credentials from DB
     async with SessionLocal() as db:
         result = await db.execute(select(OrganizationSettings).limit(1))
         settings = result.scalars().first()
@@ -91,29 +87,42 @@ async def email_history_node(state: AgentState):
         if settings and settings.email_config:
             try:
                 config_data = json.loads(settings.email_config)
-                print(f"DEBUG: Loaded email config: {list(config_data.keys())}")
-                # Ensure all required fields are present
                 if all(k in config_data for k in ["imap_server", "email_user", "email_password"]):
                     config = EmailConfig(**config_data)
                     service = EmailService(config)
-                    print(f"Fetching email history for {email_id}...")
                     email_history = service.fetch_email_history(email_id)
-                    print(f"DEBUG: Fetched {len(email_history)} emails")
-                else:
-                    print("Incomplete email config in DB.")
+                
+                # Log Activity if new incoming emails found
+                incoming_emails = [e for e in email_history if e.get('direction') == 'incoming']
+                if incoming_emails:
+                    latest_email = incoming_emails[0]
+                    await log_activity_and_notify(
+                        db,
+                        type="email",
+                        title=f"New Email Interaction: {email_id}",
+                        description=f"Received: {latest_email.get('subject')}",
+                        metadata={"email": email_id, "subject": latest_email.get('subject')}
+                    )
             except Exception as e:
-                print(f"Error parsing email config or fetching emails: {e}")
-        else:
-            print("No email config found in settings.")
+                print(f"Error fetching emails: {e}")
 
-    # 2. Analyze Intent (even if empty, to return consistent structure)
+    return {"email_history": email_history}
+
+async def email_intent_analyzer_node(state: AgentState):
+    """
+    Late LangGraph node (Post-CSO) to analyze intent with strategic guidance.
+    """
+    email_history = state.get("email_history", [])
+    cso_briefing = state.get("cso_strategic_briefing", {})
+    
+    # 1. Analyze Intent
+    # Inject CSO perspective if available
+    cso_context = cso_briefing.get("unified_command", {}).get("verdict", "")
+    
     analysis = analyze_email_intent(email_history)
-    print(f"DEBUG: Intent analysis result: {analysis}")
     
-    result = {
-        "email_history": email_history, 
-        "intent_analysis": analysis
-    }
-    print(f"DEBUG: Returning from email_history_node: email_history length = {len(email_history)}")
-    
-    return result
+    # If CSO has a specific command, we can refine the analysis
+    if cso_context and analysis.get("intent") == "Interested":
+         analysis["next_steps"] = f"CRITICAL: {cso_context}. {analysis.get('next_steps')}"
+
+    return {"intent_analysis": analysis}

@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X } from "lucide-react";
+import { User, Target, Globe, FileText, BarChart3, TrendingUp, Copy, Check, Info, Calendar, ShieldCheck, ShieldAlert, ExternalLink, ChevronRight, LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MousePointer2, MessageSquare, ArrowRight, ArrowDown, Menu, X, Search, BookOpen, Edit2, Save, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CSOCommandCard } from "./cso-command-card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 interface ReportDisplayProps {
     data: {
@@ -73,10 +78,30 @@ interface ReportDisplayProps {
         }>;
         extra_metadata?: {
             lead_source?: string;
+            lead_extracted_data?: {
+                discovery_insights?: string;
+                [key: string]: any;
+            };
+            discovery_source?: string;
+            discovery_context?: any;
             download_marketing_material?: boolean;
             demo_requested?: boolean;
             referral_partner_introduction?: boolean;
             [key: string]: any;
+        };
+        cso_strategic_briefing?: {
+            unified_command: {
+                verdict: string;
+                framework_selected: string;
+                timing_advice: string;
+                strategic_reasoning: string;
+                objection_preemption: string[];
+                sources: Array<{ source: string; snippet: string }>;
+            };
+            executive_blueprint_summary: string;
+            refined_linkedin_message?: string;
+            refined_email_body?: string;
+            strategic_proof_points?: string[];
         };
         [key: string]: any;
     } | null;
@@ -100,6 +125,140 @@ interface Activity {
 export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     const [activeSection, setActiveSection] = React.useState<number>(0);
     const [isNavVisible, setIsNavVisible] = React.useState<boolean>(true);
+    const [isProofOpen, setIsProofOpen] = useState(false);
+    
+    // --- Outreach Editing State ---
+    const [isEditingOutreach, setIsEditingOutreach] = useState(false);
+    const [isSavingOutreach, setIsSavingOutreach] = useState(false);
+    const [activeOutreachTab, setActiveOutreachTab] = useState<'tactical' | 'strategic'>('tactical');
+    const [editedOutreach, setEditedOutreach] = useState({
+        linkedin_message: '',
+        email_subject: '',
+        email_body: '',
+        hook: ''
+    });
+    const [editedStrategicOutreach, setEditedStrategicOutreach] = useState({
+        linkedin_message: '',
+        email_body: ''
+    });
+    const [isEditingIntentEmail, setIsEditingIntentEmail] = useState(false);
+    const [isSavingIntentEmail, setIsSavingIntentEmail] = useState(false);
+    const [editedIntentEmail, setEditedIntentEmail] = useState('');
+    
+    // --- Multi-Campaign State ---
+    const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+
+
+    const { toast } = useToast();
+
+    // Initialize edited data
+    React.useEffect(() => {
+        if (data && data.personalized_outreach) {
+            const outreach = data.personalized_outreach;
+            if (typeof outreach === 'object') {
+                setEditedOutreach({
+                    linkedin_message: outreach.linkedin_message || '',
+                    email_subject: outreach.email_subject || '',
+                    email_body: outreach.email_body || '',
+                    hook: outreach.hook || ''
+                });
+            }
+        }
+        if (data && data.cso_strategic_briefing) {
+            const briefing = data.cso_strategic_briefing;
+            setEditedStrategicOutreach({
+                linkedin_message: briefing.refined_linkedin_message || '',
+                email_body: briefing.refined_email_body || ''
+            });
+        }
+        if (data && data.intent_analysis) {
+            setEditedIntentEmail(data.intent_analysis.recommended_email || '');
+        }
+    }, [data]);
+
+    const handleSaveOutreach = async () => {
+        const currentData = data;
+        if (!currentData || !currentData.id) return;
+        setIsSavingOutreach(true);
+        try {
+            const isStrategic = activeOutreachTab === 'strategic';
+            const endpoint = isStrategic ? 'cso-outreach' : 'outreach';
+            const body = isStrategic ? {
+                refined_linkedin_message: editedStrategicOutreach.linkedin_message,
+                refined_email_body: editedStrategicOutreach.email_body
+            } : editedOutreach;
+
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/sales-research/reports/${currentData.id}/${endpoint}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            
+            if (response.ok) {
+                toast({
+                    title: "Success",
+                    description: `${isStrategic ? 'Strategic' : 'Tactical'} strategy updated successfully`,
+                });
+                setIsEditingOutreach(false);
+                
+                // Update local data
+                if (isStrategic) {
+                    if (currentData.cso_strategic_briefing) {
+                        currentData.cso_strategic_briefing.refined_linkedin_message = editedStrategicOutreach.linkedin_message;
+                        currentData.cso_strategic_briefing.refined_email_body = editedStrategicOutreach.email_body;
+                    }
+                } else {
+                    if (currentData.personalized_outreach && typeof currentData.personalized_outreach === 'object') {
+                        Object.assign(currentData.personalized_outreach, editedOutreach);
+                    }
+                }
+            } else {
+                throw new Error("Failed to save");
+            }
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update outreach strategy",
+            });
+        } finally {
+            setIsSavingOutreach(false);
+        }
+    };
+
+    const handleSaveIntentEmail = async () => {
+        const currentData = data;
+        if (!currentData || !currentData.id) return;
+        setIsSavingIntentEmail(true);
+        try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/sales-research/reports/${currentData.id}/intent-email`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email_text: editedIntentEmail })
+            });
+            
+            if (response.ok) {
+                toast({
+                    title: "Success",
+                    description: "Follow-up email updated successfully",
+                });
+                setIsEditingIntentEmail(false);
+                if (currentData.intent_analysis) {
+                    currentData.intent_analysis.recommended_email = editedIntentEmail;
+                }
+            } else {
+                throw new Error("Failed to save");
+            }
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update follow-up email",
+            });
+        } finally {
+            setIsSavingIntentEmail(false);
+        }
+    };
 
     if (!data) {
         return null;
@@ -209,8 +368,31 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         tactical?: any[];
     }
 
+    const extraMetadata = data.extra_metadata || {};
+    const inputLeadData = (data as any).input_lead_data || {};
+    
+    const discoverySource = extraMetadata.discovery_source || inputLeadData.discovery_source;
+    const discoveryContext = extraMetadata.discovery_context || inputLeadData.discovery_context;
+    const discoveryInsights = extraMetadata.lead_extracted_data?.discovery_insights || 
+                             inputLeadData.lead_extracted_data?.discovery_insights || 
+                             (data as any).lead_extracted_data?.discovery_insights;
+
     const sections: Section[] = [
-        { id: "synthesis", title: "Executive Blueprint", icon: <LayoutDashboard className="h-4 w-4" />, content: data.sales_research_report, badge: "CSO Briefing", isPrimary: true },
+        { id: "cso-verdict", title: "CSO Verdict", icon: <ShieldCheck className="h-4 w-4" />, content: data.cso_strategic_briefing, badge: "Unified Command", isPrimary: true },
+        { id: "synthesis", title: "Executive Blueprint", icon: <LayoutDashboard className="h-4 w-4" />, content: data.sales_research_report, badge: "CSO Briefing" },
+        // Discovery Intelligence (New) - For competitor posts or high-intent keyword matches
+        ...(discoverySource === 'competitor_comment' || discoverySource === 'keyword_search' ? [{
+            id: "discovery",
+            title: "Discovery Intelligence",
+            icon: <Search className="h-4 w-4" />,
+            content: {
+                "source_analysis": discoveryInsights,
+                "original_context": discoveryContext,
+                "discovery_source": discoverySource
+            },
+            badge: "Origin"
+        }] : []),
+
         { id: "journey", title: "Buyer Journey", icon: <TrendingUp className="h-4 w-4" />, content: "", badge: "Strategy", isJourney: true },
         { id: "profile", title: "Profile Intelligence", icon: <User className="h-4 w-4" />, content: data.user_profile_analysis, badge: "Intelligence" },
         { id: "activity", title: "Activity Board", icon: <BarChart3 className="h-4 w-4" />, content: "", badge: "Real-time", isActivity: true },
@@ -234,7 +416,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
 
 
     // Helper to render content based on its type (JSON or Markdown) with support for "sloppy" and fragmented formats
-    const DynamicContent = ({ content, title, isSocial = false, className = "" }: { content: any, title?: string, isSocial?: boolean, className?: string }) => {
+    const DynamicContent = ({ content, title, isSocial = false, className = "", excludeKeys = [] }: { content: any, title?: string, isSocial?: boolean, className?: string, excludeKeys?: string[] }) => {
         const [copied, setCopied] = React.useState(false);
 
         const handleCopy = () => {
@@ -266,6 +448,15 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 p-12 rounded-[2.5rem] bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800/60 transition-all duration-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
                         {Object.entries(content).map(([key, value]) => {
+                            // Deduplication logic: skip outreach fields in synthesis/general views
+                            const outreachKeys = [
+                                'personalized_outreach', 'outreach_tactics', 'strategic_playbook', 
+                                'linkedin_message', 'email_subject', 'email_body', 'hook',
+                                'follow_up_strategy', 'refined_linkedin_message', 'refined_email_body',
+                                'refined_hook'
+                            ];
+                            if (outreachKeys.includes(key.toLowerCase())) return null;
+
                             if (key === 'fit_assessment') {
                                 const isPoorFit = String(value).includes('STOP') || String(value).includes('POOR');
                                 return (
@@ -375,6 +566,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                     </div>
                                 );
                             }
+                            if (excludeKeys.includes(key)) return null;
                             if (key === 'recent_posts' || key === 'posts' || key === 'name' || key === 'fullname' || key === 'headline') return null;
 
                             if (Array.isArray(value)) {
@@ -593,12 +785,26 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         );
     };
 
-    const outreach = data.personalized_outreach;
-    const tacticalActions = (outreach && typeof outreach === 'object') ? [
-        { type: 'linkedin' as const, title: 'LinkedIn Request', content: outreach.linkedin_message || (outreach as any).hook || "", icon: <Linkedin className="h-4 w-4" /> },
-        { type: 'email' as const, title: 'Email Subject', content: outreach.email_subject || "", icon: <Mail className="h-4 w-4" /> },
-        { type: 'email' as const, title: 'Email Body', content: outreach.email_body || "", icon: <FileText className="h-4 w-4" /> }
+    // --- Multi-Campaign Logic ---
+    const campaignVariants = data.sales_research_report?.campaign_variants || [];
+    const hasVariants = campaignVariants.length > 0;
+    
+    const activeOutreach = hasVariants 
+        ? campaignVariants[selectedVariantIndex] 
+        : data.personalized_outreach;
+
+    const tacticalActions = (activeOutreach && typeof activeOutreach === 'object') ? [
+        { type: 'linkedin' as const, title: 'LinkedIn Request', content: activeOutreach.linkedin_message || (activeOutreach as any).hook || "", icon: <Linkedin className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Subject', content: activeOutreach.email_subject || "", icon: <Mail className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Email Body', content: activeOutreach.email_body || "", icon: <FileText className="h-4 w-4" /> }
     ].filter(a => a.content) : extractTacticalItems(data.sales_research_report);
+
+
+    const briefing = data.cso_strategic_briefing;
+    const strategicActions = (briefing && typeof briefing === 'object') ? [
+        { type: 'linkedin' as const, title: 'LinkedIn Message', content: briefing.refined_linkedin_message || "", icon: <Linkedin className="h-4 w-4" /> },
+        { type: 'email' as const, title: 'Refined Email Content', content: briefing.refined_email_body || "", icon: <FileText className="h-4 w-4" /> }
+    ].filter(a => a.content) : [];
 
     return (
         <div className="relative min-h-screen bg-zinc-50 dark:bg-zinc-950/50">
@@ -833,77 +1039,391 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                     )}
                                 </CardHeader>
                                 <CardContent className="px-12 pb-16">
-                                    {section.id === 'outreach' && tacticalActions.length > 0 && (
-                                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                {/* Outreach Cards */}
-                                                {tacticalActions.map((action, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className={cn(
-                                                            "group relative p-10 rounded-3xl transition-all duration-500",
-                                                            action.type === 'email' ? "bg-zinc-900 text-white shadow-2xl" : "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800"
-                                                        )}
-                                                    >
-                                                        <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                                                            <Button
-                                                                size="sm"
-                                                                variant={action.type === 'email' ? "secondary" : "outline"}
-                                                                className="h-9 px-4 rounded-xl gap-2 font-black uppercase tracking-tighter text-[10px]"
-                                                                onClick={() => {
-                                                                    navigator.clipboard.writeText(action.content);
-                                                                }}
-                                                            >
-                                                                <Copy className="h-3.5 w-3.5" />
-                                                                Copy {action.title.split(' ')[1] || 'Draft'}
-                                                            </Button>
-                                                        </div>
+                                    {/* CSO Verdict Rendering */}
+                                    {section.id === "cso-verdict" && data.cso_strategic_briefing && (
+                                        <div onClick={() => setIsProofOpen(true)} className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-100">
+                                            <CSOCommandCard data={data.cso_strategic_briefing.unified_command} />
+                                        </div>
+                                    )}
 
-                                                        <div className="flex items-center gap-4 mb-8">
-                                                            <div className={cn(
-                                                                "p-3 rounded-2xl border transition-transform group-hover:rotate-12",
-                                                                action.type === 'email' ? "bg-primary/20 text-primary border-primary/20 shadow-lg shadow-primary/10" : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-primary shadow-sm"
-                                                            )}>
-                                                                {action.icon}
+                                    {/* Discovery Intelligence Rendering */}
+                                    {section.id === "discovery" && (
+                                        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                            {/* Pattern Analysis Card */}
+                                            <div className="relative group">
+                                                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-primary/5 rounded-[3rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                                                <div className="relative p-10 rounded-[2.5rem] bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-white/5 shadow-2xl shadow-primary/5">
+                                                    <div className="flex flex-wrap items-center justify-between gap-6 mb-8 pb-6 border-b border-zinc-100 dark:border-white/5">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
+                                                                <TrendingUp className="h-6 w-6 text-primary" />
                                                             </div>
-                                                            <div className="space-y-1">
-                                                                <span className={cn(
-                                                                    "text-[10px] uppercase font-black tracking-widest block",
-                                                                    action.type === 'email' ? "text-zinc-400" : "text-zinc-500"
-                                                                )}>{action.title}</span>
-                                                                <div className={cn(
-                                                                    "h-1 w-12 rounded-full",
-                                                                    action.type === 'email' ? "bg-primary" : "bg-primary/30"
-                                                                )} />
+                                                            <div>
+                                                                <h3 className="text-xl font-black text-zinc-900 dark:text-white">Behavioral Pattern Analysis</h3>
+                                                                <p className="text-[11px] font-bold text-primary uppercase tracking-[0.2em] mt-1">AI-Synthesized Insights</p>
                                                             </div>
                                                         </div>
 
-                                                        <div className={cn(
-                                                            "text-[16px] leading-[1.8] font-medium italic",
-                                                            action.type === 'email' ? "text-zinc-100 selection:bg-primary/30" : "text-zinc-800 dark:text-zinc-200 selection:bg-primary/10"
-                                                        )}>
-                                                            {action.content}
-                                                        </div>
-
-                                                        {action.type === 'email' && action.title.includes('Subject') && (
-                                                            <div className="mt-6 pt-6 border-t border-white/5 flex items-center gap-3">
-                                                                <ShieldCheck className="h-4 w-4 text-primary" />
-                                                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Optimized for High Open Rates</span>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Interaction Origin</span>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <Badge variant="secondary" className="text-[10px] font-black uppercase bg-primary/10 text-primary border-none">
+                                                                        {(section.content as any).discovery_source || "Manual Discovery"}
+                                                                    </Badge>
+                                                                    <span className="text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300">
+                                                                        • {(section.content as any).original_context?.comments?.length || 0} Key Signals
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                        )}
+                                                        </div>
                                                     </div>
-                                                ))}
+                                                    
+                                                    <div className="prose prose-zinc dark:prose-invert max-w-none text-[17px] leading-[1.8] font-medium text-zinc-700 dark:text-zinc-300 antialiased italic">
+                                                        <ReactMarkdown>
+                                                            {(section.content as any).source_analysis || "No patterns identified yet."}
+                                                        </ReactMarkdown>
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            {typeof data.personalized_outreach === 'object' && data.personalized_outreach?.hook && (
-                                                <div className="p-10 rounded-3xl bg-primary/[0.03] border border-primary/10 space-y-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <Zap className="h-4 w-4 text-primary" />
-                                                        <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/70">Strategic Conversion Angle</h4>
+                                            {/* Contextual History */}
+                                            <div className="p-8 rounded-[2.5rem] bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-white/5">
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <MessageSquare className="h-4 w-4 text-zinc-400" />
+                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Original Discovery Context</h4>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {(section.content as any).original_context?.comments ? (
+                                                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {(section.content as any).original_context.comments.map((c: string, i: number) => (
+                                                                <li key={i} className="text-[15px] text-zinc-600 dark:text-zinc-400 leading-relaxed italic border-l-2 border-primary/30 pl-5 py-3 bg-white dark:bg-zinc-950/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors rounded-r-2xl border border-zinc-100 dark:border-white/5">
+                                                                    "{c}"
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : (
+                                                        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                                                            <Info className="h-5 w-5 text-zinc-300 mb-2" />
+                                                            <p className="text-sm text-zinc-400 italic">No specific comments recorded.</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Unified Outreach Rendering - Used primarily in Outreach Design, fallback to Executive Blueprint if section missing */}
+                                    {(section.id === 'outreach' || (section.id === 'synthesis' && !data?.sections?.some((s: any) => s.id === 'outreach') && (tacticalActions.length > 0 || strategicActions.length > 0))) && (
+                                        <div className={cn(
+                                            "space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700",
+                                            section.id === 'synthesis' ? "mt-16 pt-16 border-t border-dashed border-zinc-200 dark:border-zinc-800" : ""
+                                        )}>
+                                            {/* Header with Edit Button */}
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4">
+                                                <div className="flex items-center gap-4 px-2">
+                                                    <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shadow-sm">
+                                                        <Target className="h-6 w-6" />
                                                     </div>
-                                                    <p className="text-[17px] font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed italic">
-                                                        "{data.personalized_outreach.hook}"
-                                                    </p>
+                                                    <div>
+                                                        <h3 className="text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tight italic leading-none">
+                                                            {section.id === 'synthesis' ? 'Integrated Outreach Suite' : 'Recommended Playbook'}
+                                                        </h3>
+                                                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1.5 flex items-center gap-2">
+                                                            <Zap className="h-3 w-3 text-amber-500" /> Multi-Variant Execution Drafts
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-3">
+                                                    {isEditingOutreach ? (
+                                                        <>
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="ghost" 
+                                                                className="h-10 px-5 rounded-xl gap-2 text-[11px] font-black uppercase tracking-tight"
+                                                                onClick={() => setIsEditingOutreach(false)}
+                                                                disabled={isSavingOutreach}
+                                                            >
+                                                                <X className="h-3.5 w-3.5" /> Cancel
+                                                            </Button>
+                                                            <Button 
+                                                                size="sm" 
+                                                                className="h-10 px-6 rounded-xl gap-2 text-[11px] font-black uppercase tracking-tight shadow-lg shadow-primary/20"
+                                                                onClick={handleSaveOutreach}
+                                                                disabled={isSavingOutreach}
+                                                            >
+                                                                {isSavingOutreach ? <RotateCcw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                                                {isSavingOutreach ? 'Saving...' : `Save ${activeOutreachTab === 'strategic' ? 'Strategic' : 'Tactical'} Draft`}
+                                                            </Button>
+                                                        </>
+                                                    ) : (
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline" 
+                                                            className="h-10 px-6 rounded-xl gap-2 text-[11px] font-black uppercase tracking-tight border-primary/20 hover:bg-primary/5 transition-all group"
+                                                            onClick={() => setIsEditingOutreach(true)}
+                                                        >
+                                                            <Edit2 className="h-3.5 w-3.5 transition-transform group-hover:scale-110" /> Edit Current Version
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Campaign Variant Selector */}
+                                            {hasVariants && (
+                                                <div className="mb-8 space-y-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Select Campaign Strategy</span>
+                                                        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                                                    </div>
+                                                    <div className="p-1 bg-zinc-100 dark:bg-zinc-900 rounded-xl flex flex-wrap gap-2 border border-zinc-200 dark:border-zinc-800">
+                                                        {campaignVariants.map((variant: any, idx: number) => (
+                                                            <button
+                                                                key={idx}
+                                                                onClick={() => setSelectedVariantIndex(idx)}
+                                                                className={cn(
+                                                                    "px-4 py-2.5 rounded-lg text-[11px] font-black uppercase tracking-tight transition-all flex-1 md:flex-none text-center",
+                                                                    selectedVariantIndex === idx
+                                                                        ? "bg-white dark:bg-zinc-800 text-primary shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 font-black"
+                                                                        : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
+                                                                )}
+                                                            >
+                                                                {variant.variant_name || `Variant ${idx + 1}`}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* Strategic Reasoning Block */}
+                                                    {activeOutreach && (activeOutreach as any).fit_reasoning && (
+                                                        <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-500 mt-0.5">
+                                                                <Zap className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-500">Why this strategy?</h4>
+                                                                <p className="text-[14px] font-medium text-zinc-700 dark:text-zinc-300 leading-relaxed italic">
+                                                                    "{(activeOutreach as any).fit_reasoning}"
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <Tabs defaultValue="tactical" className="w-full" onValueChange={(val) => setActiveOutreachTab(val as 'tactical' | 'strategic')}>
+
+                                                <div className="flex items-center justify-between mb-8 border-b border-zinc-100 dark:border-zinc-800 pb-1">
+                                                    <TabsList className="bg-transparent h-12 p-0 gap-8">
+                                                        <TabsTrigger 
+                                                            value="tactical" 
+                                                            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-12 px-0 text-[11px] font-black uppercase tracking-[0.15em] transition-all"
+                                                        >
+                                                            Draft A: Rapid Execution
+                                                        </TabsTrigger>
+                                                        <TabsTrigger 
+                                                            value="strategic" 
+                                                            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-12 px-0 text-[11px] font-black uppercase tracking-[0.15em] transition-all"
+                                                        >
+                                                            Draft B: CSO Strategic Command
+                                                        </TabsTrigger>
+                                                    </TabsList>
+                                                    <div className="hidden md:flex items-center gap-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                                        <Info className="h-3 w-3" />
+                                                        Select version based on relationship depth
+                                                    </div>
+                                                </div>
+
+                                                <TabsContent value="tactical" className="mt-0 outline-none">
+                                                    <div className="mb-6 p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-start gap-3">
+                                                        <Zap className="h-4 w-4 text-primary mt-1" />
+                                                        <div className="space-y-1">
+                                                            <p className="text-[11px] font-black uppercase text-primary">When to use Rapid Execution</p>
+                                                            <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">Standard outreach for high-volume sequences or lower-priority prospects. Best for efficiency where deep strategic research isn't yet justified.</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                        {tacticalActions.map((action, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className={cn(
+                                                                    "group relative p-10 rounded-3xl transition-all duration-500",
+                                                                    action.type === 'email' ? "bg-zinc-900 text-white shadow-2xl" : "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800"
+                                                                )}
+                                                            >
+                                                                <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant={action.type === 'email' ? "secondary" : "outline"}
+                                                                        className="h-9 px-4 rounded-xl gap-2 font-black uppercase tracking-tighter text-[10px]"
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(action.content);
+                                                                            toast({ title: "Copied", description: `${action.title} copied to clipboard` });
+                                                                        }}
+                                                                    >
+                                                                        <Copy className="h-3.5 w-3.5" />
+                                                                        Copy {action.title.split(' ')[1] || 'Draft'}
+                                                                    </Button>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-4 mb-8">
+                                                                    <div className={cn(
+                                                                        "p-3 rounded-2xl border transition-transform group-hover:rotate-12",
+                                                                        action.type === 'email' ? "bg-primary/20 text-primary border-primary/20 shadow-lg shadow-primary/10" : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-primary shadow-sm"
+                                                                    )}>
+                                                                        {action.icon}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <h4 className={cn("text-xs font-black uppercase tracking-widest", action.type === 'email' ? "text-zinc-400" : "text-zinc-500")}>{action.title}</h4>
+                                                                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-tighter px-1.5 h-4 border-zinc-700 text-zinc-400">Tactical</Badge>
+                                                                        </div>
+                                                                        <p className={cn("text-[10px] font-medium uppercase tracking-tight mt-1", action.type === 'email' ? "text-primary/60" : "text-zinc-400")}>Modular Synthesis Draft</p>
+                                                                    </div>
+                                                                </div>
+
+                                                                {isEditingOutreach ? (
+                                                                    <div className="space-y-4">
+                                                                        <Textarea 
+                                                                            value={action.type === 'linkedin' ? editedOutreach.linkedin_message : 
+                                                                                   action.title.includes('Subject') ? editedOutreach.email_subject : 
+                                                                                   editedOutreach.email_body}
+                                                                            onChange={(e) => {
+                                                                                const val = e.target.value;
+                                                                                if (action.type === 'linkedin') setEditedOutreach(prev => ({ ...prev, linkedin_message: val }));
+                                                                                else if (action.title.includes('Subject')) setEditedOutreach(prev => ({ ...prev, email_subject: val }));
+                                                                                else setEditedOutreach(prev => ({ ...prev, email_body: val }));
+                                                                            }}
+                                                                            className={cn(
+                                                                                "min-h-[120px] rounded-2xl text-[15px] font-medium leading-relaxed resize-none",
+                                                                                action.type === 'email' ? "bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500" : "bg-white dark:bg-zinc-950"
+                                                                            )}
+                                                                            placeholder={`Enter ${action.title}...`}
+                                                                        />
+                                                                        <div className="flex justify-end">
+                                                                            <p className="text-[10px] font-bold text-zinc-500 uppercase">Auto-Saves to Blueprint</p>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className={cn(
+                                                                        "prose prose-zinc dark:prose-invert max-w-none text-[16px] font-medium leading-relaxed italic border-l-4 pl-8 py-2",
+                                                                        action.type === 'email' ? "text-zinc-100 border-primary/30" : "text-zinc-800 dark:text-zinc-200 border-primary/10"
+                                                                    )}>
+                                                                        <ReactMarkdown>{action.content}</ReactMarkdown>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </TabsContent>
+
+                                                <TabsContent value="strategic" className="mt-0 outline-none">
+                                                    <div className="mb-6 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-3">
+                                                        <ShieldCheck className="h-4 w-4 text-amber-500 mt-1" />
+                                                        <div className="space-y-1">
+                                                            <p className="text-[11px] font-black uppercase text-amber-500">When to use CSO Strategic Command</p>
+                                                            <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">VIP prospects and Tier-1 accounts. Uses RAG-derived deep insights to maximize conversion for complex, high-stakes enterprise conversations.</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                        {strategicActions.map((action, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className={cn(
+                                                                    "group relative p-10 rounded-3xl transition-all duration-500",
+                                                                    action.type === 'email' ? "bg-zinc-900 text-white shadow-2xl" : "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800"
+                                                                )}
+                                                            >
+                                                                <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant={action.type === 'email' ? "secondary" : "outline"}
+                                                                        className="h-9 px-4 rounded-xl gap-2 font-black uppercase tracking-tighter text-[10px]"
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(action.content);
+                                                                            toast({ title: "Copied", description: `${action.title} copied to clipboard` });
+                                                                        }}
+                                                                    >
+                                                                        <Copy className="h-3.5 w-3.5" />
+                                                                        Copy {action.title.split(' ')[1] || 'Draft'}
+                                                                    </Button>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-4 mb-8">
+                                                                    <div className={cn(
+                                                                        "p-3 rounded-2xl border transition-transform group-hover:rotate-12",
+                                                                        action.type === 'email' ? "bg-primary/20 text-primary border-primary/20 shadow-lg shadow-primary/10" : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-primary shadow-sm"
+                                                                    )}>
+                                                                        {action.icon}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <h4 className={cn("text-xs font-black uppercase tracking-widest", action.type === 'email' ? "text-zinc-400" : "text-zinc-500")}>{action.title}</h4>
+                                                                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-tighter px-1.5 h-4 border-amber-500/30 text-amber-500">CSO Refined</Badge>
+                                                                        </div>
+                                                                        <p className={cn("text-[10px] font-medium uppercase tracking-tight mt-1", action.type === 'email' ? "text-primary/60" : "text-zinc-400")}>RAG Optimized Blueprint</p>
+                                                                    </div>
+                                                                </div>
+
+                                                                {isEditingOutreach ? (
+                                                                    <div className="space-y-4">
+                                                                        <Textarea 
+                                                                            value={action.type === 'linkedin' ? editedStrategicOutreach.linkedin_message : 
+                                                                                   editedStrategicOutreach.email_body}
+                                                                            onChange={(e) => {
+                                                                                const val = e.target.value;
+                                                                                if (action.type === 'linkedin') setEditedStrategicOutreach(prev => ({ ...prev, linkedin_message: val }));
+                                                                                else setEditedStrategicOutreach(prev => ({ ...prev, email_body: val }));
+                                                                            }}
+                                                                            className={cn(
+                                                                                "min-h-[120px] rounded-2xl text-[15px] font-medium leading-relaxed resize-none",
+                                                                                action.type === 'email' ? "bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500" : "bg-white dark:bg-zinc-950"
+                                                                            )}
+                                                                            placeholder={`Enter ${action.title}...`}
+                                                                        />
+                                                                        <div className="flex justify-end">
+                                                                            <p className="text-[10px] font-bold text-zinc-500 uppercase">Updates Strategic RAG Briefing</p>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className={cn(
+                                                                        "prose prose-zinc dark:prose-invert max-w-none text-[16px] font-medium leading-relaxed italic border-l-4 pl-8 py-2",
+                                                                        action.type === 'email' ? "text-zinc-100 border-primary/30" : "text-zinc-800 dark:text-zinc-200 border-primary/10"
+                                                                    )}>
+                                                                        <ReactMarkdown>{action.content}</ReactMarkdown>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </TabsContent>
+                                            </Tabs>
+
+                                            {/* Hook / Strategic Angle */}
+                                            {/* Check if activeOutreach exists OR edited hook exists, AND we are in tactical mode */}
+                                            {((activeOutreach && typeof activeOutreach === 'object' && ((activeOutreach as any).hook || (activeOutreach as any).strategic_hook)) || editedOutreach.hook) && activeOutreachTab === 'tactical' && (
+                                                <div className="max-w-4xl mx-auto pt-4">
+                                                    <div className="p-8 rounded-[2.5rem] bg-zinc-100 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 flex items-start gap-8 group hover:shadow-xl transition-all duration-500">
+                                                        <div className="p-4 rounded-3xl bg-white dark:bg-zinc-950 text-amber-500 shadow-sm border border-amber-100 dark:border-amber-900/30 group-hover:scale-110 transition-transform">
+                                                            <Zap className="h-6 w-6" />
+                                                        </div>
+                                                        <div className="flex-1 space-y-3">
+                                                            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-500">Strategic Conversion Angle</h4>
+                                                            {isEditingOutreach ? (
+                                                                <Textarea 
+                                                                    value={editedOutreach.hook}
+                                                                    onChange={(e) => setEditedOutreach(prev => ({ ...prev, hook: e.target.value }))}
+                                                                    className="min-h-[100px] rounded-2xl text-[16px] font-medium italic leading-relaxed border-zinc-200 resize-none bg-white/50"
+                                                                    placeholder="Enter Hook/Strategic Angle..."
+                                                                />
+                                                            ) : (
+                                                                <p className="text-[17px] font-black text-zinc-900 dark:text-white leading-relaxed tracking-tight italic">
+                                                                    "{editedOutreach.hook || (activeOutreach as any).hook || (activeOutreach as any).strategic_hook}"
+                                                                </p>
+                                                            )}
+                                                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pt-2">The Psychological Engagement Hook</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -1151,13 +1671,12 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
                                             {typeof data.lead_score_analysis === 'object' ? (
                                                 <>
-                                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                                         {[
-                                                            { label: "Demographic", score: data.lead_score_analysis.score_breakdown?.demographic_fit?.score || 0, max: 25, color: "text-blue-500" },
-                                                            { label: "Engagement", score: data.lead_score_analysis.score_breakdown?.engagement?.score || 0, max: 20, color: "text-emerald-500" },
-                                                            { label: "Readiness", score: data.lead_score_analysis.score_breakdown?.sales_readiness?.score || 0, max: 25, color: "text-orange-500" },
-                                                            { label: "Source", score: data.lead_score_analysis.score_breakdown?.lead_source?.score || 0, max: 15, color: "text-purple-500" },
-                                                            { label: "Timing", score: data.lead_score_analysis.score_breakdown?.timing?.score || 0, max: 15, color: "text-rose-500" }
+                                                            { label: "Firmographic", score: data.lead_score_analysis.score_breakdown?.firmographic_fit?.score || 0, max: 25, color: "text-blue-500" },
+                                                            { label: "Persona", score: data.lead_score_analysis.score_breakdown?.persona_alignment?.score || 0, max: 25, color: "text-emerald-500" },
+                                                            { label: "Behavioral", score: data.lead_score_analysis.score_breakdown?.behavioral_engagement?.score || 0, max: 25, color: "text-orange-500" },
+                                                            { label: "Intent", score: data.lead_score_analysis.score_breakdown?.strategic_intent?.score || 0, max: 25, color: "text-rose-500" }
                                                         ].map((item, idx) => (
                                                             <div key={idx} className="p-8 rounded-[2rem] bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 flex flex-col items-center text-center space-y-4 hover:scale-105 transition-transform duration-500">
                                                                 <div className={cn("text-3xl font-black", item.color)}>
@@ -1237,22 +1756,66 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                                             <Mail className="h-4 w-4 text-primary" />
                                                             Recommended Follow-up Email
                                                         </h3>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 gap-2 group"
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(data.intent_analysis?.recommended_email || "");
-                                                            }}
-                                                        >
-                                                            <Copy className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
-                                                            Copy Email
-                                                        </Button>
+                                                        <div className="flex items-center gap-2">
+                                                            {isEditingIntentEmail ? (
+                                                                <>
+                                                                    <Button 
+                                                                        size="sm" 
+                                                                        variant="ghost" 
+                                                                        className="h-8 gap-2 text-[10px] font-black uppercase"
+                                                                        onClick={() => setIsEditingIntentEmail(false)}
+                                                                        disabled={isSavingIntentEmail}
+                                                                    >
+                                                                        <X className="h-3 w-3" /> Cancel
+                                                                    </Button>
+                                                                    <Button 
+                                                                        size="sm" 
+                                                                        className="h-8 gap-2 text-[10px] font-black uppercase"
+                                                                        onClick={handleSaveIntentEmail}
+                                                                        disabled={isSavingIntentEmail}
+                                                                    >
+                                                                        {isSavingIntentEmail ? <RotateCcw className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                                                        {isSavingIntentEmail ? 'Saving...' : 'Save Draft'}
+                                                                    </Button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Button 
+                                                                        size="sm" 
+                                                                        variant="outline" 
+                                                                        className="h-8 gap-2 text-[10px] font-black uppercase border-primary/20 hover:bg-primary/10"
+                                                                        onClick={() => setIsEditingIntentEmail(true)}
+                                                                    >
+                                                                        <Edit2 className="h-3 w-3" /> Edit Email
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="h-8 gap-2 group"
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(data.intent_analysis?.recommended_email || "");
+                                                                        }}
+                                                                    >
+                                                                        <Copy className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+                                                                        Copy Email
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <div className="relative group p-8 rounded-2xl bg-zinc-900 text-white border border-zinc-800 shadow-xl overflow-hidden">
                                                         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] rounded-full -mr-16 -mt-16 pointer-events-none" />
                                                         <div className="relative z-10 text-[16px] font-medium leading-relaxed italic text-zinc-100">
-                                                            {data.intent_analysis.recommended_email}
+                                                            {isEditingIntentEmail ? (
+                                                                <Textarea 
+                                                                    value={editedIntentEmail}
+                                                                    onChange={(e) => setEditedIntentEmail(e.target.value)}
+                                                                    className="bg-white/10 border-white/20 text-white placeholder:text-zinc-500 min-h-[250px] text-[16px] font-medium italic"
+                                                                    placeholder="Follow-up Email Body..."
+                                                                />
+                                                            ) : (
+                                                                data.intent_analysis.recommended_email
+                                                            )}
                                                         </div>
                                                         <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
                                                             <ShieldCheck className="h-3 w-3" />
@@ -1354,17 +1917,58 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                         </div>
                                     )}
 
-                                    <DynamicContent
-                                        content={section.content}
-                                        title={section.title}
-                                        isSocial={section.id === 'profile'}
-                                    />
+                                    {!(section.isActivity || section.isIntent || section.isOutreach || section.isJourney || section.id === 'discovery' || section.id === 'lead-score') && (
+                                        <DynamicContent
+                                            content={section.content}
+                                            title={section.title}
+                                            isSocial={section.id === 'profile'}
+                                            excludeKeys={['personalized_outreach', 'cso_strategic_briefing', 'intent_analysis', 'buyer_journey_analysis', 'lead_score_analysis']}
+                                        />
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>
                     ))}
                 </div>
             </div>
+
+            {/* Knowledge Proof Sidebar */}
+            <Sheet open={isProofOpen} onOpenChange={setIsProofOpen}>
+                <SheetContent side="right" className="sm:max-w-2xl w-full h-full overflow-y-auto bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-l border-zinc-200 dark:border-zinc-800 p-0 shadow-2xl">
+                    <div className="p-12 space-y-12">
+                        <SheetHeader className="space-y-6">
+                            <div className="h-16 w-16 rounded-[2rem] bg-amber-500/10 text-amber-500 flex items-center justify-center shadow-inner">
+                                <BookOpen className="h-8 w-8" />
+                            </div>
+                            <div>
+                                <SheetTitle className="text-4xl font-black italic uppercase tracking-tighter mb-2">Knowledge Proofs</SheetTitle>
+                                <SheetDescription className="text-zinc-500 font-bold text-base leading-relaxed">
+                                    Strategic assets and playbooks synthesized by our CSO to validate this command.
+                                </SheetDescription>
+                            </div>
+                        </SheetHeader>
+
+                        <div className="space-y-10">
+                            {data.cso_strategic_briefing?.unified_command.sources.map((source, i) => (
+                                <div key={i} className="group relative">
+                                    <div className="absolute -inset-1 bg-gradient-to-r from-primary/5 to-transparent rounded-[2rem] blur opacity-0 group-hover:opacity-100 transition duration-500" />
+                                    <div className="relative space-y-6 p-10 rounded-[2.5rem] bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 hover:border-primary/20 transition-all duration-300">
+                                        <div className="flex items-center justify-between">
+                                            <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-primary/20 text-primary bg-primary/5 px-3 py-1">
+                                                Asset: {source.source}
+                                            </Badge>
+                                            <div className="h-1.5 w-1.5 rounded-full bg-primary/40" />
+                                        </div>
+                                        <div className="prose prose-zinc dark:prose-invert max-w-none text-[16px] font-medium text-zinc-800 dark:text-zinc-200 leading-relaxed italic border-l-4 border-primary/10 pl-8 py-2">
+                                            <ReactMarkdown>{source.snippet}</ReactMarkdown>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div >
     );
 }

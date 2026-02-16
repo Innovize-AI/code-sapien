@@ -9,17 +9,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db, save_competitor_analysis, upsert_identified_profile, get_identified_profiles, batch_upsert_identified_profiles, count_identified_profiles
 from db.database import SessionLocal
 from services.classification_service import event_manager, run_classification_and_update
+from utils.activity_helper import log_activity_and_notify
 
 competitor_router = APIRouter(tags=['Competitor Analysis'], responses={404: {"description": "Not found"}},)
 
 @competitor_router.get("/profiles")
-async def get_profiles(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
+async def get_profiles(
+    skip: int = 0, 
+    limit: int = 100, 
+    search: str = None, 
+    db: AsyncSession = Depends(get_db)
+):
     """
     Fetch all identified profiles from competitor discovery.
     """
     try:
-        profiles = await get_identified_profiles(db, skip, limit)
-        total = await count_identified_profiles(db)
+        profiles = await get_identified_profiles(db, skip, limit, search_query=search)
+        total = await count_identified_profiles(db, search_query=search)
         return {"profiles": profiles, "total": total}
     except Exception as e:
         return {"error": str(e)}
@@ -130,6 +136,15 @@ async def discover_leads(
         if raw_leads_to_save:
             print(f"DEBUG: Saving {len(raw_leads_to_save)} raw leads to DB...")
             await batch_upsert_identified_profiles(db, raw_leads_to_save)
+            
+            # Log Activity (One summary activity for the batch)
+            await log_activity_and_notify(
+                db,
+                type="comment",
+                title=f"Discovered {len(raw_leads_to_save)} potential leads",
+                description=f"Identified new commenters on competitor posts ({', '.join(urls[:2])}...)",
+                metadata={"urls": urls, "count": len(raw_leads_to_save)}
+            )
             
         # 2. Trigger Background Classification
         background_tasks.add_task(run_classification_and_update, raw_leads_to_save)

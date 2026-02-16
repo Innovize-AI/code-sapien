@@ -63,9 +63,13 @@ async def get_integrations(db: AsyncSession = Depends(get_db)):
     return IntegrationSettings(
         tavily_api_key=settings.tavily_api_key,
         apollo_api_key=settings.apollo_api_key,
+        email_config=settings.email_config,
+        integrations_config=settings.integrations_config,
+        kit_api_key=settings.kit_api_key,
+        kit_api_secret=settings.kit_api_secret,
         user_linkedin_url=settings.user_linkedin_url,
         company_linkedin_url=settings.company_linkedin_url,
-        email_config=settings.email_config
+        slack_webhook_url=settings.slack_webhook_url,
     )
 
 
@@ -83,13 +87,21 @@ async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depend
         settings.user_linkedin_url = data.user_linkedin_url
         settings.company_linkedin_url = data.company_linkedin_url
         settings.email_config = data.email_config
+        settings.integrations_config = data.integrations_config
+        settings.kit_api_key = data.kit_api_key
+        settings.kit_api_secret = data.kit_api_secret
+        settings.slack_webhook_url = data.slack_webhook_url
     else:
         settings = OrganizationSettings(
             tavily_api_key=data.tavily_api_key, 
             apollo_api_key=data.apollo_api_key,
+            email_config=data.email_config,
+            integrations_config=data.integrations_config,
+            kit_api_key=data.kit_api_key,
+            kit_api_secret=data.kit_api_secret,
             user_linkedin_url=data.user_linkedin_url,
             company_linkedin_url=data.company_linkedin_url,
-            email_config=data.email_config
+            slack_webhook_url=data.slack_webhook_url,
         )
         db.add(settings)
 
@@ -97,3 +109,18 @@ async def save_integrations(data: IntegrationSettings, db: AsyncSession = Depend
     await db.commit()
     await db.refresh(settings)
     return data
+
+@settings_router.get("/settings/onboarding-status")
+async def get_onboarding_status(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    settings = result.scalars().first()
+    return {"complete": bool(settings.onboarding_complete) if settings else False}
+
+@settings_router.post("/settings/onboarding-complete")
+async def set_onboarding_complete(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    settings = result.scalars().first()
+    if settings:
+        settings.onboarding_complete = 1
+        await db.commit()
+    return {"status": "success"}

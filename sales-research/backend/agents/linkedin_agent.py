@@ -8,7 +8,7 @@ from workflow.state import AgentState
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, COMPANY_CONTEXT
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 from models.structured_output import LinkedInAnalysis
 
 load_dotenv()
@@ -21,6 +21,8 @@ class ProfileClassificationResult(BaseModel):
     is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
     reasoning: str = Field(description="Brief explanation of the classification.")
+    intent: Optional[str] = Field(None, description="The person's intent (interested, pain_point, curious, competitor)")
+    sentiment: Optional[str] = Field(None, description="The sentiment of their interaction (positive, neutral, negative)")
 
 class BatchProfileClassification(BaseModel):
     classifications: List[ProfileClassificationResult] = Field(description="List of profile classifications")
@@ -43,7 +45,7 @@ def batch_classify_profiles(profiles: List[Dict]):
         
     try:
         # Reverting to gpt-4o-mini as gpt-4.1-mini is not a valid model
-        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
+        llm = get_gemini_model(temperature=0, model="gemini-3-flash-preview")
         structured_llm = llm.with_structured_output(BatchProfileClassification)
         
         # Format profiles for prompt
@@ -79,7 +81,7 @@ def classify_profile(name: str, headline: str):
         return {"is_competitor": False, "is_fit": False, "is_decision_maker": False, "reasoning": "No headline provided."}
         
     try:
-        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
+        llm = get_gemini_model(temperature=0, model="gemini-3-flash-preview")
         structured_llm = llm.with_structured_output(ProfileClassification)
         
         prompt = PROFILE_CLASSIFIER_PROMPT.format(
@@ -257,7 +259,7 @@ def get_linkedin_engagement(state: AgentState):
     if not lead_linkedin_url or (not user_linkedin_url and not company_linkedin_url):
         return {"post_engagements": []}
 
-    lead_urn = state["lead_li_urn"]
+    lead_urn = state.get("lead_li_urn")
     targets = []
     if user_linkedin_url: targets.append(("user", get_username_from_url(user_linkedin_url)))
     if company_linkedin_url: targets.append(("company", get_username_from_url(company_linkedin_url)))
@@ -289,29 +291,27 @@ def get_linkedin_engagement(state: AgentState):
                 if not post_urn: continue
 
                 # Check reactions for this post
-                reactions_url = f"{linkedin_base_url}/post/reactions"
-                # Note: Some APIs use 'post_id' or 'url'. We'll assume post_id is enough for this RapidAPI.
-                r_params = {"post_url": post_urn, "page_number": 1} 
-                r_resp = requests.get(reactions_url, headers=headers, params=r_params)
-                r_data = r_resp.json()
-                
-                data = r_data.get("data", {})
-                for reaction in data.get("reactions", []):
-                    reaction_type = reaction.get("reaction_type", "LIKE")
-                    reactor = reaction.get("reactor", {})
-                    reactor_urn = reactor.get("urn", "")
-
-                    if reactor.get("urn") == lead_urn:
-                        print(f"Found engagement for {target_type}: {reaction_type}")
-                        found_engagements.append({
-                            "type": "reaction",
-                            "target": target_type,
-                            "post_id": post_urn,
-                            "content": post_text[:100] + "...",
-                            "post_url":posts_url,
-                            "reaction_type": reaction_type,
-                            "reactor_urn": reactor.get("urn", "")
-                        })
+                if lead_urn:
+                    reactions_url = f"{linkedin_base_url}/post/reactions"
+                    r_params = {"post_url": post_urn, "page_number": 1} 
+                    r_resp = requests.get(reactions_url, headers=headers, params=r_params)
+                    r_data = r_resp.json()
+                    
+                    data = r_data.get("data", {})
+                    for reaction in data.get("reactions", []):
+                        reactor = reaction.get("reactor", {})
+                        if reactor.get("urn") == lead_urn:
+                            reaction_type = reaction.get("reaction_type", "LIKE")
+                            print(f"Found engagement for {target_type}: {reaction_type}")
+                            found_engagements.append({
+                                "type": "reaction",
+                                "target": target_type,
+                                "post_id": post_urn,
+                                "content": post_text[:100] + "...",
+                                "post_url":posts_url,
+                                "reaction_type": reaction_type,
+                                "reactor_urn": reactor.get("urn", "")
+                            })
                 
                 # Check comments
                 comments_url = f"{linkedin_base_url}/post/comments"
@@ -416,7 +416,7 @@ def linkedin_profile_analyzer(state: AgentState):
     ]
     
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(LinkedInAnalysis)
         response = structured_llm.invoke(messages)
         
@@ -463,7 +463,7 @@ def analyze_competitor_posts(competitor_urls: list[str]):
         HumanMessage(content=json.dumps(all_competitor_data))
     ]
     
-    model = get_open_ai(model="gpt-4o-mini", temperature=1)
+    model = get_gemini_model(model="gemini-3-flash-preview", temperature=1)
     response = model.invoke(messages)
     return response.content
 
@@ -496,7 +496,7 @@ def get_post_commenters(post_id: str):
 def analyze_lead_with_ai(lead: dict, icp_data: dict):
     """Evaluates a single lead against the ICP using AI."""
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0) # Use 0 temp for consistent scoring
+        model = get_gemini_model(model="gemini-1.5-flash", temperature=0) # Use 0 temp for consistent scoring
         
         prompt = AI_LEAD_EVALUATOR_PROMPT.format(
             name=lead.get("name"),
@@ -679,7 +679,7 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
         return {}
         
     try:
-        llm = get_open_ai(temperature=0, model="gpt-4o-mini")
+        llm = get_gemini_model(temperature=0, model="gemini-3-flash-preview")
         structured_llm = llm.with_structured_output(BatchProfileClassification)
         
         # Format profiles for prompt

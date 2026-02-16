@@ -2,7 +2,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 import json
 from workflow.state import AgentState
 from prompts.sales_prompts import FOLLOW_UP_STRATEGY_PROMPT
-from models.openai_models import get_open_ai
+from models.gemini_models import get_gemini_model
 
 def follow_up_strategy_node(state: AgentState):
     """Crafts a tailored follow-up strategy for existing prospect relationships."""
@@ -12,12 +12,15 @@ def follow_up_strategy_node(state: AgentState):
     solutions = state.get("strategic_solutions", "")
     journey_analysis = state.get("buyer_journey_analysis", {})
 
+    cso_briefing = state.get("cso_strategic_briefing", {})
+
     intelligence_context = {
         "email_history": email_history,
         "meeting_notes": meeting_notes,
         "pain_points": pain_points,
         "solutions": solutions,
-        "journey_context": journey_analysis
+        "journey_context": journey_analysis,
+        "cso_guidance": cso_briefing
     }
 
     messages = [
@@ -26,7 +29,7 @@ def follow_up_strategy_node(state: AgentState):
     ]
 
     try:
-        model = get_open_ai(model="gpt-4o-mini", temperature=0.7)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0.7)
         response = model.invoke(messages)
         return {"follow_up_strategy": response.content}
     except Exception as e:

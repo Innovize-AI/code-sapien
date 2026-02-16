@@ -18,6 +18,7 @@ export interface LeadStatus {
     status: AnalysisStatus
     error?: string
     currentStep?: string
+    progress?: number
     result?: any
 }
 
@@ -30,6 +31,7 @@ interface BulkAnalysisModalProps {
     isProcessing: boolean
     globalError: string | null
     onRetry: () => void
+    onReset: () => void
     onCancel: () => void // Just closes the modal, doesn't necessarily cancel the background process (unless we want it to)
 }
 
@@ -42,11 +44,15 @@ export function BulkAnalysisModal({
     isProcessing,
     globalError,
     onRetry,
+    onReset,
     onCancel
 }: BulkAnalysisModalProps) {
 
     const completedCount = leadsStatus.filter(l => l.status === "completed").length
-    const progress = leads.length > 0 ? (completedCount / leads.length) * 100 : 0
+    
+    // Average progress across all leads
+    const totalProgress = leadsStatus.reduce((acc, lead) => acc + (lead.progress || 0), 0)
+    const progress = leads.length > 0 ? (totalProgress / leads.length) : 0
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -102,6 +108,11 @@ export function BulkAnalysisModal({
                                         {lead.status === "error" && <XCircle className="w-4 h-4 text-red-500" />}
                                     </div>
                                 </div>
+                                {lead.status === "analyzing" && lead.progress !== undefined && (
+                                    <div className="mt-2">
+                                        <Progress value={lead.progress} className="h-1 bg-primary/10" />
+                                    </div>
+                                )}
                                 {lead.error && (
                                     <p className="text-[10px] text-red-500/80 mt-1 line-clamp-1">{lead.error}</p>
                                 )}
@@ -110,11 +121,22 @@ export function BulkAnalysisModal({
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t">
+                        <Button variant="ghost" className="text-muted-foreground mr-auto" onClick={() => {
+                            onReset();
+                            onCancel();
+                        }} disabled={isProcessing}>
+                            Reset State
+                        </Button>
                         <Button variant="outline" onClick={onCancel}>
                             Close
                         </Button>
-                        {!isProcessing && completedCount < leads.length && leads.length > 0 && (
+                        {!isProcessing && completedCount < leads.length && leads.length > 0 ? (
                             <Button onClick={onRetry}>Retry Failed</Button>
+                        ) : (
+                            // Show "Analyze New" if we have leads pending that aren't being processed? 
+                            // Actually, the modal is just a view. The trigger comes from the page.
+                            // But if we are here and something failed, we might want to retry.
+                            null
                         )}
                     </div>
                 </div>

@@ -160,7 +160,7 @@ def solution_node(state: AgentState):
     ]
     
     try:
-        model = get_gemini_model(model="gemini-3-pro-preview", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(StrategicSolutionProposal)
         response = structured_llm.invoke(messages)
         return {"strategic_solutions": response.model_dump() if response else {}}
@@ -218,7 +218,7 @@ DO NOT generate a second variant.
     ]
     
     try:
-        model = get_gemini_model(model="gemini-3-pro-preview", temperature=0.2) # Slightly higher temp for creativity
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0.2) # Slightly higher temp for creativity
         structured_llm = model.with_structured_output(MultiCampaignResponse)
         response = structured_llm.invoke(messages)
         

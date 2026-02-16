@@ -217,14 +217,28 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                     discovery_history = interactions
                     
                     if sources:
-                        options.discovery_source = "competitor_comment"
-                        options.discovery_context = {
-                            "comments": unique_comments,
-                            "source_posts": sources,
-                            # Removed redundant interaction_history here as it's passed at top level now
-                            "fit_reasoning": profile.fit_reasoning,
-                            "intent": profile.intent
-                        }
+                        # Intelligently detect if it's a keyword search even if sources exist
+                        # (Because keyword discovered leads also save their source posts)
+                        is_keyword = any(isinstance(s, dict) and str(s.get("competitor", "")).startswith("Keyword:") for s in sources)
+                        
+                        if is_keyword:
+                            options.discovery_source = "keyword_search"
+                            options.discovery_context = {
+                                "fit_reasoning": profile.fit_reasoning,
+                                "intent": profile.intent,
+                                "profile_metadata": profile.profile_metadata,
+                                "comments": unique_comments, # Include comments/posts for richness
+                                "source_posts": sources
+                            }
+                        else:
+                            options.discovery_source = "competitor_comment"
+                            options.discovery_context = {
+                                "comments": unique_comments,
+                                "source_posts": sources,
+                                # Removed redundant interaction_history here as it's passed at top level now
+                                "fit_reasoning": profile.fit_reasoning,
+                                "intent": profile.intent
+                            }
                     else:
                         options.discovery_source = "keyword_search"
                         options.discovery_context = {

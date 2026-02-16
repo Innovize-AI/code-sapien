@@ -157,7 +157,7 @@ def sales_research_report_generator(state: AgentState):
         HumanMessage(content=f"Synthesize the research for this prospect. LEAD SEGMENT: {lead_segment}")
     ]
 
-    llm = get_gemini_model(model="gemini-3-pro-preview", temperature=0.7) # Gemini Pro for strategic synthesis
+    llm = get_gemini_model(model="gemini-3-flash-preview", temperature=0.7) # Gemini Pro for strategic synthesis
     structured_llm = llm.with_structured_output(GlobalExecutiveBriefing)
     response = structured_llm.invoke(messages)
 

@@ -24,6 +24,7 @@ export default function FindLeadsPage() {
         isBulkModalOpen,
         setIsBulkModalOpen,
         startBulkAnalysis,
+        resetBulkAnalysis,
         setBulkLeads
     } = useBulkAnalysis()
 
@@ -33,15 +34,15 @@ export default function FindLeadsPage() {
     }
 
     const handleBulkAnalyze = (leads: { url: string, website: string }[], options?: { refresh: boolean }) => {
-        setBulkLeads(leads)
+        // If an analysis is already running, we append to it
+        // If not running, we start fresh (but don't necessarily reset if we want to keep history)
         setIsBulkModalOpen(true)
-        if (!isProcessing) {
-            startBulkAnalysis(leads, {
-                project_urgency: 2,
-                lead_source: "Discovery",
-                refresh: options?.refresh || false
-            })
-        }
+        
+        startBulkAnalysis(leads, {
+            project_urgency: 2,
+            lead_source: "Discovery",
+            refresh: options?.refresh || false
+        })
     }
 
     const handleRetry = () => {
@@ -113,6 +114,7 @@ export default function FindLeadsPage() {
                     isProcessing={isProcessing}
                     globalError={globalError}
                     onRetry={handleRetry}
+                    onReset={resetBulkAnalysis}
                     onCancel={() => setIsBulkModalOpen(false)}
                 />
             </div>

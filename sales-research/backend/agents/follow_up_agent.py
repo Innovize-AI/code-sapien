@@ -29,7 +29,7 @@ def follow_up_strategy_node(state: AgentState):
     ]
 
     try:
-        model = get_gemini_model(model="gemini-3-pro-preview", temperature=0.7)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0.7)
         response = model.invoke(messages)
         return {"follow_up_strategy": response.content}
     except Exception as e:

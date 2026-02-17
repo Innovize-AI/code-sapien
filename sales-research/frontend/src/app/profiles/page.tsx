@@ -42,6 +42,7 @@ export default function ProfilesPage() {
         isBulkModalOpen,
         setIsBulkModalOpen,
         startBulkAnalysis,
+        resetBulkAnalysis,
         setBulkLeads,
         leadsStatus,
         globalError
@@ -423,6 +424,9 @@ export default function ProfilesPage() {
                                     <span className="flex items-center gap-1">
                                         Last Active: {formatTimestamp(profile.last_interaction_at)}
                                     </span>
+                                    <span className="flex items-center gap-1 opacity-70">
+                                        Identified by: {(profile as any).rep_name || "System"}
+                                    </span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -539,6 +543,7 @@ export default function ProfilesPage() {
                 isProcessing={isProcessing}
                 globalError={globalError}
                 onRetry={handleBulkAnalyze}
+                onReset={resetBulkAnalysis}
                 onCancel={() => setIsBulkModalOpen(false)}
             />
         </DashboardLayout>

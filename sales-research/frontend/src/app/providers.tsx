@@ -1,9 +1,10 @@
 "use client"
 
+import { AuthProvider } from "@/context/auth-context"
 import { BulkAnalysisProvider } from "@/context/bulk-analysis-context"
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { getICP } from "@/lib/api"
+import { getICP, getOnboardingStatus } from "@/lib/api"
 import { Loader2 } from "lucide-react"
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -14,14 +15,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const checkICP = async () => {
             // Skip check if we are already on onboarding
-            if (pathname === "/onboarding") {
+            if (pathname === "/onboarding" || pathname === "/login") {
                 setIsChecking(false)
                 return
             }
 
             try {
-                const icp = await getICP()
-                if (!icp) {
+                const [icp, status] = await Promise.all([
+                    getICP(),
+                    getOnboardingStatus().catch(() => ({ complete: true }))
+                ])
+                if (!icp && !status.complete) {
                     router.push("/onboarding")
                 }
             } catch (e) {
@@ -43,8 +47,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <BulkAnalysisProvider>
-            {children}
-        </BulkAnalysisProvider>
+        <AuthProvider>
+            <BulkAnalysisProvider>
+                {children}
+            </BulkAnalysisProvider>
+        </AuthProvider>
     )
 }

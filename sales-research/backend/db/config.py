@@ -1,4 +1,24 @@
 import os
+from dotenv import load_dotenv
+
+# Search for .env in current and parent directories
+def load_project_dotenv():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Try current dir (backend/db), parent (backend), and grandparent (sales-research), then root (code-sapien)
+    search_dirs = [
+        current_dir,
+        os.path.dirname(current_dir),
+        os.path.dirname(os.path.dirname(current_dir)),
+        os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+    ]
+    for d in search_dirs:
+        env_path = os.path.join(d, ".env")
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            return True
+    return False
+
+load_project_dotenv()
 
 raw_url = os.getenv(
     "DATABASE_URL",

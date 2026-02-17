@@ -9,12 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Calendar, ExternalLink, ArrowRight, Loader2 } from "lucide-react";
 import { useBulkAnalysis } from "@/context/bulk-analysis-context";
+import { useAuth } from "@/context/auth-context";
 
 interface HistoryItem {
     id: string;
     created_at: string;
     linkedin_url: string;
     lead_score: number;
+    rep_name?: string;
     // Optional fields for UI handling of temporary items
     status?: 'pending' | 'analyzing' | 'completed' | 'error';
     isTemporary?: boolean;
@@ -25,6 +27,7 @@ interface HistoryItem {
 export default function HistoryPage() {
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const { user } = useAuth();
     const { leadsStatus } = useBulkAnalysis();
 
     useEffect(() => {
@@ -43,12 +46,13 @@ export default function HistoryPage() {
     }, []);
 
     // Merge history with temporary bulk analysis items
-    const displayHistory = [
+    const displayHistory: HistoryItem[] = [
         ...leadsStatus.map(lead => ({
             id: `temp-${lead.url}`,
             created_at: new Date().toISOString(), // Show as 'just now' effectively
             linkedin_url: lead.url,
             lead_score: lead.result?.lead_score || 0,
+            rep_name: user?.full_name || "You",
             status: lead.status,
             isTemporary: true,
             result: lead.result,
@@ -88,6 +92,7 @@ export default function HistoryPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Date</TableHead>
+                                        <TableHead>Representative</TableHead>
                                         <TableHead>LinkedIn URL</TableHead>
                                         <TableHead>Lead Score</TableHead>
                                         <TableHead className="text-right">Action</TableHead>
@@ -104,6 +109,11 @@ export default function HistoryPage() {
                                                         {item.status === 'analyzing' ? 'Processing' : 'Unsaved'}
                                                     </Badge>
                                                 )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="text-[10px] font-normal">
+                                                    {item.rep_name || "System"}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell className="truncate max-w-[300px]">
                                                 <a href={item.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:underline">

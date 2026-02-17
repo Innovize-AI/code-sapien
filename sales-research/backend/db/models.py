@@ -49,6 +49,10 @@ class ResearchReport(Base):
     lead_score = Column(Integer, nullable=True)
     project_urgency = Column(Integer, nullable=True)
     
+    # Ownership & Context
+    created_by_id = Column(UUID(as_uuid=True), nullable=True) # Tagging the rep
+    icp_context = Column(Text, nullable=True) # Snapshotted ICP used for this report
+
     # New Email & Intent Analysis
     email_history = Column(Text, nullable=True)  # JSON array of email objects
     intent_analysis = Column(Text, nullable=True)  # JSON object with intent data
@@ -77,6 +81,10 @@ class LeadSubmission(Base):
     
     # Link to resulting report if processed
     research_id = Column(UUID(as_uuid=True), nullable=True)
+    
+    # Rep Attribution
+    rep_id = Column(UUID(as_uuid=True), nullable=True) # Which rep's funnel?
+
     # Email & Intent Analysis
     email_history = Column(Text, nullable=True)    # JSON array
     intent_analysis = Column(Text, nullable=True)  # JSON object
@@ -135,6 +143,7 @@ class Competitor(Base):
     
     name = Column(String, nullable=True)
     linkedin_url = Column(Text, nullable=False, unique=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True)
 
 class IdentifiedProfile(Base):
     __tablename__ = "identified_profiles"
@@ -145,6 +154,7 @@ class IdentifiedProfile(Base):
     name = Column(String, nullable=True)
     headline = Column(Text, nullable=True)
     linkedin_url = Column(Text, nullable=False, unique=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True)
     
     # Classification
     is_fit = Column(Boolean, default=False)
@@ -175,3 +185,35 @@ class Activity(Base):
     metadata_json = Column(Text, nullable=True) # JSON object for extra details
     intent = Column(String, nullable=True)
     sentiment = Column(String, nullable=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True)
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True) # Corresponds to Supabase auth.users.id
+    email = Column(String, unique=True, nullable=False)
+    role = Column(String, default="user", nullable=False)
+    full_name = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    user_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))
+
+    # Private Rep Identity
+    user_linkedin_url = Column(Text, nullable=True)
+    email_config = Column(Text, nullable=True) # IMAP details
+    
+    # Personal ICP Override
+    icp_json = Column(Text, nullable=True)
+
+    # Slack Mapping
+    slack_user_id = Column(String, nullable=True, unique=True)
+    
+    # Rep-specific Slack Attribution is handled by tagging global alerts with rep_id, 
+    # but we could store a personal webhook here if they ever want isolation.
+    # For now, following user's "identify where it came from" request via tagging.

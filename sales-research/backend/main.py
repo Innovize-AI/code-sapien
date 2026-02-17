@@ -65,6 +65,8 @@ app.include_router(competitors_crud_router, prefix="/api")
 app.include_router(activities_router, prefix="/api")
 app.include_router(knowledge_router, prefix="/api/knowledge")
 app.include_router(slack_interactions_router)
+from routes.auth import router as auth_router
+app.include_router(auth_router, prefix="/api/auth")
 
 @app.on_event("startup")
 async def startup_event():

@@ -6,7 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy import desc, or_, func, text
 from sqlalchemy.dialects.postgresql import insert, JSONB
 from sqlalchemy import Table
-from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile, Activity, OrganizationSettings
+from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile, Activity, OrganizationSettings, UserSettings
 from db.schemas import ResearchReportCreate
 
 def _safe_deserialize(val):
@@ -65,7 +65,8 @@ def _report_to_dict(report):
         "hiring_data": _safe_json_load(report.hiring_data, []),
         "company_stats": _safe_json_load(report.company_stats, {}),
         "lead_li_urn": report.lead_li_urn,
-        "lead_company_linkedin_url": report.lead_company_linkedin_url
+        "lead_company_linkedin_url": report.lead_company_linkedin_url,
+        "created_at": report.created_at.isoformat() if report.created_at else None
     }
 
 async def batch_upsert(
@@ -380,12 +381,18 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict):
     await db.refresh(db_profile)
     return db_profile
 
-async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100, search_query: str = None):
+async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100, search_query: str = None, user_id: str = None):
     # Sort by number of touchpoints (length of source_posts array)
     # Join with ResearchReport to check if report exists
     query = select(IdentifiedProfile, ResearchReport.id.label("report_id")).outerjoin(
         ResearchReport, IdentifiedProfile.linkedin_url == ResearchReport.linkedin_url
     )
+    
+    if user_id:
+        # Note: In "Collaborative" model, we might want to show all leads but highlight owned ones.
+        # However, following the "Identify where it came from" request, we filter if user_id is provided
+        # or we just allow admins to see all.
+        query = query.where(or_(IdentifiedProfile.created_by_id == user_id, IdentifiedProfile.created_by_id == None))
     
     if search_query:
         search = f"%{search_query}%"
@@ -433,12 +440,34 @@ async def count_identified_profiles(db: AsyncSession, search_query: str = None):
     result = await db.execute(query)
     return result.scalar()
 
-async def save_report(db: AsyncSession, report_data: ResearchReportCreate):
+async def save_report(db: AsyncSession, report_data: ResearchReportCreate, user_id: str = None):
     db_report = ResearchReport(**report_data.model_dump())
+    if user_id:
+        db_report.created_by_id = user_id
     db.add(db_report)
     await db.commit()
     await db.refresh(db_report)
     return db_report
+
+async def get_user_settings(db: AsyncSession, user_id: str):
+    result = await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
+    return result.scalars().first()
+
+async def upsert_user_settings(db: AsyncSession, user_id: str, settings_data: dict):
+    result = await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
+    db_settings = result.scalars().first()
+    
+    if db_settings:
+        for key, value in settings_data.items():
+            if hasattr(db_settings, key):
+                setattr(db_settings, key, value)
+    else:
+        db_settings = UserSettings(user_id=user_id, **settings_data)
+        db.add(db_settings)
+    
+    await db.commit()
+    await db.refresh(db_settings)
+    return db_settings
 
 async def get_report_by_email_or_linkedin(db: AsyncSession, email_id: str = None, linkedin_url: str = None):
     if not email_id and not linkedin_url:
@@ -454,8 +483,11 @@ async def get_report_by_email_or_linkedin(db: AsyncSession, email_id: str = None
     result = await db.execute(query)
     return result.scalar_one_or_none()
 
-async def get_history(db: AsyncSession, skip: int = 0, limit: int = 100):
-    query = select(ResearchReport).order_by(desc(ResearchReport.created_at)).offset(skip).limit(limit)
+async def get_history(db: AsyncSession, skip: int = 0, limit: int = 100, user_id: str = None):
+    query = select(ResearchReport)
+    if user_id:
+        query = query.where(ResearchReport.created_by_id == user_id)
+    query = query.order_by(desc(ResearchReport.created_at)).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -513,9 +545,11 @@ async def update_report_intent_email(db: AsyncSession, report_id: str, email_tex
             return None
     return None
 
-async def save_lead_submission(db: AsyncSession, submission: ResearchReportCreate):
+async def save_lead_submission(db: AsyncSession, submission: ResearchReportCreate, rep_id: str = None):
     from db.models import LeadSubmission
     db_item = LeadSubmission(**submission.dict())
+    if rep_id:
+        db_item.rep_id = rep_id
     db.add(db_item)
     await db.commit()
     await db.refresh(db_item)
@@ -532,15 +566,20 @@ async def get_competitor_analyses(db: AsyncSession, skip: int = 0, limit: int = 
     result = await db.execute(query)
     return result.scalars().all()
 
-async def create_competitor(db: AsyncSession, competitor_data: dict):
+async def create_competitor(db: AsyncSession, competitor_data: dict, user_id: str = None):
     db_competitor = Competitor(**competitor_data)
+    if user_id:
+        db_competitor.created_by_id = user_id
     db.add(db_competitor)
     await db.commit()
     await db.refresh(db_competitor)
     return db_competitor
 
-async def get_competitors(db: AsyncSession):
-    query = select(Competitor).order_by(desc(Competitor.created_at))
+async def get_competitors(db: AsyncSession, user_id: str = None):
+    query = select(Competitor)
+    if user_id:
+        query = query.where(Competitor.created_by_id == user_id)
+    query = query.order_by(desc(Competitor.created_at))
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -554,22 +593,27 @@ async def delete_competitor(db: AsyncSession, competitor_id: str):
         return True
     return False
 
-async def create_activity(db: AsyncSession, type: str, title: str, description: str = None, metadata_json: str = None, intent: str = None, sentiment: str = None):
+async def create_activity(db: AsyncSession, type: str, title: str, description: str = None, metadata_json: str = None, intent: str = None, sentiment: str = None, user_id: str = None):
     activity = Activity(
         type=type,
         title=title,
         description=description,
         metadata_json=metadata_json,
         intent=intent,
-        sentiment=sentiment
+        sentiment=sentiment,
+        created_by_id=user_id
     )
     db.add(activity)
     await db.commit()
     await db.refresh(activity)
     return activity
 
-async def get_activities(db: AsyncSession, limit: int = 50):
-    result = await db.execute(select(Activity).order_by(desc(Activity.created_at)).limit(limit))
+async def get_activities(db: AsyncSession, limit: int = 50, user_id: str = None):
+    query = select(Activity)
+    if user_id:
+        query = query.where(Activity.created_by_id == user_id)
+    query = query.order_by(desc(Activity.created_at)).limit(limit)
+    result = await db.execute(query)
     return result.scalars().all()
 
 async def get_org_settings(db: AsyncSession):

@@ -7,9 +7,10 @@ import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from db.database import get_db
-from db.models import OrganizationSettings
+from db.models import OrganizationSettings, Profile
 from db.schemas import SellingProfileConfig, ProductConfig
 from services.knowledge_service import KnowledgeService
+from dependencies import get_current_user, require_admin
 
 
 router = APIRouter(tags=['Knowledge Base'])
@@ -27,7 +28,7 @@ class NamespaceInfo(BaseModel):
     count: int
 
 @router.get("/namespaces", response_model=List[NamespaceInfo])
-async def get_namespaces():
+async def get_namespaces(current_user: Profile = Depends(get_current_user)):
     """
     Returns a list of available namespaces in the Knowledge Base with real counts.
     """
@@ -60,7 +61,7 @@ async def get_namespaces():
         ]
 
 @router.get("/list-files")
-async def list_knowledge_files():
+async def list_knowledge_files(current_user: Profile = Depends(get_current_user)):
     """
     Lists the files available in the market_validation directory.
     """
@@ -88,7 +89,7 @@ async def list_knowledge_files():
     return {"files": files}
 
 @router.post("/ingest")
-async def ingest_file(request: IngestRequest):
+async def ingest_file(request: IngestRequest, admin_user: Profile = Depends(require_admin)):
     """
     Ingests a specific file into a namespace.
     """
@@ -112,7 +113,7 @@ async def ingest_file(request: IngestRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sync-defaults")
-async def sync_defaults(background_tasks: BackgroundTasks):
+async def sync_defaults(background_tasks: BackgroundTasks, admin_user: Profile = Depends(require_admin)):
     """
     Auto-ingests the project's default playbooks into the knowledge base.
     """
@@ -146,7 +147,8 @@ async def sync_defaults(background_tasks: BackgroundTasks):
 @router.post("/upload")
 async def upload_knowledge_file(
     file: UploadFile = File(...),
-    namespace: str = "playbooks"
+    namespace: str = "playbooks",
+    admin_user: Profile = Depends(require_admin)
 ):
     """
     Uploads a file to the market_validation directory and ingests it.
@@ -186,7 +188,11 @@ class StrategyConfig(BaseModel):
     relevant_files: List[str] = []
 
 @router.post("/configure-strategy")
-async def configure_strategy(config: StrategyConfig, db: AsyncSession = Depends(get_db)):
+async def configure_strategy(
+    config: StrategyConfig, 
+    db: AsyncSession = Depends(get_db),
+    admin_user: Profile = Depends(require_admin)
+):
     """
     Updates the organization settings with the 'Hero Product' configuration.
     """
@@ -268,7 +274,10 @@ async def configure_strategy(config: StrategyConfig, db: AsyncSession = Depends(
     return {"status": "success", "profile": current_profile.dict()}
 
 @router.get("/strategy")
-async def get_strategy(db: AsyncSession = Depends(get_db)):
+async def get_strategy(
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
     """
     Gets the current strategic pivot configuration.
     """

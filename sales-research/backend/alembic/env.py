@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.database import Base
-from db.models import ResearchReport, OrganizationSettings, CompetitorAnalysis, Competitor, IdentifiedProfile
+from db.models import ResearchReport, OrganizationSettings, CompetitorAnalysis, Competitor, IdentifiedProfile, Profile
 
 load_dotenv()
 

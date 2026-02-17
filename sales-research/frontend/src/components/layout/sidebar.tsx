@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Search, Settings, Home, History, Plus, Users,Link2, UserCheck, BookOpen } from "lucide-react"
+import { BarChart3, Search, Settings, Home, History, Plus, Users, Link2, UserCheck, BookOpen, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ interface SidebarItem {
     href: string;
     icon: any;
     comingSoon?: boolean;
+    roles?: string[];
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -44,6 +45,7 @@ const sidebarItems: SidebarItem[] = [
         title: "Integrations",
         href: "/integrations",
         icon: Link2,
+        roles: ["admin"],
     },
     {
         title: "Competitors",
@@ -54,6 +56,7 @@ const sidebarItems: SidebarItem[] = [
         title: "Knowledge Base",
         href: "/knowledge-base",
         icon: BookOpen,
+        roles: ["admin"],
     },
     {
         title: "Settings",
@@ -62,8 +65,16 @@ const sidebarItems: SidebarItem[] = [
     },
 ]
 
+import { useAuth } from "@/context/auth-context"
+
 export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
     const pathname = usePathname()
+    const { user, logout } = useAuth()
+
+    const filteredItems = sidebarItems.filter(item => {
+        if (!item.roles) return true;
+        return item.roles.includes(user?.role || "user");
+    });
 
     return (
         <div className="flex flex-col h-full border-r bg-sidebar text-sidebar-foreground w-64">
@@ -85,7 +96,7 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
             </div>
 
             <nav className="flex-1 p-4 space-y-1">
-                {sidebarItems.map((item) => {
+                {filteredItems.map((item) => {
                     const isActive = pathname === item.href
                     const content = (
                         <>
@@ -130,16 +141,26 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
                 })}
             </nav>
 
-            <div className="p-4 border-t border-sidebar-border">
+            <div className="p-4 border-t border-sidebar-border space-y-2">
                 <div className="flex items-center gap-3 px-3 py-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                        U
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary uppercase">
+                        {user?.email?.[0] || "U"}
                     </div>
-                    <div className="flex flex-col">
-                        <span className="text-sm font-medium">User</span>
-                        <span className="text-xs text-muted-foreground">Pro Plan</span>
+                    <div className="flex flex-col flex-1 overflow-hidden">
+                        <span className="text-sm font-medium truncate" title={user?.email || "User"}>
+                            {user?.email?.split('@')[0] || "User"}
+                        </span>
+                        <span className="text-xs text-muted-foreground capitalize">{user?.role || "User"}</span>
                     </div>
                 </div>
+                <Button 
+                    variant="ghost" 
+                    className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-3 h-9"
+                    onClick={logout}
+                >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                </Button>
             </div>
         </div>
     )

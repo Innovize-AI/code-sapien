@@ -21,13 +21,46 @@ async def get_profiles(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Fetch all identified profiles from competitor discovery.
+    Fetch all identified profiles with rep attribution.
     """
+    from db.models import IdentifiedProfile, Profile
+    from sqlalchemy import select, func, or_
+    
     try:
-        profiles = await get_identified_profiles(db, skip, limit, search_query=search)
-        total = await count_identified_profiles(db, search_query=search)
-        return {"profiles": profiles, "total": total}
+        # Base query for profiles
+        query = select(IdentifiedProfile, Profile.full_name).outerjoin(Profile, IdentifiedProfile.created_by_id == Profile.id)
+        
+        if search:
+            search_filter = or_(
+                IdentifiedProfile.name.ilike(f"%{search}%"),
+                IdentifiedProfile.headline.ilike(f"%{search}%"),
+                IdentifiedProfile.linkedin_url.ilike(f"%{search}%")
+            )
+            query = query.where(search_filter)
+            
+        query = query.order_by(IdentifiedProfile.last_interaction_at.desc()).offset(skip).limit(limit)
+        result = await db.execute(query)
+        
+        enriched_profiles = []
+        for profile, rep_name in result.all():
+            p_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns}
+            # Convert UUIDs to strings for JSON
+            for k, v in p_dict.items():
+                if hasattr(v, 'hex'): p_dict[k] = str(v)
+            p_dict["rep_name"] = rep_name or "System"
+            enriched_profiles.append(p_dict)
+            
+        # Count for pagination
+        count_query = select(func.count(IdentifiedProfile.id))
+        if search:
+            count_query = count_query.where(search_filter)
+        total_result = await db.execute(count_query)
+        total = total_result.scalar()
+        
+        return {"profiles": enriched_profiles, "total": total}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
 
 class CompetitorInput(BaseModel):

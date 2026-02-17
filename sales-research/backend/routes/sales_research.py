@@ -16,6 +16,8 @@ from agents.linkedin_agent import discover_leads_from_keywords
 from services.classification_service import run_classification_and_update
 from utils.activity_helper import log_activity_and_notify
 from pydantic import BaseModel
+from dependencies import get_current_user
+from db.models import Profile
 
 sales_router = APIRouter(tags=['Glial Revenue Intelligence'], responses={404: {"description": "Not found"}},)
 
@@ -35,7 +37,8 @@ class CheckReportsInput(BaseModel):
 @sales_router.post("/check-existing")
 async def check_existing_reports(
     input_data: CheckReportsInput,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     results = {}
     if not input_data.leads:
@@ -101,7 +104,7 @@ async def check_existing_reports(
     return results
 
 @sales_router.post("/discover")
-async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db), current_user: Profile = Depends(get_current_user)):
     """
     Endpoint to discover/find new leads based on criteria.
     """
@@ -173,7 +176,8 @@ async def run_research(
     linkedin_url: Optional[str] = Query(None, description="LinkedIn profile URL"),
     website: Optional[str] = Query(None, description="Website URL"),
     email: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     async def event_generator():
         # Logic moved to graph routers for intelligent skipping
@@ -200,7 +204,8 @@ async def run_research(
 
 @sales_router.post("/bulk")
 async def run_bulk_research(
-    input_data: BulkLeadInput
+    input_data: BulkLeadInput,
+    current_user: Profile = Depends(get_current_user)
 ):
     import asyncio
     queue = asyncio.Queue()
@@ -263,7 +268,8 @@ async def run_bulk_research(
 async def update_outreach(
     report_id: str,
     outreach_data: dict = Body(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     from db.crud import update_report_outreach
     updated_report = await update_report_outreach(db, report_id, outreach_data)
@@ -275,7 +281,8 @@ async def update_outreach(
 async def update_cso_outreach(
     report_id: str,
     cso_data: dict = Body(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     from db.crud import update_report_cso_outreach
     updated_report = await update_report_cso_outreach(db, report_id, cso_data)
@@ -287,7 +294,8 @@ async def update_cso_outreach(
 async def update_intent_email(
     report_id: str,
     email_data: dict = Body(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     from db.crud import update_report_intent_email
     email_text = email_data.get('email_text', '')

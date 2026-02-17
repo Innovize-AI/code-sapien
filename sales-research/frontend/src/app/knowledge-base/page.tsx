@@ -51,7 +51,11 @@ const uploadKnowledgeFile = async (file: File, namespace: string) => {
     return res.json();
 };
 
+import { useAuth } from "@/context/auth-context";
+
 export default function KnowledgeBasePage() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === "admin";
     const [namespaces, setNamespaces] = useState<NamespaceInfo[]>([]);
     const [knowledgeFiles, setKnowledgeFiles] = useState<KnowledgeFile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -225,86 +229,88 @@ export default function KnowledgeBasePage() {
                             Manage the strategic intelligence that powers your RAG agents.
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                            <SheetTrigger asChild>
-                                <Button variant="outline" className="gap-2">
-                                    <Plus className="w-4 h-4" />
-                                    Add Knowledge
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent>
-                                <SheetHeader>
-                                    <SheetTitle>Add Knowledge Asset</SheetTitle>
-                                    <SheetDescription>
-                                        Upload a markdown file or provide a server path.
-                                    </SheetDescription>
-                                </SheetHeader>
-                                <div className="grid gap-6 py-8">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="namespace">Target Namespace</Label>
-                                        <Select value={newNamespace} onValueChange={setNewNamespace}>
-                                            <SelectTrigger id="namespace">
-                                                <SelectValue placeholder="Select namespace" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="playbooks">Playbooks</SelectItem>
-                                                <SelectItem value="solutions">Solutions</SelectItem>
-                                                <SelectItem value="case-studies">Case Studies</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    
-                                    <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                        <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
-                                        <p className="text-sm font-medium">Click to Upload File</p>
-                                        <p className="text-xs text-muted-foreground">Markdown files (.md) supported</p>
-                                        <input 
-                                            type="file" 
-                                            ref={fileInputRef} 
-                                            className="hidden" 
-                                            accept=".md" 
-                                            onChange={handleFileUpload}
-                                        />
-                                    </div>
-
-                                    <div className="relative">
-                                        <div className="absolute inset-0 flex items-center">
-                                            <span className="w-full border-t" />
-                                        </div>
-                                        <div className="relative flex justify-center text-xs uppercase">
-                                            <span className="bg-background px-2 text-muted-foreground">Or ingets from path</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="path">Server File Path</Label>
-                                        <Input 
-                                            id="path" 
-                                            placeholder="market_validation/innovize-ai/example.md" 
-                                            value={newFilePath}
-                                            onChange={(e) => setNewFilePath(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                                <SheetFooter>
-                                    <Button onClick={handleIngest} disabled={isIngesting || !newFilePath} className="w-full">
-                                        {isIngesting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                        Run Ingestion
+                    {isAdmin && (
+                        <div className="flex gap-2">
+                            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                                <SheetTrigger asChild>
+                                    <Button variant="outline" className="gap-2">
+                                        <Plus className="w-4 h-4" />
+                                        Add Knowledge
                                     </Button>
-                                </SheetFooter>
-                            </SheetContent>
-                        </Sheet>
-                        <Button 
-                            variant="default" 
-                            onClick={handleSync} 
-                            disabled={isSyncing}
-                            className="gap-2"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                            Sync All Defaults
-                        </Button>
-                    </div>
+                                </SheetTrigger>
+                                <SheetContent>
+                                    <SheetHeader>
+                                        <SheetTitle>Add Knowledge Asset</SheetTitle>
+                                        <SheetDescription>
+                                            Upload a markdown file or provide a server path.
+                                        </SheetDescription>
+                                    </SheetHeader>
+                                    <div className="grid gap-6 py-8">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="namespace">Target Namespace</Label>
+                                            <Select value={newNamespace} onValueChange={setNewNamespace}>
+                                                <SelectTrigger id="namespace">
+                                                    <SelectValue placeholder="Select namespace" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="playbooks">Playbooks</SelectItem>
+                                                    <SelectItem value="solutions">Solutions</SelectItem>
+                                                    <SelectItem value="case-studies">Case Studies</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        
+                                        <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                            <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
+                                            <p className="text-sm font-medium">Click to Upload File</p>
+                                            <p className="text-xs text-muted-foreground">Markdown files (.md) supported</p>
+                                            <input 
+                                                type="file" 
+                                                ref={fileInputRef} 
+                                                className="hidden" 
+                                                accept=".md" 
+                                                onChange={handleFileUpload}
+                                            />
+                                        </div>
+
+                                        <div className="relative">
+                                            <div className="absolute inset-0 flex items-center">
+                                                <span className="w-full border-t" />
+                                            </div>
+                                            <div className="relative flex justify-center text-xs uppercase">
+                                                <span className="bg-background px-2 text-muted-foreground">Or ingets from path</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="path">Server File Path</Label>
+                                            <Input 
+                                                id="path" 
+                                                placeholder="market_validation/innovize-ai/example.md" 
+                                                value={newFilePath}
+                                                onChange={(e) => setNewFilePath(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <SheetFooter>
+                                        <Button onClick={handleIngest} disabled={isIngesting || !newFilePath} className="w-full">
+                                            {isIngesting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                            Run Ingestion
+                                        </Button>
+                                    </SheetFooter>
+                                </SheetContent>
+                            </Sheet>
+                            <Button 
+                                variant="default" 
+                                onClick={handleSync} 
+                                disabled={isSyncing}
+                                className="gap-2"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                                Sync All Defaults
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Categories Grid */}
@@ -381,14 +387,17 @@ export default function KnowledgeBasePage() {
                                         <h3 className="font-semibold text-primary">Define Your Offerings</h3>
                                         <p className="text-sm text-muted-foreground">Create products/services and link them to your knowledge assets.</p>
                                     </div>
-                                    <Button onClick={() => { setEditingProduct(undefined); setIsProductModalOpen(true); }} className="gap-2">
-                                        <Plus className="w-4 h-4" /> New Product
-                                    </Button>
+                                    {isAdmin && (
+                                        <Button onClick={() => { setEditingProduct(undefined); setIsProductModalOpen(true); }} className="gap-2">
+                                            <Plus className="w-4 h-4" /> New Product
+                                        </Button>
+                                    )}
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     {products.length > 0 ? products.map((p: any) => (
                                         <Card key={p.name} className="relative overflow-hidden hover:border-primary/50 transition-colors group cursor-pointer" onClick={() => {
+                                             if (!isAdmin) return;
                                              setEditingProduct({
                                                 product_name: p.name,
                                                 description: p.description,
@@ -438,13 +447,16 @@ export default function KnowledgeBasePage() {
                                             name={f.name} 
                                             status="Available" 
                                             date={`Size: ${(f.size / 1024).toFixed(1)} KB`}
+                                            isAdmin={isAdmin}
                                         />
                                     )) : (
                                         <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-xl bg-muted/30">
                                             <AlertCircle className="w-12 h-12 text-muted-foreground mb-4 opacity-20" />
                                             <h3 className="font-medium text-lg">No Case Studies Found</h3>
                                             <p className="text-sm text-muted-foreground mb-4">Upload industry-specific ROI documents to grounding AI outreach in hard numbers.</p>
-                                            <Button variant="outline" size="sm" onClick={() => { setIsSheetOpen(true); setNewNamespace("case-studies"); }}>Add Case Study</Button>
+                                            {isAdmin && (
+                                                <Button variant="outline" size="sm" onClick={() => { setIsSheetOpen(true); setNewNamespace("case-studies"); }}>Add Case Study</Button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -460,6 +472,7 @@ export default function KnowledgeBasePage() {
                         onSave={handleSaveProduct}
                         initialConfig={editingProduct}
                         availableFiles={availableFilesForModal}
+                        isAdmin={isAdmin}
                     />
                 )}
 
@@ -468,7 +481,7 @@ export default function KnowledgeBasePage() {
     );
 }
 
-function DocumentItem({ name, status, date, onStrategyClick, pivotInfo }: { name: string, status: string, date: string, onStrategyClick?: () => void, pivotInfo?: any }) {
+function DocumentItem({ name, status, date, onStrategyClick, pivotInfo, isAdmin }: { name: string, status: string, date: string, onStrategyClick?: () => void, pivotInfo?: any, isAdmin?: boolean }) {
     return (
         <div className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors cursor-pointer group">
             <div className="flex items-center gap-4">
@@ -494,7 +507,7 @@ function DocumentItem({ name, status, date, onStrategyClick, pivotInfo }: { name
                     {status}
                 </Badge>
                 
-                {onStrategyClick && (
+                {onStrategyClick && isAdmin && (
                     <Button 
                         variant="ghost" 
                         size="icon" 

@@ -116,6 +116,10 @@ class IntegrationSettings(BaseModel):
     slack_webhook_url: Optional[str] = None
     slack_user_id: Optional[str] = None
     
+    # HubSpot
+    hubspot_access_token: Optional[str] = None
+    hubspot_sync_enabled: bool = False
+    
     # Discovery Configs
     discovery_keywords: Optional[str] = None
     apollo_search_config: Optional[str] = None
@@ -132,6 +136,9 @@ class OrganizationSettingsBase(BaseModel):
     company_linkedin_url: Optional[str] = None
     email_config: Optional[str] = None
     slack_webhook_url: Optional[str] = None
+    
+    hubspot_access_token: Optional[str] = None
+    hubspot_sync_enabled: Optional[bool] = False
 
     crm_config: Optional[str] = None
     integrations_config: Optional[str] = None

@@ -41,6 +41,15 @@ def strategic_recommender_node(state: AgentState):
         "meeting_notes": meeting_notes,
         "cso_guidance": cso_briefing
     }
+    
+    # Check for negative penalty
+    penalty = lead_score_analysis.get("negative_penalty", 0)
+    if penalty > 0:
+        intelligence_context["NEGATIVE_SIGNAL_ALERT"] = {
+            "penalty_points": penalty,
+            "reason": lead_score_analysis.get("penalty_reason", ""),
+            "instruction": "The lead has explicitly rejected us or is a Closed Lost deal. You MUST recommend a 'Monitor' or 'Break Up' play unless there is a strategic reason to persist."
+        }
 
     messages = [
         SystemMessage(content=GLOBAL_STRATEGY_ADVISOR_PROMPT),

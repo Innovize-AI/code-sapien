@@ -14,6 +14,7 @@ from agents.follow_up_agent import follow_up_strategy_node
 from agents.cso_agent import narrative_arbitrator_node
 from agents.waterfall_agent import signal_waterfall_node
 from agents.rag_researcher import strategic_rag_researcher_node
+from agents.crm_agent import crm_lookup_node
 
 
 def discovery_router(state: AgentState):
@@ -23,6 +24,14 @@ def discovery_router(state: AgentState):
     """
     input_data = state.get("input_lead_data")
     refresh = getattr(input_data, 'refresh', False) if hasattr(input_data, 'refresh') else input_data.get('refresh', False) if isinstance(input_data, dict) else False
+    
+    trigger = getattr(input_data, 'trigger_context', None) if hasattr(input_data, 'trigger_context') else input_data.get('trigger_context') if isinstance(input_data, dict) else None
+    
+    # If this is a targeted update (email/crm), we skip deep pain point discovery
+    # because the company profile likely hasn't changed.
+    if trigger in ["email_update", "crm_update"]:
+        print(f"Skipping deep discovery for trigger: {trigger}")
+        return "strategic_merger"
     
     if not refresh and state.get("target_pain_points"):
         print("Skipping discovery/solution mapping - analysis already exists.")
@@ -62,23 +71,31 @@ def research_router(state: AgentState):
     input_data = state.get("input_lead_data")
     refresh = getattr(input_data, 'refresh', False) if hasattr(input_data, 'refresh') else input_data.get('refresh', False) if isinstance(input_data, dict) else False
 
+    trigger_ctx = getattr(input_data, 'trigger_context', None) if hasattr(input_data, 'trigger_context') else input_data.get('trigger_context') if isinstance(input_data, dict) else None
+
     # Branch 1: LinkedIn
-    if refresh or not state.get("user_profile_analysis"):
-        if not state.get("linkedin_url"):
-            next_nodes.append("enrich_linkedin")
-        else:
-            next_nodes.append("linkedin_profile_fetcher")
+    if not trigger_ctx or trigger_ctx == "full":
+        if refresh or not state.get("user_profile_analysis"):
+            if not state.get("linkedin_url"):
+                next_nodes.append("enrich_linkedin")
+            else:
+                next_nodes.append("linkedin_profile_fetcher")
             
     # Branch 2: Website
-    if refresh or not state.get("website_analysis"):
-        if not state.get("website"):
-            next_nodes.append("enrich_website")
-        else:
-            next_nodes.append("website_scraper")
+    if not trigger_ctx or trigger_ctx == "full":
+        if refresh or not state.get("website_analysis"):
+            if not state.get("website"):
+                next_nodes.append("enrich_website")
+            else:
+                next_nodes.append("website_scraper")
             
-    # Branch 3: Email History
-    if state.get("email_id"):
+    # Branch 3: Email History - Run if triggered OR if standard run
+    if (trigger_ctx == "email_update") or (not trigger_ctx and state.get("email_id")):
         next_nodes.append("email_history_fetcher")
+
+    # Branch 4: CRM Lookup - Run if triggered OR if standard run
+    if (trigger_ctx == "crm_update") or (not trigger_ctx):
+        next_nodes.append("crm_lookup")
         
     return next_nodes
 
@@ -172,6 +189,7 @@ builder.add_node("email_history_fetcher", email_history_fetcher_node)
 builder.add_node("email_intent_analyzer", email_intent_analyzer_node)
 builder.add_node("signal_waterfall", signal_waterfall_node)
 builder.add_node("narrative_arbitrator", narrative_arbitrator_node)
+builder.add_node("crm_lookup", crm_lookup_node)
 
 # Set entry point
 builder.set_entry_point("collector")
@@ -195,6 +213,7 @@ builder.add_edge("website_scraper", "website_analyzer")
 builder.add_edge("linkedin_profile_analyzer", "lead_data_extractor")
 builder.add_edge("website_analyzer", "lead_data_extractor")
 builder.add_edge("email_history_fetcher", "lead_data_extractor")
+builder.add_edge("crm_lookup", "lead_data_extractor")
 
 # Sequential Logic
 builder.add_edge("lead_data_extractor", "lead_scorer")
@@ -233,7 +252,8 @@ builder.add_conditional_edges("collector", research_router, {
     "linkedin_profile_fetcher": "linkedin_profile_fetcher",
     "enrich_website": "enrich_website",
     "website_scraper": "website_scraper",
-    "email_history_fetcher": "email_history_fetcher"
+    "email_history_fetcher": "email_history_fetcher",
+    "crm_lookup": "crm_lookup"
 })
 
 
@@ -259,5 +279,6 @@ NODE_STATUS_MAPPING = {
     "outreach_designer": "Designing personalized outreach strategy...",
     "follow_up_designer": "Crafting context-aware follow-up strategy...",
     "strategic_recommender": "Determining buyer journey stage & strategy...",
+    "crm_lookup": "Matching lead with HubSpot CRM context...",
 }
 

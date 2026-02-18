@@ -67,6 +67,15 @@ const INTEGRATIONS: IntegrationMetadata[] = [
         webhookPath: "/api/webhooks/cal",
         docsUrl: "https://docs.cal.com/core-features/webhooks",
         category: "Scheduler"
+    },
+    {
+        id: "hubspot",
+        name: "HubSpot",
+        description: "Sync deals, past champions, and web visits.",
+        icon: Layout, // Or find a more suitable icon if available
+        webhookPath: "/api/webhooks/hubspot",
+        docsUrl: "https://developers.hubspot.com/docs/api/overview",
+        category: "Other"
     }
 ];
 
@@ -361,6 +370,59 @@ export default function IntegrationsPage() {
                                                     )}
                                                 </div>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {app.id === "hubspot" && isEnabled && (
+                                        <div className="pt-6 border-t space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                                            <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+                                                <Label className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground transition-all duration-300 group-hover:text-primary/70">
+                                                    HubSpot CRM Configuration
+                                                </Label>
+                                                <div className="space-y-3 pt-1">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] font-semibold text-foreground/80">Private App Access Token</Label>
+                                                        <Input
+                                                            type="password"
+                                                            placeholder="pat-na1-..."
+                                                            className="text-xs h-9 bg-background/50 hover:bg-background border-border/40 focus:border-primary/30 focus:ring-primary/5 transition-all duration-200"
+                                                            defaultValue={settings?.hubspot_access_token || ""}
+                                                            onBlur={(e) => {
+                                                                if (settings) {
+                                                                    const updated = { ...settings, hubspot_access_token: e.target.value };
+                                                                    saveIntegrations(updated).then(() => {
+                                                                        setSettings(updated);
+                                                                        toast({ title: "Configuration Updated", description: "HubSpot access token has been saved." });
+                                                                    });
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center justify-between py-2 border-t border-border/20 mt-2">
+                                                        <div className="space-y-0.5">
+                                                            <Label className="text-[11px] font-semibold">Automated CRM Sync</Label>
+                                                            <p className="text-[10px] text-muted-foreground leading-tight">
+                                                                Sync deals, champions & visits every 12h.
+                                                            </p>
+                                                        </div>
+                                                        <Switch
+                                                            checked={settings?.hubspot_sync_enabled}
+                                                            onCheckedChange={(checked) => {
+                                                                if (settings) {
+                                                                    const updated = { ...settings, hubspot_sync_enabled: checked };
+                                                                    saveIntegrations(updated).then(() => {
+                                                                        setSettings(updated);
+                                                                        toast({ 
+                                                                            title: checked ? "Sync Enabled" : "Sync Disabled", 
+                                                                            description: `HubSpot background synchronization is now ${checked ? 'active' : 'paused'}.` 
+                                                                        });
+                                                                    });
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
                                 </CardContent>

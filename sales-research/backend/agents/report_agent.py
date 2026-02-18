@@ -55,8 +55,12 @@ def sales_research_report_generator(state: AgentState):
         breakdown_str = "\n".join(breakdown_lines)
         recommendations = "\n".join([f"      * {r}" for r in lead_score_dict.get('recommendations', [])])
         
+        penalty = lead_score_dict.get('negative_penalty', 0)
+        penalty_reason = lead_score_dict.get('penalty_reason', '')
+        penalty_str = f"\n        - [ALERT] NEGATIVE PENALTY: -{penalty} points ({penalty_reason})" if penalty > 0 else ""
+
         lead_score_analysis = f"""
-        - Total Score: {lead_score_dict.get('total_score')}
+        - Total Score: {lead_score_dict.get('total_score')}{penalty_str}
         - Detailed Breakdown:
 {breakdown_str}
         - Analysis: {lead_score_dict.get('analysis')}
@@ -140,6 +144,9 @@ def sales_research_report_generator(state: AgentState):
     
     6. CHIEF STRATEGY OFFICER (CSO) VERDICT:
     - Unified Command: {json.dumps(state.get('cso_strategic_briefing', {}))}
+
+    7. HISTORICAL CRM CONTEXT:
+    {json.dumps(state.get('crm_context') or "No historical CRM records found.")}
     """
     
     selling_profile = state.get("selling_company_profile")

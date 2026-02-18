@@ -128,6 +128,8 @@ async def get_integrations(
         slack_webhook_url=settings.slack_webhook_url,
         discovery_keywords=settings.discovery_keywords,
         apollo_search_config=settings.apollo_search_config,
+        hubspot_access_token=settings.hubspot_access_token,
+        hubspot_sync_enabled=settings.hubspot_sync_enabled,
     )
 
 
@@ -152,6 +154,8 @@ async def save_integrations(
         settings.slack_webhook_url = data.slack_webhook_url
         settings.discovery_keywords = data.discovery_keywords
         settings.apollo_search_config = data.apollo_search_config
+        settings.hubspot_access_token = data.hubspot_access_token
+        settings.hubspot_sync_enabled = data.hubspot_sync_enabled
     else:
         settings = OrganizationSettings(
             tavily_api_key=data.tavily_api_key, 
@@ -165,6 +169,8 @@ async def save_integrations(
             slack_webhook_url=data.slack_webhook_url,
             discovery_keywords=data.discovery_keywords,
             apollo_search_config=data.apollo_search_config,
+            hubspot_access_token=data.hubspot_access_token,
+            hubspot_sync_enabled=data.hubspot_sync_enabled,
         )
 
         db.add(settings)

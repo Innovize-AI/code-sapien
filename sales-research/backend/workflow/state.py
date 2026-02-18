@@ -62,6 +62,7 @@ class InputLeadData(BaseModel):
     discovery_context: Optional[dict] = None # { "comment": "...", "post_url": "...", "keyword": "..." }
     
     extra_metadata: Optional[dict] = None # For webhook/form extras
+    trigger_context: Optional[str] = None # 'email_update', 'crm_update'
 
 class AgentState(TypedDict):
     email_id: str
@@ -99,6 +100,7 @@ class AgentState(TypedDict):
     company_industries: Annotated[Optional[List[str]], reduce_last]
     company_stats: Annotated[Optional[dict], reduce_last]
     discovery_interaction_history: Annotated[List[dict], reduce_last]
+    crm_context: Annotated[Optional[dict], reduce_last]
 
 
     # Specialized Nodules

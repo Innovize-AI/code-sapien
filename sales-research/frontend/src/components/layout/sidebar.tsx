@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Search, Settings, Home, History, Plus, Users, Link2, UserCheck, BookOpen, LogOut } from "lucide-react"
+import { BarChart3, Search, Settings, Home, History, Plus, Users, Link2, UserCheck, BookOpen, LogOut, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -30,6 +30,11 @@ const sidebarItems: SidebarItem[] = [
         title: "Identified Profiles",
         href: "/profiles",
         icon: UserCheck,
+    },
+    {
+        title: "Autopilot",
+        href: "/autopilot",
+        icon: Zap,
     },
     {
         title: "Analyze Lead",

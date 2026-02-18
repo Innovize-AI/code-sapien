@@ -126,7 +126,10 @@ async def get_integrations(
         user_linkedin_url=settings.user_linkedin_url,
         company_linkedin_url=settings.company_linkedin_url,
         slack_webhook_url=settings.slack_webhook_url,
+        discovery_keywords=settings.discovery_keywords,
+        apollo_search_config=settings.apollo_search_config,
     )
+
 
 @settings_router.post("/settings/integrations", response_model=IntegrationSettings)
 async def save_integrations(
@@ -147,6 +150,8 @@ async def save_integrations(
         settings.kit_api_key = data.kit_api_key
         settings.kit_api_secret = data.kit_api_secret
         settings.slack_webhook_url = data.slack_webhook_url
+        settings.discovery_keywords = data.discovery_keywords
+        settings.apollo_search_config = data.apollo_search_config
     else:
         settings = OrganizationSettings(
             tavily_api_key=data.tavily_api_key, 
@@ -158,7 +163,10 @@ async def save_integrations(
             user_linkedin_url=data.user_linkedin_url,
             company_linkedin_url=data.company_linkedin_url,
             slack_webhook_url=data.slack_webhook_url,
+            discovery_keywords=data.discovery_keywords,
+            apollo_search_config=data.apollo_search_config,
         )
+
         db.add(settings)
         
     await db.commit()

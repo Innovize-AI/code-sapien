@@ -68,8 +68,8 @@ if "pooler.supabase.com" in SUBABASE_URL or not SUBABASE_URL.startswith("http"):
 supabase: Client = create_client(SUBABASE_URL, SERVICE_KEY)
 
 PARTNERS = [
-    {"email": "jon@partner.com", "password": "securepassword123", "role": "user"},
-    {"email": "pavan.kumar@innovizeai.com", "password": "adminpassword123", "role": "admin"}
+    {"email": "jon@partner.com", "password": "securepassword123", "role": "user", "name": "Jon Partner"},
+    {"email": "pavan.kumar@innovizeai.com", "password": "adminpassword123", "role": "admin", "name": "Pavan Kumar"}
 ]
 
 # Quick key validation
@@ -157,12 +157,13 @@ async def seed_users():
                     existing = result.scalars().first()
                     
                     if not existing:
-                        profile = Profile(id=user_id, email=p["email"], role=p["role"])
+                        profile = Profile(id=user_id, email=p["email"], role=p["role"], full_name=p["name"])
                         db.add(profile)
                         print(f"  Created Profile for {p['email']}")
                     else:
                         existing.role = p["role"]
-                        print(f"  Updated Role for {p['email']}")
+                        existing.full_name = p["name"]
+                        print(f"  Updated Profile/Role for {p['email']}")
                     
                     await db.commit()
                 else:

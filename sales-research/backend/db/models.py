@@ -112,6 +112,11 @@ class OrganizationSettings(Base):
     tavily_api_key = Column(String, nullable=True)
     apollo_api_key = Column(String, nullable=True)
 
+    # Lead Discovery Autopilot Configs
+    discovery_keywords = Column(Text, nullable=True)    # JSON list of keywords
+    apollo_search_config = Column(Text, nullable=True)  # JSON object with search filters
+
+
     # LinkedIn Identity for Engagement Tracking
     user_linkedin_url = Column(Text, nullable=True)
     company_linkedin_url = Column(Text, nullable=True)
@@ -217,3 +222,16 @@ class UserSettings(Base):
     # Rep-specific Slack Attribution is handled by tagging global alerts with rep_id, 
     # but we could store a personal webhook here if they ever want isolation.
     # For now, following user's "identify where it came from" request via tagging.
+
+class AutopilotRule(Base):
+    __tablename__ = "autopilot_rules"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    organization_id = Column(UUID(as_uuid=True), nullable=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=False)
+    
+    type = Column(String, nullable=False) # 'keyword', 'apollo_config'
+    value = Column(Text, nullable=False) # The keyword or JSON string
+    is_active = Column(Boolean, default=True, nullable=False)

@@ -24,7 +24,20 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if not profile:
         # Create default user profile if missing
         try:
-            profile = Profile(id=user_id, email=user_response.user.email, role="user")
+            # Try to get name from metadata
+            user_meta = user_response.user.user_metadata or {}
+            full_name = user_meta.get("full_name") or user_meta.get("name")
+            
+            # Fallback to email prefix
+            if not full_name:
+                full_name = user_response.user.email.split("@")[0].title()
+
+            profile = Profile(
+                id=user_id, 
+                email=user_response.user.email, 
+                role="user",
+                full_name=full_name
+            )
             db.add(profile)
             await db.commit()
             await db.refresh(profile)

@@ -115,6 +115,11 @@ class IntegrationSettings(BaseModel):
     kit_api_secret: Optional[str] = None
     slack_webhook_url: Optional[str] = None
     slack_user_id: Optional[str] = None
+    
+    # Discovery Configs
+    discovery_keywords: Optional[str] = None
+    apollo_search_config: Optional[str] = None
+
 
 
 class OrganizationSettingsBase(BaseModel):
@@ -131,6 +136,10 @@ class OrganizationSettingsBase(BaseModel):
     crm_config: Optional[str] = None
     integrations_config: Optional[str] = None
     onboarding_complete: Optional[int] = 0
+    
+    discovery_keywords: Optional[str] = None
+    apollo_search_config: Optional[str] = None
+
 
 class OrganizationSettingsCreate(OrganizationSettingsBase):
     pass
@@ -205,6 +214,25 @@ class ActivityCreate(ActivityBase):
 class Activity(ActivityBase):
     id: UUID
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Autopilot Rule Schemas
+class AutopilotRuleBase(BaseModel):
+    type: str # 'keyword', 'apollo_config'
+    value: str
+    is_active: bool = True
+    organization_id: Optional[UUID] = None
+    created_by_id: Optional[UUID] = None
+
+class AutopilotRuleCreate(AutopilotRuleBase):
+    pass
+
+class AutopilotRule(AutopilotRuleBase):
+    id: UUID
+    created_at: datetime
+    creator_name: Optional[str] = None # For UI display
 
     class Config:
         from_attributes = True

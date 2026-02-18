@@ -3,10 +3,9 @@ import datetime
 from typing import Iterable, Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc, or_, func, text
+from sqlalchemy import delete, update, desc, func, or_, Table, text
 from sqlalchemy.dialects.postgresql import insert, JSONB
-from sqlalchemy import Table
-from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile, Activity, OrganizationSettings, UserSettings
+from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile, Activity, OrganizationSettings, UserSettings, AutopilotRule, Profile
 from db.schemas import ResearchReportCreate
 
 def _safe_deserialize(val):
@@ -576,12 +575,20 @@ async def create_competitor(db: AsyncSession, competitor_data: dict, user_id: st
     return db_competitor
 
 async def get_competitors(db: AsyncSession, user_id: str = None):
-    query = select(Competitor)
+    query = select(Competitor, func.coalesce(Profile.full_name, Profile.email).label("creator_name")).outerjoin(
+        Profile, Competitor.created_by_id == Profile.id
+    )
     if user_id:
         query = query.where(Competitor.created_by_id == user_id)
     query = query.order_by(desc(Competitor.created_at))
     result = await db.execute(query)
-    return result.scalars().all()
+    
+    competitors = []
+    for comp, creator_name in result.all():
+        # Set a transient attribute for Pydantic to pick up
+        setattr(comp, "creator_name", creator_name)
+        competitors.append(comp)
+    return competitors
 
 async def delete_competitor(db: AsyncSession, competitor_id: str):
     query = select(Competitor).where(Competitor.id == competitor_id)
@@ -609,12 +616,55 @@ async def create_activity(db: AsyncSession, type: str, title: str, description: 
     return activity
 
 async def get_activities(db: AsyncSession, limit: int = 50, user_id: str = None):
-    query = select(Activity)
+    query = select(Activity, func.coalesce(Profile.full_name, Profile.email).label("creator_name")).outerjoin(
+        Profile, Activity.created_by_id == Profile.id
+    )
     if user_id:
         query = query.where(Activity.created_by_id == user_id)
     query = query.order_by(desc(Activity.created_at)).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    
+    activities = []
+    for activity, creator_name in result.all():
+        setattr(activity, "creator_name", creator_name)
+        activities.append(activity)
+    return activities
+
+# Autopilot Rules CRUD
+async def create_autopilot_rule(db: AsyncSession, rule_data: dict, user_id: str = None):
+    db_rule = AutopilotRule(**rule_data)
+    if user_id:
+        db_rule.created_by_id = user_id
+    db.add(db_rule)
+    await db.commit()
+    await db.refresh(db_rule)
+    return db_rule
+
+async def get_autopilot_rules(db: AsyncSession, rule_type: str = None):
+    query = select(AutopilotRule, func.coalesce(Profile.full_name, Profile.email).label("creator_name")).outerjoin(
+        Profile, AutopilotRule.created_by_id == Profile.id
+    )
+    if rule_type:
+        query = query.where(AutopilotRule.type == rule_type)
+    query = query.where(AutopilotRule.is_active == True).order_by(desc(AutopilotRule.created_at))
+    result = await db.execute(query)
+    
+    rules = []
+    for rule, creator_name in result.all():
+        setattr(rule, "creator_name", creator_name)
+        rules.append(rule)
+    return rules
+
+async def delete_autopilot_rule(db: AsyncSession, rule_id: str):
+    query = select(AutopilotRule).where(AutopilotRule.id == rule_id)
+    result = await db.execute(query)
+    rule = result.scalar_one_or_none()
+    if rule:
+        # Soft delete
+        rule.is_active = False
+        await db.commit()
+        return True
+    return False
 
 async def get_org_settings(db: AsyncSession):
     result = await db.execute(select(OrganizationSettings).limit(1))

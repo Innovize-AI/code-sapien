@@ -252,6 +252,8 @@ export interface IntegrationSettings {
     kit_api_secret?: string;
     slack_webhook_url?: string;
     slack_user_id?: string;
+    discovery_keywords?: string;
+    apollo_search_config?: string;
 }
 
 
@@ -343,20 +345,47 @@ export interface Competitor {
     name?: string;
     linkedin_url: string;
     created_at: string;
+    created_by_id?: string;
+    creator_name?: string;
 }
 
+export interface AutopilotRule {
+    id: string;
+    type: 'keyword' | 'apollo_config';
+    value: string;
+    is_active: boolean;
+    created_at: string;
+    created_by_id: string;
+    creator_name?: string;
+}
+
+export const getAutopilotRules = async (type?: string): Promise<AutopilotRule[]> => {
+    const response = await axios.get(`${API_URL}/api/autopilot/rules`, { params: { type } });
+    return response.data;
+};
+
+export const addAutopilotRule = async (data: Partial<AutopilotRule>) => {
+    const response = await axios.post(`${API_URL}/api/autopilot/rules`, data);
+    return response.data;
+};
+
+export const deleteAutopilotRule = async (id: string) => {
+    const response = await axios.delete(`${API_URL}/api/autopilot/rules/${id}`);
+    return response.data;
+};
+
 export const getCompetitors = async (): Promise<Competitor[]> => {
-    const response = await axios.get(`${API_URL}/api/competitors/`);
+    const response = await axios.get(`${API_URL}/api/autopilot/competitors`);
     return response.data;
 };
 
 export const addCompetitor = async (data: { name?: string, linkedin_url: string }) => {
-    const response = await axios.post(`${API_URL}/api/competitors/`, data);
+    const response = await axios.post(`${API_URL}/api/autopilot/competitors`, data);
     return response.data;
 };
 
 export const deleteCompetitor = async (id: string) => {
-    const response = await axios.delete(`${API_URL}/api/competitors/${id}`);
+    const response = await axios.delete(`${API_URL}/api/autopilot/competitors/${id}`);
     return response.data;
 };
 

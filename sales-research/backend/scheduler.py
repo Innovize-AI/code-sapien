@@ -155,12 +155,86 @@ async def apollo_discovery_job():
         except Exception as e:
             logger.error(f"Error in Apollo discovery job: {e}")
 
+async def hubspot_sync_job():
+    logger.info("Starting HubSpot CRM Sync job...")
+    from services.hubspot_service import HubspotService
+    from db.models import CRMContext
+    from sqlalchemy import select
+    
+    async with SessionLocal() as db:
+        try:
+            settings = await crud.get_org_settings(db)
+            if not settings or not settings.hubspot_access_token or not settings.hubspot_sync_enabled:
+                logger.info("HubSpot integration not configured or disabled. Skipping.")
+                return
+            
+            hs = HubspotService(settings.hubspot_access_token)
+            
+            # 1. Sync Deals & Champions
+            logger.info("Syncing recent HubSpot deals...")
+            deals = await hs.get_recent_deals(days=7)
+            for deal in deals:
+                deal_id = deal["id"]
+                props = deal["properties"]
+                stage = props.get("dealstage")
+                
+                # Get associated contacts
+                contacts = await hs.get_deal_contacts(deal_id)
+                for contact in contacts:
+                    c_props = contact["properties"]
+                    email = c_props.get("email")
+                    li_url = c_props.get("linkedin_url")
+                    
+                    # Determine context type
+                    context_type = "customer" if stage == "closedwon" else "lost_deal" if stage == "closedlost" else "active_prospect"
+                    
+                    # Competitor Discovery from Lost Deals
+                    competitor_mentions = []
+                    lost_reason = props.get("closed_lost_reason") or ""
+                    if lost_reason:
+                        # Simple extraction logic - look for capitalized words that might be company names
+                        # or specific keywords. In a real scenario, use LLM or a list.
+                        common_competitors = ["clay", "apollo", "zoominfo", "salesforce", "outreach", "salesloft"]
+                        for comp in common_competitors:
+                            if comp in lost_reason.lower():
+                                competitor_mentions.append(comp)
+                                logger.info(f"Potential competitor found in HubSpot deal {deal_id}: {comp}")
+
+                    # Store context
+                    context_data = {
+                        "email": email,
+                        "linkedin_url": li_url,
+                        "hubspot_contact_id": contact["id"],
+                        "type": context_type,
+                        "deal_name": props.get("dealname"),
+                        "deal_stage": stage,
+                        "closed_lost_reason": lost_reason,
+                        "original_company": c_props.get("company"),
+                        "extra_metadata": json.dumps({"competitors": competitor_mentions}) if competitor_mentions else None
+                    }
+                    
+                    # Upsert CRM Context
+                    await crud.upsert_crm_context(db, context_data)
+            
+            # 2. Sync Web Visits as Signals
+            logger.info("Syncing HubSpot Web Vist signals...")
+            visits = await hs.get_web_visits(days=1)
+            for visit in visits:
+                # Process intense signals (multiple views or specific pages)
+                # Implementation depends on event payload structure
+                pass
+                
+            logger.info("HubSpot sync job completed.")
+        except Exception as e:
+            logger.error(f"Error in HubSpot sync job: {e}")
+
 def start_scheduler():
     # Schedule all discovery jobs to run every 24 hours
     scheduler.add_job(update_competitor_leads_job, 'interval', hours=24)
     scheduler.add_job(keyword_discovery_job, 'interval', hours=24)
     scheduler.add_job(apollo_discovery_job, 'interval', hours=24)
+    scheduler.add_job(hubspot_sync_job, 'interval', hours=12) # More frequent for signals
     
     scheduler.start()
-    logger.info("Scheduler started: All Autopilot discovery jobs running every 24 hours.")
+    logger.info("Scheduler started: All signals and discovery jobs active.")
 

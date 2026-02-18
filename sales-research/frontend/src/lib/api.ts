@@ -254,6 +254,8 @@ export interface IntegrationSettings {
     slack_user_id?: string;
     discovery_keywords?: string;
     apollo_search_config?: string;
+    hubspot_access_token?: string;
+    hubspot_sync_enabled?: boolean;
 }
 
 

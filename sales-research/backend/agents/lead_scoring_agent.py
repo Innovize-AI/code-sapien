@@ -22,6 +22,10 @@ class ExtractedLeadData(BaseModel):
     purchase_timeline: str = Field(description="Estimated timeline for purchase")
     project_urgency: str = Field(description="Level of urgency for the project (High, Medium, Low)")
     discovery_insights: str = Field(description="Analysis of HOW the lead was found (e.g., intent behind their competitor comment, relevance of search keywords). patterns detected.")
+    
+    # Negative/Cold Signal Handling
+    negative_signals: List[str] = Field(default=[], description="List of specific negative signals found (e.g., 'Competitor Lock-in', 'Hostile Reply', 'Closed Lost - Product Gap', 'Unsubscribe Request').")
+    is_cold: bool = Field(default=False, description="TRUE if the lead has explicitly rejected us, unsubscribed, or is a 'Closed Lost' deal with no chance of recovery.")
 
 class CategoricalScore(BaseModel):
     score: int = Field(description="Numerical score for this category")
@@ -36,6 +40,8 @@ class LeadScoreBreakdown(BaseModel):
 class LeadScoreAnalysis(BaseModel):
     total_score: int = Field(description="The final calculated lead score.")
     score_breakdown: LeadScoreBreakdown = Field(description="Detailed breakdown of scores for each category.")
+    negative_penalty: int = Field(default=0, description="Points deducted due to negative signals (e.g., 50 for is_cold).")
+    penalty_reason: str = Field(default="", description="Reason for the penalty (e.g., 'Lead Unsubscribed').")
     analysis: str = Field(description="Detailed reasoning for the assigned score.")
     viability_analysis: str = Field(description="Specific assessment of how well this lead fits the Ideal Customer Profile (ICP).")
     lead_score_recommendations: List[str] = Field(description="Strategic recommendations for next steps.")
@@ -57,7 +63,8 @@ def lead_data_extractor(state: AgentState):
         "interaction_history": email_history,
         "current_session_engagements": post_engagements,
         "discovery_interaction_history": state.get("discovery_interaction_history", []),
-        "input_metadata": input_lead_data.model_dump() if hasattr(input_lead_data, 'model_dump') else input_lead_data
+        "input_metadata": input_lead_data.model_dump() if hasattr(input_lead_data, 'model_dump') else input_lead_data,
+        "crm_history": state.get("crm_context")
     }
     
     messages = [
@@ -86,7 +93,7 @@ def lead_scorer(state: AgentState):
 
     messages = [
         SystemMessage(content=LEAD_SCORER_SYSTEM_PROMPT.format(content=ideal_profile_json)),
-        HumanMessage(content=f"SCORE THIS LEAD PROFILE: {json.dumps(lead_extracted_dict)}")
+        HumanMessage(content=f"SCORE THIS LEAD PROFILE: {json.dumps(lead_extracted_dict)}. CRM_CONTEXT: {json.dumps(state.get('crm_context') or {})}")
     ]
 
     try:

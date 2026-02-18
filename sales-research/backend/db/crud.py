@@ -669,3 +669,38 @@ async def delete_autopilot_rule(db: AsyncSession, rule_id: str):
 async def get_org_settings(db: AsyncSession):
     result = await db.execute(select(OrganizationSettings).limit(1))
     return result.scalars().first()
+
+# CRM Context CRUD
+async def upsert_crm_context(db: AsyncSession, data: dict):
+    from db.models import CRMContext
+    from sqlalchemy.dialects.postgresql import insert
+    
+    stmt = insert(CRMContext).values(**data)
+    # Upsert on email or linkedin_url if provided
+    index_elements = []
+    if data.get("email"):
+        index_elements.append(CRMContext.email)
+    elif data.get("linkedin_url"):
+        index_elements.append(CRMContext.linkedin_url)
+        
+    if index_elements:
+        stmt = stmt.on_conflict_do_update(
+            index_elements=index_elements,
+            set_={k: v for k, v in data.items() if k not in ["email", "linkedin_url"]}
+        )
+    
+    await db.execute(stmt)
+    await db.commit()
+
+async def match_crm_context(db: AsyncSession, email: str = None, linkedin_url: str = None):
+    from db.models import CRMContext
+    query = select(CRMContext)
+    if email:
+        query = query.where(CRMContext.email == email)
+    elif linkedin_url:
+        query = query.where(CRMContext.linkedin_url == linkedin_url)
+    else:
+        return None
+        
+    result = await db.execute(query)
+    return result.scalars().first()

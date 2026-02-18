@@ -279,8 +279,10 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     discovery_history = []
 
     options_refresh = options.refresh if options else False
+    trigger_ctx = getattr(options, 'trigger_context', None) if options else None
 
-    if not options_refresh:
+    # Load existing state if NOT refreshing OR if this is a targeted update (which needs context)
+    if not options_refresh or trigger_ctx:
         async with SessionLocal() as db:
             existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
             if existing:
@@ -366,6 +368,40 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         print(f"Error during graph execution: {e}")
         raise e
 
+async def _push_to_hubspot_if_enabled(db, user_id, report, final_state):
+    """
+    Check if HubSpot sync is enabled and push research as a Note.
+    """
+    from db.crud import get_org_settings
+    from services.hubspot_service import HubspotService
+    
+    settings = await get_org_settings(db)
+    if settings and settings.hubspot_access_token and settings.hubspot_sync_enabled:
+        try:
+            hs = HubspotService(settings.hubspot_access_token)
+            
+            # Match contact first
+            email = report.email_id
+            li_url = report.linkedin_url
+            
+            # Find contact ID from CRM Context or search HubSpot
+            from db.crud import match_crm_context
+            crm_ctx = await match_crm_context(db, email=email, linkedin_url=li_url)
+            
+            target_id = None
+            if crm_ctx and crm_ctx.hubspot_contact_id:
+                target_id = crm_ctx.hubspot_contact_id
+            
+            if target_id:
+                content = f"<h3>AI Research Report (Score: {report.lead_score})</h3>"
+                content += f"<p><b>Viability:</b> {report.viability_analysis[:500]}...</p>"
+                content += f"<p><a href='/reports/{report.id}'>View Full Report in Innovize AI</a></p>"
+                
+                await hs.push_note("contact", target_id, content)
+                print(f"Successfully pushed research note to HubSpot for {email}")
+        except Exception as e:
+            print(f"Failed to push HubSpot note: {e}")
+
 async def run_single_research(
     linkedin_url: Optional[str] = None,
     website: Optional[str] = None,
@@ -390,10 +426,12 @@ async def run_single_research(
 
         # Persist results to DB
         async with SessionLocal() as db:
-            await _persist_results(db, linkedin_url, website, final_state, options, user_id=user_id)
+            saved_report = await _persist_results(db, linkedin_url, website, final_state, options, user_id=user_id)
+            if saved_report:
+                # HubSpot Bidirectional Sync
+                await _push_to_hubspot_if_enabled(db, user_id, saved_report, final_state)
                 
         return {"linkedin_url": linkedin_url, "result": _prepare_state_for_json(final_state)}
     except Exception as e:
         print(f"Error in run_single_research: {e}")
         # Return error/none but don't crash caller
-        return {"linkedin_url": linkedin_url, "error": str(e)}

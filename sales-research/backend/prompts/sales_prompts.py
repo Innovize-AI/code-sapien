@@ -104,8 +104,18 @@ The ideal_customer profile is present in {content} as json.
 
 4. **Strategic Intent Strength (Outbound) (Discovery Source, Pain Point Depth) - Max 25**:
    - Discovery Source: Was the lead found via a high-value signal (e.g., Competitor Comment, Specific Search)? (Yes: +10 points, No: +0 points)
-   - Pain Point Depth: Has a specific, concrete pain point been identified (from discovery context or posts)? (Specific/Deep: +10 points, Generic: +2 points)
+    - Strategic Intent Depth: Has a specific, concrete pain point or buyer journey signal been identified? (Specific/Deep: +10 points, Generic: +2 points)
    - Partner Referral/Lead: Did the lead come through a partner introduction or high-trust referral? (Yes: +5 points, No: +0 points)
+    - CRM RELATIONSHIP (URGENT): If crm_context indicates they are a "champion" (past buyer), award +10 points automatically for "Trust Foundation". If they are a "lost_deal", award +5 points for "Historical Context" but note the reason.
+    
+    **NEGATIVE SIGNAL PENALTY (OVERRIDE RULE)**:
+    - Check the `is_cold` flag and `negative_signals` list in the input.
+    - **IF `is_cold` is TRUE (e.g., Closed Lost, Unsubscribed, Hard Rejection)**: You MUST DEDUCT 50 POINTS from the final score. The lead should likely end up with a score < 20.
+    - **IF `negative_signals` exist**: Deduct 15 points for every unique negative signal found.
+    - **Usage**: Apply these deductions AFTER calculating the positive score. Be ruthless. A "bad fit" or "hostile" lead must not be scored high just because they match the industry.
+
+    - **Populate the `negative_penalty` field with the total points deducted.**
+    - **Populate the `penalty_reason` with a concise explanation (e.g., "Critical: Closed Lost due to Competitor").**
 
 ### OUTPUT EXPECTATION:
 1. Provide a definitive Total Lead Score (out of 100).
@@ -142,6 +152,14 @@ Check `discovery_interaction_history` (historical context) and `current_session_
         - **Psychological Triggers**: Are they a "Technical Skeptic" (challenging claims with data), a "Visionary Champion" (excited about future roadmaps), or a "Value Hunter" (focused on ROI/pricing)?
         - **Recurring Sentiment**: How has their sentiment evolved? Is there a trend in their skepticism?
         - **Competitive Positioning**: (ONLY for `competitor_comment`) Which specific competitors are they engaging with, and what is the tone?
+        - CRM HISTORY (CRITICAL): Check `crm_history` for past deals. Are they a "champion" (past customer)? Did we lose a deal with them previously? Reference the `closed_lost_reason`.
+        
+    - **NEGATIVE SIGNAL DETECTION (CRITICAL)**:
+        - Check `interaction_history` (Email) for explicitly negative sentiment (e.g., "Stop emailing me", "Not interested", "Unsubscribe").
+        - Check `crm_history` for "Closed Lost" status.
+        - If ANY hard rejection or "Closed Lost" (for product gap/competitor reasons) is found:
+            - Set `is_cold` to TRUE.
+            - Add the specific reason to `negative_signals` list (e.g., "Email Rejection: Not Interested", "Closed Lost: Competitor Lock-in").
     - **Output Expectation**: Provide a granular, multi-sentence analysis that links specific behaviors/discovery context to potential sales opportunities. Show us the *why* behind their engagement.
 
     - Synthesize these patterns into the `discovery_insights` field.
@@ -347,13 +365,16 @@ A sales rep is about to read this. They don't need a summary of the labels you'v
    - If `lead_segment` is **DIRECT_COMPETITOR**: Assign **[ALERT: DIRECT COMPETITOR]** to `fit_assessment`. Explain that while they are a competitor, they represent a strategic partnership or "Internal Efficiency" play.
    - If the evidence (Lead Score, Persona Analysis, or Intent) strongly suggests they are a bad fit, state this clearly as a **[STOP: POOR FIT]** alert.
    - Explain the reasoning in one concise sentence.
-2. **Executive Synthesis**: Connect the dots. How does this person's role and recent activity specifically align with the company's current market position and {selling_company_name}'s value?
-3. **The "Why Now?" (Critical)**: Synthesize the lead score, intent, and news into a 2-3 sentence argument for why *this specific week* is the perfect time to reach out.
-4. **Strategic Playbook**: 
+2. **CRM Context & Champion Narrative**: 
+   - If the lead is a **Past Champion**, frame the entire narrative around **"Reconnecting with a trusted partner"**. 
+   - If it was a **Lost Deal**, address the previous blockers (from `closed_lost_reason`) as something we have now solved with our new "Specialized AI Agents" or "Glial Infrastructure".
+3. **Executive Synthesis**: Connect the dots. How does this person's role and recent activity specifically align with the company's current market position and {selling_company_name}'s value?
+4. **The "Why Now?" (Critical)**: Synthesize the lead score, intent, and news into a 2-3 sentence argument for why *this specific week* is the perfect time to reach out.
+5. **Strategic Playbook**: 
    - Cleanly present the finalized outreach tactics (LinkedIn/Email).
    - **Pivot Rule**: If `lead_segment` is DIRECT_COMPETITOR, ensure the outreach focuses on **Glial as Intelligence Infrastructure** or **Partnership/Moat**, and NOT cold selling of competing features.
    - Refine the "Hook" to connect the lead's own public theories (e.g., 'AI Teammates') to their internal operational gaps.
-5. **Advanced Next Steps (Unified Strategy)**:
+6. **Advanced Next Steps (Unified Strategy)**:
    - Create a 3-5 step high-level strategy that synthesizes EVERYTHING.
 6. **Internal Advisory**: Provide 2 "Insider Tips" for the rep.
 

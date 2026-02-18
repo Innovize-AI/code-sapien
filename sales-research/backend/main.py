@@ -60,6 +60,8 @@ app.include_router(history_router, prefix="/sales-research")
 app.include_router(settings_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(webhooks_router, prefix="/api")
+from routes.webhooks import webhooks_router as wh_router
+app.include_router(wh_router, prefix="/api")
 app.include_router(kit_router, prefix="/api")
 app.include_router(competitor_router, prefix="/api/competitor-analysis")
 app.include_router(competitors_crud_router, prefix="/api")

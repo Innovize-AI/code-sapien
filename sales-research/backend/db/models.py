@@ -130,6 +130,33 @@ class OrganizationSettings(Base):
     kit_api_key = Column(String, nullable=True) # Public Key for v3
     kit_api_secret = Column(String, nullable=True) # Secret Key for v3
     slack_webhook_url = Column(String, nullable=True)
+    
+    # HubSpot Integration
+    hubspot_access_token = Column(Text, nullable=True)
+    hubspot_sync_enabled = Column(Boolean, server_default=text("false"), nullable=False)
+
+class CRMContext(Base):
+    __tablename__ = "crm_context"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    # Core identifying fields for matching leads
+    email = Column(String, nullable=True, index=True)
+    linkedin_url = Column(Text, nullable=True, index=True)
+    hubspot_contact_id = Column(String, nullable=True)
+    hubspot_company_id = Column(String, nullable=True)
+
+    # Contextual data
+    type = Column(String, nullable=False) # 'champion', 'lost_deal', 'customer', 'website_visitor'
+    original_company = Column(String, nullable=True)
+    deal_name = Column(String, nullable=True)
+    deal_stage = Column(String, nullable=True) # e.g. 'closedwon', 'closedlost'
+    closed_lost_reason = Column(Text, nullable=True)
+    
+    # Matching metadata
+    last_sync_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    extra_metadata = Column(Text, nullable=True) # JSON store for flexible context
 
 class CompetitorAnalysis(Base):
     __tablename__ = "competitor_analysis"

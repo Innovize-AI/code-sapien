@@ -7,8 +7,55 @@ from routes.sales_research import run_single_research
 from workflow.state import InputLeadData
 from utils.activity_helper import log_activity_and_notify
 import asyncio
+from pydantic import BaseModel
+from typing import Optional
+from fastapi import BackgroundTasks
 
 webhooks_router = APIRouter(tags=['Webhooks'], prefix="/webhooks")
+
+class EmailWebhookPayload(BaseModel):
+    email_id: str
+    subject: Optional[str] = None
+    snippet: Optional[str] = None
+
+class CRMWebhookPayload(BaseModel):
+    contact_email: str
+    deal_id: Optional[str] = None
+    change_type: str # e.g., "stage_change", "new_note"
+
+async def run_targeted_research_background(email: str, trigger: str):
+    """
+    Background task to run the research graph with a specific trigger.
+    Consumes the generator to ensure the graph executes fully.
+    """
+    print(f"WEBHOOK: Starting targeted research for {email} (Trigger: {trigger})")
+    
+    # We need a user_id context. For webhooks, we might need a system user or 
+    # try to find the owner. For now, we'll try to find an owner or use None (system).
+    user_id = None
+    
+    try:
+        from services.research_service import _run_research_gen
+        
+        # Create Input with Trigger Context
+        input_data = InputLeadData(
+            refresh=True, # We want to re-run relevant nodes
+            trigger_context=trigger
+        )
+        
+        async for _ in _run_research_gen(
+            linkedin_url=None, 
+            website=None, 
+            options=input_data, 
+            email=email, 
+            user_id=user_id
+        ):
+            pass
+            
+        print(f"WEBHOOK: Targeted research completed for {email}")
+        
+    except Exception as e:
+        print(f"WEBHOOK ERROR for {email}: {e}")
 
 @webhooks_router.post("/generic")
 async def generic_webhook(
@@ -224,4 +271,20 @@ async def process_webhook_lead(submission_id, email, linkedin_url, extras, rep_i
             await db.commit()
             
     except Exception as e:
-        print(f"Error processing webhook lead {submission_id}: {e}")
+        print(f"Error processing webhook lead {submission}: {e}")
+
+@webhooks_router.post("/email-received")
+async def email_received_webhook(payload: EmailWebhookPayload, background_tasks: BackgroundTasks):
+    """
+    Trigger research update when a new email is received.
+    """
+    background_tasks.add_task(run_targeted_research_background, payload.email_id, "email_update")
+    return {"status": "accepted", "message": f"Research update triggered for {payload.email_id}"}
+
+@webhooks_router.post("/crm-updated")
+async def crm_updated_webhook(payload: CRMWebhookPayload, background_tasks: BackgroundTasks):
+    """
+    Trigger research update when CRM data changes.
+    """
+    background_tasks.add_task(run_targeted_research_background, payload.contact_email, "crm_update")
+    return {"status": "accepted", "message": f"Research update triggered for {payload.contact_email}"}

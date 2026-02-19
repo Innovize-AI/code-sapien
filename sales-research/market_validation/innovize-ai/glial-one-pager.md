@@ -1,10 +1,10 @@
-# **Glial Revenue Intelligence System**
+# **Glial Revenue Intelligence System (v1.0 Beta)**
 
 ### **Evolving Sales Intelligence Infrastructure for Revenue Teams**
 
 **This is not lead generation and it’s not static research.**
 
-**Glial Revenue Intelligence System** is a productized sales research system that turns raw market signals into analyst-grade execution. We deploy a dedicated, autonomous **"Sales Brain"** that you own—controlled via a custom **Command Center**—that tells your team **who** to contact, **when**, and **why**, without hiring more analysts.
+**Glial Revenue Intelligence System** is a productized sales research system that turns raw market signals into analyst-grade execution. We deploy a dedicated, autonomous **"Sales Brain"** that you own—controlled via a custom **Command Center**—that tells your team **who** to contact, **when**, and **why**, without hiring more analysts. It is powered by a multi-agent architecture including **Intent**, **Lead Scoring**, and **Strategy Agents**.
 
 \[\!NOTE\] **Why Glial?**: Just as glial cells provide the essential infrastructure and "brain glue" that allows neurons to fire and communicate, **Glial** provides the intelligence infrastructure that allows your sales team to act with precision and speed.
 
@@ -21,7 +21,7 @@ Static data leads to wasted effort. Most revenue teams struggle with:
 
 #### **1\. The Command Center (Identify & Intercept)**
 
-Your team gets a dedicated frontend to steer the engine. You can adjust your ICP and competitor lists in real-time. The system acts as a 24/7 scout, identifying prospects from:
+Your team gets a dedicated frontend to steer the engine. You can adjust your ICP and competitor lists in real-time. The system acts as a 24/7 **Autopilot**, identifying prospects from:
 
 * **Competitor Intercepts:** Buyers engaging with competitor posts on LinkedIn.  
 * **Keyword Intelligence:** Public posts discussing specific pain points or budget triggers.  
@@ -32,6 +32,7 @@ Your team gets a dedicated frontend to steer the engine. You can adjust your ICP
 Before a rep touches a lead, Glial performs a primary evaluation based on LinkedIn profiles and headlines. Leads are instantly tagged:
 
 * ✅ **Potential Fit** | 👤 **Decision Maker** | 🚫 **Competitor** (Auto-filtered)
+* 🌐 **Website Positioning:** The system scrapes the prospect's website to distinguish between "Adjacent Partners" and "Direct Competitors".
 
 #### **3\. High-Stakes Deep Analysis (Decision Briefings)**
 
@@ -40,6 +41,7 @@ Reps can bulk-select profiles to trigger a **Deep Analysis**. The system ingests
 * **Why Now:** The specific trigger (e.g., a post about unmanaged Azure costs).  
 * **Pain Point Hypothesis:** AI-driven analysis of the prospect’s likely blockers.  
 * **Strategic Command:** Hyper-personalized hooks and a 5-step tactical engagement plan.
+* **Framework Selection:** The CSO Agent dynamically selects the best framework (**AIDA**, **PAS**, or **BAB**) based on the prospect's persona.
 
 #### **4\. The Continuous Signal Loop (Always-Monitoring)**
 
@@ -47,6 +49,7 @@ Once an account is monitored, Glial never stops. It tracks new signals (emails, 
 
 * **Evolving Advice:** When a signal changes, the system **re-runs the analysis.**  
 * **Slack Updates:** Reps receive updated "Next Steps" the moment the prospect’s context shifts.
+* **Real-Time Feed:** The Command Center uses **Server-Sent Events (SSE)** to stream live opportunities as they happen.
 
 ### **Why Glial is Different**
 
@@ -60,8 +63,8 @@ We deliver a production-ready infrastructure in **2–3 weeks**.
 
 **What is Included (Customization):**
 
-* **Workflow Audit:** Mapping your "Sales Book," playbooks, and case studies into the engine.  
-* **One CRM Integration:** Two-way sync with one major CRM (e.g.,HubSpot, Pipedrive).  
+* **Workflow Audit:** Mapping your "Sales Book," playbooks, and case studies into the **Knowledge Base**.  
+* **Advanced CRM Integration:** Two-way sync with HubSpot (including **Lost Deal Recycling** and **Champion Tracking**).  
 * **One Meeting Integration:** Connect to one scheduling tool (e.g., Calendly, SavvyCal) to trigger research loops.  
 * **Slack Command App:** Full setup of the notification and remote-action environment.  
 * **Standard Signal Mapping:** Tracking for up to 5 competitors and 10 core intent keywords.

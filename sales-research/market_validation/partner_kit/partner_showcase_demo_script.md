@@ -13,7 +13,7 @@
 *   **Action:** Open the **Legacy Dashboard** (or Main Interface).
 *   **Narrative:** "This is the Command Center. Unlike a standard CRM, this is an active listening post."
 *   **Show:**
-    *   **Competitor Intercepts:** "Here, we are tracking [Competitor Name]. Anyone commenting on their posts is instantly captured."
+    *   **Competitor Intercepts:** "Here, we are tracking [Competitor Name]. Anyone commenting on their posts is captured every day or what ever frequency you set ."
     *   **Keyword Monitor:** "We're also listening for keywords like 'SDR Burnout' or 'Q4 Planning'."
 *   **Key Point:** "This runs 24/7 in the background. The 'Autopilot' engine is doing the work of a junior analyst."
 

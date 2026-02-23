@@ -8,8 +8,10 @@ from sqlalchemy import event
 engine = create_async_engine(
     DATABASE_URL,
     echo=True,
-    pool_size=20,
-    max_overflow=10,
+    pool_size=5,
+    max_overflow=0,
+    # Disable statement caching for compatibility with transaction-mode poolers
+    statement_cache_size=0,
     connect_args={
         "server_settings": {
             "search_path": f'"{DB_SCHEMA}", public'

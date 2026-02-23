@@ -30,6 +30,12 @@ async def verify_classification():
             "headline": "CEO at RivalAI",
             "comment": "Nice post, we have a similar solution.",
             "source_post": "How Innovize AI is transforming lead discovery."
+        },
+        {
+            "id": "https://www.linkedin.com/in/test-poster",
+            "headline": "GTM Leader at ScaleUp",
+            "comment": "Posted about keywords: Why our sales team is moving to agentic workflows to handle research...",
+            "source_post": "Why our sales team is moving to agentic workflows to handle research..."
         }
     ]
     

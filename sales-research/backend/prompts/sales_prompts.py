@@ -477,9 +477,14 @@ Profiles to Analyze:
 {profiles_data}
 
 ### CONTEXTUAL GUIDANCE:
-- **comment**: This is the specific comment the person made on a competitor's post or a summary of their recent activity.
-- **source_post**: This is the context of the post they were engaging with.
-- **Use these fields to determine 'intent' and 'sentiment'**. For example, if they ask for a trial in the comment, intent is 'interested'. If they complain about a feature, intent is 'pain_point'.
+- **comment**: 
+    - **Commenter Mode**: If it is a short message, the lead is commenting on someone else's post. Analyze their intent based on their response.
+    - **Poster Mode**: If it starts with "Posted about keywords:", the lead is the **Original Author** of the post. They are sharing their own thoughts/expertise on this topic.
+- **source_post**: This is the context of the post they were engaging with (or wrote).
+- **Use these fields to determine 'intent' and 'sentiment'**:
+    - **Interested (Commenter)**: Asking a question, requesting a demo, or expressing interest in a competitor's solution.
+    - **Pain Point (Poster/Commenter)**: Complaining about manual work, poor ROI, or technical bottlenecks.
+    - **Thought Leadership (Poster)**: If they are posting high-value content but not expressing a specific need yet, mark as 'low_intent' or 'curious' but 'is_fit' if they match the ICP.
 
 ### CLASSIFICATION CRITERIA (STRICT):
 1. **is_competitor**: (boolean) Does the profile belong to someone at a rival AI/Automation company?
@@ -490,13 +495,13 @@ Profiles to Analyze:
 4. **intent**: (string)
     - 'interested': Explicitly asking for price, demo, or info.
     - 'pain_point': Expressing frustration with current tools or manual work.
-    - 'curious': Generic positive engagement.
+    - 'curious': Generic positive engagement or sharing relevant expertise.
     - 'competitor': They are a competitor.
-    - 'low_intent': Just liking or generic comments.
+    - 'low_intent': Just liking, generic comments, or general industry updates.
 5. **sentiment**: (positive, neutral, negative).
 
 ### FOCUS ON REASONING:
-Explain WHY they are a fit. If they are just a "Founder" but their company isn't relevant, explain that. Reference their specific comment or post context if it supports your reasoning.
+Explain WHY they are a fit. Distinguish if they are a **High-Intent Commenter** or a **Strategic Poster**. Reference their specific comment or post context to justify your intent mapping.
 
 Output strictly in JSON format as a list of objects:
 {{
@@ -506,7 +511,7 @@ Output strictly in JSON format as a list of objects:
       "is_competitor": boolean,
       "is_fit": boolean,
       "is_decision_maker": boolean,
-      "reasoning": "Brief explanation focused on ICP alignment and intent signals.",
+      "reasoning": "Brief explanation focused on ICP alignment, lead mode (poster vs commenter), and intent signals.",
       "intent": "string (interested, pain_point, curious, competitor, or low_intent)",
       "sentiment": "string (positive, neutral, negative)"
     }},

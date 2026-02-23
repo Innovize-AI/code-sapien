@@ -47,17 +47,22 @@ environment = os.getenv("ENVIRONMENT", "dev")  # Default to 'development' if not
 
 # Configure CORS
 allow_origins = os.getenv("ALLOW_ORIGINS", "*").split(",")
-# Strip whitespace from origins
-allow_origins = [origin.strip() for origin in allow_origins]
+# Strip whitespace and trailing slashes from origins
+allow_origins = [origin.strip().rstrip("/") for origin in allow_origins]
+
+# Starlette/FastAPI: allow_credentials=True cannot be used with allow_origins=["*"]
+allow_credentials = True
+if "*" in allow_origins:
+    allow_credentials = False
 
 if environment == "dev":
     logger = logging.getLogger("uvicorn")
-    logger.warning("Running in development mode - CORS allowed for: %s", allow_origins)
+    logger.warning("CORS Configuration: origins=%s, credentials=%s", allow_origins, allow_credentials)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

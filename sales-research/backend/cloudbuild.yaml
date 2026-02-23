@@ -14,10 +14,10 @@ steps:
 
   # 2. Push the image to Container Registry
   - name: "gcr.io/cloud-builders/docker"
-    args: ["push", "gcr.io/$PROJECT_ID/sales-research-backend:$COMMIT_SHA"]
+    args: ["push", "gcr.io/$PROJECT_ID/glial-research-backend:$COMMIT_SHA"]
 
   - name: "gcr.io/cloud-builders/docker"
-    args: ["push", "gcr.io/$PROJECT_ID/sales-research-backend:latest"]
+    args: ["push", "gcr.io/$PROJECT_ID/glial-research-backend:latest"]
 
   # 3. Deploy to Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
@@ -25,7 +25,7 @@ steps:
     args:
       - "run"
       - "deploy"
-      - "glial-research-backend"
+      - "glial-research-backend-service"
       - "--image"
       - "gcr.io/$PROJECT_ID/glial-research-backend:$COMMIT_SHA"
       - "--platform"

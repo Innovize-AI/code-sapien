@@ -25,7 +25,7 @@ steps:
     args:
       - "run"
       - "deploy"
-      - "glial-research-frontend"
+      - "glial-research-frontend-service"
       - "--image"
       - "gcr.io/$PROJECT_ID/glial-research-frontend:$COMMIT_SHA"
       - "--platform"

@@ -10,7 +10,11 @@ engine = create_async_engine(
     echo=True,
     pool_size=20,
     max_overflow=10,
-    connect_args={"server_settings": {"search_path": DB_SCHEMA}}
+    connect_args={
+        "server_settings": {
+            "search_path": f'"{DB_SCHEMA}", public'
+        }
+    }
 )
 
 SessionLocal = sessionmaker(

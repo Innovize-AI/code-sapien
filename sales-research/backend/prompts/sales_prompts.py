@@ -468,13 +468,18 @@ Determine:
 """
 
 BATCH_PROFILE_CLASSIFIER_PROMPT = """
-You are a Sales Intelligence Expert. deeply analyze the following list of LinkedIn profiles (headlines) to classify them based on the provided company context.
+You are a Sales Intelligence Expert. deeply analyze the following list of LinkedIn profiles (headlines) along with the context of their discovery (recent comments or posts they made) to classify them based on the provided company context.
 
 Company Context: 
 {company_context}
 
 Profiles to Analyze:
 {profiles_data}
+
+### CONTEXTUAL GUIDANCE:
+- **comment**: This is the specific comment the person made on a competitor's post or a summary of their recent activity.
+- **source_post**: This is the context of the post they were engaging with.
+- **Use these fields to determine 'intent' and 'sentiment'**. For example, if they ask for a trial in the comment, intent is 'interested'. If they complain about a feature, intent is 'pain_point'.
 
 ### CLASSIFICATION CRITERIA (STRICT):
 1. **is_competitor**: (boolean) Does the profile belong to someone at a rival AI/Automation company?
@@ -491,7 +496,7 @@ Profiles to Analyze:
 5. **sentiment**: (positive, neutral, negative).
 
 ### FOCUS ON REASONING:
-Explain WHY they are a fit. If they are just a "Founder" but their company isn't relevant, explain that.
+Explain WHY they are a fit. If they are just a "Founder" but their company isn't relevant, explain that. Reference their specific comment or post context if it supports your reasoning.
 
 Output strictly in JSON format as a list of objects:
 {{
@@ -501,7 +506,7 @@ Output strictly in JSON format as a list of objects:
       "is_competitor": boolean,
       "is_fit": boolean,
       "is_decision_maker": boolean,
-      "reasoning": "Brief explanation focused on ICP alignment.",
+      "reasoning": "Brief explanation focused on ICP alignment and intent signals.",
       "intent": "string (interested, pain_point, curious, competitor, or low_intent)",
       "sentiment": "string (positive, neutral, negative)"
     }},

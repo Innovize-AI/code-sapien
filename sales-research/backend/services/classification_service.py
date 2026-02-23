@@ -46,7 +46,9 @@ async def run_classification_and_update(raw_leads: List[dict]):
             if lead["linkedin_url"] not in unique_profiles_map:
                 unique_profiles_map[lead["linkedin_url"]] = {
                     "id": lead["linkedin_url"],
-                    "headline": lead.get("headline", "")
+                    "headline": lead.get("headline", ""),
+                    "comment": lead.get("comment", ""),
+                    "source_post": lead.get("source_post", "")
                 }
         
         unique_profiles_list = list(unique_profiles_map.values())

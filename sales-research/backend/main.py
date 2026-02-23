@@ -45,16 +45,22 @@ environment = os.getenv("ENVIRONMENT", "dev")  # Default to 'development' if not
 
 
 
+# Configure CORS
+allow_origins = os.getenv("ALLOW_ORIGINS", "*").split(",")
+# Strip whitespace from origins
+allow_origins = [origin.strip() for origin in allow_origins]
+
 if environment == "dev":
     logger = logging.getLogger("uvicorn")
-    logger.warning("Running in development mode - allowing CORS for all origins")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    logger.warning("Running in development mode - CORS allowed for: %s", allow_origins)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(sales_router, prefix="/sales-research")
 app.include_router(history_router, prefix="/sales-research")

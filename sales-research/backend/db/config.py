@@ -34,3 +34,7 @@ else:
     DATABASE_URL = raw_url
     
 DB_SCHEMA = os.getenv("DB_SCHEMA", "public")
+# Handle cases where Cloud Deploy placeholders are not resolved
+if DB_SCHEMA == "${db_schema}" or not DB_SCHEMA:
+    DB_SCHEMA = "staging" if os.getenv("ENVIRONMENT") != "production" else "public"
+

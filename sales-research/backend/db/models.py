@@ -262,3 +262,17 @@ class AutopilotRule(Base):
     type = Column(String, nullable=False) # 'keyword', 'apollo_config'
     value = Column(Text, nullable=False) # The keyword or JSON string
     is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Scheduling fields
+    interval_hours = Column(Integer, default=24, nullable=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+
+class ScheduledTask(Base):
+    __tablename__ = "scheduled_tasks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    name = Column(String, unique=True, nullable=False) # 'competitor_update', 'hubspot_sync'
+    interval_hours = Column(Integer, default=24, nullable=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))

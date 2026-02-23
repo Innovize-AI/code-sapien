@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy import text
 
 from alembic import context
 import os
@@ -82,6 +83,9 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Set the search path so migrations happen in the correct schema
+        connection.execute(text(f'SET search_path TO "{DB_SCHEMA}", public'))
+        
         context.configure(
             connection=connection, 
             target_metadata=target_metadata,

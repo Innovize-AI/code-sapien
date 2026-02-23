@@ -1,0 +1,78 @@
+{
+  "id": "demo-123",
+  "fullname": "Pavan Kumar Vuppaladadium",
+  "profile_picture_url": "https://media.licdn.com/dms/image/v2/D4D03AQHbR-aatFOfzw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1713363899479?e=1767830400&v=beta&t=kr7Zng9Fapkfz3NAaPOTHR_qV3yqbCVEu2n8nNiVCFE",
+  "linkedin_url": "https://linkedin.com/in/pavan34",
+  "website": "https://innovize-ai.com",
+  "lead_score": 92,
+  "sales_research_report": {
+    "fit_assessment": "GOOD FIT",
+    "fit_reasoning": "Pavan is the founder of Innovize AI and actively builds AI systems, making him the perfect persona for revenue intelligence tools.",
+    "executive_synthesis": "Pavan is a technical founder who bridges the gap between AI development and business transformation. He is currently focusing on reducing manual research for sales teams, which aligns perfectly with Glial's core value proposition of 'Revenue Intelligence Factory'.",
+    "why_now": "Pavan recently shared insights about AI projects stalling due to lack of strategic implementation. Reaching out now with a solution that focuses on 'decisions, not dashboards' positions us as the transformation partner he advocates for.",
+    "strategic_playbook": {
+      "outreach_tactics": "LinkedIn: Start with his '12 Checkpoints' post to build rapport.\nEmail: Pivot to how Glial automates the research grind he currently solves manually.",
+      "refined_hook": "Found your '12 Checkpoints' post incredibly timely.",
+      "strategic_proof_points": ["Automated Chart Generation", "Sales Research Agents", "HIPAA Compliant Inbox Manager"]
+    },
+    "internal_advisory": [
+      "Pavan values 'Neural Tuning' and raw API transparency.",
+      "Avoid buzzword-heavy pitches; focus on 'architecture of ownership'."
+    ],
+    "advanced_next_steps": [
+      "Send the Executive Briefing for his top 5 accounts.",
+      "Schedule a 'Strategic Discovery' call focused on PAA (Private Asset) model.",
+      "Offer a pilot focusing on his current 20-person sales team."
+    ],
+    "campaign_variants": [
+      {
+        "variant_name": "Best Fit - Revenue Intelligence",
+        "fit_reasoning": "Direct alignment with his current 'Sales Research Agent' project.",
+        "hook": "Saw your work on Sales Research Agents—Glial is the next evolution of that engine.",
+        "linkedin_message": "Hi Pavan, saw your post on AI transformation. Glial is built for lean teams like Innovize to automate the research grind.",
+        "email_subject": "Scaling Innovize AI's research capability",
+        "email_body": "Hi Pavan,\n\nI've been following your work on AI systems, specifically the 'Sales Research Agent' project. Glial provides the high-grade intercept and sifting layer that could 10x your team's output."
+      }
+    ]
+  },
+  "user_profile_analysis": {
+    "profile_summary": "Pavan Kumar is an AI Consultant and Founder of Innovize AI with extensive experience in LangChain, LangGraph, and full-stack development.",
+    "posts_analysis": [
+      {
+        "post_title": "The 12 Checkpoints for AI Projects",
+        "summary": "Pavan outlines a framework for successful AI adoption, emphasizing the shift from experimentation to deployment.",
+        "posted_date": "2 days ago",
+        "post_url": "https://linkedin.com/in/pavan34/posts/..."
+      }
+    ],
+    "strategic_role_fit": "Founder/Decision Maker",
+    "engagement_persona": "Thought Leader/Technical Expert"
+  },
+  "website_analysis": {
+    "mission": "Helping SMEs reduce manual work with AI Systems.",
+    "target_audience": "SMBs, agencies, and enterprises.",
+    "offerings": ["Discovery & AI Readiness", "MVP & Pilots", "Full-Scale Deployment"],
+    "pain_points_solved": ["Manual research grind", "Data fragmentation", "AI adoption hurdles"]
+  },
+  "lead_score_analysis": {
+    "score_breakdown": {
+        "demographic_fit": {"score": 10, "reasoning": "Founder of AI transformation agency."},
+        "engagement": {"score": 8, "reasoning": "High social activity on relevant topics."},
+        "intent": {"score": 9, "reasoning": "Building similar internal tools."}
+    },
+    "total_score": 92,
+    "analysis": "Pavan is a Tier-1 prospect with immediate pain that Glial solves.",
+    "recommendations": ["Direct outreach", "Partner ecosystem exploration"]
+  },
+  "cso_strategic_briefing": {
+    "unified_command": {
+        "verdict": "GREEN LIGHT - HIGH PRIORITY",
+        "framework_selected": "PEER-TO-PEER PARTNERSHIP",
+        "timing_advice": "Immediate outreach",
+        "strategic_reasoning": "His recent content indicates he is actively solving for research scalability.",
+        "objection_preemption": ["API Cost Transparency", "Neuro-alignment"],
+        "sources": [{"source": "LinkedIn Post", "snippet": "Research shouldn't take 4 hours."}]
+    },
+    "executive_blueprint_summary": "Strategic alignment via AI automation leadership."
+  }
+}

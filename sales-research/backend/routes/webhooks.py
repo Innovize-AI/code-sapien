@@ -7,12 +7,60 @@ from routes.sales_research import run_single_research
 from workflow.state import InputLeadData
 from utils.activity_helper import log_activity_and_notify
 import asyncio
+from pydantic import BaseModel
+from typing import Optional
+from fastapi import BackgroundTasks
 
 webhooks_router = APIRouter(tags=['Webhooks'], prefix="/webhooks")
+
+class EmailWebhookPayload(BaseModel):
+    email_id: str
+    subject: Optional[str] = None
+    snippet: Optional[str] = None
+
+class CRMWebhookPayload(BaseModel):
+    contact_email: str
+    deal_id: Optional[str] = None
+    change_type: str # e.g., "stage_change", "new_note"
+
+async def run_targeted_research_background(email: str, trigger: str):
+    """
+    Background task to run the research graph with a specific trigger.
+    Consumes the generator to ensure the graph executes fully.
+    """
+    print(f"WEBHOOK: Starting targeted research for {email} (Trigger: {trigger})")
+    
+    # We need a user_id context. For webhooks, we might need a system user or 
+    # try to find the owner. For now, we'll try to find an owner or use None (system).
+    user_id = None
+    
+    try:
+        from services.research_service import _run_research_gen
+        
+        # Create Input with Trigger Context
+        input_data = InputLeadData(
+            refresh=True, # We want to re-run relevant nodes
+            trigger_context=trigger
+        )
+        
+        async for _ in _run_research_gen(
+            linkedin_url=None, 
+            website=None, 
+            options=input_data, 
+            email=email, 
+            user_id=user_id
+        ):
+            pass
+            
+        print(f"WEBHOOK: Targeted research completed for {email}")
+        
+    except Exception as e:
+        print(f"WEBHOOK ERROR for {email}: {e}")
 
 @webhooks_router.post("/generic")
 async def generic_webhook(
     request: Request,
+    rep_id: str = None,
     db: AsyncSession = Depends(get_db)
 ):
     payload = await request.json()
@@ -29,16 +77,17 @@ async def generic_webhook(
         payload=json.dumps(payload)
     )
     
-    saved = await save_lead_submission(db, submission)
+    saved = await save_lead_submission(db, submission, rep_id=rep_id)
     
     # Trigger research in background
-    asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, payload))
+    asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, payload, rep_id))
     
     return {"status": "received", "submission_id": str(saved.id)}
 
 @webhooks_router.post("/calendly")
 async def calendly_webhook(
     request: Request,
+    rep_id: str = None,
     db: AsyncSession = Depends(get_db)
 ):
     payload = await request.json()
@@ -60,7 +109,7 @@ async def calendly_webhook(
             source="calendly",
             payload=json.dumps(payload)
         )
-        saved = await save_lead_submission(db, submission)
+        saved = await save_lead_submission(db, submission, rep_id=rep_id)
         
         # Log Activity
         await log_activity_and_notify(
@@ -68,10 +117,11 @@ async def calendly_webhook(
             type="meeting", 
             title="New Meeting Booked (Calendly)", 
             description=f"Meeting scheduled by {email}",
-            metadata={"email": email, "source": "calendly", "payload": payload}
+            metadata={"email": email, "source": "calendly", "payload": payload},
+            user_id=rep_id
         )
         
-        asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, payload))
+        asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, payload, rep_id))
         return {"status": "processed"}
         
     return {"status": "ignored"}
@@ -79,6 +129,7 @@ async def calendly_webhook(
 @webhooks_router.post("/cal")
 async def cal_webhook(
     request: Request,
+    rep_id: str = None,
     db: AsyncSession = Depends(get_db)
 ):
     payload = await request.json()
@@ -92,7 +143,7 @@ async def cal_webhook(
             source="cal",
             payload=json.dumps(payload)
         )
-        saved = await save_lead_submission(db, submission)
+        saved = await save_lead_submission(db, submission, rep_id=rep_id)
         
         # Log Activity
         await log_activity_and_notify(
@@ -100,10 +151,11 @@ async def cal_webhook(
             type="meeting", 
             title="New Meeting Booked (Cal.com)", 
             description=f"Meeting scheduled by {email}",
-            metadata={"email": email, "source": "cal", "payload": payload}
+            metadata={"email": email, "source": "cal", "payload": payload},
+            user_id=rep_id
         )
         
-        asyncio.create_task(process_webhook_lead(saved.id, email, None, payload))
+        asyncio.create_task(process_webhook_lead(saved.id, email, None, payload, rep_id))
         return {"status": "processed"}
     
     return {"status": "ignored"}
@@ -111,6 +163,7 @@ async def cal_webhook(
 @webhooks_router.post("/convertkit")
 async def convertkit_webhook(
     request: Request,
+    rep_id: str = None,
     db: AsyncSession = Depends(get_db)
 ):
     payload = await request.json()
@@ -135,7 +188,7 @@ async def convertkit_webhook(
             external_form_id=form_id,
             external_form_name=form_name
         )
-        saved = await save_lead_submission(db, submission)
+        saved = await save_lead_submission(db, submission, rep_id=rep_id)
         
         # Add form context to the research extras
         extras = {
@@ -143,7 +196,7 @@ async def convertkit_webhook(
             "lead_intent": f"Subscribed to form: {form_name}" if form_name else "Joined subscriber list"
         }
         
-        asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, extras))
+        asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, extras, rep_id))
         return {"status": "processed"}
         
     return {"status": "ignored"}
@@ -151,6 +204,7 @@ async def convertkit_webhook(
 @webhooks_router.post("/typeform")
 async def typeform_webhook(
     request: Request,
+    rep_id: str = None,
     db: AsyncSession = Depends(get_db)
 ):
     payload = await request.json()
@@ -179,13 +233,13 @@ async def typeform_webhook(
             source="typeform",
             payload=json.dumps(payload)
         )
-        saved = await save_lead_submission(db, submission)
-        asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, payload))
+        saved = await save_lead_submission(db, submission, rep_id=rep_id)
+        asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, payload, rep_id))
         return {"status": "processed"}
         
     return {"status": "ignored"}
 
-async def process_webhook_lead(submission_id, email, linkedin_url, extras):
+async def process_webhook_lead(submission_id, email, linkedin_url, extras, rep_id=None):
     """Background task to run research for a webhook lead."""
     from datetime import datetime
     from sqlalchemy import update
@@ -201,7 +255,8 @@ async def process_webhook_lead(submission_id, email, linkedin_url, extras):
         result = await run_single_research(
             linkedin_url=linkedin_url,
             email=email,
-            options=options
+            options=options,
+            user_id=rep_id
         )
         
         research_id = result.get("result", {}).get("id")
@@ -216,4 +271,20 @@ async def process_webhook_lead(submission_id, email, linkedin_url, extras):
             await db.commit()
             
     except Exception as e:
-        print(f"Error processing webhook lead {submission_id}: {e}")
+        print(f"Error processing webhook lead {submission}: {e}")
+
+@webhooks_router.post("/email-received")
+async def email_received_webhook(payload: EmailWebhookPayload, background_tasks: BackgroundTasks):
+    """
+    Trigger research update when a new email is received.
+    """
+    background_tasks.add_task(run_targeted_research_background, payload.email_id, "email_update")
+    return {"status": "accepted", "message": f"Research update triggered for {payload.email_id}"}
+
+@webhooks_router.post("/crm-updated")
+async def crm_updated_webhook(payload: CRMWebhookPayload, background_tasks: BackgroundTasks):
+    """
+    Trigger research update when CRM data changes.
+    """
+    background_tasks.add_task(run_targeted_research_background, payload.contact_email, "crm_update")
+    return {"status": "accepted", "message": f"Research update triggered for {payload.contact_email}"}

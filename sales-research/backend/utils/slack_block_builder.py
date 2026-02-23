@@ -10,20 +10,23 @@ def build_hot_lead_blocks(
     sentiment: str,
     reasoning: str,
     source: str = "Competitor Comment",
-    post_link: str = None
+    post_link: str = None,
+    rep_name: str = None,
+    title: str = None
 ) -> List[Dict[str, Any]]:
     """
-    Builds a Slack Block Kit message for a Hot Lead discovery.
+    Builds a Slack Block Kit message for a Potential Lead discovery.
     """
-    status_emoji = "🔥" if intent == "interested" else "🚨" if intent == "pain_point" else "👀"
-    title_text = f"{status_emoji} *Hot Lead Discovery: {name}*"
+    if not title:
+        status_emoji = "🔥" if intent == "interested" else "🚨" if intent == "pain_point" else "👀"
+        title = f"{status_emoji} *Potential Opportunity: {name}*"
     
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"New Potential Opportunity Found!",
+                "text": title.replace("*", ""), # Strip markdown for header
                 "emoji": True
             }
         },
@@ -44,6 +47,14 @@ def build_hot_lead_blocks(
             ]
         }
     ]
+
+    if rep_name:
+        blocks.insert(1, {
+            "type": "context",
+            "elements": [
+                {"type": "mrkdwn", "text": f"👤 *Assigned Rep:* {rep_name}"}
+            ]
+        })
 
     if comment:
         blocks.append({
@@ -93,19 +104,26 @@ def build_hot_lead_blocks(
 
     return blocks
 
-def build_generic_activity_blocks(title: str, description: str, metadata: dict = None) -> List[Dict[str, Any]]:
+def build_generic_activity_blocks(title: str, description: str, metadata: dict = None, rep_name: str = None) -> List[Dict[str, Any]]:
     """
     Fallback for generic activities.
     """
-    blocks = [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*{title}*\n{description or ''}"
-            }
+    blocks = []
+    if rep_name:
+         blocks.append({
+            "type": "context",
+            "elements": [
+                {"type": "mrkdwn", "text": f"👤 *Activity by:* {rep_name}"}
+            ]
+        })
+
+    blocks.append({
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"*{title}*\n{description or ''}"
         }
-    ]
+    })
     return blocks
 
 def build_research_completed_blocks(
@@ -113,7 +131,8 @@ def build_research_completed_blocks(
     lead_score: int, 
     why_now: str, 
     action_plan: List[str], 
-    report_id: str
+    report_id: str,
+    rep_name: str = None
 ) -> List[Dict[str, Any]]:
     """
     Builds a Slack Block Kit message when a deep research analysis is finished.
@@ -137,6 +156,14 @@ def build_research_completed_blocks(
             }
         }
     ]
+
+    if rep_name:
+        blocks.insert(1, {
+            "type": "context",
+            "elements": [
+                {"type": "mrkdwn", "text": f"👤 *Researched by:* {rep_name}"}
+            ]
+        })
 
     if why_now:
         blocks.append({

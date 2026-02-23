@@ -64,7 +64,14 @@ def batch_classify_profiles(profiles: List[Dict]):
         results_map = {}
         if response and response.classifications:
             for res in response.classifications:
-                results_map[res.id] = res.model_dump()
+                results_map[res.id] = {
+                    "is_fit": res.is_fit,
+                    "is_competitor": res.is_competitor,
+                    "is_decision_maker": res.is_decision_maker,
+                    "reasoning": res.reasoning,
+                    "intent": res.intent,
+                    "sentiment": res.sentiment
+                }
                 
         return results_map
 
@@ -703,7 +710,9 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
                     "is_fit": item.is_fit,
                     "is_competitor": item.is_competitor,
                     "is_decision_maker": item.is_decision_maker,
-                    "reasoning": item.reasoning
+                    "reasoning": item.reasoning,
+                    "intent": item.intent,
+                    "sentiment": item.sentiment
                 }
                 
         return results_map

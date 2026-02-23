@@ -2,6 +2,35 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
 
+// Configure axios interceptor
+axios.interceptors.request.use((config) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem("accessToken") : null;
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+// Response interceptor to handle 401s
+axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("user");
+                window.location.href = "/login";
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
+const getAuthHeaders = (): Record<string, string> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem("accessToken") : null;
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
 export interface LeadData {
     linkedin_url?: string;
     website?: string;
@@ -41,6 +70,7 @@ export const generateResearch = async (
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            ...getAuthHeaders()
         },
         body: JSON.stringify(body),
     });
@@ -120,6 +150,7 @@ export const bulkAnalyzeLeads = async (
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            ...getAuthHeaders()
         },
         body: JSON.stringify({
             leads,
@@ -181,7 +212,10 @@ export const getICP = async (): Promise<IdealProfileData | null> => {
     try {
         const response = await axios.get(`${API_URL}/api/settings/icp`);
         return response.data;
-    } catch (e) {
+    } catch (e: any) {
+        if (e.response?.status === 401) {
+            throw e; // Let auth provider handle it
+        }
         return null;
     }
 };
@@ -217,6 +251,11 @@ export interface IntegrationSettings {
     kit_api_key?: string;
     kit_api_secret?: string;
     slack_webhook_url?: string;
+    slack_user_id?: string;
+    discovery_keywords?: string;
+    apollo_search_config?: string;
+    hubspot_access_token?: string;
+    hubspot_sync_enabled?: boolean;
 }
 
 
@@ -224,13 +263,62 @@ export const getIntegrations = async (): Promise<IntegrationSettings | null> => 
     try {
         const response = await axios.get(`${API_URL}/api/settings/integrations`);
         return response.data;
-    } catch (e) {
+    } catch (e: any) {
+        if (e.response?.status === 401) {
+            throw e; // Let auth provider handle it
+        }
         return null;
     }
 };
 
 export const saveIntegrations = async (data: IntegrationSettings) => {
     const response = await axios.post(`${API_URL}/api/settings/integrations`, data);
+    return response.data;
+};
+
+export const getUserIntegrations = async (): Promise<{ user_linkedin_url: string | null, email_config: string | null, slack_user_id: string | null } | null> => {
+    try {
+        const response = await axios.get(`${API_URL}/api/settings/user-integrations`);
+        return response.data;
+    } catch (e) {
+        return null;
+    }
+};
+
+export const saveUserIntegrations = async (data: { user_linkedin_url?: string | null, email_config?: string | null, slack_user_id?: string | null }) => {
+    const response = await axios.post(`${API_URL}/api/settings/user-integrations`, data);
+    return response.data;
+};
+
+export interface ProductConfig {
+    name: string;
+    description: string;
+    is_strategic_pivot?: boolean;
+    target_roles?: string[];
+    relevant_files?: string[];
+    rag_context?: string;
+}
+
+export interface SellingProfileConfig {
+    company_name: string;
+    description: string;
+    products: ProductConfig[];
+}
+
+export const getSellingProfile = async (): Promise<SellingProfileConfig | null> => {
+    try {
+        const response = await axios.get(`${API_URL}/api/settings/selling-profile`);
+        return response.data;
+    } catch (e: any) {
+        if (e.response?.status === 401) {
+            throw e;
+        }
+        return null;
+    }
+};
+
+export const saveSellingProfile = async (data: SellingProfileConfig) => {
+    const response = await axios.post(`${API_URL}/api/settings/selling-profile`, data);
     return response.data;
 };
 
@@ -259,20 +347,47 @@ export interface Competitor {
     name?: string;
     linkedin_url: string;
     created_at: string;
+    created_by_id?: string;
+    creator_name?: string;
 }
 
+export interface AutopilotRule {
+    id: string;
+    type: 'keyword' | 'apollo_config';
+    value: string;
+    is_active: boolean;
+    created_at: string;
+    created_by_id: string;
+    creator_name?: string;
+}
+
+export const getAutopilotRules = async (type?: string): Promise<AutopilotRule[]> => {
+    const response = await axios.get(`${API_URL}/api/autopilot/rules`, { params: { type } });
+    return response.data;
+};
+
+export const addAutopilotRule = async (data: Partial<AutopilotRule>) => {
+    const response = await axios.post(`${API_URL}/api/autopilot/rules`, data);
+    return response.data;
+};
+
+export const deleteAutopilotRule = async (id: string) => {
+    const response = await axios.delete(`${API_URL}/api/autopilot/rules/${id}`);
+    return response.data;
+};
+
 export const getCompetitors = async (): Promise<Competitor[]> => {
-    const response = await axios.get(`${API_URL}/api/competitors/`);
+    const response = await axios.get(`${API_URL}/api/autopilot/competitors`);
     return response.data;
 };
 
 export const addCompetitor = async (data: { name?: string, linkedin_url: string }) => {
-    const response = await axios.post(`${API_URL}/api/competitors/`, data);
+    const response = await axios.post(`${API_URL}/api/autopilot/competitors`, data);
     return response.data;
 };
 
 export const deleteCompetitor = async (id: string) => {
-    const response = await axios.delete(`${API_URL}/api/competitors/${id}`);
+    const response = await axios.delete(`${API_URL}/api/autopilot/competitors/${id}`);
     return response.data;
 };
 

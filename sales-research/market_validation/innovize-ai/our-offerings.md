@@ -12,7 +12,7 @@ InnovizeAI is an AI delivery partner for agencies and an AI transformation partn
 | :---- | :---- |
 | **Inbox & Workflow Automation** Intent detection, smart routing, suggested replies. CRM enrichment and action triggers based on email content. ***Example:** Support ticket triage, inquiry automation* | **Reporting Automation** Ingest messy CSV/Excel data, generate charts, produce narrative summaries. Scheduled reporting that runs itself. ***Example:** Weekly KPI decks, board reporting automation* |
 
- [Read Case studies here](https://www.notion.so/innovizeai/Portfolio-Case-Studies-11caea48a31b8027a776c5d19b6352cb). 
+ [Read Case studies here](https://www.https://innovizeai.notion.site/innovizeai/Portfolio-Case-Studies-11caea48a31b8027a776c5d19b6352cb). 
 
 # **Product: Glial Revenue Intelligence System**
 

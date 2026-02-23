@@ -46,7 +46,9 @@ async def run_classification_and_update(raw_leads: List[dict]):
             if lead["linkedin_url"] not in unique_profiles_map:
                 unique_profiles_map[lead["linkedin_url"]] = {
                     "id": lead["linkedin_url"],
-                    "headline": lead.get("headline", "")
+                    "headline": lead.get("headline", ""),
+                    "comment": lead.get("comment", ""),
+                    "source_post": lead.get("source_post", "")
                 }
         
         unique_profiles_list = list(unique_profiles_map.values())
@@ -98,13 +100,20 @@ async def run_classification_and_update(raw_leads: List[dict]):
                 
                 # D. Trigger Individual Notifications for Hot Leads or Pain Points
                 for lu in leads_to_update_batch:
-                    if lu.get("is_fit") or lu.get("intent") == "pain_point":
+                    # High Priority: fit AND high intent OR just a pain point intent
+                    is_hot = lu.get("is_fit") and lu.get("intent") in ["interested", "pain_point"]
+                    is_qualified = lu.get("is_fit") and not is_hot
+                    
+                    if is_hot or lu.get("intent") == "pain_point" or is_qualified:
+                        title_prefix = "🔥 Hot Lead" if is_hot else "👀 Qualified Lead"
+                        if lu.get("intent") == "pain_point":
+                            title_prefix = "🚨 Pain Point"
+
                         async with SessionLocal() as session:
-                            # We don't use session.begin() here because log_activity_and_notify handles its own commits via CRUD
                             await log_activity_and_notify(
                                 session,
-                                type="high_potential" if lu.get("is_fit") else "comment",
-                                title=f"Hot Lead: {lu.get('name') or 'Someone'} linked to {lu.get('competitor') or 'competitor'}",
+                                type="high_potential" if is_hot else "comment",
+                                title=f"{title_prefix}: {lu.get('name') or 'Someone'} linked to {lu.get('competitor') or 'competitor'}",
                                 description=f"Intent: {lu.get('intent')} | Sentiment: {lu.get('sentiment')}\nComment: {lu.get('comment')}",
                                 metadata=lu
                             )

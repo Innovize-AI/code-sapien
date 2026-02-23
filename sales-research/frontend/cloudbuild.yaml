@@ -46,4 +46,4 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _API_URL: "http://localhost:8000" # Default value, can be overridden in trigger or via CLI
+  _API_URL: "http://localhost:8000" # Default value, can be overridden in trigger

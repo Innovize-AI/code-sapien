@@ -34,7 +34,7 @@ steps:
       - "us-central1"
       - "--port"
       - "3000"
-      - "--allow-unauthenticated"
+      - "--no-allow-unauthenticated"
 
 images:
   - "gcr.io/$PROJECT_ID/glial-research-frontend:$COMMIT_SHA"

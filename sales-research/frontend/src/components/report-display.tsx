@@ -60,6 +60,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { API_URL } from "@/lib/api";
 
 interface ReportDisplayProps {
   data: {
@@ -249,7 +250,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         : editedOutreach;
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/sales-research/reports/${currentData.id}/${endpoint}`,
+        `${API_URL}/sales-research/reports/${currentData.id}/${endpoint}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -300,7 +301,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     setIsSavingIntentEmail(true);
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/sales-research/reports/${currentData.id}/intent-email`,
+        `${API_URL}/sales-research/reports/${currentData.id}/intent-email`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

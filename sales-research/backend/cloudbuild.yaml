@@ -10,7 +10,7 @@ steps:
         "gcr.io/$PROJECT_ID/glial-research-backend:latest",
         ".",
       ]
-    dir: "backend"
+    dir: "sales-research/backend"
 
   # 2. Push the image to Container Registry
   - name: "gcr.io/cloud-builders/docker"

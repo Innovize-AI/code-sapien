@@ -44,6 +44,4 @@ EXPOSE 8080
 ENV PYTHONPATH=/app
 
 # Run migrations and start application
-# Note: In a real prod env, you might want to run migrations separately, 
-# but for simplicity we can include them in the startup if it's safe.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8080"

@@ -32,3 +32,5 @@ elif raw_url.startswith("postgresql://"):
     DATABASE_URL = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 else:
     DATABASE_URL = raw_url
+    
+DB_SCHEMA = os.getenv("DB_SCHEMA", "public")

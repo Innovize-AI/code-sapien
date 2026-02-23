@@ -37,7 +37,7 @@ steps:
       - "--concurrency"
       - "80"
       - "--cpu-throttling"
-      - "--set-env-vars"
+      - "--update-env-vars"
       - "ENVIRONMENT=production"
       - "--no-allow-unauthenticated"
 

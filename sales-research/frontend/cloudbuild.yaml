@@ -4,6 +4,8 @@ steps:
     args:
       [
         "build",
+        "--build-arg",
+        "API_URL=$_API_URL",
         "-t",
         "gcr.io/$PROJECT_ID/glial-research-frontend:$COMMIT_SHA",
         "-t",
@@ -42,3 +44,6 @@ images:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _API_URL: "http://localhost:8000" # Default value, can be overridden in trigger or via CLI

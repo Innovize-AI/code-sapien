@@ -160,10 +160,12 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-#avoid folder
-/google-drive-slack-agent/qdrant_storage
-qdrant_storage
-backup.tar
+# Avoid accidental project folders
+carousel-craft/
+open-claw/
+innovize-ai-marketing/
+open-cv-poc/
+content-generation/
 
 .next/
 node_modules/

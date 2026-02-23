@@ -37,8 +37,8 @@ steps:
       - "--concurrency"
       - "80"
       - "--cpu-throttling"
-      - "--set-env-vars"
       - "ENVIRONMENT=production"
+      - "--no-allow-unauthenticated"
 
 images:
   - "gcr.io/$PROJECT_ID/glial-research-backend:$COMMIT_SHA"

@@ -83,17 +83,19 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        # Set the search path so migrations happen ONLY in the correct schema.
-        # We include 'public' at the end only so extensions/functions are found.
-        connection.execute(text(f'SET search_path TO "{DB_SCHEMA}", public'))
-        # Ensure the schema exists (migration-level safeguard)
+        # CRITICAL: We ONLY set the search path to the target schema.
+        # We do NOT include 'public' here to prevent Alembic from accidentally 
+        # finding and modifying tables in the production/public schema.
+        connection.execute(text(f'SET search_path TO "{DB_SCHEMA}"'))
+        
+        # Ensure the schema exists
         connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{DB_SCHEMA}"'))
         
         context.configure(
             connection=connection, 
             target_metadata=target_metadata,
             version_table_schema=DB_SCHEMA,
-            include_schemas=True,
+            include_schemas=False, # Don't crawl other schemas
         )
 
         with context.begin_transaction():

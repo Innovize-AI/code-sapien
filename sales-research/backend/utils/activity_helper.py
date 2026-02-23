@@ -9,7 +9,8 @@ async def log_activity_and_notify(
     type: str, 
     title: str, 
     description: str = None, 
-    metadata: dict = None
+    metadata: dict = None,
+    user_id: str = None
 ):
     """
     Logs an activity to the database and sends a Slack notification if configured.
@@ -28,8 +29,19 @@ async def log_activity_and_notify(
         description=description, 
         metadata_json=metadata_json,
         intent=intent,
-        sentiment=sentiment
+        sentiment=sentiment,
+        user_id=user_id
     )
+
+    # 1.5 Resolve Rep Name
+    rep_name = None
+    if user_id:
+        from db.models import Profile
+        from sqlalchemy import select
+        result = await db.execute(select(Profile).where(Profile.id == user_id))
+        profile = result.scalars().first()
+        if profile:
+            rep_name = profile.email.split("@")[0].replace(".", " ").title()
     
     # 2. Fetch Slack webhook and notify
     settings = await get_org_settings(db)
@@ -54,7 +66,9 @@ async def log_activity_and_notify(
                 sentiment=sentiment or "neutral",
                 reasoning=metadata.get("fit_reasoning", ""),
                 source=source_text,
-                post_link=metadata.get("source_post_url")
+                post_link=metadata.get("source_post_url"),
+                rep_name=rep_name,
+                title=title
             )
         elif type == "analysis" and metadata and metadata.get("report_id"):
             blocks = build_research_completed_blocks(
@@ -62,10 +76,13 @@ async def log_activity_and_notify(
                 lead_score=metadata.get("lead_score", 0),
                 why_now=metadata.get("why_now", ""),
                 action_plan=metadata.get("action_plan", []),
-                report_id=metadata.get("report_id")
+                report_id=metadata.get("report_id"),
+                rep_name=rep_name
             )
         else:
-            blocks = build_generic_activity_blocks(title, description)
+            blocks = build_generic_activity_blocks(title, description, rep_name=rep_name)
 
-        slack_text = f"*{title}*\n{description}" if description else f"*{title}*"
-        await send_slack_notification(settings.slack_webhook_url, slack_text, blocks=blocks)
+        # 3. Send Slack Notification
+        if settings.slack_webhook_url:
+            slack_text = f"*{title}*\n{description}" if description else f"*{title}*"
+            await send_slack_notification(settings.slack_webhook_url, slack_text, blocks=blocks)

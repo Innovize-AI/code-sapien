@@ -11,9 +11,25 @@ class SupabaseService:
     def __init__(self):
         self.url = os.getenv("SUPABASE_URL")
         self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+        self.database_url = os.getenv("DATABASE_URL")
+        
+        # Robust URL resolution: if url is a pooler or doesn't start with https, try to fix it
+        if self.url and ("pooler.supabase.com" in self.url or not self.url.startswith("http")):
+             if self.database_url and "postgres." in self.database_url:
+                try:
+                    # Extract project ref from postgres.[REF]:[PASS]@[HOST]
+                    part1 = self.database_url.split("postgres.")[1]
+                    project_ref = part1.split(":")[0]
+                    self.url = f"https://{project_ref}.supabase.co"
+                except:
+                    pass
+
         self.client: Client = None
         if self.url and self.key:
-            self.client = create_client(self.url, self.key)
+            try:
+                self.client = create_client(self.url, self.key)
+            except Exception as e:
+                print(f"Failed to create Supabase client: {e}")
 
     def batch_upsert_profiles(self, profiles: list[dict]):
         """

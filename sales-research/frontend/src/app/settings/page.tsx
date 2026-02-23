@@ -2,12 +2,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Loader2, Save, Plus, Trash2 } from "lucide-react"
+import { Loader2, Save, Plus, Trash2, ShieldAlert, UserCheck, Lock, Building2, User, Briefcase } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/context/auth-context"
 import {
     Form,
     FormControl,
@@ -21,7 +22,18 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { saveICP, getICP, IdealProfileData, saveIntegrations, getIntegrations, IntegrationSettings, getCompetitors, addCompetitor, deleteCompetitor, Competitor } from "@/lib/api"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { 
+    saveICP, getICP, IdealProfileData, 
+    saveIntegrations, getIntegrations, getUserIntegrations, saveUserIntegrations, IntegrationSettings, 
+    getCompetitors, addCompetitor, deleteCompetitor, Competitor,
+    getSellingProfile, saveSellingProfile, SellingProfileConfig
+} from "@/lib/api"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
+
+// --- Schemas ---
 
 const icpFormSchema = z.object({
     industry: z.string().min(2, "Industry is required"),
@@ -38,10 +50,23 @@ const keysFormSchema = z.object({
     company_linkedin_url: z.string().optional().refine(val => !val || val.includes("linkedin.com"), "Must be a valid LinkedIn URL"),
     email_config: z.string().optional(),
     slack_webhook_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+    slack_user_id: z.string().optional(),
 })
 
+const sellingProfileSchema = z.object({
+    company_name: z.string().min(1, "Company Name is required"),
+    description: z.string().min(1, "Description is required"),
+    products: z.array(z.object({
+        name: z.string().min(1, "Product Name is required"),
+        description: z.string().min(1, "Product Description is required"),
+        is_strategic_pivot: z.boolean().optional(),
+        target_roles: z.array(z.string()).optional() // Handled as comma-sep string in UI for simplicity
+    }))
+})
 
 export default function SettingsPage() {
+    const { user } = useAuth()
+    const isAdmin = user?.role === "admin"
     const [isLoading, setIsLoading] = useState(false)
     const [isFetching, setIsFetching] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -50,59 +75,182 @@ export default function SettingsPage() {
     const [newCompetitorUrl, setNewCompetitorUrl] = useState("")
     const [isAddingCompetitor, setIsAddingCompetitor] = useState(false)
 
-    const form = useForm<IdealProfileData>({
-        resolver: zodResolver(icpFormSchema),
+    // --- Forms ---
+    
+    // 1. Personal Settings Form (User Context)
+    const personalForm = useForm<IntegrationSettings & IdealProfileData>({
+        resolver: zodResolver(z.intersection(keysFormSchema, icpFormSchema)),
         defaultValues: {
-            industry: "",
-            company_size: "",
-            revenue: "",
-            job_title: "",
-            value_proposition: "",
-        },
+            // ICP Defaults
+            industry: "", company_size: "", revenue: "", job_title: "", value_proposition: "",
+            // User Integrations Defaults
+            user_linkedin_url: "", email_config: "", slack_user_id: ""
+        }
     })
 
-    const keysForm = useForm<IntegrationSettings>({
-        resolver: zodResolver(keysFormSchema),
+    // 2. Organization Settings Form (Global Context)
+    const orgForm = useForm<IntegrationSettings & IdealProfileData & SellingProfileConfig>({
+        // We might need a loose schema here since admins only edit parts, or split into sub-forms. 
+        // For simplicity, we'll use separate submit handlers but one state object isn't ideal.
+        // Let's keep them separate in logic.
+        defaultValues: {} 
+    })
+    
+    // We'll use separate form instances for Org sections to manage validation cleanliness
+    const globalIcpForm = useForm<IdealProfileData>({ resolver: zodResolver(icpFormSchema) })
+    const globalKeysForm = useForm<IntegrationSettings>({ resolver: zodResolver(keysFormSchema) })
+    const sellingProfileForm = useForm<SellingProfileConfig>({ 
+        resolver: zodResolver(sellingProfileSchema),
         defaultValues: {
-            tavily_api_key: "",
-            apollo_api_key: "",
-            user_linkedin_url: "",
-            company_linkedin_url: "",
-            email_config: "",
-            slack_webhook_url: "",
-        },
-
+            company_name: "",
+            description: "",
+            products: []
+        }
     })
 
-    // Load existing settings
+    const { fields: productFields, append: appendProduct, remove: removeProduct } = useFieldArray({
+        control: sellingProfileForm.control,
+        name: "products"
+    });
+
+    // Load Data
     useEffect(() => {
         const loadSettings = async () => {
+            setIsFetching(true)
             try {
-                const [icpData, keysData, competitorsData] = await Promise.all([getICP(), getIntegrations(), getCompetitors()])
-                if (icpData) {
-                    // Start: Sanitize nulls to empty strings
-                    const sanitizedIcp = Object.fromEntries(
-                        Object.entries(icpData).map(([k, v]) => [k, v ?? ""])
-                    ) as IdealProfileData
-                    form.reset(sanitizedIcp)
+                // Fetch Global Data
+                const [globalIcp, globalKeys, globalSelling, competitorsList] = await Promise.all([
+                    getICP(), // This returns user override if present, but for Org tab we want GLOBAL. 
+                              // API behavior: getICP returns user's if present. 
+                              // We need a way to get RAW GLOBAL. 
+                              // Current API limitation: User sees what applies to them. 
+                              // For Admin editing Global, they are the user, so it works if they haven't overridden it. 
+                              // *Assumption*: Admins don't override their own ICP, they set the Global one.
+                    isAdmin ? getIntegrations() : Promise.resolve(null),
+                    getSellingProfile(),
+                    getCompetitors()
+                ])
+
+                // Fetch Personal Data
+                const userIntegrations = await getUserIntegrations()
+                // We can't easily fetch "User Only ICP" separate from "Resolved ICP" with current API 
+                // without modifying backend to explicitly separate them.
+                // Workaround: We will use the resolved ICP for the Personal Tab as "Your Current Configuration".
+
+                // Populate Personal Form
+                if (userIntegrations) {
+                    personalForm.setValue("user_linkedin_url", userIntegrations.user_linkedin_url || "")
+                    personalForm.setValue("email_config", userIntegrations.email_config || "")
+                    personalForm.setValue("slack_user_id", userIntegrations.slack_user_id || "")
                 }
-                if (keysData) {
-                    const sanitizedKeys = Object.fromEntries(
-                        Object.entries(keysData).map(([k, v]) => [k, v ?? ""])
-                    ) as IntegrationSettings
-                    keysForm.reset(sanitizedKeys)
+                if (globalIcp) {
+                   // If user is not admin, this is their effective ICP (potentially overridden).
+                   // If user IS admin, this is likely the global ICP.
+                   // We'll populate both forms initially, but save logic differs.
+                   const icpValues = {
+                       industry: globalIcp.industry || "",
+                       company_size: globalIcp.company_size || "",
+                       revenue: globalIcp.revenue || "",
+                       job_title: globalIcp.job_title || "",
+                       value_proposition: globalIcp.value_proposition || ""
+                   }
+                   personalForm.reset({ ...personalForm.getValues(), ...icpValues })
+                   globalIcpForm.reset(icpValues)
                 }
-                if (competitorsData) {
-                    setCompetitors(competitorsData)
+
+                // Populate Org Forms
+                if (globalKeys) {
+                    globalKeysForm.reset(globalKeys)
                 }
+                if (globalSelling) {
+                    sellingProfileForm.reset(globalSelling)
+                }
+                if (competitorsList) {
+                    setCompetitors(competitorsList)
+                }
+
             } catch (e) {
                 console.error("Failed to load settings", e)
+                setError("Failed to load settings.")
             } finally {
                 setIsFetching(false)
             }
         }
         loadSettings()
-    }, [form, keysForm])
+    }, [isAdmin])
+
+
+    // --- Handlers ---
+
+    const handleSavePersonal = async (values: any) => {
+        setIsLoading(true); setSuccess(null); setError(null);
+        try {
+            // Save User Integrations
+            await saveUserIntegrations({
+                user_linkedin_url: values.user_linkedin_url,
+                email_config: values.email_config,
+                slack_user_id: values.slack_user_id
+            })
+            // Save User ICP Override (Backend handles "if not admin then override" logic for this endpoint? 
+            // Actually `saveICP` checks role. If not admin, it saves to user settings. Perfect.)
+            await saveICP({
+                industry: values.industry,
+                company_size: values.company_size,
+                revenue: values.revenue,
+                job_title: values.job_title,
+                value_proposition: values.value_proposition
+            })
+            setSuccess("Personal settings saved successfully.")
+            setTimeout(() => setSuccess(null), 3000)
+        } catch (e) {
+            setError("Failed to save personal settings.")
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleSaveGlobalICP = async (values: IdealProfileData) => {
+        if (!isAdmin) return;
+        setIsLoading(true); setSuccess(null); setError(null);
+        try {
+            // Admin calling saveICP updates Global Settings
+            await saveICP(values)
+            setSuccess("Global ICP updated.")
+            setTimeout(() => setSuccess(null), 3000)
+        } catch (e) {
+            setError("Failed to update Global ICP.")
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleSaveGlobalKeys = async (values: IntegrationSettings) => {
+        if (!isAdmin) return;
+        setIsLoading(true); setSuccess(null); setError(null);
+        try {
+            await saveIntegrations(values)
+            setSuccess("Integration keys updated.")
+            setTimeout(() => setSuccess(null), 3000)
+        } catch (e) {
+            setError("Failed to update keys.")
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleSaveSellingProfile = async (values: SellingProfileConfig) => {
+        if (!isAdmin) return;
+        setIsLoading(true); setSuccess(null); setError(null);
+        try {
+            await saveSellingProfile(values)
+            setSuccess("Selling profile updated.")
+            setTimeout(() => setSuccess(null), 3000)
+        } catch (e) {
+            setError("Failed to update selling profile.")
+        } finally {
+            setIsLoading(false)
+        }
+    }
 
     const handleAddCompetitor = async () => {
         if (!newCompetitorUrl) return
@@ -128,22 +276,6 @@ export default function SettingsPage() {
         }
     }
 
-    async function onSubmit(values: IdealProfileData) {
-        setIsLoading(true)
-        setError(null)
-        setSuccess(null)
-        try {
-            await saveICP(values)
-            // Save keys as well
-            await saveIntegrations(keysForm.getValues())
-            setSuccess("Settings saved successfully!")
-            setTimeout(() => setSuccess(null), 3000)
-        } catch (e: any) {
-            setError("Failed to save settings. Please try again.")
-        } finally {
-            setIsLoading(false)
-        }
-    }
 
     if (isFetching) {
         return (
@@ -154,273 +286,448 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto py-8">
-            <h1 className="text-3xl font-bold mb-8">Settings</h1>
+        <div className="max-w-5xl mx-auto py-8 px-4">
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold">Settings</h1>
+                    <p className="text-muted-foreground mt-1">Manage your personal preferences and organization defaults.</p>
+                </div>
+                <Badge variant="outline" className={isAdmin ? "text-primary border-primary/20 bg-primary/5" : "text-amber-500 border-amber-500/20 bg-amber-500/5"}>
+                    {isAdmin ? <ShieldAlert className="w-3 h-3 mr-1" /> : <UserCheck className="w-3 h-3 mr-1" />}
+                    {isAdmin ? "Admin Access" : "Representative Access"}
+                </Badge>
+            </div>
 
-            <div className="grid gap-8">
-                <Card className="border-border">
-                    <CardHeader>
-                        <CardTitle>Ideal Customer Profile</CardTitle>
-                        <CardDescription>
-                            Configure your target audience parameters for automated research.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                                <FormField
-                                    control={form.control}
-                                    name="industry"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Target Industry</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="e.g. Fintech, Healthcare, SaaS" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+            {error && <Alert variant="destructive" className="mb-6"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+            {success && <Alert className="mb-6 border-green-500/20 bg-green-500/5 text-green-700"><AlertTitle>Success</AlertTitle><AlertDescription>{success}</AlertDescription></Alert>}
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="company_size"
+            <Tabs defaultValue="personal" className="w-full space-y-6">
+                <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+                    <TabsTrigger value="personal" className="gap-2"><User className="w-4 h-4"/> Personal Settings</TabsTrigger>
+                    <TabsTrigger value="organization" className="gap-2"><Building2 className="w-4 h-4"/> Organization</TabsTrigger>
+                </TabsList>
+
+                {/* --- PERSONAL SETTINGS TAB --- */}
+                <TabsContent value="personal" className="space-y-6 animate-in fade-in slide-in-from-top-2">
+                     <Alert className="border-blue-500/20 bg-blue-500/5">
+                        <UserCheck className="h-4 w-4 text-blue-500" />
+                        <AlertTitle className="text-blue-500">Member Configuration</AlertTitle>
+                        <AlertDescription className="text-blue-500/80">
+                            Settings configured here apply <strong>only to you</strong> and override organization defaults.
+                        </AlertDescription>
+                    </Alert>
+
+                    <Form {...personalForm}>
+                        <form onSubmit={personalForm.handleSubmit(handleSavePersonal)} className="space-y-8">
+                            
+                            {/* Personal Identity */}
+                            <Card>
+                                <CardHeader><CardTitle>Identity & Integrations</CardTitle><CardDescription>Your private credentials for research.</CardDescription></CardHeader>
+                                <CardContent className="space-y-4">
+                                     <FormField
+                                        control={personalForm.control}
+                                        name="user_linkedin_url"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Company Size</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Any size" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="1-10">1-10 employees</SelectItem>
-                                                        <SelectItem value="11-50">11-50 employees</SelectItem>
-                                                        <SelectItem value="51-200">51-200 employees</SelectItem>
-                                                        <SelectItem value="201-500">201-500 employees</SelectItem>
-                                                        <SelectItem value="500+">500+ employees</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                                <FormLabel>Your LinkedIn URL</FormLabel>
+                                                <FormControl><Input placeholder="https://linkedin.com/in/yourname" {...field} /></FormControl>
+                                                <FormDescription>Used to track lead engagement on your posts.</FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
                                     <FormField
-                                        control={form.control}
-                                        name="revenue"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Annual Revenue</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Any revenue" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="<$1M">Less than $1M</SelectItem>
-                                                        <SelectItem value="$1M-$10M">$1M - $10M</SelectItem>
-                                                        <SelectItem value="$10M-$50M">$10M - $50M</SelectItem>
-                                                        <SelectItem value="$50M+">$50M+</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-
-                                <FormField
-                                    control={form.control}
-                                    name="job_title"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Target Job Titles</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="e.g. CTO, VP of Engineering, Product Manager" {...field} />
-                                            </FormControl>
-                                            <FormDescription>Separate multiple titles with commas.</FormDescription>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={form.control}
-                                    name="value_proposition"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Value Proposition (Optional)</FormLabel>
-                                            <FormControl>
-                                                <Textarea
-                                                    placeholder="Briefly describe how your product helps these customers..."
-                                                    className="resize-none min-h-[80px]"
-                                                    {...field}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <div className="pt-4 border-t">
-                                    <h3 className="text-lg font-medium mb-4">Integrations</h3>
-                                    <div className="grid gap-4">
-                                        <FormField
-                                            control={keysForm.control}
-                                            name="tavily_api_key"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Tavily API Key</FormLabel>
-                                                    <FormControl>
-                                                        <Input type="password" placeholder="tvly-..." {...field} />
-                                                    </FormControl>
-                                                    <FormDescription>Required for web search in lead discovery.</FormDescription>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={keysForm.control}
-                                            name="apollo_api_key"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Apollo API Key (Optional)</FormLabel>
-                                                    <FormControl>
-                                                        <Input type="password" placeholder="..." {...field} />
-                                                    </FormControl>
-                                                    <FormDescription>Required if using Apollo as discovery provider.</FormDescription>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4 mt-4">
-                                        <FormField
-                                            control={keysForm.control}
-                                            name="user_linkedin_url"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Your LinkedIn URL</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="https://linkedin.com/in/yourname" {...field} />
-                                                    </FormControl>
-                                                    <FormDescription>Used to track lead engagement with your posts.</FormDescription>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={keysForm.control}
-                                            name="company_linkedin_url"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Company LinkedIn URL</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="https://linkedin.com/company/yourcompany" {...field} />
-                                                    </FormControl>
-                                                    <FormDescription>Used to track lead engagement with company posts.</FormDescription>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="grid gap-4 mt-4">
-                                        <FormField
-                                            control={keysForm.control}
-                                            name="slack_webhook_url"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Slack Webhook URL (Optional)</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="https://hooks.slack.com/services/..." {...field} />
-                                                    </FormControl>
-                                                    <FormDescription>Used for real-time activity notifications.</FormDescription>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                </div>
-
-
-                                <div className="pt-4 border-t">
-                                    <h3 className="text-lg font-medium mb-4">Email Configuration (IMAP)</h3>
-                                    <FormField
-                                        control={keysForm.control}
+                                        control={personalForm.control}
                                         name="email_config"
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>IMAP Configuration (JSON)</FormLabel>
                                                 <FormControl>
-                                                    <Textarea
-                                                        placeholder='{"imap_server": "imap.gmail.com", "email_user": "your@email.com", "email_password": "app-password"}'
-                                                        className="resize-none min-h-[100px] font-mono text-sm"
-                                                        {...field}
+                                                    <Textarea 
+                                                        placeholder='{"imap_server": "...", "email_user": "...", "email_password": "..."}' 
+                                                        className="font-mono text-sm min-h-[80px]" 
+                                                        {...field} 
                                                     />
                                                 </FormControl>
-                                                <FormDescription>
-                                                    Provide IMAP server details in JSON format. Required for email history analysis.
-                                                </FormDescription>
+                                                <FormDescription>Required for analyzing your email history with leads.</FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
-                                </div>
+                                    <FormField
+                                        control={personalForm.control}
+                                        name="slack_user_id"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Slack Member ID</FormLabel>
+                                                <FormControl><Input placeholder="U01234567" {...field} /></FormControl>
+                                                <FormDescription>Used to identify you when you click buttons in Slack.</FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </CardContent>
+                            </Card>
 
-                                {error && <div className="text-red-500 text-sm">{error}</div>}
-                                {success && <div className="text-green-500 text-sm">{success}</div>}
+                            {/* Personal ICP Override */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Personal ICP Override</CardTitle>
+                                    <CardDescription>Customize the Ideal Customer Profile for your specific territory or focus.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <FormField
+                                        control={personalForm.control}
+                                        name="industry"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Target Industry</FormLabel>
+                                                <FormControl><Input placeholder="e.g. Fintech" {...field} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <FormField
+                                            control={personalForm.control}
+                                            name="company_size"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Company Size</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                        <FormControl><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger></FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="1-10">1-10</SelectItem>
+                                                            <SelectItem value="11-50">11-50</SelectItem>
+                                                            <SelectItem value="51-200">51-200</SelectItem>
+                                                            <SelectItem value="201-500">201-500</SelectItem>
+                                                            <SelectItem value="500+">500+</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={personalForm.control}
+                                            name="revenue"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Revenue</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                        <FormControl><SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger></FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="<$1M">&lt;$1M</SelectItem>
+                                                            <SelectItem value="$1M-$10M">$1M - $10M</SelectItem>
+                                                            <SelectItem value="$10M-$50M">$10M - $50M</SelectItem>
+                                                            <SelectItem value="$50M+">$50M+</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                    <FormField
+                                        control={personalForm.control}
+                                        name="job_title"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Job Titles</FormLabel>
+                                                <FormControl><Input placeholder="CTO, VP Eng" {...field} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                     <FormField
+                                        control={personalForm.control}
+                                        name="value_proposition"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>My Value Prop</FormLabel>
+                                                <FormControl><Textarea placeholder="How I pitch to this segment..." {...field} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </CardContent>
+                            </Card>
 
-                                <Button type="submit" disabled={isLoading}>
-                                    {isLoading ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Save className="mr-2 h-4 w-4" />
-                                    )}
-                                    Save Changes
-                                </Button>
-                            </form>
-                        </Form>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-border">
-                    <CardHeader>
-                        <CardTitle>Competitor List</CardTitle>
-                        <CardDescription>
-                            Add competitor LinkedIn profiles to track and generate leads from.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            <div className="flex gap-2">
-                                <Input
-                                    placeholder="LinkedIn Profile URL"
-                                    value={newCompetitorUrl}
-                                    onChange={(e) => setNewCompetitorUrl(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleAddCompetitor()}
-                                />
-                                <Button onClick={handleAddCompetitor} disabled={isAddingCompetitor || !newCompetitorUrl}>
-                                    {isAddingCompetitor ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                                    <span className="ml-2">Add</span>
+                            <div className="flex justify-end">
+                                <Button type="submit" disabled={isLoading} size="lg">
+                                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    Save Personal Settings
                                 </Button>
                             </div>
-                            <div className="space-y-2">
-                                {competitors.map((competitor) => (
-                                    <div key={competitor.id} className="flex items-center justify-between p-2 border rounded-md">
-                                        <span className="text-sm truncate max-w-[300px]">{competitor.linkedin_url}</span>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteCompetitor(competitor.id)}>
-                                            <Trash2 className="h-4 w-4 text-destructive" />
+                        </form>
+                    </Form>
+                </TabsContent>
+
+                {/* --- ORGANIZATION SETTINGS TAB --- */}
+                <TabsContent value="organization" className="space-y-6 animate-in fade-in slide-in-from-top-2">
+                     {!isAdmin && (
+                        <Alert variant="destructive" className="border-amber-500/20 bg-amber-500/5">
+                            <Lock className="h-4 w-4 text-amber-500" />
+                            <AlertTitle className="text-amber-500">Read Only Mode</AlertTitle>
+                            <AlertDescription className="text-amber-500/80">
+                                You are viewing organization-wide defaults. Only administrators can modify these settings.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Selling Profile */}
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Selling Profile</CardTitle>
+                            <CardDescription>Define what the organization sells. This context is used to generate strategic pivots and match scores.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Form {...sellingProfileForm}>
+                                <form onSubmit={sellingProfileForm.handleSubmit(handleSaveSellingProfile)} className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <FormField
+                                            control={sellingProfileForm.control}
+                                            name="company_name"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Company Name</FormLabel>
+                                                    <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                         <FormField
+                                            control={sellingProfileForm.control}
+                                            name="description"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Company Tagline</FormLabel>
+                                                    <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                    
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="text-sm font-semibold">Products & Services</h4>
+                                            {isAdmin && (
+                                                <Button type="button" variant="outline" size="sm" onClick={() => appendProduct({ name: "", description: "" })}>
+                                                    <Plus className="w-3 h-3 mr-1" /> Add Product
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {productFields.map((field, index) => (
+                                            <div key={field.id} className="p-4 border rounded-lg bg-muted/10 space-y-3 relative group">
+                                                {isAdmin && (
+                                                    <Button type="button" variant="ghost" size="sm" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeProduct(index)}>
+                                                        <Trash2 className="w-3 h-3 text-destructive" />
+                                                    </Button>
+                                                )}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <FormField
+                                                        control={sellingProfileForm.control}
+                                                        name={`products.${index}.name`}
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormLabel className="text-xs">Product Name</FormLabel>
+                                                                <FormControl><Input {...field} disabled={!isAdmin} className="h-8" /></FormControl>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                    <FormField
+                                                        control={sellingProfileForm.control}
+                                                        name={`products.${index}.is_strategic_pivot`}
+                                                        render={({ field }) => (
+                                                            <FormItem className="flex flex-row items-end space-x-2 space-y-0 h-full pb-2">
+                                                                <FormControl>
+                                                                    <Checkbox 
+                                                                        checked={field.value} 
+                                                                        onCheckedChange={field.onChange} 
+                                                                        disabled={!isAdmin} 
+                                                                    />
+                                                                </FormControl>
+                                                                <FormLabel className="font-normal text-xs cursor-pointer">
+                                                                    Mark as Strategic Pivot (Hero Product)
+                                                                </FormLabel>
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </div>
+                                                <FormField
+                                                    control={sellingProfileForm.control}
+                                                    name={`products.${index}.target_roles`}
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs">Target Roles (comma separated)</FormLabel>
+                                                            <FormControl>
+                                                                <Input 
+                                                                    {...field} 
+                                                                    value={Array.isArray(field.value) ? field.value.join(", ") : (field.value || "")}
+                                                                    onChange={e => field.onChange(e.target.value.split(",").map(s => s.trim()))}
+                                                                    disabled={!isAdmin} 
+                                                                    placeholder="Founder, CTO, VP Sales"
+                                                                    className="h-8"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                 <FormField
+                                                    control={sellingProfileForm.control}
+                                                    name={`products.${index}.description`}
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs">Value & Capabilities</FormLabel>
+                                                            <FormControl><Textarea {...field} disabled={!isAdmin} className="min-h-[60px] resize-none" /></FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {isAdmin && (
+                                        <div className="flex justify-end">
+                                            <Button type="submit" disabled={isLoading} size="sm" variant="outline">
+                                                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                                Update Selling Profile
+                                            </Button>
+                                        </div>
+                                    )}
+                                </form>
+                            </Form>
+                        </CardContent>
+                    </Card>
+
+                    {/* Global ICP */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Global Ideal Customer Profile</CardTitle>
+                            <CardDescription>The default research baseline for the entire organization.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Form {...globalIcpForm}>
+                                <form onSubmit={globalIcpForm.handleSubmit(handleSaveGlobalICP)} className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <FormField
+                                            control={globalIcpForm.control}
+                                            name="industry"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Industry</FormLabel>
+                                                    <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={globalIcpForm.control}
+                                            name="job_title"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Job Title</FormLabel>
+                                                    <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                    <FormField
+                                            control={globalIcpForm.control}
+                                            name="value_proposition"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Global Value Prop</FormLabel>
+                                                    <FormControl><Textarea {...field} disabled={!isAdmin} className="h-20" /></FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    {isAdmin && (
+                                        <div className="flex justify-end">
+                                            <Button type="submit" disabled={isLoading} size="sm" variant="outline">Update Global ICP</Button>
+                                        </div>
+                                    )}
+                                </form>
+                            </Form>
+                        </CardContent>
+                    </Card>
+
+                    {/* Competitors */}
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Competitor Tracking</CardTitle>
+                            <CardDescription>Competitor profiles monitored for lead sourcing.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <div className="space-y-4">
+                                {isAdmin && (
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="LinkedIn Profile URL"
+                                            value={newCompetitorUrl}
+                                            onChange={(e) => setNewCompetitorUrl(e.target.value)}
+                                            onKeyPress={(e) => e.key === 'Enter' && handleAddCompetitor()}
+                                        />
+                                        <Button onClick={handleAddCompetitor} disabled={isAddingCompetitor || !newCompetitorUrl}>
+                                            <Plus className="h-4 w-4" />
                                         </Button>
                                     </div>
-                                ))}
+                                )}
+                                <div className="space-y-2">
+                                    {competitors.map((competitor) => (
+                                        <div key={competitor.id} className="flex items-center justify-between p-2 border rounded-md bg-muted/20">
+                                            <div className="flex items-center gap-2">
+                                                <Briefcase className="w-4 h-4 text-muted-foreground" />
+                                                <span className="text-sm truncate max-w-[300px]">{competitor.linkedin_url}</span>
+                                            </div>
+                                            {isAdmin && (
+                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteCompetitor(competitor.id)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {competitors.length === 0 && <p className="text-sm text-muted-foreground italic">No competitors tracked.</p>}
+                                </div>
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Global Keys */}
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>API Integrations</CardTitle>
+                            <CardDescription>Organization-wide keys for data providers.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <Form {...globalKeysForm}>
+                                <form onSubmit={globalKeysForm.handleSubmit(handleSaveGlobalKeys)} className="space-y-4">
+                                     <FormField
+                                        control={globalKeysForm.control}
+                                        name="tavily_api_key"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <div className="flex items-center justify-between">
+                                                    <FormLabel>Tavily API Key</FormLabel>
+                                                    {!isAdmin && <Badge variant="outline" className="text-xs h-5"><Lock className="w-2 h-2 mr-1"/> Admin Only</Badge>}
+                                                </div>
+                                                <FormControl><Input type="password" {...field} disabled={!isAdmin} /></FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <div className="flex justify-end pt-2">
+                                         {isAdmin && <Button type="submit" disabled={isLoading} size="sm" variant="outline">Update Keys</Button>}
+                                    </div>
+                                </form>
+                            </Form>
+                        </CardContent>
+                     </Card>
+
+                </TabsContent>
+            </Tabs>
         </div >
     )
 }

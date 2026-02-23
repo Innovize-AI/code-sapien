@@ -12,14 +12,23 @@ from workflow.graph import graph, NODE_STATUS_MAPPING
 from utils.common import add_https_if_missing
 from prompts.sales_prompts import COMPANY_CONTEXT
 
-async def _get_organization_settings() -> dict:
-    """Helper to fetch settings from database."""
+async def _get_organization_settings(user_id: str = None) -> dict:
+    """Helper to fetch settings from database with per-user overrides."""
     async with SessionLocal() as db:
         from sqlalchemy import select
-        from db.models import OrganizationSettings
-        result = await db.execute(select(OrganizationSettings).limit(1))
-        settings = result.scalars().first()
+        from db.models import OrganizationSettings, UserSettings
         
+        # 1. Fetch Global Settings
+        result = await db.execute(select(OrganizationSettings).limit(1))
+        global_settings = result.scalars().first()
+        
+        # 2. Fetch User Settings (if user_id provided)
+        user_settings = None
+        if user_id:
+            result = await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
+            user_settings = result.scalars().first()
+            
+        # 3. Default ICP (Fallback if neither global nor user set)
         icp = IdealProfile(
             industry="Finance",
             company_size="10-50",
@@ -27,32 +36,46 @@ async def _get_organization_settings() -> dict:
             job_title="CTO, CEO"
         )
         
-        user_linkedin = None
-        company_linkedin = None
+        # 4. Apply Global ICP if available
+        if global_settings and global_settings.icp_json:
+            try:
+                icp = IdealProfile(**json.loads(global_settings.icp_json))
+            except Exception as e:
+                print(f"Error parsing global ICP settings: {e}")
+                
+        # 5. Apply User ICP Override if available
+        if user_settings and user_settings.icp_json:
+            try:
+                user_icp_data = json.loads(user_settings.icp_json)
+                if user_icp_data: # If not empty dict
+                    icp = IdealProfile(**user_icp_data)
+            except Exception as e:
+                print(f"Error parsing user ICP settings: {e}")
 
-        if settings:
-            if settings.icp_json:
-                try:
-                    icp = IdealProfile(**json.loads(settings.icp_json))
-                except Exception as e:
-                    print(f"Error parsing ICP settings: {e}")
-            
-            selling_profile = None
-            if settings.selling_profile_json:
-                try:
-                    from db.schemas import SellingProfileConfig
-                    selling_profile = SellingProfileConfig(**json.loads(settings.selling_profile_json))
-                except Exception as e:
-                    print(f"Error parsing Selling Profile: {e}")
+        # 6. Resolve Identity (User-private URLs/Config)
+        # Priority: User Settings > Global Settings > None
+        user_linkedin = (user_settings.user_linkedin_url if user_settings and user_settings.user_linkedin_url else None) or \
+                        (global_settings.user_linkedin_url if global_settings else None)
+        
+        email_config = (user_settings.email_config if user_settings and user_settings.email_config else None) or \
+                       (global_settings.email_config if global_settings else None)
+        
+        company_linkedin = global_settings.company_linkedin_url if global_settings else None
+        
+        selling_profile = None
+        if global_settings and global_settings.selling_profile_json:
+            try:
+                from db.schemas import SellingProfileConfig
+                selling_profile = SellingProfileConfig(**json.loads(global_settings.selling_profile_json))
+            except Exception as e:
+                print(f"Error parsing Selling Profile: {e}")
 
-            user_linkedin = settings.user_linkedin_url
-            company_linkedin = settings.company_linkedin_url
-            
         return {
             "icp": icp,
             "selling_profile": selling_profile,
             "user_linkedin_url": user_linkedin,
-            "company_linkedin_url": company_linkedin
+            "company_linkedin_url": company_linkedin,
+            "email_config": email_config
         }
 
 def _safe_serialize(val):
@@ -75,8 +98,8 @@ def _prepare_state_for_json(state):
             cleaned[k] = v
     return cleaned
 
-async def _persist_results(db, linkedin_url, website, final_state, options):
-    """Common logic to save research results to DB."""
+async def _persist_results(db, linkedin_url, website, final_state, options, user_id=None):
+    """Common logic to save research results to DB with multi-tenant support."""
     if not final_state.get("sales_research_report"):
         print("Skipping database save: No research report generated.")
         return None
@@ -135,11 +158,10 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
         company_news=json.dumps(final_state.get("company_news") or []),
         hiring_data=json.dumps(final_state.get("hiring_data") or []),
         company_stats=json.dumps(final_state.get("company_stats") or {}),
-        lead_li_urn=final_state.get("lead_li_urn"),
-        lead_company_linkedin_url=final_state.get("lead_company_linkedin_url")
+        icp_context=json.dumps(final_state.get("ideal_profile").model_dump() if hasattr(final_state.get("ideal_profile"), "model_dump") else (final_state.get("ideal_profile") or {}))
     )
     
-    saved_report = await save_report(db, report_data)
+    saved_report = await save_report(db, report_data, user_id=user_id)
     
     if saved_report:
         # Log Activity: Analysis Completed
@@ -149,7 +171,8 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
             type="analysis",
             title=f"Analysis completed for {fullname}",
             description=f"Deep research finished with lead score: {lead_score}",
-            metadata={"report_id": str(saved_report.id), "lead_score": lead_score, "name": fullname}
+            metadata={"report_id": str(saved_report.id), "lead_score": lead_score, "name": fullname},
+            user_id=user_id
         )
         
         # Log Activity: High Potential Lead
@@ -159,20 +182,21 @@ async def _persist_results(db, linkedin_url, website, final_state, options):
                 type="high_potential",
                 title=f"🔥 High Potential Lead Identified: {fullname}",
                 description=f"Match score {lead_score}/100 exceeds threshold.",
-                metadata={"report_id": str(saved_report.id), "lead_score": lead_score, "name": fullname, "is_fit": True}
+                metadata={"report_id": str(saved_report.id), "lead_score": lead_score, "name": fullname, "is_fit": True},
+                user_id=user_id
             )
             
         return saved_report
     else:
         return None
 
-async def _run_research_gen(linkedin_url, website, options: InputLeadData, email):
+async def _run_research_gen(linkedin_url, website, options: InputLeadData, email, user_id=None):
     """Core generator that runs the research graph and yields updates."""
     website = add_https_if_missing(website)
-    thread_id = email if email else (linkedin_url if linkedin_url else str(uuid.uuid4()))
+    thread_id = f"{user_id}_{email or linkedin_url or uuid.uuid4()}"
     thread = {"configurable": {"thread_id": thread_id}}
     
-    org_settings = await _get_organization_settings()
+    org_settings = await _get_organization_settings(user_id=user_id)
     ideal_profile = org_settings["icp"]
 
     if options is None:
@@ -255,8 +279,10 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     discovery_history = []
 
     options_refresh = options.refresh if options else False
+    trigger_ctx = getattr(options, 'trigger_context', None) if options else None
 
-    if not options_refresh:
+    # Load existing state if NOT refreshing OR if this is a targeted update (which needs context)
+    if not options_refresh or trigger_ctx:
         async with SessionLocal() as db:
             existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
             if existing:
@@ -291,9 +317,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "linkedin_url": linkedin_url or existing_state.get("linkedin_url"),
         "website": website or existing_state.get("website"),
         "company_context": COMPANY_CONTEXT,
-        "company_context": COMPANY_CONTEXT,
         "selling_company_profile": selling_company_profile, # dynamic context
-        "ideal_profile": ideal_profile,
         "ideal_profile": ideal_profile,
         "user_linkedin_url": org_settings["user_linkedin_url"],
         "company_linkedin_url": org_settings["company_linkedin_url"],
@@ -344,11 +368,46 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         print(f"Error during graph execution: {e}")
         raise e
 
+async def _push_to_hubspot_if_enabled(db, user_id, report, final_state):
+    """
+    Check if HubSpot sync is enabled and push research as a Note.
+    """
+    from db.crud import get_org_settings
+    from services.hubspot_service import HubspotService
+    
+    settings = await get_org_settings(db)
+    if settings and settings.hubspot_access_token and settings.hubspot_sync_enabled:
+        try:
+            hs = HubspotService(settings.hubspot_access_token)
+            
+            # Match contact first
+            email = report.email_id
+            li_url = report.linkedin_url
+            
+            # Find contact ID from CRM Context or search HubSpot
+            from db.crud import match_crm_context
+            crm_ctx = await match_crm_context(db, email=email, linkedin_url=li_url)
+            
+            target_id = None
+            if crm_ctx and crm_ctx.hubspot_contact_id:
+                target_id = crm_ctx.hubspot_contact_id
+            
+            if target_id:
+                content = f"<h3>AI Research Report (Score: {report.lead_score})</h3>"
+                content += f"<p><b>Viability:</b> {report.viability_analysis[:500]}...</p>"
+                content += f"<p><a href='/reports/{report.id}'>View Full Report in Innovize AI</a></p>"
+                
+                await hs.push_note("contact", target_id, content)
+                print(f"Successfully pushed research note to HubSpot for {email}")
+        except Exception as e:
+            print(f"Failed to push HubSpot note: {e}")
+
 async def run_single_research(
     linkedin_url: Optional[str] = None,
     website: Optional[str] = None,
     options: InputLeadData = None,
     email: Optional[str] = None,
+    user_id: Optional[str] = None,
     progress_callback=None
 ):
     """
@@ -359,7 +418,7 @@ async def run_single_research(
 
     final_state = {}
     try:
-        async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):
+        async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email, user_id=user_id):
             final_state = current_state
             if progress_callback:
                 message = NODE_STATUS_MAPPING.get(node_name, f"Processing {node_name}...")
@@ -367,10 +426,12 @@ async def run_single_research(
 
         # Persist results to DB
         async with SessionLocal() as db:
-            await _persist_results(db, linkedin_url, website, final_state, options)
+            saved_report = await _persist_results(db, linkedin_url, website, final_state, options, user_id=user_id)
+            if saved_report:
+                # HubSpot Bidirectional Sync
+                await _push_to_hubspot_if_enabled(db, user_id, saved_report, final_state)
                 
         return {"linkedin_url": linkedin_url, "result": _prepare_state_for_json(final_state)}
     except Exception as e:
         print(f"Error in run_single_research: {e}")
         # Return error/none but don't crash caller
-        return {"linkedin_url": linkedin_url, "error": str(e)}

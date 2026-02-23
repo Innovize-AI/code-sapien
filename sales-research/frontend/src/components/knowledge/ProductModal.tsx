@@ -14,6 +14,7 @@ interface ProductModalProps {
     onSave: (config: ProductConfig) => Promise<void>;
     initialConfig?: ProductConfig;
     availableFiles: { name: string; path: string; type: 'playbooks' | 'case-studies' | 'solutions' }[];
+    isAdmin?: boolean;
 }
 
 export interface ProductConfig {
@@ -26,7 +27,7 @@ export interface ProductConfig {
 
 const COMMON_ROLES = ["Founder", "CEO", "CRO", "VP Sales", "Head of Growth", "CTO", "COO", "Director of Sales"];
 
-export function ProductModal({ isOpen, onClose, onSave, initialConfig, availableFiles }: ProductModalProps) {
+export function ProductModal({ isOpen, onClose, onSave, initialConfig, availableFiles, isAdmin }: ProductModalProps) {
     const [isSaving, setIsSaving] = useState(false);
     
     // Form State
@@ -189,7 +190,7 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
 
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
-                    <Button onClick={handleSave} disabled={isSaving || !name}>
+                    <Button onClick={handleSave} disabled={isSaving || !name || !isAdmin}>
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Save Product
                     </Button>

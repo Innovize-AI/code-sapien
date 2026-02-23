@@ -31,6 +31,8 @@ from routes.competitors import router as competitors_crud_router
 from routes.activities import activities_router
 from routes.slack_interactions import slack_interactions_router
 from routes.knowledge import router as knowledge_router
+from routes.autopilot import autopilot_router
+from routes.tasks import tasks_router
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -59,12 +61,18 @@ app.include_router(history_router, prefix="/sales-research")
 app.include_router(settings_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(webhooks_router, prefix="/api")
+from routes.webhooks import webhooks_router as wh_router
+app.include_router(wh_router, prefix="/api")
 app.include_router(kit_router, prefix="/api")
 app.include_router(competitor_router, prefix="/api/competitor-analysis")
 app.include_router(competitors_crud_router, prefix="/api")
 app.include_router(activities_router, prefix="/api")
 app.include_router(knowledge_router, prefix="/api/knowledge")
 app.include_router(slack_interactions_router)
+app.include_router(autopilot_router, prefix="/api")
+app.include_router(tasks_router, prefix="/api")
+from routes.auth import router as auth_router
+app.include_router(auth_router, prefix="/api/auth")
 
 @app.on_event("startup")
 async def startup_event():

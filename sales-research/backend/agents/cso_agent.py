@@ -43,23 +43,37 @@ def narrative_arbitrator_node(state: AgentState):
     selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
     selling_products_list = ", ".join([p.name for p in selling_profile.products]) if selling_profile else "Glial, IDP, Agentic KB"
     
+    analysis_str = json.dumps(lead_score)
+    penalty = lead_score.get("negative_penalty", 0)
+    penalty_reason = lead_score.get("penalty_reason", "")
+    
+    alert_section = ""
+    if penalty > 0:
+        alert_section = f"""
+    !!! CRITICAL NEGATIVE SIGNAL DETECTED !!!
+    - PENALTY APPLIED: {penalty} points deducted.
+    - REASON: {penalty_reason}
+    - ACTION REQUIRED: You MUST consider this a "High Risk" or "Do Not Follow-up" scenario unless there is overwhelming evidence otherwise.
+    """
+
     synthesis_input = f"""
     LEAD INTELLIGENCE:
     - Persona: {persona}
     - Lead Segment: {lead_segment}
-    - Lead Score Analysis: {json.dumps(lead_score)}
+    - Lead Score Analysis: {analysis_str}
+    {alert_section}
     - Pain Points: {json.dumps(pain_points)}
     - Proposed Solutions: {json.dumps(solutions)}
 
     VERIFIED AGENTIC RAG BRIEFING:
     {rag_briefing}
 
-    57:     YOUR MISSION (Surgical Strategy & Evidence Selection):
-    58:     1. **VIABILITY CHECK (CRITICAL)**: Analyze the `Lead Score Analysis`. If the score is low (<50) or the `fit_assessment` from other agents suggests a "Poor Fit", your verdict MUST account for this. Do NOT blindly issue a "Green Light" if the data says "STOP".
-    59:     2. STRATEGIZE: Based on the Lead Intelligence and Strategic Playbooks, determine the winning Narrative of Opportunity (OR Disqualification Reason).
-    60:     3. SELECT FRAMEWORK: Choose the optimal Messaging Framework (AIDA, PAS, BAB) from the playbooks. Explicitly explain WHY this framework fits the lead's persona (e.g., 'Skeptical technical buyers need PAS to validate pain first').
+    YOUR MISSION (Surgical Strategy & Evidence Selection):
+    1. **VIABILITY CHECK (CRITICAL)**: Analyze the `Lead Score Analysis`. If the score is low (<50) or the `fit_assessment` from other agents suggests a "Poor Fit", your verdict MUST account for this. Do NOT blindly issue a "Green Light" if the data says "STOP".
+    2. STRATEGIZE: Based on the Lead Intelligence and Strategic Playbooks, determine the winning Narrative of Opportunity (OR Disqualification Reason).
+    3. SELECT FRAMEWORK: Choose the optimal Messaging Framework (AIDA, PAS, BAB) from the playbooks. Explicitly explain WHY this framework fits the lead's persona (e.g., 'Skeptical technical buyers need PAS to validate pain first').
     3. IDENTIFY PROOF: From the "STRATEGIC PLAYBOOKS", identify 1-2 powerful "Proof Points".
-    4. COMMAND: Issue a one-sentence "Unified Command" that is prescriptive. If a "Poor Fit", command to "Monitor" or "Deprioritize". If "Good Fit", command to "Strike".
+    4. COMMAND: Issue a one-sentence "Unified Command" that is prescriptive. If a "Poor Fit" or "High Risk", command to "Monitor" or "Deprioritize". If "Good Fit", command to "Strike".
     5. JUSTIFY PRODUCT: Explicitly explain why you chose a specific Product (e.g., Glial). If "Poor Fit", explain why we should NOT pitch.
     6. **SCORE CITATION**: In your `strategic_reasoning`, you MUST explicitly cite the 'Total Lead Score' and the key drivers (e.g., 'High Demographic Fit', 'Low Engagement') that led to your verdict.
     7. EXTRACT PROOFS: List the underlying specific insights used in `strategic_proof_points`.

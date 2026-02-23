@@ -39,6 +39,11 @@ class ResearchReportBase(BaseModel):
 
     lead_score: Optional[int] = None
     project_urgency: Optional[int] = None
+    
+    # Ownership & Context
+    created_by_id: Optional[UUID] = None
+    icp_context: Optional[str] = None # JSON snapshot
+    
     email_history: Optional[str] = None  # JSON string
     intent_analysis: Optional[str] = None  # JSON string
     extra_metadata: Optional[str] = None   # JSON string
@@ -56,6 +61,7 @@ class LeadSubmissionBase(BaseModel):
     action_metadata: Optional[str] = None
     external_form_id: Optional[str] = None
     external_form_name: Optional[str] = None
+    rep_id: Optional[UUID] = None # Attribution
 
 class LeadSubmissionCreate(LeadSubmissionBase):
     pass
@@ -108,22 +114,39 @@ class IntegrationSettings(BaseModel):
     kit_api_key: Optional[str] = None
     kit_api_secret: Optional[str] = None
     slack_webhook_url: Optional[str] = None
+    slack_user_id: Optional[str] = None
+    
+    # HubSpot
+    hubspot_access_token: Optional[str] = None
+    hubspot_sync_enabled: bool = False
+    
+    # Discovery Configs
+    discovery_keywords: Optional[str] = None
+    apollo_search_config: Optional[str] = None
+
 
 
 class OrganizationSettingsBase(BaseModel):
     icp_json: Optional[str] = None
     selling_profile_json: Optional[str] = None
-
+    
     tavily_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
     user_linkedin_url: Optional[str] = None
     company_linkedin_url: Optional[str] = None
     email_config: Optional[str] = None
     slack_webhook_url: Optional[str] = None
+    
+    hubspot_access_token: Optional[str] = None
+    hubspot_sync_enabled: Optional[bool] = False
 
     crm_config: Optional[str] = None
     integrations_config: Optional[str] = None
     onboarding_complete: Optional[int] = 0
+    
+    discovery_keywords: Optional[str] = None
+    apollo_search_config: Optional[str] = None
+
 
 class OrganizationSettingsCreate(OrganizationSettingsBase):
     pass
@@ -140,6 +163,7 @@ class OrganizationSettings(OrganizationSettingsBase):
 class CompetitorBase(BaseModel):
     name: Optional[str] = None
     linkedin_url: str
+    created_by_id: Optional[UUID] = None
 
 class CompetitorCreate(CompetitorBase):
     pass
@@ -168,6 +192,7 @@ class IdentifiedProfileBase(BaseModel):
     source_posts: Optional[str] = None
     interaction_history: Optional[str] = None
     profile_metadata: Optional[str] = None
+    created_by_id: Optional[UUID] = None
 
 class IdentifiedProfileCreate(IdentifiedProfileBase):
     pass
@@ -188,6 +213,7 @@ class ActivityBase(BaseModel):
     metadata_json: Optional[str] = None
     intent: Optional[str] = None
     sentiment: Optional[str] = None
+    created_by_id: Optional[UUID] = None
 
 class ActivityCreate(ActivityBase):
     pass
@@ -195,6 +221,47 @@ class ActivityCreate(ActivityBase):
 class Activity(ActivityBase):
     id: UUID
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Autopilot Rule Schemas
+class AutopilotRuleBase(BaseModel):
+    type: str # 'keyword', 'apollo_config'
+    value: str
+    is_active: bool = True
+    organization_id: Optional[UUID] = None
+    created_by_id: Optional[UUID] = None
+
+class AutopilotRuleCreate(AutopilotRuleBase):
+    pass
+
+class AutopilotRule(AutopilotRuleBase):
+    id: UUID
+    created_at: datetime
+    creator_name: Optional[str] = None # For UI display
+
+    class Config:
+        from_attributes = True
+
+# User Settings Schemas
+class UserSettingsBase(BaseModel):
+    user_linkedin_url: Optional[str] = None
+    email_config: Optional[str] = None
+    icp_json: Optional[str] = None
+    slack_user_id: Optional[str] = None
+
+class UserSettingsCreate(UserSettingsBase):
+    user_id: UUID
+
+class UserSettingsUpdate(UserSettingsBase):
+    pass
+
+class UserSettings(UserSettingsBase):
+    id: UUID
+    user_id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True

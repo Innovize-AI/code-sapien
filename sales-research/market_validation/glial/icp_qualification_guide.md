@@ -20,7 +20,7 @@ Use this "Cheat Sheet" to quickly identify if a contact in your network is a goo
 ## 🚦 Qualification Signals
 
 ### ✅ GREEN LIGHTS (Go for it!)
-*   **"We have too many leads and can't call them all."** -> Perfect. Glial auto-qualifies inbound leads so they only talk to the best ones.
+*   **"We have too many leads and can't reach them all."** -> Perfect. Glial auto-qualifies inbound leads so they only talk to the best ones.
 *   **"We are hiring SDRs."** -> Great time to pitch automation instead of headcount.
 *   **"Our reply rates are tanking."** -> They need better quality/personalization (Glial's specialty).
 *   **"My team spends too much time on Admin."** -> Glial removes the research admin work.

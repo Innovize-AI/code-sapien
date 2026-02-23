@@ -49,6 +49,10 @@ class ResearchReport(Base):
     lead_score = Column(Integer, nullable=True)
     project_urgency = Column(Integer, nullable=True)
     
+    # Ownership & Context
+    created_by_id = Column(UUID(as_uuid=True), nullable=True) # Tagging the rep
+    icp_context = Column(Text, nullable=True) # Snapshotted ICP used for this report
+
     # New Email & Intent Analysis
     email_history = Column(Text, nullable=True)  # JSON array of email objects
     intent_analysis = Column(Text, nullable=True)  # JSON object with intent data
@@ -77,6 +81,10 @@ class LeadSubmission(Base):
     
     # Link to resulting report if processed
     research_id = Column(UUID(as_uuid=True), nullable=True)
+    
+    # Rep Attribution
+    rep_id = Column(UUID(as_uuid=True), nullable=True) # Which rep's funnel?
+
     # Email & Intent Analysis
     email_history = Column(Text, nullable=True)    # JSON array
     intent_analysis = Column(Text, nullable=True)  # JSON object
@@ -104,6 +112,11 @@ class OrganizationSettings(Base):
     tavily_api_key = Column(String, nullable=True)
     apollo_api_key = Column(String, nullable=True)
 
+    # Lead Discovery Autopilot Configs
+    discovery_keywords = Column(Text, nullable=True)    # JSON list of keywords
+    apollo_search_config = Column(Text, nullable=True)  # JSON object with search filters
+
+
     # LinkedIn Identity for Engagement Tracking
     user_linkedin_url = Column(Text, nullable=True)
     company_linkedin_url = Column(Text, nullable=True)
@@ -117,6 +130,33 @@ class OrganizationSettings(Base):
     kit_api_key = Column(String, nullable=True) # Public Key for v3
     kit_api_secret = Column(String, nullable=True) # Secret Key for v3
     slack_webhook_url = Column(String, nullable=True)
+    
+    # HubSpot Integration
+    hubspot_access_token = Column(Text, nullable=True)
+    hubspot_sync_enabled = Column(Boolean, server_default=text("false"), nullable=False)
+
+class CRMContext(Base):
+    __tablename__ = "crm_context"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    # Core identifying fields for matching leads
+    email = Column(String, nullable=True, index=True)
+    linkedin_url = Column(Text, nullable=True, index=True)
+    hubspot_contact_id = Column(String, nullable=True)
+    hubspot_company_id = Column(String, nullable=True)
+
+    # Contextual data
+    type = Column(String, nullable=False) # 'champion', 'lost_deal', 'customer', 'website_visitor'
+    original_company = Column(String, nullable=True)
+    deal_name = Column(String, nullable=True)
+    deal_stage = Column(String, nullable=True) # e.g. 'closedwon', 'closedlost'
+    closed_lost_reason = Column(Text, nullable=True)
+    
+    # Matching metadata
+    last_sync_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    extra_metadata = Column(Text, nullable=True) # JSON store for flexible context
 
 class CompetitorAnalysis(Base):
     __tablename__ = "competitor_analysis"
@@ -135,6 +175,7 @@ class Competitor(Base):
     
     name = Column(String, nullable=True)
     linkedin_url = Column(Text, nullable=False, unique=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True)
 
 class IdentifiedProfile(Base):
     __tablename__ = "identified_profiles"
@@ -145,6 +186,7 @@ class IdentifiedProfile(Base):
     name = Column(String, nullable=True)
     headline = Column(Text, nullable=True)
     linkedin_url = Column(Text, nullable=False, unique=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True)
     
     # Classification
     is_fit = Column(Boolean, default=False)
@@ -175,3 +217,62 @@ class Activity(Base):
     metadata_json = Column(Text, nullable=True) # JSON object for extra details
     intent = Column(String, nullable=True)
     sentiment = Column(String, nullable=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True)
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True) # Corresponds to Supabase auth.users.id
+    email = Column(String, unique=True, nullable=False)
+    role = Column(String, default="user", nullable=False)
+    full_name = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    user_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))
+
+    # Private Rep Identity
+    user_linkedin_url = Column(Text, nullable=True)
+    email_config = Column(Text, nullable=True) # IMAP details
+    
+    # Personal ICP Override
+    icp_json = Column(Text, nullable=True)
+
+    # Slack Mapping
+    slack_user_id = Column(String, nullable=True, unique=True)
+    
+    # Rep-specific Slack Attribution is handled by tagging global alerts with rep_id, 
+    # but we could store a personal webhook here if they ever want isolation.
+    # For now, following user's "identify where it came from" request via tagging.
+
+class AutopilotRule(Base):
+    __tablename__ = "autopilot_rules"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    organization_id = Column(UUID(as_uuid=True), nullable=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=False)
+    
+    type = Column(String, nullable=False) # 'keyword', 'apollo_config'
+    value = Column(Text, nullable=False) # The keyword or JSON string
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Scheduling fields
+    interval_hours = Column(Integer, default=24, nullable=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+
+class ScheduledTask(Base):
+    __tablename__ = "scheduled_tasks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    name = Column(String, unique=True, nullable=False) # 'competitor_update', 'hubspot_sync'
+    interval_hours = Column(Integer, default=24, nullable=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))

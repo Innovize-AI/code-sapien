@@ -1,0 +1,48 @@
+steps:
+  # 1. Build the Docker image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "gcr.io/$PROJECT_ID/glial-research-backend:$COMMIT_SHA",
+        "-t",
+        "gcr.io/$PROJECT_ID/glial-research-backend:latest",
+        ".",
+      ]
+    dir: "backend"
+
+  # 2. Push the image to Container Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/$PROJECT_ID/sales-research-backend:$COMMIT_SHA"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/$PROJECT_ID/sales-research-backend:latest"]
+
+  # 3. Deploy to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "glial-research-backend"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/glial-research-backend:$COMMIT_SHA"
+      - "--platform"
+      - "managed"
+      - "--region"
+      - "us-central1"
+      - "--timeout"
+      - "3600"
+      - "--concurrency"
+      - "80"
+      - "--cpu-throttling"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production"
+
+images:
+  - "gcr.io/$PROJECT_ID/glial-research-backend:$COMMIT_SHA"
+  - "gcr.io/$PROJECT_ID/glial-research-backend:latest"
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -10,9 +10,8 @@ engine = create_async_engine(
     echo=True,
     pool_size=5,
     max_overflow=0,
-    # Disable statement caching for compatibility with transaction-mode poolers
-    statement_cache_size=0,
     connect_args={
+        "prepared_statement_cache_size": 0,
         "server_settings": {
             "search_path": f'"{DB_SCHEMA}", public'
         }

@@ -1,7 +1,8 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -23,9 +24,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-    saveICP, getICP, IdealProfileData, 
-    saveIntegrations, getIntegrations, getUserIntegrations, saveUserIntegrations, IntegrationSettings, 
+import {
+    saveICP, getICP, IdealProfileData,
+    saveIntegrations, getIntegrations, getUserIntegrations, saveUserIntegrations, IntegrationSettings,
     getCompetitors, addCompetitor, deleteCompetitor, Competitor,
     getSellingProfile, saveSellingProfile, SellingProfileConfig
 } from "@/lib/api"
@@ -65,18 +66,45 @@ const sellingProfileSchema = z.object({
 })
 
 export default function SettingsPage() {
+    const queryClient = useQueryClient()
     const { user } = useAuth()
     const isAdmin = user?.role === "admin"
-    const [isLoading, setIsLoading] = useState(false)
-    const [isFetching, setIsFetching] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+
+    // --- Queries ---
+
+    const { data: globalIcp, isLoading: isIcpLoading, error: icpError } = useQuery({
+        queryKey: ["settings", "icp"],
+        queryFn: getICP
+    })
+
+    const { data: globalKeys, isLoading: isKeysLoading } = useQuery({
+        queryKey: ["settings", "integrations"],
+        queryFn: getIntegrations,
+        enabled: isAdmin
+    })
+
+    const { data: globalSelling, isLoading: isSellingLoading } = useQuery({
+        queryKey: ["settings", "selling-profile"],
+        queryFn: getSellingProfile
+    })
+
+    const { data: competitorsList, isLoading: isCompetitorsLoading } = useQuery({
+        queryKey: ["settings", "competitors"],
+        queryFn: getCompetitors
+    })
+
+    const { data: userIntegrations, isLoading: isUserIntegrationsLoading } = useQuery({
+        queryKey: ["settings", "user-integrations"],
+        queryFn: getUserIntegrations
+    })
+
+    // Local state for non-form elements
     const [success, setSuccess] = useState<string | null>(null)
-    const [competitors, setCompetitors] = useState<Competitor[]>([])
+    const [error, setError] = useState<string | null>(null)
     const [newCompetitorUrl, setNewCompetitorUrl] = useState("")
-    const [isAddingCompetitor, setIsAddingCompetitor] = useState(false)
 
     // --- Forms ---
-    
+
     // 1. Personal Settings Form (User Context)
     const personalForm = useForm<IntegrationSettings & IdealProfileData>({
         resolver: zodResolver(z.intersection(keysFormSchema, icpFormSchema)),
@@ -93,13 +121,13 @@ export default function SettingsPage() {
         // We might need a loose schema here since admins only edit parts, or split into sub-forms. 
         // For simplicity, we'll use separate submit handlers but one state object isn't ideal.
         // Let's keep them separate in logic.
-        defaultValues: {} 
+        defaultValues: {}
     })
-    
+
     // We'll use separate form instances for Org sections to manage validation cleanliness
     const globalIcpForm = useForm<IdealProfileData>({ resolver: zodResolver(icpFormSchema) })
     const globalKeysForm = useForm<IntegrationSettings>({ resolver: zodResolver(keysFormSchema) })
-    const sellingProfileForm = useForm<SellingProfileConfig>({ 
+    const sellingProfileForm = useForm<SellingProfileConfig>({
         resolver: zodResolver(sellingProfileSchema),
         defaultValues: {
             company_name: "",
@@ -113,168 +141,110 @@ export default function SettingsPage() {
         name: "products"
     });
 
-    // Load Data
+    // Sync form data when queries finish
     useEffect(() => {
-        const loadSettings = async () => {
-            setIsFetching(true)
-            try {
-                // Fetch Global Data
-                const [globalIcp, globalKeys, globalSelling, competitorsList] = await Promise.all([
-                    getICP(), // This returns user override if present, but for Org tab we want GLOBAL. 
-                              // API behavior: getICP returns user's if present. 
-                              // We need a way to get RAW GLOBAL. 
-                              // Current API limitation: User sees what applies to them. 
-                              // For Admin editing Global, they are the user, so it works if they haven't overridden it. 
-                              // *Assumption*: Admins don't override their own ICP, they set the Global one.
-                    isAdmin ? getIntegrations() : Promise.resolve(null),
-                    getSellingProfile(),
-                    getCompetitors()
-                ])
-
-                // Fetch Personal Data
-                const userIntegrations = await getUserIntegrations()
-                // We can't easily fetch "User Only ICP" separate from "Resolved ICP" with current API 
-                // without modifying backend to explicitly separate them.
-                // Workaround: We will use the resolved ICP for the Personal Tab as "Your Current Configuration".
-
-                // Populate Personal Form
-                if (userIntegrations) {
-                    personalForm.setValue("user_linkedin_url", userIntegrations.user_linkedin_url || "")
-                    personalForm.setValue("email_config", userIntegrations.email_config || "")
-                    personalForm.setValue("slack_user_id", userIntegrations.slack_user_id || "")
-                }
-                if (globalIcp) {
-                   // If user is not admin, this is their effective ICP (potentially overridden).
-                   // If user IS admin, this is likely the global ICP.
-                   // We'll populate both forms initially, but save logic differs.
-                   const icpValues = {
-                       industry: globalIcp.industry || "",
-                       company_size: globalIcp.company_size || "",
-                       revenue: globalIcp.revenue || "",
-                       job_title: globalIcp.job_title || "",
-                       value_proposition: globalIcp.value_proposition || ""
-                   }
-                   personalForm.reset({ ...personalForm.getValues(), ...icpValues })
-                   globalIcpForm.reset(icpValues)
-                }
-
-                // Populate Org Forms
-                if (globalKeys) {
-                    globalKeysForm.reset(globalKeys)
-                }
-                if (globalSelling) {
-                    sellingProfileForm.reset(globalSelling)
-                }
-                if (competitorsList) {
-                    setCompetitors(competitorsList)
-                }
-
-            } catch (e) {
-                console.error("Failed to load settings", e)
-                setError("Failed to load settings.")
-            } finally {
-                setIsFetching(false)
-            }
+        if (userIntegrations) {
+            personalForm.setValue("user_linkedin_url", userIntegrations.user_linkedin_url || "")
+            personalForm.setValue("email_config", userIntegrations.email_config || "")
+            personalForm.setValue("slack_user_id", userIntegrations.slack_user_id || "")
         }
-        loadSettings()
-    }, [isAdmin])
+    }, [userIntegrations, personalForm])
 
+    useEffect(() => {
+        if (globalIcp) {
+            const icpValues = {
+                industry: globalIcp.industry || "",
+                company_size: globalIcp.company_size || "",
+                revenue: globalIcp.revenue || "",
+                job_title: globalIcp.job_title || "",
+                value_proposition: globalIcp.value_proposition || ""
+            }
+            personalForm.reset({ ...personalForm.getValues(), ...icpValues })
+            globalIcpForm.reset(icpValues)
+        }
+    }, [globalIcp, personalForm, globalIcpForm])
+
+    useEffect(() => {
+        if (globalKeys) globalKeysForm.reset(globalKeys)
+    }, [globalKeys, globalKeysForm])
+
+    useEffect(() => {
+        if (globalSelling) sellingProfileForm.reset(globalSelling)
+    }, [globalSelling, sellingProfileForm])
+
+    // --- Mutations ---
+
+    const invalidateSettings = () => {
+        queryClient.invalidateQueries({ queryKey: ["settings"] })
+        setSuccess("Settings saved successfully")
+        setTimeout(() => setSuccess(null), 3000)
+    }
+
+    const personalMutation = useMutation({
+        mutationFn: async (values: any) => {
+            await Promise.all([
+                saveUserIntegrations({
+                    user_linkedin_url: values.user_linkedin_url,
+                    email_config: values.email_config,
+                    slack_user_id: values.slack_user_id
+                }),
+                saveICP({
+                    industry: values.industry,
+                    company_size: values.company_size,
+                    revenue: values.revenue,
+                    job_title: values.job_title,
+                    value_proposition: values.value_proposition
+                })
+            ])
+        },
+        onSuccess: invalidateSettings,
+        onError: () => setError("Failed to save personal settings")
+    })
+
+    const globalIcpMutation = useMutation({
+        mutationFn: saveICP,
+        onSuccess: invalidateSettings,
+        onError: () => setError("Failed to update Global ICP")
+    })
+
+    const globalKeysMutation = useMutation({
+        mutationFn: saveIntegrations,
+        onSuccess: invalidateSettings,
+        onError: () => setError("Failed to update keys")
+    })
+
+    const sellingProfileMutation = useMutation({
+        mutationFn: saveSellingProfile,
+        onSuccess: invalidateSettings,
+        onError: () => setError("Failed to update selling profile")
+    })
+
+    const addCompetitorMutation = useMutation({
+        mutationFn: (url: string) => addCompetitor({ linkedin_url: url }),
+        onSuccess: () => {
+            setNewCompetitorUrl("")
+            queryClient.invalidateQueries({ queryKey: ["settings", "competitors"] })
+        }
+    })
+
+    const deleteCompetitorMutation = useMutation({
+        mutationFn: deleteCompetitor,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settings", "competitors"] })
+    })
 
     // --- Handlers ---
 
-    const handleSavePersonal = async (values: any) => {
-        setIsLoading(true); setSuccess(null); setError(null);
-        try {
-            // Save User Integrations
-            await saveUserIntegrations({
-                user_linkedin_url: values.user_linkedin_url,
-                email_config: values.email_config,
-                slack_user_id: values.slack_user_id
-            })
-            // Save User ICP Override (Backend handles "if not admin then override" logic for this endpoint? 
-            // Actually `saveICP` checks role. If not admin, it saves to user settings. Perfect.)
-            await saveICP({
-                industry: values.industry,
-                company_size: values.company_size,
-                revenue: values.revenue,
-                job_title: values.job_title,
-                value_proposition: values.value_proposition
-            })
-            setSuccess("Personal settings saved successfully.")
-            setTimeout(() => setSuccess(null), 3000)
-        } catch (e) {
-            setError("Failed to save personal settings.")
-        } finally {
-            setIsLoading(false)
-        }
+    const handleSavePersonal = (values: any) => personalMutation.mutate(values)
+    const handleSaveGlobalICP = (values: IdealProfileData) => globalIcpMutation.mutate(values)
+    const handleSaveGlobalKeys = (values: IntegrationSettings) => globalKeysMutation.mutate(values)
+    const handleSaveSellingProfile = (values: SellingProfileConfig) => sellingProfileMutation.mutate(values)
+    const handleAddCompetitor = () => {
+        if (newCompetitorUrl) addCompetitorMutation.mutate(newCompetitorUrl)
     }
+    const handleDeleteCompetitor = (id: string) => deleteCompetitorMutation.mutate(id)
 
-    const handleSaveGlobalICP = async (values: IdealProfileData) => {
-        if (!isAdmin) return;
-        setIsLoading(true); setSuccess(null); setError(null);
-        try {
-            // Admin calling saveICP updates Global Settings
-            await saveICP(values)
-            setSuccess("Global ICP updated.")
-            setTimeout(() => setSuccess(null), 3000)
-        } catch (e) {
-            setError("Failed to update Global ICP.")
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    const handleSaveGlobalKeys = async (values: IntegrationSettings) => {
-        if (!isAdmin) return;
-        setIsLoading(true); setSuccess(null); setError(null);
-        try {
-            await saveIntegrations(values)
-            setSuccess("Integration keys updated.")
-            setTimeout(() => setSuccess(null), 3000)
-        } catch (e) {
-            setError("Failed to update keys.")
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    const handleSaveSellingProfile = async (values: SellingProfileConfig) => {
-        if (!isAdmin) return;
-        setIsLoading(true); setSuccess(null); setError(null);
-        try {
-            await saveSellingProfile(values)
-            setSuccess("Selling profile updated.")
-            setTimeout(() => setSuccess(null), 3000)
-        } catch (e) {
-            setError("Failed to update selling profile.")
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    const handleAddCompetitor = async () => {
-        if (!newCompetitorUrl) return
-        setIsAddingCompetitor(true)
-        try {
-            await addCompetitor({ linkedin_url: newCompetitorUrl })
-            setNewCompetitorUrl("")
-            const updated = await getCompetitors()
-            setCompetitors(updated)
-        } catch (e) {
-            console.error("Failed to add competitor", e)
-        } finally {
-            setIsAddingCompetitor(false)
-        }
-    }
-
-    const handleDeleteCompetitor = async (id: string) => {
-        try {
-            await deleteCompetitor(id)
-            setCompetitors(competitors.filter(c => c.id !== id))
-        } catch (e) {
-            console.error("Failed to delete competitor", e)
-        }
-    }
+    const isFetching = isIcpLoading || isKeysLoading || isSellingLoading || isCompetitorsLoading || isUserIntegrationsLoading
+    const isLoading = personalMutation.isPending || globalIcpMutation.isPending || globalKeysMutation.isPending || sellingProfileMutation.isPending
 
 
     if (isFetching) {
@@ -303,13 +273,13 @@ export default function SettingsPage() {
 
             <Tabs defaultValue="personal" className="w-full space-y-6">
                 <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-                    <TabsTrigger value="personal" className="gap-2"><User className="w-4 h-4"/> Personal Settings</TabsTrigger>
-                    <TabsTrigger value="organization" className="gap-2"><Building2 className="w-4 h-4"/> Organization</TabsTrigger>
+                    <TabsTrigger value="personal" className="gap-2"><User className="w-4 h-4" /> Personal Settings</TabsTrigger>
+                    <TabsTrigger value="organization" className="gap-2"><Building2 className="w-4 h-4" /> Organization</TabsTrigger>
                 </TabsList>
 
                 {/* --- PERSONAL SETTINGS TAB --- */}
                 <TabsContent value="personal" className="space-y-6 animate-in fade-in slide-in-from-top-2">
-                     <Alert className="border-blue-500/20 bg-blue-500/5">
+                    <Alert className="border-blue-500/20 bg-blue-500/5">
                         <UserCheck className="h-4 w-4 text-blue-500" />
                         <AlertTitle className="text-blue-500">Member Configuration</AlertTitle>
                         <AlertDescription className="text-blue-500/80">
@@ -319,12 +289,12 @@ export default function SettingsPage() {
 
                     <Form {...personalForm}>
                         <form onSubmit={personalForm.handleSubmit(handleSavePersonal)} className="space-y-8">
-                            
+
                             {/* Personal Identity */}
                             <Card>
                                 <CardHeader><CardTitle>Identity & Integrations</CardTitle><CardDescription>Your private credentials for research.</CardDescription></CardHeader>
                                 <CardContent className="space-y-4">
-                                     <FormField
+                                    <FormField
                                         control={personalForm.control}
                                         name="user_linkedin_url"
                                         render={({ field }) => (
@@ -343,10 +313,10 @@ export default function SettingsPage() {
                                             <FormItem>
                                                 <FormLabel>IMAP Configuration (JSON)</FormLabel>
                                                 <FormControl>
-                                                    <Textarea 
-                                                        placeholder='{"imap_server": "...", "email_user": "...", "email_password": "..."}' 
-                                                        className="font-mono text-sm min-h-[80px]" 
-                                                        {...field} 
+                                                    <Textarea
+                                                        placeholder='{"imap_server": "...", "email_user": "...", "email_password": "..."}'
+                                                        className="font-mono text-sm min-h-[80px]"
+                                                        {...field}
                                                     />
                                                 </FormControl>
                                                 <FormDescription>Required for analyzing your email history with leads.</FormDescription>
@@ -439,7 +409,7 @@ export default function SettingsPage() {
                                             </FormItem>
                                         )}
                                     />
-                                     <FormField
+                                    <FormField
                                         control={personalForm.control}
                                         name="value_proposition"
                                         render={({ field }) => (
@@ -465,7 +435,7 @@ export default function SettingsPage() {
 
                 {/* --- ORGANIZATION SETTINGS TAB --- */}
                 <TabsContent value="organization" className="space-y-6 animate-in fade-in slide-in-from-top-2">
-                     {!isAdmin && (
+                    {!isAdmin && (
                         <Alert variant="destructive" className="border-amber-500/20 bg-amber-500/5">
                             <Lock className="h-4 w-4 text-amber-500" />
                             <AlertTitle className="text-amber-500">Read Only Mode</AlertTitle>
@@ -476,7 +446,7 @@ export default function SettingsPage() {
                     )}
 
                     {/* Selling Profile */}
-                     <Card>
+                    <Card>
                         <CardHeader>
                             <CardTitle>Selling Profile</CardTitle>
                             <CardDescription>Define what the organization sells. This context is used to generate strategic pivots and match scores.</CardDescription>
@@ -496,7 +466,7 @@ export default function SettingsPage() {
                                                 </FormItem>
                                             )}
                                         />
-                                         <FormField
+                                        <FormField
                                             control={sellingProfileForm.control}
                                             name="description"
                                             render={({ field }) => (
@@ -508,7 +478,7 @@ export default function SettingsPage() {
                                             )}
                                         />
                                     </div>
-                                    
+
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-center">
                                             <h4 className="text-sm font-semibold">Products & Services</h4>
@@ -543,10 +513,10 @@ export default function SettingsPage() {
                                                         render={({ field }) => (
                                                             <FormItem className="flex flex-row items-end space-x-2 space-y-0 h-full pb-2">
                                                                 <FormControl>
-                                                                    <Checkbox 
-                                                                        checked={field.value} 
-                                                                        onCheckedChange={field.onChange} 
-                                                                        disabled={!isAdmin} 
+                                                                    <Checkbox
+                                                                        checked={field.value}
+                                                                        onCheckedChange={field.onChange}
+                                                                        disabled={!isAdmin}
                                                                     />
                                                                 </FormControl>
                                                                 <FormLabel className="font-normal text-xs cursor-pointer">
@@ -563,11 +533,11 @@ export default function SettingsPage() {
                                                         <FormItem>
                                                             <FormLabel className="text-xs">Target Roles (comma separated)</FormLabel>
                                                             <FormControl>
-                                                                <Input 
-                                                                    {...field} 
+                                                                <Input
+                                                                    {...field}
                                                                     value={Array.isArray(field.value) ? field.value.join(", ") : (field.value || "")}
                                                                     onChange={e => field.onChange(e.target.value.split(",").map(s => s.trim()))}
-                                                                    disabled={!isAdmin} 
+                                                                    disabled={!isAdmin}
                                                                     placeholder="Founder, CTO, VP Sales"
                                                                     className="h-8"
                                                                 />
@@ -576,7 +546,7 @@ export default function SettingsPage() {
                                                         </FormItem>
                                                     )}
                                                 />
-                                                 <FormField
+                                                <FormField
                                                     control={sellingProfileForm.control}
                                                     name={`products.${index}.description`}
                                                     render={({ field }) => (
@@ -636,15 +606,15 @@ export default function SettingsPage() {
                                         />
                                     </div>
                                     <FormField
-                                            control={globalIcpForm.control}
-                                            name="value_proposition"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Global Value Prop</FormLabel>
-                                                    <FormControl><Textarea {...field} disabled={!isAdmin} className="h-20" /></FormControl>
-                                                </FormItem>
-                                            )}
-                                        />
+                                        control={globalIcpForm.control}
+                                        name="value_proposition"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Global Value Prop</FormLabel>
+                                                <FormControl><Textarea {...field} disabled={!isAdmin} className="h-20" /></FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
                                     {isAdmin && (
                                         <div className="flex justify-end">
                                             <Button type="submit" disabled={isLoading} size="sm" variant="outline">Update Global ICP</Button>
@@ -656,13 +626,13 @@ export default function SettingsPage() {
                     </Card>
 
                     {/* Competitors */}
-                     <Card>
+                    <Card>
                         <CardHeader>
                             <CardTitle>Competitor Tracking</CardTitle>
                             <CardDescription>Competitor profiles monitored for lead sourcing.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                             <div className="space-y-4">
+                            <div className="space-y-4">
                                 {isAdmin && (
                                     <div className="flex gap-2">
                                         <Input
@@ -671,60 +641,65 @@ export default function SettingsPage() {
                                             onChange={(e) => setNewCompetitorUrl(e.target.value)}
                                             onKeyPress={(e) => e.key === 'Enter' && handleAddCompetitor()}
                                         />
-                                        <Button onClick={handleAddCompetitor} disabled={isAddingCompetitor || !newCompetitorUrl}>
-                                            <Plus className="h-4 w-4" />
+                                        <Button onClick={handleAddCompetitor} disabled={addCompetitorMutation.isPending || !newCompetitorUrl}>
+                                            {addCompetitorMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                                         </Button>
                                     </div>
                                 )}
                                 <div className="space-y-2">
-                                    {competitors.map((competitor) => (
+                                    {(competitorsList || []).map((competitor) => (
                                         <div key={competitor.id} className="flex items-center justify-between p-2 border rounded-md bg-muted/20">
                                             <div className="flex items-center gap-2">
                                                 <Briefcase className="w-4 h-4 text-muted-foreground" />
                                                 <span className="text-sm truncate max-w-[300px]">{competitor.linkedin_url}</span>
                                             </div>
                                             {isAdmin && (
-                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteCompetitor(competitor.id)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteCompetitor(competitor.id)}
+                                                    disabled={deleteCompetitorMutation.isPending}
+                                                >
+                                                    {deleteCompetitorMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
                                                 </Button>
                                             )}
                                         </div>
                                     ))}
-                                    {competitors.length === 0 && <p className="text-sm text-muted-foreground italic">No competitors tracked.</p>}
+                                    {(!competitorsList || competitorsList.length === 0) && <p className="text-sm text-muted-foreground italic">No competitors tracked.</p>}
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
                     {/* Global Keys */}
-                     <Card>
+                    <Card>
                         <CardHeader>
                             <CardTitle>API Integrations</CardTitle>
                             <CardDescription>Organization-wide keys for data providers.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                             <Form {...globalKeysForm}>
+                            <Form {...globalKeysForm}>
                                 <form onSubmit={globalKeysForm.handleSubmit(handleSaveGlobalKeys)} className="space-y-4">
-                                     <FormField
+                                    <FormField
                                         control={globalKeysForm.control}
                                         name="tavily_api_key"
                                         render={({ field }) => (
                                             <FormItem>
                                                 <div className="flex items-center justify-between">
                                                     <FormLabel>Tavily API Key</FormLabel>
-                                                    {!isAdmin && <Badge variant="outline" className="text-xs h-5"><Lock className="w-2 h-2 mr-1"/> Admin Only</Badge>}
+                                                    {!isAdmin && <Badge variant="outline" className="text-xs h-5"><Lock className="w-2 h-2 mr-1" /> Admin Only</Badge>}
                                                 </div>
                                                 <FormControl><Input type="password" {...field} disabled={!isAdmin} /></FormControl>
                                             </FormItem>
                                         )}
                                     />
                                     <div className="flex justify-end pt-2">
-                                         {isAdmin && <Button type="submit" disabled={isLoading} size="sm" variant="outline">Update Keys</Button>}
+                                        {isAdmin && <Button type="submit" disabled={isLoading} size="sm" variant="outline">Update Keys</Button>}
                                     </div>
                                 </form>
                             </Form>
                         </CardContent>
-                     </Card>
+                    </Card>
 
                 </TabsContent>
             </Tabs>

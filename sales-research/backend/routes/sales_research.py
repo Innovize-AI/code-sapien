@@ -1,5 +1,6 @@
 import json
 import uuid
+from fastapi_cache import FastAPICache
 from typing import Optional, List
 from fastapi import APIRouter, Query, Depends, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -195,6 +196,7 @@ async def run_research(
         # Persist results to DB
         try:
             await _persist_results(db, linkedin_url, website, final_state, options)
+            await FastAPICache.clear(namespace="dashboard")
         except Exception as e:
             print(f"Failed to save report: {e}")
 

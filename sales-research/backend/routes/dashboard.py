@@ -6,6 +6,8 @@ from sqlalchemy import select, func
 from db.database import get_db
 from db.models import ResearchReport
 from pydantic import BaseModel
+from fastapi_cache import FastAPICache
+from fastapi_cache.decorator import cache
 
 dashboard_router = APIRouter(tags=['Dashboard'])
 
@@ -16,6 +18,7 @@ class DashboardStats(BaseModel):
     time_saved_hours: float
 
 @dashboard_router.get("/dashboard/stats", response_model=DashboardStats)
+@cache(expire=60, namespace="dashboard")
 async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     """
     Get aggregated statistics for the dashboard.

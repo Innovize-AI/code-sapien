@@ -1,4 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi_cache import FastAPICache
+from fastapi_cache.decorator import cache
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_history, get_report, get_db, _report_to_dict
 import json
@@ -6,6 +9,7 @@ import json
 history_router = APIRouter()
 
 @history_router.get("/history")
+@cache(expire=60, namespace="dashboard")
 async def read_history(db: AsyncSession = Depends(get_db)):
     from db.models import ResearchReport, Profile
     from sqlalchemy import select
@@ -27,6 +31,7 @@ async def read_history(db: AsyncSession = Depends(get_db)):
     return history_data
 
 @history_router.get("/history/{report_id}")
+@cache(expire=300)
 async def read_report_item(report_id: str, db: AsyncSession = Depends(get_db)):
     report = await get_report(db, report_id)
     if not report:

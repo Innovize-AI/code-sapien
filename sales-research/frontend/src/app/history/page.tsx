@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { fetchHistory } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,25 +26,13 @@ interface HistoryItem {
 }
 
 export default function HistoryPage() {
-    const [history, setHistory] = useState<HistoryItem[]>([]);
-    const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const { leadsStatus } = useBulkAnalysis();
 
-    useEffect(() => {
-        const loadHistory = async () => {
-            try {
-                const data = await fetchHistory();
-                setHistory(data);
-            } catch (error) {
-                console.error("Failed to load history", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadHistory();
-    }, []);
+    const { data: history = [], isLoading: loading } = useQuery({
+        queryKey: ["history"],
+        queryFn: fetchHistory
+    });
 
     // Merge history with temporary bulk analysis items
     const displayHistory: HistoryItem[] = [

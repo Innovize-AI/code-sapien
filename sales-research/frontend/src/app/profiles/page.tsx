@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import {
   Card,
@@ -9,7 +10,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { getIdentifiedProfiles, IdentifiedProfile, API_URL } from "@/lib/api";
+import { getIdentifiedProfiles, IdentifiedProfile, API_URL, IdentifiedProfilesResponse } from "@/lib/api";
 import {
   Loader2,
   ExternalLink,
@@ -51,14 +52,30 @@ function formatTimestamp(dateStr: string) {
 const PAGE_SIZE = 100;
 
 export default function ProfilesPage() {
-  const [profiles, setProfiles] = useState<IdentifiedProfile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // --- Queries ---
+  const { data, isLoading, error: queryError } = useQuery({
+    queryKey: ["profiles", { page, search: debouncedSearch }],
+    queryFn: () => getIdentifiedProfiles(page * PAGE_SIZE, PAGE_SIZE, debouncedSearch),
+    placeholderData: (previousData: IdentifiedProfilesResponse | undefined) => previousData, // Keep previous data while fetching
+  });
+
+  const profiles = data?.profiles || [];
+  const total = data?.total || 0;
+  const error = queryError ? "Failed to load identified profiles" : null;
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Bulk Analysis Context
   const {
@@ -74,31 +91,10 @@ export default function ProfilesPage() {
     globalError,
   } = useBulkAnalysis();
 
+  // Sync page reset on search
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      async function loadProfiles() {
-        setIsLoading(true);
-        try {
-          const skip = page * PAGE_SIZE;
-          const data = await getIdentifiedProfiles(
-            skip,
-            PAGE_SIZE,
-            searchQuery,
-          );
-          setProfiles(data.profiles || []);
-          setTotal(data.total || 0);
-        } catch (err) {
-          setError("Failed to load identified profiles");
-          console.error(err);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-      loadProfiles();
-    }, 500); // Debounce search
-
-    return () => clearTimeout(timeoutId);
-  }, [page, searchQuery]);
+    setPage(0);
+  }, [debouncedSearch]);
 
   // SSE Listener for Real-Time Updates
   useEffect(() => {
@@ -109,27 +105,9 @@ export default function ProfilesPage() {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "classification_update" && data.leads) {
-          setProfiles((prevProfiles) => {
-            // Create a map for faster lookup
-            const updatesMap = new Map<string, any>(
-              data.leads.map((l: any) => [l.linkedin_url, l]),
-            );
-
-            return prevProfiles.map((profile) => {
-              const update = updatesMap.get(profile.linkedin_url);
-              if (update) {
-                return {
-                  ...profile,
-                  is_fit: update.is_fit,
-                  is_competitor: update.is_competitor,
-                  is_decision_maker: update.is_decision_maker,
-                  fit_reasoning: update.fit_reasoning,
-                };
-              }
-              return profile;
-            });
-          });
+        if (data.type === "classification_update") {
+          // Trigger a silent refetch to get updated database state
+          queryClient.invalidateQueries({ queryKey: ["profiles"] });
         }
       } catch (error) {
         console.error("Error parsing SSE event:", error);
@@ -170,8 +148,8 @@ export default function ProfilesPage() {
     }
   };
 
-  const keywordProfiles = profiles.filter(isKeywordLead);
-  const competitorProfiles = profiles.filter((p) => !isKeywordLead(p));
+  const keywordProfiles = profiles.filter((p: IdentifiedProfile) => isKeywordLead(p));
+  const competitorProfiles = profiles.filter((p: IdentifiedProfile) => !isKeywordLead(p));
 
   const getActiveConfig = () => {
     if (activeTab === "keyword")
@@ -188,14 +166,14 @@ export default function ProfilesPage() {
     if (selectedIds.size > 0 && leadsStatus.length > 0) {
       const processingUrls = new Set(
         leadsStatus
-          .filter((s) => s.status === "analyzing" || s.status === "pending")
-          .map((s) => s.url),
+          .filter((s: any) => s.status === "analyzing" || s.status === "pending")
+          .map((s: any) => s.url),
       );
 
       if (processingUrls.size > 0) {
         // Find IDs of profiles that are now processing
         const idsToRemove: string[] = [];
-        activeList.forEach((p) => {
+        activeList.forEach((p: IdentifiedProfile) => {
           if (selectedIds.has(p.id) && processingUrls.has(p.linkedin_url)) {
             idsToRemove.push(p.id);
           }
@@ -203,7 +181,7 @@ export default function ProfilesPage() {
 
         if (idsToRemove.length > 0) {
           const nextSelected = new Set(selectedIds);
-          idsToRemove.forEach((id) => nextSelected.delete(id));
+          idsToRemove.forEach((id: string) => nextSelected.delete(id));
           setSelectedIds(nextSelected);
         }
       }
@@ -214,14 +192,14 @@ export default function ProfilesPage() {
     if (selectedIds.size === activeList.length) {
       setSelectedIds(new Set());
     } else {
-      const allIds = new Set(activeList.map((p) => p.id));
+      const allIds = new Set(activeList.map((p: IdentifiedProfile) => p.id));
       setSelectedIds(allIds);
     }
   };
 
   const handleBulkAnalyze = () => {
-    const selectedProfiles = activeList.filter((p) => selectedIds.has(p.id));
-    const bulkPayload = selectedProfiles.map((p) => ({
+    const selectedProfiles = activeList.filter((p: IdentifiedProfile) => selectedIds.has(p.id));
+    const bulkPayload = selectedProfiles.map((p: IdentifiedProfile) => ({
       url: p.linkedin_url,
       website: "", // Add website if available in profile metadata later
     }));

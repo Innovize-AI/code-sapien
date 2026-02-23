@@ -2,6 +2,7 @@
 
 import { AuthProvider } from "@/context/auth-context"
 import { BulkAnalysisProvider } from "@/context/bulk-analysis-context"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { getICP, getOnboardingStatus } from "@/lib/api"
@@ -11,6 +12,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const router = useRouter()
     const pathname = usePathname()
     const [isChecking, setIsChecking] = useState(true)
+    const [queryClient] = useState(() => new QueryClient({
+        defaultOptions: {
+            queries: {
+                staleTime: 60 * 1000,
+                refetchOnWindowFocus: false,
+            },
+        },
+    }))
 
     useEffect(() => {
         const checkICP = async () => {
@@ -47,10 +56,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <AuthProvider>
-            <BulkAnalysisProvider>
-                {children}
-            </BulkAnalysisProvider>
-        </AuthProvider>
+        <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+                <BulkAnalysisProvider>
+                    {children}
+                </BulkAnalysisProvider>
+            </AuthProvider>
+        </QueryClientProvider>
     )
 }

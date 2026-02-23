@@ -4,6 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 import json
+from fastapi_cache import FastAPICache
+from fastapi_cache.decorator import cache
+
 
 from db.database import get_db
 from db.models import OrganizationSettings, Profile
@@ -13,6 +16,7 @@ from dependencies import get_current_user, require_admin
 settings_router = APIRouter(tags=['Settings'])
 
 @settings_router.get("/settings/icp", response_model=Optional[IdealProfileData])
+@cache(expire=300, namespace="settings") # Cache for 5 minutes
 async def get_icp(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
@@ -66,9 +70,12 @@ async def save_icp(
         from db.crud import upsert_user_settings
         await upsert_user_settings(db, str(current_user.id), {"icp_json": icp_data.json()})
     
+    # Invalidate Cache
+    await FastAPICache.clear(namespace="settings")
     return icp_data
 
 @settings_router.get("/settings/user-integrations")
+@cache(expire=300, namespace="settings")
 async def get_user_integrations(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
@@ -102,9 +109,11 @@ async def save_user_integrations(
     """
     from db.crud import upsert_user_settings
     await upsert_user_settings(db, str(current_user.id), data)
+    await FastAPICache.clear(namespace="settings")
     return {"status": "success"}
 
 @settings_router.get("/settings/integrations", response_model=IntegrationSettings)
+@cache(expire=300, namespace="settings")
 async def get_integrations(
     db: AsyncSession = Depends(get_db),
     admin_user: Profile = Depends(require_admin)
@@ -177,6 +186,7 @@ async def save_integrations(
         
     await db.commit()
     await db.refresh(settings)
+    await FastAPICache.clear(namespace="settings")
     return data
 
 @settings_router.get("/settings/onboarding-status")

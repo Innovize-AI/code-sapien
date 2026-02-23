@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.inmemory import InMemoryBackend
 
 load_dotenv()
 
@@ -94,6 +96,10 @@ async def startup_event():
         logging.warning("APScheduler not installed. Background automation disabled.")
     except Exception as e:
         logging.error(f"Failed to start background scheduler: {e}")
+
+    # Initialize Cache
+    FastAPICache.init(InMemoryBackend())
+    logging.info("🚀 FastAPICache initialized with InMemoryBackend")
 
 
 if __name__ == "__main__":

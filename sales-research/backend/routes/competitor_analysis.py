@@ -1,4 +1,7 @@
 from fastapi import APIRouter, Depends, Body, BackgroundTasks, Request
+from fastapi_cache import FastAPICache
+from fastapi_cache.decorator import cache
+
 from fastapi.responses import StreamingResponse
 from typing import List, Dict
 import asyncio
@@ -14,6 +17,7 @@ from utils.activity_helper import log_activity_and_notify
 competitor_router = APIRouter(tags=['Competitor Analysis'], responses={404: {"description": "Not found"}},)
 
 @competitor_router.get("/profiles")
+@cache(expire=60, namespace="dashboard")
 async def get_profiles(
     skip: int = 0, 
     limit: int = 100, 
@@ -76,7 +80,7 @@ async def run_competitor_analysis(input_data: CompetitorInput, db: AsyncSession 
         
         # Save to DB
         await save_competitor_analysis(db, ",".join(input_data.urls), report)
-        
+        await FastAPICache.clear(namespace="dashboard")
         return {"report": report}
     except Exception as e:
         return {"error": str(e)}
@@ -182,6 +186,7 @@ async def discover_leads(
         # 2. Trigger Background Classification
         background_tasks.add_task(run_classification_and_update, raw_leads_to_save)
         
+        await FastAPICache.clear(namespace="dashboard")
         print(f"DEBUG: Returning {len(all_leads)} leads immediately to frontend.")
         return {"leads": all_leads}
     except Exception as e:

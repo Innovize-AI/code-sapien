@@ -1,9 +1,9 @@
-
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import axios from "axios";
+import { API_URL } from "@/lib/api";
 
 interface User {
   id: string;
@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check local storage for existing session
     const token = localStorage.getItem("accessToken");
     const storedUser = localStorage.getItem("user");
-    
+
     if (token && storedUser) {
       try {
         setUser(JSON.parse(storedUser));
@@ -46,14 +46,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-        // Updated to point to backend auth route
-      const response = await axios.post("http://localhost:8000/api/auth/login", {
+      // Updated to point to backend auth route
+      const response = await axios.post(`${API_URL}/api/auth/login`, {
         email,
         password,
       });
 
       const { access_token, user } = response.data;
-      
+
       localStorage.setItem("accessToken", access_token);
       localStorage.setItem("user", JSON.stringify(user));
       setUser(user);
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const publicPaths = ["/login"];
     if (!loading && !user && !publicPaths.includes(pathname)) {
-        router.push("/login");
+      router.push("/login");
     }
   }, [user, loading, pathname, router]);
 

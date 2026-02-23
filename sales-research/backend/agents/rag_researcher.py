@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from langchain_openai import ChatOpenAI
-from langchain_classic.agents import AgentExecutor, create_openai_functions_agent
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from skills.rag_skills import RAG_SKILLS
 import json
@@ -45,25 +45,50 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
     website_analysis = state.get("website_analysis", {})
     industry = website_analysis.get("industry", "Unknown")
     company_desc = website_analysis.get("summary", "Unknown")
-    company_size = website_analysis.get("company_size", "Unknown") # derived from somewhere?
+    
+    # robustly fetch company size from various state fields
+    extracted_data = state.get("lead_extracted_data", {})
+    company_stats = state.get("company_stats", {})
+    
+    company_size = extracted_data.get("company_size") or \
+                   company_stats.get("employee_count") or \
+                   company_stats.get("staff_count") or \
+                   "Unknown"
+
+    # Fetch product-specific qualification context via RAG
+    print(f"Retrieving Qualification Context for {product_name}...")
+    qualification_context = knowledge_service.retrieve_context(
+        query=f"What is the ideal customer profile for {product_name}? What are the icp qualification criteria, industry fit, and target audience?",
+        namespace="playbooks",
+        k=2
+    )
+    
+    if not qualification_context.strip():
+        # Fallback search if playbooks namespace is empty/not specific
+        qualification_context = knowledge_service.retrieve_context(
+            query=f"{product_name} target audience and industries",
+            namespace="solutions",
+            k=1
+        )
 
     prompt = f"""
     Analyze if this company is a good fit for the product '{product_name}'.
     
-    Product Context: {product_name} matches companies in specific industries (tech, logistics, finance) or sizes.
+    ### PRODUCT QUALIFICATION CONTEXT (INTERNAL):
+    {qualification_context if qualification_context.strip() else f"Standard qualification for {product_name}."}
     
-    Company Profile:
+    ### PROSPECT COMPANY PROFILE:
     - Industry: {industry}
     - Description: {company_desc}
     - Size: {company_size}
     
     Target Roles: {target_roles} (Role matched: {job_title})
     
-    Is this a high-potential fit? Return boolean.
+    Is this a high-potential fit? Return boolean and clear reasoning based on the qualification context above.
     """
     
     try:
-        model = get_gemini_model(model="gemini-2.0-flash", temperature=0)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(PivotFitCheck)
         messages = [
             SystemMessage(content="You are a strict qualification agent. You only approve leads that are a clear fit."),
@@ -79,7 +104,7 @@ def create_strategic_rag_agent():
     """
     Creates an autonomous researcher agent with specialized sales intelligence skills.
     """
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    llm = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a Senior Strategic Research Agent at {selling_company_name}. 
@@ -101,7 +126,7 @@ def create_strategic_rag_agent():
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ])
     
-    agent = create_openai_functions_agent(llm, RAG_SKILLS, prompt)
+    agent = create_tool_calling_agent(llm, RAG_SKILLS, prompt)
     return AgentExecutor(agent=agent, tools=RAG_SKILLS, verbose=True)
 
 async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]:

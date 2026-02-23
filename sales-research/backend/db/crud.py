@@ -231,7 +231,6 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                     post_entry["comments"].append(interaction["comment"])
             
             upsert_rows.append({
-                "id": p.id,
                 "linkedin_url": url,
                 "name": data["name"] or p.name,
                 "headline": data.get("headline") or p.headline,

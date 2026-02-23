@@ -67,7 +67,8 @@ async def log_activity_and_notify(
                 reasoning=metadata.get("fit_reasoning", ""),
                 source=source_text,
                 post_link=metadata.get("source_post_url"),
-                rep_name=rep_name
+                rep_name=rep_name,
+                title=title
             )
         elif type == "analysis" and metadata and metadata.get("report_id"):
             blocks = build_research_completed_blocks(
@@ -81,5 +82,7 @@ async def log_activity_and_notify(
         else:
             blocks = build_generic_activity_blocks(title, description, rep_name=rep_name)
 
-        slack_text = f"*{title}*\n{description}" if description else f"*{title}*"
-        await send_slack_notification(settings.slack_webhook_url, slack_text, blocks=blocks)
+        # 3. Send Slack Notification
+        if settings.slack_webhook_url:
+            slack_text = f"*{title}*\n{description}" if description else f"*{title}*"
+            await send_slack_notification(settings.slack_webhook_url, slack_text, blocks=blocks)

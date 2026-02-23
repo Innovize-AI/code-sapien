@@ -11,20 +11,22 @@ def build_hot_lead_blocks(
     reasoning: str,
     source: str = "Competitor Comment",
     post_link: str = None,
-    rep_name: str = None
+    rep_name: str = None,
+    title: str = None
 ) -> List[Dict[str, Any]]:
     """
-    Builds a Slack Block Kit message for a Hot Lead discovery.
+    Builds a Slack Block Kit message for a Potential Lead discovery.
     """
-    status_emoji = "🔥" if intent == "interested" else "🚨" if intent == "pain_point" else "👀"
-    title_text = f"{status_emoji} *Hot Lead Discovery: {name}*"
+    if not title:
+        status_emoji = "🔥" if intent == "interested" else "🚨" if intent == "pain_point" else "👀"
+        title = f"{status_emoji} *Potential Opportunity: {name}*"
     
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"New Potential Opportunity Found!",
+                "text": title.replace("*", ""), # Strip markdown for header
                 "emoji": True
             }
         },

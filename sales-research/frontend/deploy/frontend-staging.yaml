@@ -13,7 +13,7 @@ spec:
     spec:
       containerConcurrency: 80
       containers:
-        - image: glial-research-frontend-image
+        - image: gcr.io/innovize-ai/glial-research-frontend-image
           ports:
             - name: http1
               containerPort: 3000

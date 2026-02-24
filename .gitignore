@@ -169,3 +169,5 @@ content-generation/
 
 .next/
 node_modules/
+qdrant_storage/
+google-drive-slack-agent/

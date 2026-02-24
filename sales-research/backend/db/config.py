@@ -34,14 +34,16 @@ else:
     DATABASE_URL = raw_url
     
 DB_SCHEMA = os.getenv("DB_SCHEMA")
-env = (os.getenv("ENVIRONMENT") or "dev").lower().strip()
+env = (os.getenv("ENVIRONMENT") or "production").lower().strip() # Default to production for safety
 
 # Handle cases where Cloud Deploy placeholders are not resolved or env is missing
 if not DB_SCHEMA or DB_SCHEMA == "${db_schema}":
-    DB_SCHEMA = "staging" if env != "production" else "public"
+    # Only use staging if explicitly requested
+    DB_SCHEMA = "staging" if env == "staging" else "public"
 
-print(f"--- DATABASE INITIALIZATION ---")
-print(f"ENVIRONMENT: {env}")
-print(f"DB_SCHEMA: {DB_SCHEMA}")
-print(f"-------------------------------")
+print(f"--- DB INITIALIZATION ---")
+print(f"ENV: {env}")
+print(f"TARGET SCHEMA: {DB_SCHEMA}")
+print(f"SEARCH PATH: {DB_SCHEMA}")
+print(f"--------------------------")
 

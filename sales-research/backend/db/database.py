@@ -13,7 +13,7 @@ engine = create_async_engine(
     connect_args={
         "statement_cache_size": 0,
         "server_settings": {
-            "search_path": f'"{DB_SCHEMA}", public'
+            "search_path": f'"{DB_SCHEMA}"'
         }
     }
 )

@@ -66,8 +66,8 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        print(f"DEBUG: Setting search_path to {DB_SCHEMA}, public")
-        connection.execute(text(f'SET search_path TO "{DB_SCHEMA}", public'))
+        print(f"DEBUG: Setting search_path to {DB_SCHEMA}")
+        connection.execute(text(f'SET search_path TO "{DB_SCHEMA}"'))
         
         # Ensure the schema exists
         print(f"DEBUG: Creating schema {DB_SCHEMA} if not exists")

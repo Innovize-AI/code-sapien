@@ -4,7 +4,7 @@ metadata:
   name: glial-sales-research-backend
 build:
   artifacts:
-    - image: glial-research-backend-image
+    - image: gcr.io/innovize-ai/glial-research-backend-image
       context: .
 profiles:
   - name: staging

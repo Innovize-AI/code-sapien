@@ -3,19 +3,21 @@ kind: Service
 metadata:
   name: glial-research-backend-service-staging
   annotations:
-    run.googleapis.com/ingress: all
+    run.googleapis.com/minScale: "1"
+    run.googleapis.com/cpu-throttling: false
+    run.googleapis.com/invoker-iam-disabled: false
 spec:
   template:
     metadata:
       annotations:
         autoscaling.knative.dev/maxScale: "10"
-        run.googleapis.com/cpu-throttling: "true"
+        run.googleapis.com/cpu-throttling: false
         run.googleapis.com/execution-environment: gen2
     spec:
       containerConcurrency: 80
       timeoutSeconds: 3600
       containers:
-        - image: us-central1-docker.pkg.dev/innovize-ai/docker-repo/glial-research-backend-image
+        - image: us-central1-docker.pkg.dev/innovize-ai/sales-research/glial-research-backend-image:latest
           ports:
             - name: http1
               containerPort: 8080

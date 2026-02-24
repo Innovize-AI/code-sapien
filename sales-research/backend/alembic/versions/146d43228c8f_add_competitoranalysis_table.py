@@ -28,10 +28,10 @@ def upgrade() -> None:
     sa.Column('analysis_report', sa.Text(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
-    op.drop_column('organization_settings', 'onboarding_complete')
-    op.drop_column('organization_settings', 'kit_api_key')
-    op.drop_column('organization_settings', 'kit_api_secret')
-    op.drop_column('organization_settings', 'integrations_config')
+    # op.drop_column('organization_settings', 'onboarding_complete')
+    # op.drop_column('organization_settings', 'kit_api_key')
+    # op.drop_column('organization_settings', 'kit_api_secret')
+    # op.drop_column('organization_settings', 'integrations_config')
     # ### end Alembic commands ###
 
 

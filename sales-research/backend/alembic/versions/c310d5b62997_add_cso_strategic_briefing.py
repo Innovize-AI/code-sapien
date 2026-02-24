@@ -37,7 +37,7 @@ def upgrade() -> None:
                existing_type=sa.TEXT(),
                type_=sa.String(),
                existing_nullable=True)
-    op.drop_column('research_reports', 'recent_posts')
+    # op.drop_column('research_reports', 'recent_posts')
     op.add_column('research_reports', sa.Column('cso_strategic_briefing', sa.Text(), nullable=True))
     # ### end Alembic commands ###
 

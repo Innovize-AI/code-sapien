@@ -22,43 +22,59 @@ def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
     
-    # Check research_reports columns
+    # --- research_reports ---
     rr_columns = [c['name'] for c in inspector.get_columns('research_reports')]
     
-    if 'company_name' not in rr_columns:
-        op.add_column('research_reports', sa.Column('company_name', sa.Text(), nullable=True))
-    if 'company_description' not in rr_columns:
-        op.add_column('research_reports', sa.Column('company_description', sa.Text(), nullable=True))
-    if 'company_industries' not in rr_columns:
-        op.add_column('research_reports', sa.Column('company_industries', sa.Text(), nullable=True))
-    if 'post_engagements' not in rr_columns:
-        op.add_column('research_reports', sa.Column('post_engagements', sa.Text(), nullable=True))
-    if 'company_news' not in rr_columns:
-        op.add_column('research_reports', sa.Column('company_news', sa.Text(), nullable=True))
-    if 'hiring_data' not in rr_columns:
-        op.add_column('research_reports', sa.Column('hiring_data', sa.Text(), nullable=True))
-
-    # Check organization_settings columns
-    os_columns = [c['name'] for c in inspector.get_columns('organization_settings')]
+    # Missing Columns from Audit
+    missing_rr = [
+        ('company_name', sa.Text()),
+        ('company_description', sa.Text()),
+        ('company_industries', sa.Text()),
+        ('company_stats', sa.Text()),
+        ('viability_analysis', sa.Text()),
+        ('target_pain_points', sa.Text()),
+        ('strategic_solutions', sa.Text()),
+        ('personalized_outreach', sa.Text()),
+        ('follow_up_strategy', sa.Text()),
+        ('buyer_journey_analysis', sa.Text()),
+        ('meeting_notes', sa.Text()),
+        ('post_engagements', sa.Text()),
+        ('company_news', sa.Text()),
+        ('hiring_data', sa.Text()),
+        ('icp_context', sa.Text()),
+        ('email_history', sa.Text()),
+        ('intent_analysis', sa.Text()),
+    ]
     
-    if 'user_linkedin_url' not in os_columns:
-        op.add_column('organization_settings', sa.Column('user_linkedin_url', sa.Text(), nullable=True))
-    if 'company_linkedin_url' not in os_columns:
-        op.add_column('organization_settings', sa.Column('company_linkedin_url', sa.Text(), nullable=True))
-    if 'integrations_config' not in os_columns:
-        op.add_column('organization_settings', sa.Column('integrations_config', sa.Text(), nullable=True))
+    for col_name, col_type in missing_rr:
+        if col_name not in rr_columns:
+            op.add_column('research_reports', sa.Column(col_name, col_type, nullable=True))
+
+    # --- lead_submissions ---
+    if 'lead_submissions' in inspector.get_table_names():
+        ls_columns = [c['name'] for c in inspector.get_columns('lead_submissions')]
+        missing_ls = [
+            ('email_history', sa.Text()),
+            ('intent_analysis', sa.Text()),
+            ('extra_metadata', sa.Text()),
+        ]
+        for col_name, col_type in missing_ls:
+            if col_name not in ls_columns:
+                op.add_column('lead_submissions', sa.Column(col_name, col_type, nullable=True))
+
+    # --- organization_settings ---
+    os_columns = [c['name'] for c in inspector.get_columns('organization_settings')]
+    missing_os = [
+        ('user_linkedin_url', sa.Text()),
+        ('company_linkedin_url', sa.Text()),
+        ('integrations_config', sa.Text()),
+    ]
+    for col_name, col_type in missing_os:
+        if col_name not in os_columns:
+            op.add_column('organization_settings', sa.Column(col_name, col_type, nullable=True))
 
 
 def downgrade() -> None:
-    # Remove columns from organization_settings
-    op.drop_column('organization_settings', 'integrations_config')
-    op.drop_column('organization_settings', 'company_linkedin_url')
-    op.drop_column('organization_settings', 'user_linkedin_url')
-
-    # Remove columns from research_reports
-    op.drop_column('research_reports', 'hiring_data')
-    op.drop_column('research_reports', 'company_news')
-    op.drop_column('research_reports', 'post_engagements')
-    op.drop_column('research_reports', 'company_industries')
-    op.drop_column('research_reports', 'company_description')
-    op.drop_column('research_reports', 'company_name')
+    # Downgrades for added columns (optional in sync migrations but good practice)
+    # Note: We only drop what was added in upgrade, but since it's a sync migration, we omit for safety
+    pass

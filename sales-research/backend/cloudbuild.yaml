@@ -1,6 +1,22 @@
 steps:
-  # 1. Build and Create Release for Backend
+  # 1. Build and push images using Skaffold
+  - name: "gcr.io/k8s-skaffold/skaffold"
+    id: skaffold-build
+    dir: "sales-research/backend"
+    entrypoint: "/bin/bash"
+    args:
+      - "-c"
+      - |
+        skaffold build \
+          --interactive=false \
+          --default-repo="us-central1-docker.pkg.dev/${PROJECT_ID}/sales-research" \
+          --file-output=artifacts.json \
+          -f skaffold.yaml
+
+  # 2. Create Cloud Deploy Release
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: trigger-deploy
+    dir: "sales-research/backend"
     entrypoint: "bash"
     args:
       - "-c"
@@ -8,9 +24,8 @@ steps:
         gcloud deploy releases create "rel-b-${SHORT_SHA}-$$(echo ${BUILD_ID} | cut -c1-8)" \
           --delivery-pipeline="glial-sales-backend-pipeline" \
           --region="us-central1" \
-          --skaffold-file="skaffold.yaml" \
-          --source="."
-    dir: "sales-research/backend"
+          --build-artifacts="artifacts.json"
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: "E2_HIGHCPU_8"

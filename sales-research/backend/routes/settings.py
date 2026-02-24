@@ -191,7 +191,11 @@ async def set_onboarding_complete(db: AsyncSession = Depends(get_db)):
     settings = result.scalars().first()
     if settings:
         settings.onboarding_complete = 1
-        await db.commit()
+    else:
+        # Create global settings if they don't exist
+        settings = OrganizationSettings(onboarding_complete=1)
+        db.add(settings)
+    await db.commit()
     return {"status": "success"}
 @settings_router.get("/settings/selling-profile", response_model=Optional[SellingProfileConfig])
 async def get_selling_profile(

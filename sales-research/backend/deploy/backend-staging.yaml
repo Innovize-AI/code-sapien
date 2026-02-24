@@ -31,7 +31,7 @@ spec:
             - name: DB_SCHEMA
               value: staging
             - name: ALLOW_ORIGINS
-              value: "https://glial-research-frontend-service-staging-512561667165.us-central1.run.app,http://localhost:3000"
+              value: "https://glial-research-frontend-service-staging-512561667165.us-central1.run.app,http://localhost:3000,https://staging.glial.innovizeai.com"
             - name: PYTHONUNBUFFERED
               value: "1"
             - name: PYTHONPATH

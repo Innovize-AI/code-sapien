@@ -32,6 +32,8 @@ def upgrade() -> None:
         sa.Column('title', sa.String(), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
         sa.Column('metadata_json', sa.Text(), nullable=True),
+        sa.Column('intent', sa.Text(), nullable=True),
+        sa.Column('sentiment', sa.Text(), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
 

@@ -56,6 +56,9 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
+    print(f"DEBUG: Running migrations online for schema: {DB_SCHEMA}")
+    print(f"DEBUG: DATABASE_URL (masked): {config.get_main_option('sqlalchemy.url')[:20]}...")
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -63,11 +66,16 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        # CRITICAL: Include 'public' in search_path so extensions like pgcrypto (gen_random_uuid) can be found
+        print(f"DEBUG: Setting search_path to {DB_SCHEMA}, public")
         connection.execute(text(f'SET search_path TO "{DB_SCHEMA}", public'))
         
         # Ensure the schema exists
+        print(f"DEBUG: Creating schema {DB_SCHEMA} if not exists")
         connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{DB_SCHEMA}"'))
+        
+        # Commit schema creation if the dialect doesn't support transactional DDL
+        # In Postgres it's transactional, but explicit commit here helps visibility
+        connection.commit() 
         
         context.configure(
             connection=connection, 

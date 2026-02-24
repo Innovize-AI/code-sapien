@@ -1,6 +1,27 @@
 import axios from 'axios';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Dynamically determine API URL based on environment
+const getApiUrl = () => {
+    if (typeof window === 'undefined') return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    
+    const hostname = window.location.hostname;
+    
+    // 1. Localhost Check
+    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+        return 'http://localhost:8000';
+    }
+
+    // 2. Staging Check
+    // Matches if hostname contains 'staging' (custom domain or cloud run URL)
+    if (hostname.includes('staging')) {
+        return 'https://glial-research-backend-service-staging-512561667165.us-central1.run.app';
+    }
+    
+    // 3. Default to Production
+    return 'https://glial-research-backend-service-512561667165.us-central1.run.app';
+};
+
+export const API_URL = getApiUrl();
 
 // Configure axios interceptor
 axios.interceptors.request.use((config) => {

@@ -19,18 +19,34 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add missing columns to research_reports
-    op.add_column('research_reports', sa.Column('company_name', sa.Text(), nullable=True))
-    op.add_column('research_reports', sa.Column('company_description', sa.Text(), nullable=True))
-    op.add_column('research_reports', sa.Column('company_industries', sa.Text(), nullable=True))
-    op.add_column('research_reports', sa.Column('post_engagements', sa.Text(), nullable=True))
-    op.add_column('research_reports', sa.Column('company_news', sa.Text(), nullable=True))
-    op.add_column('research_reports', sa.Column('hiring_data', sa.Text(), nullable=True))
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    
+    # Check research_reports columns
+    rr_columns = [c['name'] for c in inspector.get_columns('research_reports')]
+    
+    if 'company_name' not in rr_columns:
+        op.add_column('research_reports', sa.Column('company_name', sa.Text(), nullable=True))
+    if 'company_description' not in rr_columns:
+        op.add_column('research_reports', sa.Column('company_description', sa.Text(), nullable=True))
+    if 'company_industries' not in rr_columns:
+        op.add_column('research_reports', sa.Column('company_industries', sa.Text(), nullable=True))
+    if 'post_engagements' not in rr_columns:
+        op.add_column('research_reports', sa.Column('post_engagements', sa.Text(), nullable=True))
+    if 'company_news' not in rr_columns:
+        op.add_column('research_reports', sa.Column('company_news', sa.Text(), nullable=True))
+    if 'hiring_data' not in rr_columns:
+        op.add_column('research_reports', sa.Column('hiring_data', sa.Text(), nullable=True))
 
-    # Add missing columns to organization_settings
-    op.add_column('organization_settings', sa.Column('user_linkedin_url', sa.Text(), nullable=True))
-    op.add_column('organization_settings', sa.Column('company_linkedin_url', sa.Text(), nullable=True))
-    op.add_column('organization_settings', sa.Column('integrations_config', sa.Text(), nullable=True))
+    # Check organization_settings columns
+    os_columns = [c['name'] for c in inspector.get_columns('organization_settings')]
+    
+    if 'user_linkedin_url' not in os_columns:
+        op.add_column('organization_settings', sa.Column('user_linkedin_url', sa.Text(), nullable=True))
+    if 'company_linkedin_url' not in os_columns:
+        op.add_column('organization_settings', sa.Column('company_linkedin_url', sa.Text(), nullable=True))
+    if 'integrations_config' not in os_columns:
+        op.add_column('organization_settings', sa.Column('integrations_config', sa.Text(), nullable=True))
 
 
 def downgrade() -> None:

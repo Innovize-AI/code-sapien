@@ -1,53 +1,21 @@
 steps:
-  # 1. Build the Docker image
-  - name: "gcr.io/cloud-builders/docker"
-    args:
-      [
-        "build",
-        "-t",
-        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA",
-        "-t",
-        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest",
-        ".",
-      ]
-    dir: "sales-research/backend"
-
-  # 2. Push the image to Container Registry
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["push", "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA"]
-
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["push", "gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest"]
-
-  # 3. Deploy to Cloud Run
+  # 1. Build and Create Release for Backend
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args:
-      - "run"
       - "deploy"
-      - "$_SERVICE_NAME"
-      - "--image"
-      - "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA"
-      - "--platform"
-      - "managed"
+      - "releases"
+      - "create"
+      - "rel-backend-${SHORT_SHA}"
+      - "--delivery-pipeline"
+      - "glial-sales-backend-pipeline"
       - "--region"
       - "us-central1"
-      - "--timeout"
-      - "3600"
-      - "--concurrency"
-      - "80"
-      - "--cpu-throttling"
-      - "--update-env-vars"
-      - "ENVIRONMENT=production,DB_SCHEMA=$_DB_SCHEMA"
-      - "--no-allow-unauthenticated"
-
-images:
-  - "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA"
-  - "gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest"
+      - "--skaffold-file"
+      - "skaffold.yaml"
+      - "--source"
+      - "."
+    dir: "sales-research/backend"
 
 options:
   logging: CLOUD_LOGGING_ONLY
-
-substitutions:
-  _SERVICE_NAME: "glial-research-backend-service"
-  _DB_SCHEMA: "public"

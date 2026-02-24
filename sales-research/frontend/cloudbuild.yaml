@@ -1,50 +1,21 @@
 steps:
-  # 1. Build the Docker image
-  - name: "gcr.io/cloud-builders/docker"
-    args:
-      [
-        "build",
-        "--build-arg",
-        "API_URL=$_API_URL",
-        "-t",
-        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA",
-        "-t",
-        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest",
-        ".",
-      ]
-    dir: "sales-research/frontend"
-
-  # 2. Push the image to Container Registry
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["push", "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA"]
-
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["push", "gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest"]
-
-  # 3. Deploy to Cloud Run
+  # 1. Build and Create Release for Frontend
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args:
-      - "run"
       - "deploy"
-      - "$_SERVICE_NAME"
-      - "--image"
-      - "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA"
-      - "--platform"
-      - "managed"
+      - "releases"
+      - "create"
+      - "rel-frontend-${SHORT_SHA}"
+      - "--delivery-pipeline"
+      - "glial-sales-frontend-pipeline"
       - "--region"
       - "us-central1"
-      - "--port"
-      - "3000"
-      - "--no-allow-unauthenticated"
-
-images:
-  - "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA"
-  - "gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest"
+      - "--skaffold-file"
+      - "skaffold.yaml"
+      - "--source"
+      - "."
+    dir: "sales-research/frontend"
 
 options:
   logging: CLOUD_LOGGING_ONLY
-
-substitutions:
-  _API_URL: "http://localhost:8000" # Default value, can be overridden in trigger
-  _SERVICE_NAME: "glial-research-frontend-service"

@@ -6,7 +6,7 @@ steps:
       - "deploy"
       - "releases"
       - "create"
-      - "rel-backend-${SHORT_SHA}"
+      - "rel-backend-${SHORT_SHA}-${BUILD_ID}"
       - "--delivery-pipeline"
       - "glial-sales-backend-pipeline"
       - "--region"

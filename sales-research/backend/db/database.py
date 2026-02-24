@@ -24,7 +24,8 @@ SessionLocal = sessionmaker(
     expire_on_commit=False,
 )
 
-Base = declarative_base()
+from sqlalchemy import MetaData
+Base = declarative_base(metadata=MetaData(schema=DB_SCHEMA))
 
 async def get_db():
     async with SessionLocal() as session:

@@ -5,8 +5,8 @@ metadata:
 description: Delivery pipeline for Glial Sales Research Frontend
 serialPipeline:
   stages:
-    - targetId: staging
-    - targetId: production
+    - targetId: frontend-staging
+    - targetId: frontend-production
 ---
 apiVersion: deploy.cloud.google.com/v1
 kind: Target

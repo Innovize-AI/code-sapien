@@ -1,19 +1,30 @@
-apiVersion: skaffold/v4beta7
+apiVersion: skaffold/v4beta8
 kind: Config
 metadata:
   name: glial-sales-research-backend
 build:
   artifacts:
-    - image: us-central1-docker.pkg.dev/innovize-ai/docker-repo/glial-research-backend-image
-      context: .
+    - image: us-central1-docker.pkg.dev/innovize-ai/sales-research/glial-research-backend-image
+      docker:
+        dockerfile: Dockerfile
+  tagPolicy:
+    sha256: {}
+  googleCloudBuild:
+    projectId: innovize-ai
 profiles:
   - name: staging
     manifests:
       rawYaml:
         - deploy/backend-staging.yaml
+    deploy:
+      cloudrun:
+        projectid: innovize-ai
+        region: us-central1
   - name: production
     manifests:
       rawYaml:
         - deploy/backend-production.yaml
-deploy:
-  cloudrun: {}
+    deploy:
+      cloudrun:
+        projectid: innovize-ai
+        region: us-central1

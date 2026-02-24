@@ -5,7 +5,7 @@ metadata:
   annotations:
     run.googleapis.com/minScale: "1"
     run.googleapis.com/cpu-throttling: false
-    run.googleapis.com/invoker-iam-disabled: false
+    run.googleapis.com/invoker-iam-disabled: true
 spec:
   template:
     metadata:
@@ -30,6 +30,8 @@ spec:
               value: staging
             - name: DB_SCHEMA
               value: staging
+            - name: ALLOW_ORIGINS
+              value: "https://glial-research-frontend-service-staging-512561667165.us-central1.run.app,http://localhost:3000"
             - name: PYTHONUNBUFFERED
               value: "1"
             - name: PYTHONPATH

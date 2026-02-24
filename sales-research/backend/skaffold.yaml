@@ -8,6 +8,6 @@ build:
       context: .
 manifests:
   rawYaml:
-    - ../deploy/backend.yaml
+    - backend.yaml
 deploy:
   cloudrun: {}

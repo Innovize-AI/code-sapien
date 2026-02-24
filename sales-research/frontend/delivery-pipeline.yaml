@@ -14,7 +14,7 @@ metadata:
   name: frontend-staging
 description: Frontend Staging environment
 run:
-  location: projects/{{PROJECT_ID}}/locations/us-central1
+  location: projects/innovize-ai/locations/us-central1
 deployParameters:
   frontend_service_name: glial-research-frontend-service-staging
 ---
@@ -24,6 +24,6 @@ metadata:
   name: frontend-production
 description: Frontend Production environment
 run:
-  location: projects/{{PROJECT_ID}}/locations/us-central1
+  location: projects/innovize-ai/locations/us-central1
 deployParameters:
   frontend_service_name: glial-research-frontend-service

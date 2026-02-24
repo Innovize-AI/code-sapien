@@ -14,7 +14,7 @@ metadata:
   name: backend-staging
 description: Backend Staging environment
 run:
-  location: projects/{{PROJECT_ID}}/locations/us-central1
+  location: projects/innovize-ai/locations/us-central1
 deployParameters:
   backend_service_name: glial-research-backend-service-staging
   DB_SCHEMA: staging
@@ -25,7 +25,7 @@ metadata:
   name: backend-production
 description: Backend Production environment
 run:
-  location: projects/{{PROJECT_ID}}/locations/us-central1
+  location: projects/innovize-ai/locations/us-central1
 deployParameters:
   backend_service_name: glial-research-backend-service
   DB_SCHEMA: public

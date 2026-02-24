@@ -5,7 +5,7 @@ steps:
     args:
       - "-c"
       - |
-        gcloud deploy releases create "rel-b-${SHORT_SHA}-${BUILD_ID:0:8}" \
+        gcloud deploy releases create "rel-b-${SHORT_SHA}-$$(echo ${BUILD_ID} | cut -c1-8)" \
           --delivery-pipeline="glial-sales-backend-pipeline" \
           --region="us-central1" \
           --skaffold-file="skaffold.yaml" \

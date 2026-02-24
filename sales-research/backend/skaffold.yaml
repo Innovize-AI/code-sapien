@@ -1,0 +1,13 @@
+apiVersion: skaffold/v4beta7
+kind: Config
+metadata:
+  name: glial-sales-research-backend
+build:
+  artifacts:
+    - image: glial-research-backend-image
+      context: .
+manifests:
+  rawYaml:
+    - ../deploy/backend.yaml
+deploy:
+  cloudrun: {}

@@ -30,6 +30,8 @@ def upgrade() -> None:
     sa.Column('source_posts', sa.Text(), nullable=True),
     sa.Column('last_interaction_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('profile_metadata', sa.Text(), nullable=True),
+    sa.Column('intent', sa.Text(), nullable=True),
+    sa.Column('sentiment', sa.Text(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('linkedin_url')
     )

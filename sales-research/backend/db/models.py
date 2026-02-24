@@ -41,7 +41,6 @@ class ResearchReport(Base):
     post_engagements = Column(Text, nullable=True) # JSON array
     company_news = Column(Text, nullable=True)     # JSON array
     hiring_data = Column(Text, nullable=True)      # JSON array
-    company_stats = Column(Text, nullable=True)    # JSON object
     lead_company_linkedin_url = Column(Text, nullable=True)
     lead_li_urn = Column(Text, nullable=True)
     

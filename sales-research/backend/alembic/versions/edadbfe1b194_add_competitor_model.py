@@ -29,8 +29,8 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('linkedin_url')
     )
-    op.drop_table('lead_submissions')
-    op.drop_column('research_reports', 'extra_metadata')
+    # op.drop_table('lead_submissions')  <-- REMOVED because it breaks later migrations
+    # op.drop_column('research_reports', 'extra_metadata') <-- REMOVED
     # ### end Alembic commands ###
 
 

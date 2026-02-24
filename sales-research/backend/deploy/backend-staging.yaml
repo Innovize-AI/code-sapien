@@ -1,7 +1,7 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: ${backend_service_name}
+  name: glial-research-backend-service-staging
   annotations:
     run.googleapis.com/ingress: all
 spec:
@@ -25,9 +25,9 @@ spec:
               memory: "1Gi"
           env:
             - name: ENVIRONMENT
-              value: production
+              value: staging
             - name: DB_SCHEMA
-              value: public # This will be overridden by Cloud Deploy parameters
+              value: staging
             - name: PYTHONUNBUFFERED
               value: "1"
             - name: PYTHONPATH

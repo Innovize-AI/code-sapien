@@ -6,8 +6,14 @@ build:
   artifacts:
     - image: glial-research-backend-image
       context: .
-manifests:
-  rawYaml:
-    - backend.yaml
+profiles:
+  - name: staging
+    manifests:
+      rawYaml:
+        - deploy/backend-staging.yaml
+  - name: production
+    manifests:
+      rawYaml:
+        - deploy/backend-production.yaml
 deploy:
   cloudrun: {}

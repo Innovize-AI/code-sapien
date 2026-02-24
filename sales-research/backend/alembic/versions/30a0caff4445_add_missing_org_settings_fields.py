@@ -22,7 +22,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     op.add_column('organization_settings', sa.Column('onboarding_complete', sa.Integer(), server_default=sa.text('0'), nullable=False))
     op.add_column('organization_settings', sa.Column('kit_api_key', sa.String(), nullable=True))
-    op.add_column('organization_settings', sa.Column('kit_api_secret', sa.String(), nullable=True))
+    # op.add_column('organization_settings', sa.Column('kit_api_secret', sa.String(), nullable=True))
 
 
 def downgrade() -> None:

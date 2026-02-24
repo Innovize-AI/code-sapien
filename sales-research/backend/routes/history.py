@@ -10,21 +10,28 @@ async def read_history(db: AsyncSession = Depends(get_db)):
     from db.models import ResearchReport, Profile
     from sqlalchemy import select
     
-    # Fetch history with joined profiles for rep attribution
-    query = (
-        select(ResearchReport, Profile.full_name)
-        .outerjoin(Profile, ResearchReport.created_by_id == Profile.id)
-        .order_by(ResearchReport.created_at.desc())
-    )
-    result = await db.execute(query)
-    
-    history_data = []
-    for report, rep_name in result.all():
-        item = _report_to_dict(report)
-        item["rep_name"] = rep_name or "System"
-        history_data.append(item)
+    try:
+        # Fetch history with joined profiles for rep attribution
+        query = (
+            select(ResearchReport, Profile.full_name)
+            .outerjoin(Profile, ResearchReport.created_by_id == Profile.id)
+            .order_by(ResearchReport.created_at.desc())
+        )
+        result = await db.execute(query)
         
-    return history_data
+        history_data = []
+        for report, rep_name in result.all():
+            item = _report_to_dict(report)
+            item["rep_name"] = rep_name or "System"
+            history_data.append(item)
+            
+        return history_data
+    except Exception as e:
+        import traceback
+        import logging
+        logging.error(f"Error in read_history: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 @history_router.get("/history/{report_id}")
 async def read_report_item(report_id: str, db: AsyncSession = Depends(get_db)):

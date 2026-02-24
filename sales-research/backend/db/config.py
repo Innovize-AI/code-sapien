@@ -33,8 +33,15 @@ elif raw_url.startswith("postgresql://"):
 else:
     DATABASE_URL = raw_url
     
-DB_SCHEMA = os.getenv("DB_SCHEMA", "public")
-# Handle cases where Cloud Deploy placeholders are not resolved
-if DB_SCHEMA == "${db_schema}" or not DB_SCHEMA:
-    DB_SCHEMA = "staging" if os.getenv("ENVIRONMENT") != "production" else "public"
+DB_SCHEMA = os.getenv("DB_SCHEMA")
+env = (os.getenv("ENVIRONMENT") or "dev").lower().strip()
+
+# Handle cases where Cloud Deploy placeholders are not resolved or env is missing
+if not DB_SCHEMA or DB_SCHEMA == "${db_schema}":
+    DB_SCHEMA = "staging" if env != "production" else "public"
+
+print(f"--- DATABASE INITIALIZATION ---")
+print(f"ENVIRONMENT: {env}")
+print(f"DB_SCHEMA: {DB_SCHEMA}")
+print(f"-------------------------------")
 

@@ -1,0 +1,35 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: glial-research-backend-service
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/cpu-throttling: "true"
+        run.googleapis.com/startup-cpu-boost: "true"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 3600
+      containers:
+        - image: gcr.io/PROJECT_ID/glial-research-backend:latest
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          env:
+            - name: ENVIRONMENT
+              value: production
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://user:pass@host/db"
+            - name: TASK_SECRET
+              value: "your_task_secret_here"
+            - name: SLACK_BOT_TOKEN
+              value: "xoxb-..."
+            - name: OPENAI_API_KEY
+              value: "sk-..."
+          ports:
+            - containerPort: 8080

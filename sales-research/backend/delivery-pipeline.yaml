@@ -6,7 +6,11 @@ description: Delivery pipeline for Glial Sales Research Backend
 serialPipeline:
   stages:
     - targetId: backend-staging
+      profiles:
+        - staging
     - targetId: backend-production
+      profiles:
+        - production
 ---
 apiVersion: deploy.cloud.google.com/v1
 kind: Target
@@ -15,9 +19,7 @@ metadata:
 description: Backend Staging environment
 run:
   location: projects/innovize-ai/locations/us-central1
-deployParameters:
-  backend_service_name: glial-research-backend-service-staging
-  DB_SCHEMA: staging
+deployParameters: {}
 ---
 apiVersion: deploy.cloud.google.com/v1
 kind: Target
@@ -26,6 +28,4 @@ metadata:
 description: Backend Production environment
 run:
   location: projects/innovize-ai/locations/us-central1
-deployParameters:
-  backend_service_name: glial-research-backend-service
-  DB_SCHEMA: public
+deployParameters: {}

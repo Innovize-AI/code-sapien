@@ -46,3 +46,26 @@ CSV upload of prospects (linkedin url and websites)
 
 
 # identify relevant leads in a company if current profile is not a fit
+
+---
+
+## 🚀 Future Roadmap & Enhancement Ideas
+
+### 1. Intelligence & Context
+- **Voice of Customer Integration**: Auto-ingest call transcripts from HubSpot/Zoom to refine ICP and pain points.
+- **Competitive Intelligence Tracker**: Monitor competitor sites/LinkedIn for auto-updating Battle Cards.
+- **Semantic Lead Similarities**: Find leads semantically similar to your top closed-won deals.
+
+### 2. Automation & Workflow
+- **Trigger-Based Research**: Auto-start research on "High Fit" leads identified in CRM or via webhooks.
+- **Multi-Step Outreach Sequences**: Orchestrate LinkedIn + Email follow-up sequences.
+- **Bi-Directional CRM Sync**: Automatically update Lead Status and Intent Scores in HubSpot.
+
+### 3. Multi-Channel & Media
+- **Slack Agent Interaction**: Query the research agent directly from Slack for instant lead risks/tips.
+- **Dynamic One-Pager Generation**: Auto-generate personalized PDFs or mini-sites for each lead.
+- **Reddit & Community Miner**: specialized agent for finding intent signals in niche communities.
+
+### 4. User Experience
+- **Human-in-the-Loop Review Station**: Dedicated UI for salespeople to approve/edit findings before CRM sync.
+- **Interactive Insights**: Clickable pain points linked directly to raw source data (LinkedIn/Website).

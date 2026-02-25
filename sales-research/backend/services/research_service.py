@@ -1,3 +1,4 @@
+import os
 import json
 import uuid
 import re
@@ -166,13 +167,28 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
     if saved_report:
         # Log Activity: Analysis Completed
         fullname = final_state.get("fullname") or linkedin_url or final_state.get("email_id") or "Unknown Lead"
+        
+        journey_analysis = final_state.get("buyer_journey_analysis") or {}
+        pain_point_analysis = final_state.get("target_pain_points") or {}
+        
+        metadata = {
+            "report_id": str(saved_report.id), 
+            "lead_score": lead_score, 
+            "name": fullname,
+            "journey_stage": journey_analysis.get("journey_stage"),
+            "heat_rating": journey_analysis.get("sentiment_score"),
+            "urgency": journey_analysis.get("urgency_level"),
+            "pain_points": pain_point_analysis.get("points", []) if isinstance(pain_point_analysis, dict) else []
+        }
+        
         await log_activity_and_notify(
             db,
             type="analysis",
             title=f"Analysis completed for {fullname}",
             description=f"Deep research finished with lead score: {lead_score}",
-            metadata={"report_id": str(saved_report.id), "lead_score": lead_score, "name": fullname},
+            metadata=metadata,
             user_id=user_id
+            
         )
         
         # Log Activity: High Potential Lead
@@ -395,7 +411,8 @@ async def _push_to_hubspot_if_enabled(db, user_id, report, final_state):
             if target_id:
                 content = f"<h3>AI Research Report (Score: {report.lead_score})</h3>"
                 content += f"<p><b>Viability:</b> {report.viability_analysis[:500]}...</p>"
-                content += f"<p><a href='/reports/{report.id}'>View Full Report in Innovize AI</a></p>"
+                frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+                content += f"<p><a href='{frontend_url}/reports/{report.id}'>View Full Report in Innovize AI</a></p>"
                 
                 await hs.push_note("contact", target_id, content)
                 print(f"Successfully pushed research note to HubSpot for {email}")

@@ -5,7 +5,7 @@ metadata:
   annotations:
     run.googleapis.com/minScale: "1"
     run.googleapis.com/cpu-throttling: false
-    run.googleapis.com/invoker-iam-disabled: false
+    run.googleapis.com/invoker-iam-disabled: true
 spec:
   template:
     metadata:

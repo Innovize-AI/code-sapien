@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict, Any
 
 def build_hot_lead_blocks(
@@ -132,7 +133,11 @@ def build_research_completed_blocks(
     why_now: str, 
     action_plan: List[str], 
     report_id: str,
-    rep_name: str = None
+    rep_name: str = None,
+    journey_stage: str = None,
+    heat_rating: int = None,
+    urgency: str = None,
+    pain_points: List[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Builds a Slack Block Kit message when a deep research analysis is finished.
@@ -150,10 +155,17 @@ def build_research_completed_blocks(
         },
         {
             "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*Lead Score:* {score_emoji} `{lead_score}/100`"
-            }
+            "fields": [
+                {"type": "mrkdwn", "text": f"*Lead Score:* {score_emoji} `{lead_score}/100`"},
+                {"type": "mrkdwn", "text": f"*Heat Rating:* `{'🔥' * (max(1, heat_rating // 20) if heat_rating else 1)}` ({heat_rating or 'N/A'}/100)" if heat_rating else "*Heat Rating:* N/A"}
+            ]
+        },
+        {
+            "type": "section",
+            "fields": [
+                {"type": "mrkdwn", "text": f"*Journey Stage:* `{journey_stage or 'Awareness'}`"},
+                {"type": "mrkdwn", "text": f"*Urgency:* `{urgency or 'Medium'}`"}
+            ]
         }
     ]
 
@@ -174,6 +186,15 @@ def build_research_completed_blocks(
             }
         })
 
+    if pain_points:
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*Primary Pain Points:*\n" + "\n".join([f"• {pp}" for pp in pain_points[:3]])
+            }
+        })
+
     if action_plan:
         blocks.append({
             "type": "section",
@@ -189,7 +210,7 @@ def build_research_completed_blocks(
             {
                 "type": "button",
                 "text": {"type": "plain_text", "text": "View Full Report"},
-                "url": f"http://localhost:3000/reports?id={report_id}", 
+                "url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reports?id={report_id}", 
                 "style": "primary"
             }
         ]

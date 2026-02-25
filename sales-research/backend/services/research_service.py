@@ -170,16 +170,21 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
         
         journey_analysis = final_state.get("buyer_journey_analysis") or {}
         pain_point_analysis = final_state.get("target_pain_points") or {}
+        report = final_state.get("sales_research_report") or {}
         
         metadata = {
             "report_id": str(saved_report.id), 
             "lead_score": lead_score, 
             "name": fullname,
+            "why_now": report.get("why_now"),
+            "action_plan": report.get("advanced_next_steps"), # This is the list of next steps
             "journey_stage": journey_analysis.get("journey_stage"),
             "heat_rating": journey_analysis.get("sentiment_score"),
             "urgency": journey_analysis.get("urgency_level"),
             "pain_points": pain_point_analysis.get("points", []) if isinstance(pain_point_analysis, dict) else []
         }
+        
+        print(f"DEBUG: Notification metadata for {fullname}: {json.dumps(metadata)}")
         
         await log_activity_and_notify(
             db,

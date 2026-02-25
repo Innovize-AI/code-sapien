@@ -99,11 +99,27 @@ def lead_scorer(state: AgentState):
     try:
         model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(LeadScoreAnalysis)
-        response = structured_llm.invoke(messages)
+        response: LeadScoreAnalysis = structured_llm.invoke(messages)
         
         if not response:
              return {"lead_score_analysis": {}, "viability_analysis": ""}
              
+        # Manually verify and fix total_score if LLM math failed
+        breakdown = response.score_breakdown
+        calculated_total = (
+            breakdown.firmographic_fit.score +
+            breakdown.persona_alignment.score +
+            breakdown.behavioral_engagement.score +
+            breakdown.strategic_intent.score
+        ) - response.negative_penalty
+        
+        # Ensure floor of 0
+        calculated_total = max(0, calculated_total)
+        
+        if response.total_score != calculated_total:
+            logger.warning(f"Fixing LLM lead score math: LLM said {response.total_score}, Calculated {calculated_total}")
+            response.total_score = calculated_total
+
         res_dict = response.model_dump()
         return {
             "lead_score_analysis": res_dict,

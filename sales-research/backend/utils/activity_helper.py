@@ -77,12 +77,20 @@ async def log_activity_and_notify(
                 why_now=metadata.get("why_now", ""),
                 action_plan=metadata.get("action_plan", []),
                 report_id=metadata.get("report_id"),
-                rep_name=rep_name
+                rep_name=rep_name,
+                journey_stage=metadata.get("journey_stage"),
+                heat_rating=metadata.get("heat_rating"),
+                urgency=metadata.get("urgency"),
+                pain_points=metadata.get("pain_points")
             )
         else:
             blocks = build_generic_activity_blocks(title, description, rep_name=rep_name)
 
         # 3. Send Slack Notification
         if settings.slack_webhook_url:
+            print(f"DEBUG: Sending Slack notification for {title}. Blocks: {len(blocks) if blocks else 0}")
+            if blocks:
+                print(f"DEBUG: Payload: {json.dumps(blocks, indent=2)[:1000]}") # Log first 1000 chars of blocks
+            
             slack_text = f"*{title}*\n{description}" if description else f"*{title}*"
             await send_slack_notification(settings.slack_webhook_url, slack_text, blocks=blocks)

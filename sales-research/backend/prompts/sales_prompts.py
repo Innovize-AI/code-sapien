@@ -117,8 +117,12 @@ The ideal_customer profile is present in {content} as json.
     - **Populate the `negative_penalty` field with the total points deducted.**
     - **Populate the `penalty_reason` with a concise explanation (e.g., "Critical: Closed Lost due to Competitor").**
 
+### CALCULATION RULE (STRICT):
+The `total_score` MUST be the summation of the four categorical scores (Firmographic + Persona + Behavioral + Strategic Intent) MINUS the `negative_penalty`. 
+Example: (20 + 20 + 10 + 10) - 15 = 45.
+
 ### OUTPUT EXPECTATION:
-1. Provide a definitive Total Lead Score (out of 100).
+1. Provide a definitive Total Lead Score (out of 100) following the Calculation Rule above.
 2. Provide a detailed score AND specific evidence-based reasoning for ALL 4 categories: Firmographic Fit, Persona Alignment, Behavioral Engagement, and Strategic Intent.
 3. Provide a rigorous analysis explaining the high-stakes reasoning behind each categorical score.
 4. Offer strategic recommendations for engagement.

@@ -144,6 +144,12 @@ def build_research_completed_blocks(
     """
     score_emoji = "💎" if lead_score >= 80 else "⭐️" if lead_score >= 60 else "📊"
     
+    # Defensive cast for heat_rating
+    try:
+        heat_rating_int = int(heat_rating) if heat_rating is not None and str(heat_rating).isdigit() else 0
+    except:
+        heat_rating_int = 0
+
     blocks = [
         {
             "type": "header",
@@ -157,7 +163,7 @@ def build_research_completed_blocks(
             "type": "section",
             "fields": [
                 {"type": "mrkdwn", "text": f"*Lead Score:* {score_emoji} `{lead_score}/100`"},
-                {"type": "mrkdwn", "text": f"*Heat Rating:* `{'🔥' * (max(1, heat_rating // 20) if heat_rating else 1)}` ({heat_rating or 'N/A'}/100)" if heat_rating else "*Heat Rating:* N/A"}
+                {"type": "mrkdwn", "text": f"*Heat Rating:* `{'🔥' * (max(1, heat_rating_int // 20) if heat_rating_int else 1)}` ({heat_rating_int}/100)" if heat_rating_int else "*Heat Rating:* `N/A`"}
             ]
         },
         {

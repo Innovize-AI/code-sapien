@@ -7,7 +7,7 @@ from prompts.sales_prompts import (
     OUTREACH_DESIGN_PROMPT
 )
 import json
-from models.structured_output import OutreachStrategy, CampaignVariant
+from models.structured_output import OutreachStrategy, CampaignVariant, Solution, StrategicSolutions
 from pydantic import BaseModel, Field
 from typing import List
 from services.knowledge_service import KnowledgeService
@@ -83,7 +83,7 @@ class PainPointAnalysis(BaseModel):
 
 class StrategicSolutionProposal(BaseModel):
     summary: str = Field(description="Overview of the proposed transformation.")
-    solutions: List[str] = Field(description="Specific AI/Service solutions proposed.")
+    solutions: List[Solution] = Field(description="Specific AI/Service solutions proposed with Logical Gap Mapping.")
     value_proposition: str = Field(description="The core value delivered by these solutions.")
 
 def pain_point_node(state: AgentState):

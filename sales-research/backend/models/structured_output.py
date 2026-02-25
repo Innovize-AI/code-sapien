@@ -21,6 +21,7 @@ class PainPoints(BaseModel):
 
 class Solution(BaseModel):
     title: str = Field(description="Name of the proposed solution.")
+    logical_gap_mapping: str = Field(description="The 'Silent Friction' or hidden cost this solution bridges.")
     description: str = Field(description="How the solution works.")
     expected_roi: str = Field(description="Potential efficiency or revenue gains.")
 

@@ -140,3 +140,8 @@ spec:
                 secretKeyRef:
                   name: PINECONE_API_KEY
                   key: latest
+            - name: TASK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: TASK_SECRET
+                  key: latest

@@ -13,9 +13,11 @@ tasks_router = APIRouter()
 
 # Simple security check for task endpoints
 TASK_SECRET = os.getenv("TASK_SECRET", "dev_secret")
+logger.info(f"Task security initialized with secret: {TASK_SECRET[:4]}...")
 
 async def verify_task_secret(x_task_secret: str = Header(None)):
     if x_task_secret != TASK_SECRET:
+        logger.warning(f"Heartbeat 403: Secret mismatch. Expected: {TASK_SECRET[:4]}... Received: {x_task_secret[:4] if x_task_secret else 'None'}...")
         raise HTTPException(status_code=403, detail="Invalid task secret")
 
 @tasks_router.post("/tasks/heartbeat")

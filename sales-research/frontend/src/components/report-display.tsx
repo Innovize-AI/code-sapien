@@ -839,6 +839,119 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                 return null;
 
               if (Array.isArray(value)) {
+                // Specialized Renderer for Strategic Solutions (The Transformation Accelerator)
+                const isSolutionsArray =
+                  key === "solutions" &&
+                  value.length > 0 &&
+                  typeof value[0] === "object" &&
+                  "logical_gap_mapping" in value[0];
+
+                if (isSolutionsArray) {
+                  return (
+                    <div key={key} className="md:col-span-2 space-y-12 pt-8">
+                      <div className="flex items-center gap-4 px-2">
+                        <div className="h-1px flex-1 bg-gradient-to-r from-transparent via-zinc-200 dark:via-zinc-800 to-transparent" />
+                        <div className="flex items-center gap-3 px-6 py-2 rounded-full bg-emerald-500/5 border border-emerald-500/10">
+                          <TrendingUp className="h-4 w-4 text-emerald-500" />
+                          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-600 dark:text-emerald-400">
+                            Transformation Accelerator
+                          </span>
+                        </div>
+                        <div className="h-1px flex-1 bg-gradient-to-r from-transparent via-zinc-200 dark:via-zinc-800 to-transparent" />
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-10">
+                        {value.map((solution: any, i: number) => (
+                          <div
+                            key={i}
+                            className="group/sol relative p-1 pb-10 border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+                          >
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                              {/* The Gap (Left Side) */}
+                              <div className="lg:col-span-5 space-y-6">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">
+                                      The Logical Gap
+                                    </span>
+                                  </div>
+                                  <h5 className="text-xl font-black text-zinc-900 dark:text-white uppercase leading-tight italic">
+                                    Silent Friction Detected
+                                  </h5>
+                                </div>
+                                <div className="p-8 rounded-[2rem] bg-rose-500/5 border border-rose-500/10 relative overflow-hidden group-hover/sol:bg-rose-500/[0.08] transition-all duration-500">
+                                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                                    <ShieldAlert className="h-12 w-12" />
+                                  </div>
+                                  <p className="text-[16px] font-bold text-rose-700 dark:text-rose-400 leading-relaxed italic relative z-10 antialiased">
+                                    "{solution.logical_gap_mapping}"
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-3 px-2">
+                                  <div className="h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
+                                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                                    Requires Strategic Pivot
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* The Bridge (Middle) */}
+                              <div className="hidden lg:flex lg:col-span-2 items-center justify-center">
+                                <div className="relative h-full w-px bg-gradient-to-b from-transparent via-zinc-200 dark:via-zinc-800 to-transparent">
+                                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-3 rounded-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-xl group-hover/sol:scale-110 group-hover/sol:rotate-90 transition-all duration-700">
+                                    <ArrowRight className="h-4 w-4 text-primary" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* The Solution (Right Side) */}
+                              <div className="lg:col-span-5 space-y-8">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">
+                                      The Infrastructure Bridge
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <h5 className="text-2xl font-black text-primary uppercase tracking-tight italic">
+                                      {solution.title}
+                                    </h5>
+                                    <Badge className="bg-primary/10 text-primary border-none text-[9px] font-black uppercase h-5 px-2">
+                                      Ready
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                <div className="prose prose-zinc dark:prose-invert max-w-none text-[15px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
+                                  <ReactMarkdown>
+                                    {solution.description}
+                                  </ReactMarkdown>
+                                </div>
+
+                                {solution.expected_roi && (
+                                  <div className="p-6 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-dashed border-zinc-200 dark:border-zinc-800 group-hover/sol:border-emerald-500/30 transition-all duration-500">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <Zap className="h-3.5 w-3.5 text-emerald-500" />
+                                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                        Projected ROI Driver
+                                      </span>
+                                    </div>
+                                    <p className="text-sm font-black text-zinc-900 dark:text-white italic">
+                                      {solution.expected_roi}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={key} className="md:col-span-2 space-y-3">
                     <div className="flex items-center gap-3">
@@ -855,7 +968,20 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                         >
                           <span className="text-primary mt-1.5">•</span>
                           <div className="prose prose-zinc dark:prose-invert max-w-none text-[15px] text-zinc-900 dark:text-zinc-100 leading-relaxed font-medium">
-                            <ReactMarkdown>{String(item)}</ReactMarkdown>
+                            {typeof item === "object" ? (
+                              <div className="space-y-4">
+                                {Object.entries(item).map(([sk, sv]) => (
+                                  <div key={sk}>
+                                    <span className="text-[10px] font-black uppercase text-zinc-400">
+                                      {sk}:
+                                    </span>{" "}
+                                    <ReactMarkdown>{String(sv)}</ReactMarkdown>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <ReactMarkdown>{String(item)}</ReactMarkdown>
+                            )}
                           </div>
                         </div>
                       ))}

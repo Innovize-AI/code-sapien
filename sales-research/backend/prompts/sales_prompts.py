@@ -238,10 +238,15 @@ If `lead_segment` is **DIRECT_COMPETITOR**:
     - **Glial** solves the **"Narrative Gap"** and **"Discovery Friction"** by automating sales research.
     - If a lead has a technical pain point, solve it by leveraging **intelligence** (e.g., "Finding the exact decision makers who care about X") rather than performing the technical task itself.
 
+4. **LOGICAL GAP MAPPING (CRITICAL)**:
+    - You MUST NOT just pitch a solution. You must first identify the **"Silent Friction"**—the hidden cost of their current state that they might be ignoring (e.g., "While you're scaling SDR volume, you're likely paying a 'GTM Integrity Tax' where reps are burning high-value leads with low-fidelity research").
+    - Frame every solution as the bridge across this specific logical gap.
+
 For each solution, provide:
 1. **The Solution Concept**: The exact product name from our suite or a "Strategic Pivot" move.
-2. **Pain Point Alignment**: Which specific problem from the previous phase does this solve?
-3. **The ROI Driver**: Quantify the expected impact.
+2. **Logical Gap Mapping**: What is the "Silent Friction" or "Internal Bottleneck" that makes this solution necessary?
+3. **Pain Point Alignment**: Which specific problem from the previous phase does this solve?
+4. **The ROI Driver**: Quantify the expected impact.
 
 ### OUTPUT EXPECTATION:
 Deliver a high-stakes Strategic Solution Blueprint in Markdown. Be concise, be powerful, be accurate.
@@ -283,20 +288,28 @@ Generate a high-stakes outreach strategy based on specific signals. You must piv
 
 ### STRATEGIC DIMENSIONS (Pivotal):
 You MUST categorize the prospect into ONE of these 6 Strategic Angles and use the corresponding hook:
-1. **Competitor Conquest**: (Signal: Commented on competitor post). Use a specific 2-4 word "Punchy Quote" from their comment to challenge the status quo.
-2. **Executive Intelligence**: (Signal: Founding/News/Hiring). Link their expansion to a specific "Narrative Gap" (e.g., "Scaling revenue without scaling SDR headcount").
-3. **Pain-First Automation**: (Signal: Explicitly mentioned a struggle/keyword). Address the technical cost of the "Manual Grind."
-4. **Agentic Sales Ops**: (Signal: High-value activity). Focus on "Leverage" and "Synthesis" across their team.
+1. **Competitor Conquest**: (Signal: Commented on competitor post). Use a specific 2-4 word "Punchy Quote" from their comment to challenge the status quo. Identify the gap in the competitor's approach that we solve.
+2. **Executive Intelligence**: (Signal: Founding/News/Hiring). Link their expansion to a specific **"Narrative Gap"** (e.g., "Scaling revenue without scaling SDR headcount").
+3. **Pain-First Automation**: (Signal: Explicitly mentioned a struggle/keyword). Address the technical cost of the **"Manual Grind"** and the resulting **"GTM Integrity Tax."**
+4. **Agentic Sales Ops**: (Signal: High-value activity). Focus on **"Leverage"** and **"Synthesis"** as the bridge for their team.
 5. **Inbound Intent**: (Signal: High-value page visit). Prescribe an "Optimal Play" based on their journey.
 6. **Competitor Strategic Pivot**: (Signal: `lead_segment` is DIRECT_COMPETITOR). Focus on "Advanced Data Integrity" or "Technical Integration" rather than basic product features. High-level technical dialogue.
 
 ### EXECUTION RULES (ULTRA-STRICT):
 1. **NO CRINGE GREETINGS**: BANNED phrases (Zero Tolerance): "I hope you are well," "I noticed your post," "Congrats on the role," "Resonated with me," "Resonates deeply," "Enjoyed reading," "Great post," "I'm reached out because."
-2. **SIGNAL QUOTING**: You MUST use a direct quote or a highly specific concept from their `engagements`. (e.g., Instead of "your insights on AI," use "your take on 'AI as a productivity tax'").
-3. **NO FILLER VALUE**: BANNED phrases: "Leverage AI for strategic growth," "Operational efficiency," "Strategic alignment," "Drive innovation," "Unlock potential," "Transform your business."
-4. **AUTHORITY-FIRST CTA**: Never ask "can we chat?". Ask for validation: "Would love to get your 'Founding CEO' perspective on our synthesis logic."
-5. **THE "NARRATIVE OF OPPORTUNITY"**: Treat the outreach as if you are sharing a missed intelligence signal, not trying to sell a tool.
-6. **STRICT PRODUCT GROUNDING (CRITICAL)**:
+2. **THE STRATEGIC HANDSHAKE (LINKEDIN ONLY)**: 
+    - The LinkedIn note is a Handshake, NOT a Pitch or Discovery. 
+    - **BANNED**: Asking deep business questions, probing for pain points, or offering "help to scale."
+    - **MANDATORY**: Keep it under 250 characters. Focus on a **"Technical Critique"** or **"Peer Validation"** angle. 
+    - **TONE**: Intellectual peer. If it sounds like step 1 of a sales funnel, it is a FAILURE.
+3. **GAP SYNTHESIS (THE BODY)**: 
+    - You MUST identify a **"Logical Gap"** between the prospect's current signal and their likely operational bottleneck. 
+    - Show them the **"Silent Cost"** of their current path before offering a solution.
+4. **SIGNAL QUOTING**: You MUST use a direct quote or a highly specific concept from their `engagements`. (e.g., Instead of "your insights on AI," use "your take on 'AI as a productivity tax'").
+5. **NO FILLER VALUE**: BANNED phrases: "Leverage AI for strategic growth," "Operational efficiency," "Strategic alignment," "Drive innovation," "Unlock potential," "Transform your business."
+6. **AUTHORITY-FIRST CTA**: Never ask "can we chat?". Ask for validation: "Would love to get your 'Founding CEO' perspective on our synthesis logic."
+7. **THE "NARRATIVE OF OPPORTUNITY"**: Treat the outreach as if you are sharing a missed intelligence signal, not trying to sell a tool.
+8. **STRICT PRODUCT GROUNDING (CRITICAL)**:
     - You MUST NOT invent technical capabilities.
     - **Glial** is a **Revenue Intelligence & Prospect Research Engine**. 
     - It automates **Lead Discovery** and **Deep Prospect Profiling**.
@@ -319,9 +332,9 @@ You MUST categorize the prospect into ONE of these 6 Strategic Angles and use th
 ### OUTPUT FORMAT (JSON ONLY):
 - **strategic_angle**: Reference the CSO's selected angle or refine based on insights.
 - **hook**: Use the CSO's refined hook logic, personalized with specific engagement signals.
-- **linkedin_message**: (Under 250 chars) Direct, low-friction, authority-based. Use the CSO's blueprint but personalize it further.
+- **linkedin_message**: (STRICTLY UNDER 250 characters) Direct, non-pitchy, peer-to-peer handshake. Use "Technical Critique" or "Validation" CTAs.
 - **email_subject**: Ultra-short (2-4 words).
-- **email_body**: (Under 80 words) Connect the signal quote to the Narrative of Opportunity using the CSO's Strategic Proof Points.
+- **email_body**: (Under 80 words) Connect the signal quote to the **Logical Gap** using the CSO's Strategic Proof Points.
 '''
 
 FOLLOW_UP_STRATEGY_PROMPT = '''
@@ -376,6 +389,7 @@ A sales rep is about to read this. They don't need a summary of the labels you'v
 4. **The "Why Now?" (Critical)**: Synthesize the lead score, intent, and news into a 2-3 sentence argument for why *this specific week* is the perfect time to reach out.
 5. **Strategic Playbook**: 
    - Cleanly present the finalized outreach tactics (LinkedIn/Email).
+   - **LinkedIn Handshake Rule**: Ensure the LinkedIn message is specifically the "Strategic Handshake" variant (under 250 chars, no pitch, no discovery).
    - **Pivot Rule**: If `lead_segment` is DIRECT_COMPETITOR, ensure the outreach focuses on **Glial as Intelligence Infrastructure** or **Partnership/Moat**, and NOT cold selling of competing features.
    - Refine the "Hook" to connect the lead's own public theories (e.g., 'AI Teammates') to their internal operational gaps.
 6. **Advanced Next Steps (Unified Strategy)**:

@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import requests
 import json
 import os
@@ -12,7 +14,7 @@ from models.gemini_models import get_gemini_model
 from models.structured_output import LinkedInAnalysis
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 

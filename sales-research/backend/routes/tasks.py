@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from db.database import get_db, SessionLocal
 from db.models import AutopilotRule, ScheduledTask, Competitor
 from services import task_service
+import asyncio
 import os
 import logging
 import base64

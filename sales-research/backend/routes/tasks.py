@@ -28,6 +28,7 @@ async def verify_task_secret(x_task_secret: str = Header(None)):
 PUBSUB_PROJECT_ID = os.getenv("PUBSUB_PROJECT_ID")
 PUBSUB_TOPIC_ID = os.getenv("PUBSUB_TOPIC_ID", "sales-research-discovery")
 LOCAL_PARALLEL = os.getenv("LOCAL_PARALLEL", "false").lower() == "true"
+ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 
 publisher = None
 if PUBSUB_PROJECT_ID:
@@ -44,10 +45,16 @@ async def publish_task(task_type: str, payload: dict):
         try:
             # publish() is thread-safe and non-blocking, but .result() is blocking.
             # We use to_thread to keep the event loop moving.
-            future = await asyncio.to_thread(publisher.publish, topic_path, data)
+            # We add 'environment' as a message attribute for Pub/Sub filtering.
+            future = await asyncio.to_thread(
+                publisher.publish, 
+                topic_path, 
+                data,
+                environment=ENVIRONMENT
+            )
             # result() waits for the server ACK
             msg_id = await asyncio.to_thread(future.result)
-            logger.info(f"Published {task_type} task: {msg_id}")
+            logger.info(f"Published {task_type} task (env: {ENVIRONMENT}): {msg_id}")
             return True
         except Exception as e:
             logger.error(f"Failed to publish to Pub/Sub: {e}")

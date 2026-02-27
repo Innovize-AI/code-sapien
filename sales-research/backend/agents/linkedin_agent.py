@@ -10,6 +10,7 @@ from typing import Optional, List, Dict
 from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, COMPANY_CONTEXT
 from models.gemini_models import get_gemini_model
 from models.structured_output import LinkedInAnalysis
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 load_dotenv()
 
@@ -474,6 +475,7 @@ def analyze_competitor_posts(competitor_urls: list[str]):
     response = model.invoke(messages)
     return response.content
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def get_post_commenters(post_id: str):
     """Fetches commenters for a specific LinkedIn post."""
     api_key = os.getenv("RAPID_API_KEY")
@@ -588,6 +590,7 @@ def _process_single_post(post, user_name):
         })
     return leads_acc
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def discover_leads_from_competitor(competitor_url: str):
     """Fetches recent posts from a competitor and extracts commenters as potential leads."""
     api_key = os.getenv("RAPID_API_KEY")
@@ -738,19 +741,23 @@ async def get_posts_by_keyword(keywords: List[str]):
         "x-rapidapi-host": "linkedin-scraper-api-real-time-fast-affordable.p.rapidapi.com"
     }
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def fetch_for_single_keyword(keyword: str):
         try:
             print(f"DEBUG: Fetching posts for keyword: '{keyword}'")
+            # Set a timeout for the API call
             response = await asyncio.to_thread(
                 requests.get,
                 search_url,
                 headers=headers,
-                params={"keyword": keyword}
+                params={"keyword": keyword},
+                timeout=30
             )
             
             if response.status_code != 200:
                 print(f"DEBUG: API error for keyword '{keyword}': {response.status_code}")
-                return []
+                # Raise exception to trigger Pub/Sub retry
+                response.raise_for_status()
 
             posts_data = response.json()
             
@@ -763,8 +770,9 @@ async def get_posts_by_keyword(keywords: List[str]):
                     return [posts_data["data"]]
             return []
         except Exception as e:
-            print(f"Error fetching for keyword '{keyword}': {e}")
-            return []
+            logger.error(f"Failed fetching for keyword '{keyword}': {e}")
+            # Re-raising for Pub/Sub retry
+            raise
 
     try:
         # Run all keyword searches in parallel
@@ -799,6 +807,7 @@ async def get_posts_by_keyword(keywords: List[str]):
         print(f"Error in get_posts_by_keyword: {e}")
         return []
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 async def discover_leads_from_keywords(keywords: List[str]):
     """
     High-level function to discover leads via keyword search.

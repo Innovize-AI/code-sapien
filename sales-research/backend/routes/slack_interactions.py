@@ -51,10 +51,7 @@ async def handle_slack_interactions(
                 print(f"Error resolving Slack user: {e}")
 
         if action_id == "analyze_lead" and linkedin_url:
-            # 1. Start research in background
-            background_tasks.add_task(run_single_research, linkedin_url=linkedin_url, user_id=internal_user_id)
-            
-            # 2. Respond to Slack in background (to avoid 3s timeout)
+            # 1. Respond to Slack in background (to avoid 3s timeout) IMMEDIATELY
             if response_url:
                 background_tasks.add_task(
                     send_slack_response,
@@ -62,6 +59,9 @@ async def handle_slack_interactions(
                     text=f"✅ *Analysis Started!* {user}, I'm digging into research for this {linkedin_url} lead. I will notify you and update the dashboard once the plan is ready.",
                     replace_original=False
                 )
+            
+            # 2. Start research in background
+            background_tasks.add_task(run_single_research, linkedin_url=linkedin_url, user_id=internal_user_id)
         
         elif action_id == "ignore_lead":
             if response_url:

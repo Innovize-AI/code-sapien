@@ -105,6 +105,30 @@ async def run_classification_and_update(raw_leads: List[dict]):
                     is_qualified = lu.get("is_fit") and not is_hot
                     
                     if is_hot or lu.get("intent") == "pain_point" or is_qualified:
+                        # --- Deduplication Check ---
+                        # We check if we've already logged an activity for this specific lead interaction
+                        async with SessionLocal() as session:
+                            from sqlalchemy import select, and_
+                            from db.models import Activity
+                            
+                            # Normalize comment for matching
+                            current_comment = lu.get("comment", "").strip()
+                            lead_url = lu.get("linkedin_url")
+                            
+                            # Look for existing activity with same lead and comment in metadata
+                            # We search for the exact comment string within the metadata_json
+                            stmt = select(Activity).where(
+                                and_(
+                                    Activity.metadata_json.like(f"%{lead_url}%"),
+                                    Activity.metadata_json.like(f"%{current_comment}%")
+                                )
+                            )
+                            existing_check = await session.execute(stmt)
+                            if existing_check.scalars().first():
+                                print(f"DEBUG: Skipping duplicate notification for {lu.get('name')} - Comment already alerted.")
+                                continue
+                        # --- End Deduplication Check ---
+
                         title_prefix = "🔥 Hot Lead" if is_hot else "👀 Qualified Lead"
                         if lu.get("intent") == "pain_point":
                             title_prefix = "🚨 Pain Point"

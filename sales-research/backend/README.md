@@ -69,3 +69,19 @@ CSV upload of prospects (linkedin url and websites)
 ### 4. User Experience
 - **Human-in-the-Loop Review Station**: Dedicated UI for salespeople to approve/edit findings before CRM sync.
 - **Interactive Insights**: Clickable pain points linked directly to raw source data (LinkedIn/Website).
+
+---
+
+## 📊 Activity Logging Status
+
+### Current Logging (Triggers Activities & Slack):
+- **Deep Research**: When a research report is completed.
+- **High Intent Leads**: When a lead score ≥ 80.
+- **Meetings**: New bookings from Calendly or Cal.com.
+- **Discovery**: New commenters found on competitor posts.
+- **Classification**: Hot Leads and Pain Points identifies from comments.
+
+### 📝 To-Add (Logging Needed):
+- [ ] **Settings Changes**: Log when ICP, Integration Keys, or Selling Profiles are updated.
+- [ ] **Account Setup**: Log when users update their personal Slack Member ID or IMAP configuration.
+- [ ] **Team Actions**: Log when a rep "Ignores" a lead or triggers specific research.

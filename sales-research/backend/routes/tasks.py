@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Header, HTTPException, Depends
+from fastapi import APIRouter, Header, HTTPException, Depends, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timezone, timedelta
-from db.database import get_db
-from db.models import AutopilotRule, ScheduledTask
+from db.database import get_db, SessionLocal
+from db.models import AutopilotRule, ScheduledTask, Competitor
 from services import task_service
 import os
 import logging
+import base64
+import json
+from google.cloud import pubsub_v1
 
 logger = logging.getLogger(__name__)
 tasks_router = APIRouter()
@@ -20,77 +23,150 @@ async def verify_task_secret(x_task_secret: str = Header(None)):
         logger.warning(f"Heartbeat 403: Secret mismatch. Expected: {TASK_SECRET[:4]}... Received: {x_task_secret[:4] if x_task_secret else 'None'}...")
         raise HTTPException(status_code=403, detail="Invalid task secret")
 
+# Pub/Sub Configuration
+PUBSUB_PROJECT_ID = os.getenv("PUBSUB_PROJECT_ID")
+PUBSUB_TOPIC_ID = os.getenv("PUBSUB_TOPIC_ID", "sales-research-discovery")
+LOCAL_PARALLEL = os.getenv("LOCAL_PARALLEL", "false").lower() == "true"
+
+publisher = None
+if PUBSUB_PROJECT_ID:
+    publisher = pubsub_v1.PublisherClient()
+    topic_path = publisher.topic_path(PUBSUB_PROJECT_ID, PUBSUB_TOPIC_ID)
+
+async def publish_task(task_type: str, payload: dict):
+    """
+    Publishes a task. In an async context, we run the sync publisher in a thread.
+    Returns True if published, False if fallback is needed.
+    """
+    if publisher and PUBSUB_PROJECT_ID:
+        data = json.dumps({"type": task_type, **payload}).encode("utf-8")
+        try:
+            # publish() is thread-safe and non-blocking, but .result() is blocking.
+            # We use to_thread to keep the event loop moving.
+            future = await asyncio.to_thread(publisher.publish, topic_path, data)
+            # result() waits for the server ACK
+            msg_id = await asyncio.to_thread(future.result)
+            logger.info(f"Published {task_type} task: {msg_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to publish to Pub/Sub: {e}")
+            return False
+    return False
+
 @tasks_router.post("/tasks/heartbeat")
 async def tasks_heartbeat(
-    db: AsyncSession = Depends(get_db), 
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
     _=Depends(verify_task_secret)
 ):
     """
-    Heartbeat endpoint called by external cron (e.g., Cloud Scheduler).
-    Checks all rules to see what is due and executes them.
-    We use blocking await here to ensure Cloud Run stays active during processing
-    without requiring "Always-on CPU" (saving costs).
+    Heartbeat endpoint called by external cron.
+    Dispatches tasks in PARALLEL to Pub/Sub for maximum efficiency.
     """
     import asyncio
     now = datetime.now(timezone.utc)
-    tasks_run = []
+    tasks_to_dispatch = [] # List of (task_type, payload, fallback_func, fallback_args)
     
-    # Use a semaphore to limit concurrency (e.g., max 5 parallel tasks)
-    sem = asyncio.Semaphore(5)
-
-    # 1. Check Autopilot Rules (Keywords, Apollo)
+    # 1. Collect Autopilot Rules
     result = await db.execute(select(AutopilotRule).where(AutopilotRule.is_active == True))
     rules = result.scalars().all()
     
-    async def process_rule(rule):
-        async with sem:
-            last_run = rule.last_run_at or (now - timedelta(days=365))
-            if last_run.tzinfo is None:
-                last_run = last_run.replace(tzinfo=timezone.utc)
-                
-            due_at = last_run + timedelta(hours=rule.interval_hours)
+    for rule in rules:
+        last_run = rule.last_run_at or (now - timedelta(days=365))
+        if last_run.tzinfo is None:
+            last_run = last_run.replace(tzinfo=timezone.utc)
             
-            if now >= due_at:
-                if rule.type == "keyword":
-                    await task_service.keyword_discovery_task(rule_id=str(rule.id))
-                elif rule.type == "apollo_config":
-                    await task_service.apollo_discovery_task(rule_id=str(rule.id))
-                return f"rule_{rule.id}"
-            return None
+        if now >= (last_run + timedelta(hours=rule.interval_hours)):
+            payload = {"rule_id": str(rule.id), "rule_type": rule.type}
+            fallback_func = task_service.keyword_discovery_rule_task if rule.type == "keyword" else task_service.apollo_discovery_rule_task
+            tasks_to_dispatch.append(("autopilot_rule", payload, fallback_func, (str(rule.id),)))
 
-    # Process all rules in parallel (blocking)
-    rule_tasks = [process_rule(r) for r in rules]
-    rule_results = await asyncio.gather(*rule_tasks)
-    tasks_run.extend([res for res in rule_results if res])
-
-    # 2. Check Global Scheduled Tasks (Competitor Update, HubSpot)
+    # 2. Collect Global Scheduled Tasks
     result = await db.execute(select(ScheduledTask).where(ScheduledTask.is_active == True))
     global_tasks = result.scalars().all()
     
-    async def process_global_task(task):
-        async with sem:
-            last_run = task.last_run_at or (now - timedelta(days=365))
-            if last_run.tzinfo is None:
-                last_run = last_run.replace(tzinfo=timezone.utc)
-                
-            due_at = last_run + timedelta(hours=task.interval_hours)
+    for task in global_tasks:
+        last_run = task.last_run_at or (now - timedelta(days=365))
+        if last_run.tzinfo is None:
+            last_run = last_run.replace(tzinfo=timezone.utc)
             
-            if now >= due_at:
-                if task.name == "competitor_update":
-                    await task_service.update_competitor_leads_task()
-                elif task.name == "hubspot_sync":
-                    await task_service.hubspot_sync_task()
-                return f"global_{task.name}"
-            return None
+        if now >= (last_run + timedelta(hours=task.interval_hours)):
+            if task.name == "competitor_update":
+                comp_result = await db.execute(select(Competitor))
+                for comp in comp_result.scalars().all():
+                    tasks_to_dispatch.append(("competitor_sync", {"competitor_id": str(comp.id)}, task_service.update_single_competitor_task, (str(comp.id),)))
+                task.last_run_at = now
+            else:
+                fallback_func = task_service.hubspot_sync_task if task.name == "hubspot_sync" else None
+                tasks_to_dispatch.append(("global_task", {"task_name": task.name}, fallback_func, ()))
+                task.last_run_at = now
 
-    global_task_tasks = [process_global_task(t) for t in global_tasks]
-    global_results = await asyncio.gather(*global_task_tasks)
-    tasks_run.extend([res for res in global_results if res])
+    # 3. Parallel Dispatch
+    async def dispatch_one(t_type, t_payload, f_func, f_args):
+        if await publish_task(t_type, t_payload):
+            return f"{t_type}_ok"
+        elif f_func:
+            if LOCAL_PARALLEL:
+                # Trigger as a true async task for local parallelism (ignores sequential queue)
+                asyncio.create_task(f_func(*f_args))
+                return f"{t_type}_local_parallel"
+            else:
+                # Default: FastAPI sequential background task queue
+                background_tasks.add_task(f_func, *f_args)
+                return f"{t_type}_local_sync"
+        return f"{t_type}_skipped"
 
+    results = []
+    if tasks_to_dispatch:
+        results = await asyncio.gather(*[dispatch_one(*t) for t in tasks_to_dispatch])
+    
+    await db.commit()
     return {
         "status": "heartbeat_processed", 
-        "tasks_run": tasks_run
+        "total_dispatched": len(results),
+        "results": results
     }
+
+@tasks_router.post("/tasks/worker")
+async def tasks_worker(request: Request):
+    """
+    Endpoint triggered by Pub/Sub Push Subscription.
+    Processes the message and performs the actual discovery work.
+    """
+    try:
+        envelope = await request.json()
+        if not envelope or "message" not in envelope:
+            raise HTTPException(status_code=400, detail="Invalid Pub/Sub message format")
+        
+        payload_base64 = envelope["message"]["data"]
+        payload_json = base64.b64decode(payload_base64).decode("utf-8")
+        data = json.loads(payload_json)
+        
+        task_type = data.get("type")
+        logger.info(f"Worker received task: {task_type}")
+
+        if task_type == "autopilot_rule":
+            rule_id = data.get("rule_id")
+            rule_type = data.get("rule_type")
+            if rule_type == "keyword":
+                await task_service.keyword_discovery_rule_task(rule_id)
+            elif rule_type == "apollo_config":
+                await task_service.apollo_discovery_rule_task(rule_id)
+        
+        elif task_type == "competitor_sync":
+            competitor_id = data.get("competitor_id")
+            await task_service.update_single_competitor_task(competitor_id)
+            
+        elif task_type == "global_task":
+            task_name = data.get("task_name")
+            if task_name == "hubspot_sync":
+                await task_service.hubspot_sync_task()
+        
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Worker task failed: {e}")
+        # Returning 500 triggers Pub/Sub retry
+        raise HTTPException(status_code=500, detail=str(e))
 
 @tasks_router.post("/tasks/trigger/{task_name}")
 async def trigger_task(task_name: str, db: AsyncSession = Depends(get_db), _=Depends(verify_task_secret)):

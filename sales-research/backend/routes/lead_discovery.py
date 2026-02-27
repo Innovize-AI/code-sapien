@@ -5,6 +5,7 @@ import os
 from sqlalchemy import select
 from db.models import OrganizationSettings
 from db.database import SessionLocal  # Need a synchronous way or run async
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # We need to handle async properly if these functions are called from async routes.
 # But for now, let's allow passing keys in, or fetch them inside the router endpoint.
@@ -40,6 +41,7 @@ def generate_search_query(input_data: LeadDiscoveryInput) -> str:
 
     return " ".join(query_parts)
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def find_leads_tavily(input_data: LeadDiscoveryInput, api_key: str = None) -> List[dict]:
     """
     Uses Tavily to search for LinkedIn profiles matching the criteria.
@@ -76,6 +78,7 @@ def find_leads_tavily(input_data: LeadDiscoveryInput, api_key: str = None) -> Li
         print(f"Error during Tavily search: {e}")
         return []
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def find_leads_apollo(input_data: LeadDiscoveryInput, api_key: str = None) -> List[dict]:
     """
     Uses Apollo.io API to search for people.

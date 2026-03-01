@@ -101,7 +101,8 @@ async def email_history_fetcher_node(state: AgentState):
                         type="email",
                         title=f"New Email Interaction: {email_id}",
                         description=f"Received: {latest_email.get('subject')}",
-                        metadata={"email": email_id, "subject": latest_email.get('subject')}
+                        metadata={"email": email_id, "subject": latest_email.get('subject')},
+                        idempotency_key=f"email_interaction:{email_id}:{latest_email.get('subject')}"
                     )
             except Exception as e:
                 print(f"Error fetching emails: {e}")

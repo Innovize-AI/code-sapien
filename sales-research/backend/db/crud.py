@@ -571,6 +571,14 @@ async def create_competitor(db: AsyncSession, competitor_data: dict, user_id: st
     db.add(db_competitor)
     await db.commit()
     await db.refresh(db_competitor)
+    
+    # Set transient creator_name for Pydantic response
+    if user_id:
+        result = await db.execute(select(Profile).where(Profile.id == user_id))
+        user = result.scalar_one_or_none()
+        if user:
+            setattr(db_competitor, "creator_name", user.full_name or user.email)
+            
     return db_competitor
 
 async def get_competitors(db: AsyncSession, user_id: str = None):
@@ -647,6 +655,14 @@ async def create_autopilot_rule(db: AsyncSession, rule_data: dict, user_id: str 
     db.add(db_rule)
     await db.commit()
     await db.refresh(db_rule)
+    
+    # Set transient creator_name for Pydantic response
+    if user_id:
+        result = await db.execute(select(Profile).where(Profile.id == user_id))
+        user = result.scalar_one_or_none()
+        if user:
+            setattr(db_rule, "creator_name", user.full_name or user.email)
+            
     return db_rule
 
 async def get_autopilot_rules(db: AsyncSession, rule_type: str = None):

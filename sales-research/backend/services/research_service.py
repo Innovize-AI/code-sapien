@@ -192,8 +192,8 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
             title=f"Analysis completed for {fullname}",
             description=f"Deep research finished with lead score: {lead_score}",
             metadata=metadata,
-            user_id=user_id
-            
+            user_id=user_id,
+            idempotency_key=f"research_completion:{saved_report.id}"
         )
         
         # Log Activity: High Potential Lead
@@ -204,7 +204,8 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
                 title=f"🔥 High Potential Lead Identified: {fullname}",
                 description=f"Match score {lead_score}/100 exceeds threshold.",
                 metadata={"report_id": str(saved_report.id), "lead_score": lead_score, "name": fullname, "is_fit": True},
-                user_id=user_id
+                user_id=user_id,
+                idempotency_key=f"high_potential_alert:{saved_report.id}"
             )
             
         return saved_report

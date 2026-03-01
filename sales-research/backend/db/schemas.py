@@ -171,6 +171,7 @@ class CompetitorCreate(CompetitorBase):
 class Competitor(CompetitorBase):
     id: UUID
     created_at: datetime
+    creator_name: Optional[str] = None # For UI display
 
     class Config:
         from_attributes = True

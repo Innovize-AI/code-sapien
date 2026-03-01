@@ -112,13 +112,18 @@ async def calendly_webhook(
         saved = await save_lead_submission(db, submission, rep_id=rep_id)
         
         # Log Activity
+        import hashlib
+        event_uri = data.get("uri") or f"{email}:{payload.get('created_at')}"
+        idempotency_key = f"calendly:{hashlib.md5(event_uri.encode()).hexdigest()}"
+        
         await log_activity_and_notify(
             db, 
             type="meeting", 
             title="New Meeting Booked (Calendly)", 
             description=f"Meeting scheduled by {email}",
             metadata={"email": email, "source": "calendly", "payload": payload},
-            user_id=rep_id
+            user_id=rep_id,
+            idempotency_key=idempotency_key
         )
         
         asyncio.create_task(process_webhook_lead(saved.id, email, linkedin_url, payload, rep_id))
@@ -146,13 +151,19 @@ async def cal_webhook(
         saved = await save_lead_submission(db, submission, rep_id=rep_id)
         
         # Log Activity
+        import hashlib
+        # Cal.com payload often has a 'uid' or 'bookingId'
+        booking_id = str(payload.get("bookingId") or payload.get("uid") or f"{email}:{payload.get('createdAt')}")
+        idempotency_key = f"calcom:{hashlib.md5(booking_id.encode()).hexdigest()}"
+
         await log_activity_and_notify(
             db, 
             type="meeting", 
             title="New Meeting Booked (Cal.com)", 
             description=f"Meeting scheduled by {email}",
             metadata={"email": email, "source": "cal", "payload": payload},
-            user_id=rep_id
+            user_id=rep_id,
+            idempotency_key=idempotency_key
         )
         
         asyncio.create_task(process_webhook_lead(saved.id, email, None, payload, rep_id))

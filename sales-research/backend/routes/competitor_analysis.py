@@ -171,12 +171,17 @@ async def discover_leads(
             await batch_upsert_identified_profiles(db, raw_leads_to_save)
             
             # Log Activity (One summary activity for the batch)
+            import hashlib
+            url_hash = hashlib.md5(",".join(urls).encode()).hexdigest()
+            idempotency_key = f"competitor_discovery:{url_hash}"
+
             await log_activity_and_notify(
                 db,
                 type="comment",
                 title=f"Discovered {len(raw_leads_to_save)} potential leads",
                 description=f"Identified new commenters on competitor posts ({', '.join(urls[:2])}...)",
-                metadata={"urls": urls, "count": len(raw_leads_to_save)}
+                metadata={"urls": urls, "count": len(raw_leads_to_save)},
+                idempotency_key=idempotency_key
             )
             
         # 2. Trigger Background Classification

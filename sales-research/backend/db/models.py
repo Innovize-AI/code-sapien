@@ -56,6 +56,7 @@ class ResearchReport(Base):
     email_history = Column(Text, nullable=True)  # JSON array of email objects
     intent_analysis = Column(Text, nullable=True)  # JSON object with intent data
     extra_metadata = Column(Text, nullable=True)   # JSON object for extra fields from webhooks/forms
+    # user_feedback = Column(Text, nullable=True)    # JSON object for user feedback (is_good, reason)
 
 class LeadSubmission(Base):
     __tablename__ = "lead_submissions"
@@ -133,6 +134,7 @@ class OrganizationSettings(Base):
     # HubSpot Integration
     hubspot_access_token = Column(Text, nullable=True)
     hubspot_sync_enabled = Column(Boolean, server_default=text("false"), nullable=False)
+    # learned_constraints = Column(Text, nullable=True) # JSON list of negative constraints
 
 class CRMContext(Base):
     __tablename__ = "crm_context"
@@ -216,6 +218,7 @@ class Activity(Base):
     metadata_json = Column(Text, nullable=True) # JSON object for extra details
     intent = Column(String, nullable=True)
     sentiment = Column(String, nullable=True)
+    idempotency_key = Column(String, unique=True, nullable=True)
     created_by_id = Column(UUID(as_uuid=True), nullable=True)
 
 class Profile(Base):
@@ -241,6 +244,7 @@ class UserSettings(Base):
     
     # Personal ICP Override
     icp_json = Column(Text, nullable=True)
+    # learned_constraints = Column(Text, nullable=True) # JSON list of negative constraints
 
     # Slack Mapping
     slack_user_id = Column(String, nullable=True, unique=True)

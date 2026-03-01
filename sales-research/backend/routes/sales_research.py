@@ -155,12 +155,18 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
                  await batch_upsert_identified_profiles(db, raw_leads_to_save)
                  
                  # Log Activity: Keyword Discovery
+                 import hashlib
+                 kw_str = ",".join(input_data.keywords)
+                 user_ref = str(current_user.id) if current_user else "system"
+                 idempotency_key = f"manual_discovery:{hashlib.md5(f'{kw_str}:{user_ref}'.encode()).hexdigest()}"
+                 
                  await log_activity_and_notify(
                      db,
                      type="comment",
                      title=f"Keyword Discovery: {len(raw_leads_to_save)} leads",
                      description=f"Found new leads matching keywords: {', '.join(input_data.keywords)}",
-                     metadata={"keywords": input_data.keywords, "count": len(raw_leads_to_save)}
+                     metadata={"keywords": input_data.keywords, "count": len(raw_leads_to_save)},
+                     idempotency_key=idempotency_key
                  )
                  
                  background_tasks.add_task(run_classification_and_update, raw_leads_to_save)

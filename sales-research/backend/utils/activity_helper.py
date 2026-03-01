@@ -10,7 +10,8 @@ async def log_activity_and_notify(
     title: str, 
     description: str = None, 
     metadata: dict = None,
-    user_id: str = None
+    user_id: str = None,
+    idempotency_key: str = None
 ):
     """
     Logs an activity to the database and sends a Slack notification if configured.
@@ -22,7 +23,7 @@ async def log_activity_and_notify(
     intent = metadata.get("intent") if metadata else None
     sentiment = metadata.get("sentiment") if metadata else None
 
-    await create_activity(
+    activity = await create_activity(
         db, 
         type=type, 
         title=title, 
@@ -30,8 +31,13 @@ async def log_activity_and_notify(
         metadata_json=metadata_json,
         intent=intent,
         sentiment=sentiment,
-        user_id=user_id
+        user_id=user_id,
+        idempotency_key=idempotency_key
     )
+
+    if idempotency_key and not activity:
+        print(f"DEBUG: Idempotency conflict for key {idempotency_key}. Skipping Slack notification.")
+        return
 
     # 1.5 Resolve Rep Name
     rep_name = None

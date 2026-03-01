@@ -105,29 +105,14 @@ async def run_classification_and_update(raw_leads: List[dict]):
                     is_qualified = lu.get("is_fit") and not is_hot
                     
                     if is_hot or lu.get("intent") == "pain_point" or is_qualified:
-                        # --- Deduplication Check ---
-                        # We check if we've already logged an activity for this specific lead interaction
-                        async with SessionLocal() as session:
-                            from sqlalchemy import select, and_
-                            from db.models import Activity
-                            
-                            # Normalize comment for matching
-                            current_comment = lu.get("comment", "").strip()
-                            lead_url = lu.get("linkedin_url")
-                            
-                            # Look for existing activity with same lead and comment in metadata
-                            # We search for the exact comment string within the metadata_json
-                            stmt = select(Activity).where(
-                                and_(
-                                    Activity.metadata_json.like(f"%{lead_url}%"),
-                                    Activity.metadata_json.like(f"%{current_comment}%")
-                                )
-                            )
-                            existing_check = await session.execute(stmt)
-                            if existing_check.scalars().first():
-                                print(f"DEBUG: Skipping duplicate notification for {lu.get('name')} - Comment already alerted.")
-                                continue
-                        # --- End Deduplication Check ---
+                        import hashlib
+                        lead_url = lu.get("linkedin_url")
+                        current_comment = lu.get("comment", "").strip()
+                        
+                        # Generate a unique key based on URL and Comment to prevent duplicate alerts
+                        # Even if the worker retries, this key will be identical.
+                        raw_key = f"{lead_url}:{current_comment}"
+                        idempotency_key = f"lead_interaction:{hashlib.md5(raw_key.encode()).hexdigest()}"
 
                         title_prefix = "🔥 Hot Lead" if is_hot else "👀 Qualified Lead"
                         if lu.get("intent") == "pain_point":
@@ -139,7 +124,8 @@ async def run_classification_and_update(raw_leads: List[dict]):
                                 type="high_potential" if is_hot else "comment",
                                 title=f"{title_prefix}: {lu.get('name') or 'Someone'} linked to {lu.get('competitor') or 'competitor'}",
                                 description=f"Intent: {lu.get('intent')} | Sentiment: {lu.get('sentiment')}\nComment: {lu.get('comment')}",
-                                metadata=lu
+                                metadata=lu,
+                                idempotency_key=idempotency_key
                             )
                 
                 await event_manager.broadcast({

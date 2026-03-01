@@ -571,6 +571,14 @@ async def create_competitor(db: AsyncSession, competitor_data: dict, user_id: st
     db.add(db_competitor)
     await db.commit()
     await db.refresh(db_competitor)
+    
+    # Set transient creator_name for Pydantic response
+    if user_id:
+        result = await db.execute(select(Profile).where(Profile.id == user_id))
+        user = result.scalar_one_or_none()
+        if user:
+            setattr(db_competitor, "creator_name", user.full_name or user.email)
+            
     return db_competitor
 
 async def get_competitors(db: AsyncSession, user_id: str = None):
@@ -599,20 +607,30 @@ async def delete_competitor(db: AsyncSession, competitor_id: str):
         return True
     return False
 
-async def create_activity(db: AsyncSession, type: str, title: str, description: str = None, metadata_json: str = None, intent: str = None, sentiment: str = None, user_id: str = None):
-    activity = Activity(
+async def create_activity(db: AsyncSession, type: str, title: str, description: str = None, metadata_json: str = None, intent: str = None, sentiment: str = None, user_id: str = None, idempotency_key: str = None):
+    from sqlalchemy.dialects.postgresql import insert
+    
+    stmt = insert(Activity).values(
         type=type,
         title=title,
         description=description,
         metadata_json=metadata_json,
         intent=intent,
         sentiment=sentiment,
+        idempotency_key=idempotency_key,
         created_by_id=user_id
     )
-    db.add(activity)
+    
+    # If idempotency_key exists and conflicts, do nothing (prevents duplicates)
+    if idempotency_key:
+        stmt = stmt.on_conflict_do_nothing(index_elements=["idempotency_key"])
+    
+    stmt = stmt.returning(Activity)
+    result = await db.execute(stmt)
     await db.commit()
-    await db.refresh(activity)
-    return activity
+    
+    # scalars().first() will be None if conflict occurred
+    return result.scalars().first()
 
 async def get_activities(db: AsyncSession, limit: int = 50, user_id: str = None):
     query = select(Activity, func.coalesce(Profile.full_name, Profile.email).label("creator_name")).outerjoin(
@@ -637,6 +655,14 @@ async def create_autopilot_rule(db: AsyncSession, rule_data: dict, user_id: str 
     db.add(db_rule)
     await db.commit()
     await db.refresh(db_rule)
+    
+    # Set transient creator_name for Pydantic response
+    if user_id:
+        result = await db.execute(select(Profile).where(Profile.id == user_id))
+        user = result.scalar_one_or_none()
+        if user:
+            setattr(db_rule, "creator_name", user.full_name or user.email)
+            
     return db_rule
 
 async def get_autopilot_rules(db: AsyncSession, rule_type: str = None):

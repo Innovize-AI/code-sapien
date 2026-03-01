@@ -63,6 +63,7 @@ async def publish_task(task_type: str, payload: dict):
 
 @tasks_router.post("/tasks/heartbeat")
 async def tasks_heartbeat(
+    request: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _=Depends(verify_task_secret)
@@ -71,6 +72,12 @@ async def tasks_heartbeat(
     Heartbeat endpoint called by external cron.
     Dispatches tasks in PARALLEL to Pub/Sub for maximum efficiency.
     """
+    # SAFETY GUARD: If this endpoint is accidentally called by a Pub/Sub Push Subscription,
+    # we REJECT it immediately to prevent an infinite feedback loop.
+    if request.headers.get("x-goog-pubsub-subscription-title"):
+        logger.error("DANGER: Heartbeat triggered by Pub/Sub Push! Blocking to prevent infinite loop.")
+        raise HTTPException(status_code=400, detail="Heartbeat cannot be a Pub/Sub target.")
+
     import asyncio
     now = datetime.now(timezone.utc)
     tasks_to_dispatch = [] # List of (task_type, payload, fallback_func, fallback_args)
@@ -88,6 +95,7 @@ async def tasks_heartbeat(
             payload = {"rule_id": str(rule.id), "rule_type": rule.type}
             fallback_func = task_service.keyword_discovery_rule_task if rule.type == "keyword" else task_service.apollo_discovery_rule_task
             tasks_to_dispatch.append(("autopilot_rule", payload, fallback_func, (str(rule.id),)))
+            rule.last_run_at = now # <--- FIX: Update timestamp before dispatching
 
     # 2. Collect Global Scheduled Tasks
     result = await db.execute(select(ScheduledTask).where(ScheduledTask.is_active == True))
@@ -126,9 +134,11 @@ async def tasks_heartbeat(
 
     results = []
     if tasks_to_dispatch:
+        # Commit last_run_at updates BEFORE dispatching to prevent race conditions
+        await db.commit()
         results = await asyncio.gather(*[dispatch_one(*t) for t in tasks_to_dispatch])
-    
-    await db.commit()
+    else:
+        await db.commit()
     return {
         "status": "heartbeat_processed", 
         "total_dispatched": len(results),

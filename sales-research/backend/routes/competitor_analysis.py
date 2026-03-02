@@ -154,7 +154,7 @@ async def discover_leads(
                     "linkedin_url": l["linkedin_url"],
                     "name": l["name"],
                     "headline": l.get("headline"),
-                    "comment": l["comment_text"],
+                    "comment": l["comment"],
                     "source_post": l["source_post"],
                     "source_post_url": l["source_post_url"],
                     "competitor": l["competitor"],

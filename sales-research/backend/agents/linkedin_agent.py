@@ -580,7 +580,7 @@ def _process_single_post(post, user_name):
             "name": author.get("name") or "Anonymous",
             "headline": headline,
             "linkedin_url": linkedin_url,
-            "comment_text": comment_text,
+            "comment": comment_text,
             "source_post": source_post_title,
             "source_post_url": source_post_url or "",
             "competitor": user_name,
@@ -863,7 +863,7 @@ async def discover_leads_from_keywords(keywords: List[str]):
                 "name": author.get("name") or "Unknown",
                 "headline": headline,
                 "linkedin_url": linkedin_url,
-                "comment_text": f"Posted about keywords: {post_text[:200]}...", # Storing post text as 'comment' context
+                "comment": f"Posted about keywords: {post_text[:200]}...", # Storing post text as 'comment' context
                 "source_post": post_text[:100] + "...",
                 "source_post_url": source_post_url or "",
                 "competitor": competitor_source, # Marker with keyword

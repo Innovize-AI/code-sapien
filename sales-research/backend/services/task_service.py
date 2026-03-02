@@ -88,7 +88,7 @@ async def keyword_discovery_rule_task(rule_id: str):
                     "linkedin_url": l["linkedin_url"],
                     "name": l["name"],
                     "headline": l.get("headline"),
-                    "comment": l.get("comment_text", ""), 
+                    "comment": l.get("comment", ""), 
                     "source_post": l.get("source_post"),
                     "source_post_url": l.get("source_post_url"),
                     "competitor": l.get("competitor"),

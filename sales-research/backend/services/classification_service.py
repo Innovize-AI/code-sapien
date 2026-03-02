@@ -107,7 +107,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
                     if is_hot or lu.get("intent") == "pain_point" or is_qualified:
                         import hashlib
                         lead_url = lu.get("linkedin_url")
-                        current_comment = lu.get("comment", "").strip()
+                        current_comment = (lu.get("comment") or "").strip()
                         
                         # Generate a unique key based on URL and Comment to prevent duplicate alerts
                         # Even if the worker retries, this key will be identical.

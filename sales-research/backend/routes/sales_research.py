@@ -132,7 +132,7 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
             
             for l in leads_data:
                 # Map fields for consistency
-                l['comment'] = l.get('comment_text', '')
+                l['comment'] = l.get('comment', '')
                 
                 raw_leads_to_save.append({
                     "linkedin_url": l["linkedin_url"],

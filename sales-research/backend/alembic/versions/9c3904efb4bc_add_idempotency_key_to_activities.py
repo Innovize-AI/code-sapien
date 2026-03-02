@@ -20,13 +20,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Add the column to the staging.activities table
-    op.add_column('activities', sa.Column('idempotency_key', sa.String(), nullable=True), schema='staging')
+    # Add the column to the activities table
+    op.add_column('activities', sa.Column('idempotency_key', sa.String(), nullable=True))
     # Create the unique constraint
-    op.create_unique_constraint('idx_activities_idempotency_key', 'activities', ['idempotency_key'], schema='staging')
+    op.create_unique_constraint('idx_activities_idempotency_key', 'activities', ['idempotency_key'])
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_constraint('idx_activities_idempotency_key', 'activities', schema='staging', type_='unique')
-    op.drop_column('activities', 'idempotency_key', schema='staging')
+    op.drop_constraint('idx_activities_idempotency_key', 'activities', type_='unique')
+    op.drop_column('activities', 'idempotency_key')

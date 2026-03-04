@@ -51,9 +51,13 @@ CSV upload of prospects (linkedin url and websites)
 
 ## 🚀 Future Roadmap & Enhancement Ideas
 
+### Voice Note from Eleven Labs (voice Cloning)
+### Video Generation
+### Proposal or One Pager
+
 ### 1. Intelligence & Context
 - **Voice of Customer Integration**: Auto-ingest call transcripts from HubSpot/Zoom to refine ICP and pain points.
-- **Competitive Intelligence Tracker**: Monitor competitor sites/LinkedIn for auto-updating Battle Cards.
+- **Competitive Intelligence Tracker**: Monitor competitor sites/LinkedIn for auto-updating Battle Cards. (Done)
 - **Semantic Lead Similarities**: Find leads semantically similar to your top closed-won deals.
 
 ### 2. Automation & Workflow
@@ -62,7 +66,7 @@ CSV upload of prospects (linkedin url and websites)
 - **Bi-Directional CRM Sync**: Automatically update Lead Status and Intent Scores in HubSpot.
 
 ### 3. Multi-Channel & Media
-- **Slack Agent Interaction**: Query the research agent directly from Slack for instant lead risks/tips.
+- **Slack Agent Interaction**: /logQuery the research agent directly from Slack for instant lead risks/tips.
 - **Dynamic One-Pager Generation**: Auto-generate personalized PDFs or mini-sites for each lead.
 - **Reddit & Community Miner**: specialized agent for finding intent signals in niche communities.
 

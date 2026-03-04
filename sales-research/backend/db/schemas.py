@@ -180,6 +180,7 @@ class IdentifiedProfileBase(BaseModel):
     name: Optional[str] = None
     headline: Optional[str] = None
     linkedin_url: str
+    website: Optional[str] = None
     
     # Classification
     is_fit: bool = False
@@ -202,6 +203,7 @@ class IdentifiedProfile(IdentifiedProfileBase):
     id: UUID
     created_at: datetime
     last_interaction_at: Optional[datetime] = None
+    touchpoint_count: int = 0
     latest_report_id: Optional[UUID] = None  # New field for linking
 
     class Config:

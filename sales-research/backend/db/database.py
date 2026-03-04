@@ -7,9 +7,9 @@ from sqlalchemy import event
 
 engine = create_async_engine(
     DATABASE_URL,
-    echo=True,
-    pool_size=5,
-    max_overflow=0,
+    echo=False,
+    pool_size=20,
+    max_overflow=10,
     connect_args={
         "statement_cache_size": 0,
         "server_settings": {

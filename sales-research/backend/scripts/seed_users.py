@@ -68,7 +68,7 @@ if "pooler.supabase.com" in SUBABASE_URL or not SUBABASE_URL.startswith("http"):
 supabase: Client = create_client(SUBABASE_URL, SERVICE_KEY)
 
 PARTNERS = [
-    {"email": "jon@partner.com", "password": "securepassword123", "role": "user", "name": "Jon Partner"},
+    {"email": "jp@innovizeai.com", "password": "GlialSecure2026!", "role": "user", "name": "Jon Partner"},
     {"email": "pavan.kumar@innovizeai.com", "password": "adminpassword123", "role": "admin", "name": "Pavan Kumar"}
 ]
 

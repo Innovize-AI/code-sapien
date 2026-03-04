@@ -34,7 +34,7 @@ from routes.knowledge import router as knowledge_router
 from routes.autopilot import autopilot_router
 from routes.tasks import tasks_router
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 app = FastAPI()
 

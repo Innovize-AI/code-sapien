@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, Body, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, Body, BackgroundTasks, Request, Query
 from fastapi.responses import StreamingResponse
-from typing import List, Dict
+from typing import List, Dict, Optional
 import asyncio
 import json
 from agents.linkedin_agent import analyze_competitor_posts, discover_leads_from_competitor, batch_classify_profiles, batch_classify_profiles_async
@@ -18,6 +18,9 @@ async def get_profiles(
     skip: int = 0, 
     limit: int = 100, 
     search: str = None, 
+    status: List[str] = Query(["all"]),
+    sort_by: str = "touchpoint_count",
+    sort_order: str = "desc",
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -26,6 +29,8 @@ async def get_profiles(
     from db.models import IdentifiedProfile, Profile
     from sqlalchemy import select, func, or_
     
+    import time
+    start_time = time.time()
     try:
         # Base query for profiles
         query = select(IdentifiedProfile, Profile.full_name).outerjoin(Profile, IdentifiedProfile.created_by_id == Profile.id)
@@ -38,11 +43,41 @@ async def get_profiles(
             )
             query = query.where(search_filter)
             
-        query = query.order_by(IdentifiedProfile.last_interaction_at.desc()).offset(skip).limit(limit)
+        if status and "all" not in status:
+            if "fit" in status:
+                query = query.where(IdentifiedProfile.is_fit == True)
+            if "competitor" in status:
+                query = query.where(IdentifiedProfile.is_competitor == True)
+            if "dm" in status:
+                query = query.where(IdentifiedProfile.is_decision_maker == True)
+            
+        # Dynamic Sorting
+        sort_attr = None
+        if sort_by == "rep_name":
+            sort_attr = Profile.full_name
+        elif hasattr(IdentifiedProfile, sort_by):
+            sort_attr = getattr(IdentifiedProfile, sort_by)
+        else:
+            sort_attr = IdentifiedProfile.touchpoint_count
+
+        if sort_order == "desc":
+            query = query.order_by(sort_attr.desc())
+        else:
+            query = query.order_by(sort_attr.asc())
+
+        query = query.offset(skip).limit(limit)
+        
+        db_start = time.time()
         result = await db.execute(query)
+        db_end = time.time()
+        print(f"DEBUG: get_profiles DB execution: {db_end - db_start:.4f}s")
         
         enriched_profiles = []
-        for profile, rep_name in result.all():
+        rows = result.all()
+        fetch_end = time.time()
+        print(f"DEBUG: get_profiles Fetch rows: {fetch_end - db_end:.4f}s")
+        
+        for profile, rep_name in rows:
             p_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns}
             # Convert UUIDs to strings for JSON
             for k, v in p_dict.items():
@@ -50,12 +85,28 @@ async def get_profiles(
             p_dict["rep_name"] = rep_name or "System"
             enriched_profiles.append(p_dict)
             
+        map_end = time.time()
+        print(f"DEBUG: get_profiles Mapping: {map_end - fetch_end:.4f}s")
+            
         # Count for pagination
         count_query = select(func.count(IdentifiedProfile.id))
         if search:
             count_query = count_query.where(search_filter)
+        
+        if status and "all" not in status:
+            if "fit" in status:
+                count_query = count_query.where(IdentifiedProfile.is_fit == True)
+            if "competitor" in status:
+                count_query = count_query.where(IdentifiedProfile.is_competitor == True)
+            if "dm" in status:
+                count_query = count_query.where(IdentifiedProfile.is_decision_maker == True)
+                
         total_result = await db.execute(count_query)
         total = total_result.scalar()
+        
+        count_end = time.time()
+        print(f"DEBUG: get_profiles Count query: {count_end - map_end:.4f}s")
+        print(f"DEBUG: get_profiles TOTAL: {count_end - start_time:.4f}s")
         
         return {"profiles": enriched_profiles, "total": total}
     except Exception as e:

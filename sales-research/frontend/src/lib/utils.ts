@@ -19,3 +19,12 @@ export function normalizeUrl(url: string | undefined | null): string {
     return url || "";
   }
 }
+
+export function ensureProtocol(url: string | undefined | null): string {
+  if (!url) return "";
+  let trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return trimmed;
+}

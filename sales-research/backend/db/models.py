@@ -187,6 +187,7 @@ class IdentifiedProfile(Base):
     name = Column(String, nullable=True)
     headline = Column(Text, nullable=True)
     linkedin_url = Column(Text, nullable=False, unique=True)
+    website = Column(Text, nullable=True)
     created_by_id = Column(UUID(as_uuid=True), nullable=True)
     
     # Classification
@@ -204,6 +205,7 @@ class IdentifiedProfile(Base):
     
     # Status/Metadata
     last_interaction_at = Column(DateTime(timezone=True), server_default=text("now()"))
+    touchpoint_count = Column(Integer, default=0, server_default=text("0"))
     profile_metadata = Column(Text, nullable=True)         # JSON for flexibility
 
 class Activity(Base):

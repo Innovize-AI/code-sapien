@@ -29,13 +29,24 @@ gcloud run deploy $SERVICE_NAME \
   --concurrency 80 \
   --memory 1Gi \
   --cpu 1 \
-  --set-env-vars "ENVIRONMENT=production" \
+  --set-env-vars "ENVIRONMENT=production,LOCAL_PARALLEL=false,PUBSUB_PROJECT_ID=$PROJECT_ID,PUBSUB_TOPIC_ID=sales-research-discovery" \
   --cpu-throttling
 
 # Note: We use --cpu-throttling (standard) to ensure costs stay at $0 when idle.
 # The Blocking Heartbeat pattern ensures the CPU stays active during processing.
 
 echo "✅ Backend deployed successfully!"
+
+# 2.b Optional: Deploy Dedicated Worker
+# To separate background tasks from user traffic, run:
+# gcloud run deploy glial-research-worker \
+#   --image $IMAGE_TAG \
+#   --platform managed \
+#   --region $REGION \
+#   --no-allow-unauthenticated \
+#   --concurrency 5 \
+#   --max-instances 1 \
+#   --set-env-vars "ENVIRONMENT=production,PUBSUB_PROJECT_ID=$PROJECT_ID"
 
 # 3. Create/Update Cloud Scheduler
 echo "⏰ Setting up Cloud Scheduler..."

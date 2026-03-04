@@ -25,6 +25,7 @@ config = context.config
 # Overwrite the sqlalchemy.url in the config object with the one from the environment
 url = os.environ.get("DATABASE_URL")
 if url:
+    url = url.strip().strip('"').strip("'")
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
     elif url.startswith("postgresql+asyncpg://"):

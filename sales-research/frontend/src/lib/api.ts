@@ -23,6 +23,24 @@ const getApiUrl = () => {
 
 export const API_URL = getApiUrl();
 
+// Configure axios defaults
+axios.defaults.paramsSerializer = {
+    serialize: (params) => {
+        const searchParams = new URLSearchParams();
+        for (const key of Object.keys(params)) {
+            const param = params[key];
+            if (Array.isArray(param)) {
+                for (const p of param) {
+                    searchParams.append(key, p);
+                }
+            } else if (param !== undefined && param !== null) {
+                searchParams.append(key, String(param));
+            }
+        }
+        return searchParams.toString();
+    }
+};
+
 // Configure axios interceptor
 axios.interceptors.request.use((config) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem("accessToken") : null;
@@ -152,8 +170,17 @@ export const discoverLeads = async (data: LeadDiscoveryInput) => {
     return response.data;
 };
 
-export const fetchHistory = async () => {
-    const response = await axios.get(`${API_URL}/sales-research/history`);
+export const fetchHistory = async (
+    skip: number = 0, 
+    limit: number = 50,
+    search: string = "",
+    status: string = "all",
+    sort_by: string = "created_at",
+    sort_order: string = "desc"
+): Promise<{ items: any[], total: number }> => {
+    const response = await axios.get(`${API_URL}/sales-research/history`, {
+        params: { skip, limit, search, status, sort_by, sort_order }
+    });
     return response.data;
 };
 
@@ -436,6 +463,7 @@ export interface IdentifiedProfile {
     name?: string;
     headline?: string;
     linkedin_url: string;
+    website?: string;
 
     // Classification
     is_fit?: boolean;
@@ -449,14 +477,21 @@ export interface IdentifiedProfile {
     last_interaction_at: string;
     profile_metadata?: string;
     latest_report_id?: string;
+    rep_name?: string;
+    touchpoint_count: number;
 }
 
-export const getIdentifiedProfiles = async (skip: number = 0, limit: number = 100, search: string = ""): Promise<{ profiles: IdentifiedProfile[], total: number }> => {
-    let url = `${API_URL}/api/competitor-analysis/profiles?skip=${skip}&limit=${limit}`;
-    if (search) {
-        url += `&search=${encodeURIComponent(search)}`;
-    }
-    const response = await axios.get(url);
+export const getIdentifiedProfiles = async (
+    skip: number = 0, 
+    limit: number = 100, 
+    search: string = "",
+    status: string | string[] = "all",
+    sort_by: string = "touchpoint_count",
+    sort_order: string = "desc"
+): Promise<{ profiles: IdentifiedProfile[], total: number }> => {
+    const response = await axios.get(`${API_URL}/api/competitor-analysis/profiles`, {
+        params: { skip, limit, search, status, sort_by, sort_order }
+    });
     return response.data;
 };
 

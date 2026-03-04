@@ -230,6 +230,9 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 if interaction["comment"] and interaction["comment"] not in post_entry["comments"]:
                     post_entry["comments"].append(interaction["comment"])
             
+            # Calculate touchpoint_count
+            tp_count = sum(len(comp.get("posts", [])) for comp in db_history)
+            
             upsert_rows.append({
                 "linkedin_url": url,
                 "name": data["name"] or p.name,
@@ -243,6 +246,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "comment_history": json.dumps(db_comments),
                 "source_posts": json.dumps(db_sources),
                 "interaction_history": json.dumps(db_history),
+                "touchpoint_count": tp_count,
                 "last_interaction_at": now
             })
         else:
@@ -280,6 +284,9 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                         "competitor": i["competitor"]
                     })
 
+            # Calculate touchpoint_count
+            tp_count = sum(len(comp.get("posts", [])) for comp in new_history)
+
             upsert_rows.append({
                 "linkedin_url": url,
                 "name": data["name"],
@@ -293,6 +300,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "comment_history": json.dumps(legacy_comments),
                 "source_posts": json.dumps(legacy_sources),
                 "interaction_history": json.dumps(new_history),
+                "touchpoint_count": tp_count,
                 "last_interaction_at": now
             })
 
@@ -303,7 +311,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             IdentifiedProfile.__table__,
             upsert_rows,
             conflict_cols=["linkedin_url"],
-            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "comment_history", "source_posts", "interaction_history", "last_interaction_at"]
+            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at"]
         )
         await db.commit()
         print(f"DEBUG: Batch upsert committed successfully. Results count: {len(results)}")
@@ -360,17 +368,22 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict):
             if not any(s.get("url") == ns["url"] for s in sources):
                 sources.append(ns)
         db_profile.source_posts = json.dumps(sources)
+        db_profile.touchpoint_count = len(sources)
         
         db_profile.last_interaction_at = datetime.datetime.now(datetime.timezone.utc)
         if profile_data.get("name") and not db_profile.name:
             db_profile.name = profile_data["name"]
     else:
         # Create new
+        # Calculate touchpoint_count
+        tp_count = len(new_sources)
+        
         db_profile = IdentifiedProfile(
             linkedin_url=profile_data["linkedin_url"],
             name=profile_data.get("name"),
             comment_history=json.dumps([new_comment]) if new_comment else "[]",
             source_posts=json.dumps(new_sources),
+            touchpoint_count=tp_count,
             last_interaction_at=datetime.datetime.now(datetime.timezone.utc)
         )
         db.add(db_profile)

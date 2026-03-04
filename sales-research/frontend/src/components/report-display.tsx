@@ -61,6 +61,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
+import { ensureProtocol } from "@/lib/utils";
 
 interface ReportDisplayProps {
   data: {
@@ -1375,7 +1376,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                 )}
                 {data.website && (
                   <a
-                    href={data.website}
+                    href={ensureProtocol(data.website)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group"

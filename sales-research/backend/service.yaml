@@ -31,5 +31,11 @@ spec:
               value: "xoxb-..."
             - name: OPENAI_API_KEY
               value: "sk-..."
+            - name: LOCAL_PARALLEL
+              value: "false"
+            - name: PUBSUB_PROJECT_ID
+              value: "PROJECT_ID"
+            - name: PUBSUB_TOPIC_ID
+              value: "sales-research-discovery"
           ports:
             - containerPort: 8080

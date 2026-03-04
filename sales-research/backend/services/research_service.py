@@ -122,7 +122,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
     report_data = ResearchReportCreate(
         linkedin_url=linkedin_url or "",
         email_id=final_state.get("email_id") or "",
-        website=website or "",
+        website=final_state.get("website") or website or "",
         sales_research_report=_safe_serialize(final_state.get("sales_research_report")),
         viability_analysis=_safe_serialize(final_state.get("viability_analysis")),
         lead_score_analysis=json.dumps(final_state.get("lead_score_analysis") or {}),
@@ -165,6 +165,17 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
     saved_report = await save_report(db, report_data, user_id=user_id)
     
     if saved_report:
+        # Sync website back to IdentifiedProfile if missing
+        if saved_report.website and saved_report.linkedin_url:
+            from db.models import IdentifiedProfile
+            from sqlalchemy import update
+            await db.execute(
+                update(IdentifiedProfile)
+                .where(IdentifiedProfile.linkedin_url == saved_report.linkedin_url)
+                .where(IdentifiedProfile.website == None)
+                .values(website=saved_report.website)
+            )
+            await db.commit()
         # Log Activity: Analysis Completed
         fullname = final_state.get("fullname") or linkedin_url or final_state.get("email_id") or "Unknown Lead"
         

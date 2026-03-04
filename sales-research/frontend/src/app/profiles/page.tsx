@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import {
   Card,
@@ -20,13 +20,26 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Play,
   BarChart3,
   CheckCircle2,
   Eye,
   FileText,
   Search,
+  List,
+  LayoutGrid,
+  Info,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +47,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useBulkAnalysis } from "@/context/bulk-analysis-context";
 import { BulkAnalysisModal } from "@/components/bulk-analysis-modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ensureProtocol } from "@/lib/utils";
 
 function formatTimestamp(dateStr: string) {
   try {
@@ -59,6 +88,12 @@ export default function ProfilesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  const [sortBy, setSortBy] = useState<string>("touchpoint_count");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
 
   // Bulk Analysis Context
   const {
@@ -84,6 +119,9 @@ export default function ProfilesPage() {
             skip,
             PAGE_SIZE,
             searchQuery,
+            statusFilter.length > 0 ? statusFilter : "all",
+            sortBy,
+            sortOrder,
           );
           setProfiles(data.profiles || []);
           setTotal(data.total || 0);
@@ -98,7 +136,21 @@ export default function ProfilesPage() {
     }, 500); // Debounce search
 
     return () => clearTimeout(timeoutId);
-  }, [page, searchQuery]);
+  }, [page, searchQuery, statusFilter, sortBy, sortOrder]);
+
+  // Click outside for status filter
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        statusRef.current &&
+        !statusRef.current.contains(event.target as Node)
+      ) {
+        setIsStatusDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // SSE Listener for Real-Time Updates
   useEffect(() => {
@@ -170,8 +222,12 @@ export default function ProfilesPage() {
     }
   };
 
-  const keywordProfiles = profiles.filter(isKeywordLead);
-  const competitorProfiles = profiles.filter((p) => !isKeywordLead(p));
+  const keywordProfiles = profiles.filter((p: IdentifiedProfile) =>
+    isKeywordLead(p),
+  );
+  const competitorProfiles = profiles.filter(
+    (p: IdentifiedProfile) => !isKeywordLead(p),
+  );
 
   const getActiveConfig = () => {
     if (activeTab === "keyword")
@@ -181,6 +237,56 @@ export default function ProfilesPage() {
     return { list: profiles, total: profiles.length };
   };
 
+  const getTouchpointStats = (profile: IdentifiedProfile) => {
+    let keywordCount = 0;
+    let competitorCount = 0;
+    const allTouchpoints: Array<{
+      competitor: string;
+      title: string;
+      url: string;
+      comments: string[];
+    }> = [];
+
+    try {
+      const history = JSON.parse(profile.interaction_history || "[]");
+      if (Array.isArray(history)) {
+        history.forEach((h: any) => {
+          const isKeyword =
+            h.competitor === "Keyword Search" ||
+            h.competitor === "Keyword" ||
+            (h.competitor && h.competitor.startsWith("Keyword:"));
+
+          const posts = h.posts || [];
+          if (isKeyword) {
+            keywordCount += posts.length;
+          } else {
+            competitorCount += posts.length;
+          }
+
+          if (Array.isArray(posts)) {
+            posts.forEach((p: any) => {
+              allTouchpoints.push({
+                competitor: h.competitor,
+                title: p.title,
+                url: p.url,
+                comments: (p.comments || []) as string[],
+              });
+            });
+          }
+        });
+      }
+    } catch (e) {
+      // Quietly handle parse errors
+    }
+
+    return {
+      keywordCount,
+      competitorCount,
+      totalCount: keywordCount + competitorCount,
+      allTouchpoints,
+    };
+  };
+
   const { list: activeList } = getActiveConfig();
 
   // Auto-deselect leads that are being processed
@@ -188,8 +294,10 @@ export default function ProfilesPage() {
     if (selectedIds.size > 0 && leadsStatus.length > 0) {
       const processingUrls = new Set(
         leadsStatus
-          .filter((s) => s.status === "analyzing" || s.status === "pending")
-          .map((s) => s.url),
+          .filter(
+            (s: any) => s.status === "analyzing" || s.status === "pending",
+          )
+          .map((s: any) => s.url),
       );
 
       if (processingUrls.size > 0) {
@@ -220,8 +328,10 @@ export default function ProfilesPage() {
   };
 
   const handleBulkAnalyze = () => {
-    const selectedProfiles = activeList.filter((p) => selectedIds.has(p.id));
-    const bulkPayload = selectedProfiles.map((p) => ({
+    const selectedProfiles = activeList.filter((p: IdentifiedProfile) =>
+      selectedIds.has(p.id),
+    );
+    const bulkPayload = selectedProfiles.map((p: IdentifiedProfile) => ({
       url: p.linkedin_url,
       website: "", // Add website if available in profile metadata later
     }));
@@ -289,16 +399,30 @@ export default function ProfilesPage() {
                     <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors">
                       {profile.name || "Anonymous Profile"}
                     </CardTitle>
-                    <a
-                      href={profile.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline flex items-center gap-1 opacity-80"
-                    >
-                      <Globe className="w-3 h-3" />
-                      LinkedIn Profile
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <a
+                        href={profile.linkedin_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 opacity-80"
+                      >
+                        <Globe className="w-2.5 h-2.5" />
+                        LinkedIn
+                        <ExternalLink className="w-2 h-2" />
+                      </a>
+                      {profile.website && (
+                        <a
+                          href={ensureProtocol(profile.website)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1 opacity-80"
+                        >
+                          <Globe className="w-2.5 h-2.5" />
+                          Website
+                          <ExternalLink className="w-2 h-2" />
+                        </a>
+                      )}
+                    </div>
                     {profile.headline && (
                       <p className="text-xs text-muted-foreground mt-1 text-ellipsis overflow-hidden line-clamp-2">
                         {profile.headline}
@@ -382,13 +506,82 @@ export default function ProfilesPage() {
                       </div>
                     )}
                   </div>
-                  {sources.length > 1 && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-primary/5 text-primary border-primary/10"
-                    >
-                      {sources.length} Touchpoints
-                    </Badge>
+                  {sources.length > 0 && (
+                    <TooltipProvider>
+                      <Tooltip delayDuration={100}>
+                        <TooltipTrigger asChild>
+                          <div className="group/touchpoints cursor-help">
+                            <Badge
+                              variant="secondary"
+                              className="bg-primary/5 text-[10px] text-primary border-primary/10 hover:bg-primary/10 transition-colors py-1 flex items-center gap-1.5"
+                            >
+                              <div className="flex items-center gap-1">
+                                <Search className="w-2.5 h-2.5 opacity-60" />
+                                {getTouchpointStats(profile).keywordCount}
+                              </div>
+                              <div className="w-px h-2.5 bg-primary/20" />
+                              <div className="flex items-center gap-1">
+                                <Users className="w-2.5 h-2.5 opacity-60" />
+                                {getTouchpointStats(profile).competitorCount}
+                              </div>
+                            </Badge>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="left"
+                          className="w-80 p-0 shadow-xl border-primary/20 overflow-hidden"
+                        >
+                          <div className="p-3 bg-muted/30 border-b border-primary/10 flex items-center justify-between">
+                            <span className="font-bold text-xs">
+                              All Touchpoints
+                            </span>
+                            <Badge variant="outline" className="text-[10px]">
+                              {getTouchpointStats(profile).totalCount} Total
+                            </Badge>
+                          </div>
+                          <div className="max-h-60 overflow-y-auto p-2 space-y-2 scrollbar-thin">
+                            {getTouchpointStats(profile).allTouchpoints.map(
+                              (tp, i) => (
+                                <div
+                                  key={i}
+                                  className="p-2 rounded bg-muted/40 border border-muted/50 hover:bg-muted/60 transition-colors"
+                                >
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0" />
+                                    <span className="text-[10px] font-bold uppercase text-primary/70">
+                                      {tp.competitor}
+                                    </span>
+                                  </div>
+                                  <a
+                                    href={tp.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] text-blue-600 hover:underline whitespace-normal italic block pl-3"
+                                  >
+                                    "{tp.title}"
+                                  </a>
+                                  {tp.comments.length > 0 && (
+                                    <div className="mt-2 pl-3 space-y-1.5 border-l border-primary/10 ml-1">
+                                      {tp.comments.map((comment, ci) => (
+                                        <div
+                                          key={ci}
+                                          className="text-[10px] text-muted-foreground leading-relaxed flex gap-1.5"
+                                        >
+                                          <MessageSquare className="w-2.5 h-2.5 mt-0.5 opacity-40 shrink-0" />
+                                          <p className="line-clamp-3">
+                                            {comment}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                 </div>
               </CardHeader>
@@ -533,13 +726,350 @@ export default function ProfilesPage() {
                     Last Active: {formatTimestamp(profile.last_interaction_at)}
                   </span>
                   <span className="flex items-center gap-1 opacity-70">
-                    Identified by: {(profile as any).rep_name || "System"}
+                    Identified by: {profile.rep_name || "System"}
                   </span>
                 </div>
               </CardContent>
             </Card>
           );
         })}
+      </div>
+    );
+  };
+
+  const toggleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+    setPage(0);
+  };
+
+  const SortButton = ({
+    column,
+    label,
+  }: {
+    column: string;
+    label: string | React.ReactNode;
+  }) => {
+    const isActive = sortBy === column;
+    return (
+      <button
+        onClick={() => toggleSort(column)}
+        className={`flex items-center gap-1 hover:text-primary transition-colors ${
+          isActive ? "text-primary font-bold" : ""
+        }`}
+      >
+        {label}
+        {isActive ? (
+          sortOrder === "asc" ? (
+            <ArrowUp className="w-3 h-3" />
+          ) : (
+            <ArrowDown className="w-3 h-3" />
+          )
+        ) : (
+          <ArrowUpDown className="w-3 h-3 opacity-30" />
+        )}
+      </button>
+    );
+  };
+
+  const renderProfileList = (profileList: IdentifiedProfile[]) => {
+    if (profileList.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-xl border-2 border-dashed text-center">
+          <Users className="w-12 h-12 text-muted-foreground/30 mb-4" />
+          <h3 className="text-lg font-semibold text-muted-foreground">
+            No profiles found
+          </h3>
+          <p className="text-sm text-muted-foreground max-w-xs mt-1">
+            Try adjusting your search or filters.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-md border bg-card overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={
+                    selectedIds.size === profileList.length &&
+                    profileList.length > 0
+                  }
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
+              <TableHead>
+                <SortButton column="name" label="Profile" />
+              </TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>
+                <SortButton
+                  column="touchpoint_count"
+                  label="Interaction History"
+                />
+              </TableHead>
+              <TableHead>AI Reasoning</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {profileList.map((profile) => {
+              const status = leadsStatus?.find(
+                (s) => s.url === profile.linkedin_url,
+              )?.status;
+              const result = leadsStatus?.find(
+                (s) => s.url === profile.linkedin_url,
+              )?.result;
+              const reportId =
+                status === "completed" && result?.id
+                  ? result.id
+                  : profile.latest_report_id;
+
+              let interactionHistory: any[] = [];
+              try {
+                interactionHistory = JSON.parse(
+                  profile.interaction_history || "[]",
+                );
+              } catch (e) {}
+
+              return (
+                <TableRow key={profile.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(profile.id)}
+                      onCheckedChange={() => toggleSelection(profile.id)}
+                      disabled={status === "analyzing" || status === "pending"}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col max-w-[300px]">
+                      <span className="font-bold truncate">
+                        {profile.name || "Anonymous"}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <a
+                          href={profile.linkedin_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          LinkedIn <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                        {profile.website && (
+                          <a
+                            href={ensureProtocol(profile.website)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1"
+                          >
+                            Website <Globe className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
+                      {profile.headline && (
+                        <p className="text-[10px] text-muted-foreground truncate italic mt-0.5">
+                          {profile.headline}
+                        </p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {status === "analyzing" && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[9px] h-4 bg-blue-100 text-blue-700 animate-pulse"
+                        >
+                          Researching...
+                        </Badge>
+                      )}
+                      {profile.is_competitor && (
+                        <Badge variant="destructive" className="text-[9px] h-4">
+                          Comp
+                        </Badge>
+                      )}
+                      {profile.is_fit && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] h-4 bg-green-50 text-green-700 border-green-200"
+                          title={profile.fit_reasoning}
+                        >
+                          Fit
+                        </Badge>
+                      )}
+                      {profile.is_decision_maker && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] h-4 bg-blue-50 text-blue-700 border-blue-200"
+                        >
+                          DM
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-normal min-w-[240px] max-w-[450px]">
+                    <div className="">
+                      {interactionHistory.length > 0 ? (
+                        <TooltipProvider>
+                          <Tooltip delayDuration={100}>
+                            <TooltipTrigger asChild>
+                              <div className="flex flex-col gap-1.5 cursor-help group/touchpoints hover:bg-muted/30 p-1.5 rounded-md transition-colors">
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-primary/5 text-[9px] text-primary border-primary/10 py-0.5"
+                                  >
+                                    <Search className="w-2.5 h-2.5 mr-1 opacity-60" />
+                                    {getTouchpointStats(profile).keywordCount}
+                                  </Badge>
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-primary/5 text-[9px] text-primary border-primary/10 py-0.5"
+                                  >
+                                    <Users className="w-2.5 h-2.5 mr-1 opacity-60" />
+                                    {
+                                      getTouchpointStats(profile)
+                                        .competitorCount
+                                    }
+                                  </Badge>
+                                  <Info className="w-3.5 h-3.5 text-primary/30 group-hover/touchpoints:text-primary transition-colors ml-auto" />
+                                </div>
+                                {interactionHistory
+                                  .slice(0, 1)
+                                  .map((comp, i) => (
+                                    <div
+                                      key={i}
+                                      className="text-[10px] whitespace-normal"
+                                    >
+                                      <span className="font-semibold uppercase text-primary/70">
+                                        {comp.competitor}:
+                                      </span>{" "}
+                                      <span className="text-muted-foreground italic">
+                                        "{comp.posts?.[0]?.comments?.[0]}"
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="left"
+                              className="w-80 p-0 shadow-xl border-primary/20 overflow-hidden"
+                            >
+                              <div className="p-3 bg-muted/30 border-b border-primary/10 flex items-center justify-between">
+                                <span className="font-bold text-xs uppercase tracking-tight">
+                                  All Discoveries
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-white"
+                                >
+                                  {getTouchpointStats(profile).totalCount} Total
+                                </Badge>
+                              </div>
+                              <div className="max-h-72 overflow-y-auto p-2 space-y-2 scrollbar-thin">
+                                {getTouchpointStats(profile).allTouchpoints.map(
+                                  (tp, i) => (
+                                    <div
+                                      key={i}
+                                      className="p-2 rounded bg-muted/40 border border-muted/50 hover:bg-muted/60 transition-all"
+                                    >
+                                      <div className="flex items-center gap-1.5 mb-1">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0" />
+                                        <span className="text-[10px] font-bold uppercase text-primary/70">
+                                          {tp.competitor}
+                                        </span>
+                                      </div>
+                                      <a
+                                        href={tp.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[10px] text-blue-600 hover:underline whitespace-normal italic block pl-3"
+                                      >
+                                        "{tp.title}"
+                                      </a>
+                                      {tp.comments.length > 0 && (
+                                        <div className="mt-2 pl-3 space-y-1.5 border-l border-primary/10 ml-1">
+                                          {tp.comments.map((comment, ci) => (
+                                            <div
+                                              key={ci}
+                                              className="text-[10px] text-muted-foreground leading-relaxed flex gap-1.5"
+                                            >
+                                              <MessageSquare className="w-2.5 h-2.5 mt-0.5 opacity-40 shrink-0" />
+                                              <p className="line-clamp-3">
+                                                {comment}
+                                              </p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground italic">
+                          No history
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-normal min-w-[200px] max-w-[400px]">
+                    {profile.fit_reasoning ? (
+                      <div className="text-[10px] text-muted-foreground italic">
+                        {profile.fit_reasoning}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground italic">
+                        No reasoning available
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      {reportId && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-primary hover:text-primary hover:bg-primary/10"
+                          asChild
+                        >
+                          <a href={`/reports?id=${reportId}`}>
+                            <Eye className="w-3.5 h-3.5 mr-1" />
+                            Report
+                          </a>
+                        </Button>
+                      )}
+                      {!status && !reportId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => {
+                            setSelectedIds(new Set([profile.id]));
+                            handleBulkAnalyze();
+                          }}
+                        >
+                          <Play className="w-3.5 h-3.5 mr-1" />
+                          Analyze
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     );
   };
@@ -623,18 +1153,172 @@ export default function ProfilesPage() {
         ) : (
           <>
             <div className="flex justify-between items-center mb-4">
-              <div className="relative w-full max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search by name, headline, or keyword..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setPage(0); // Reset to first page on search
-                  }}
-                />
+              <div className="flex items-center gap-3 w-full max-w-xl">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search by name, headline, or keyword..."
+                    className="pl-9 h-10"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setPage(0); // Reset to first page on search
+                    }}
+                  />
+                </div>
+                <div className="relative" ref={statusRef}>
+                  <div
+                    className={`flex items-center gap-2 p-1.5 px-3 rounded-lg border h-10 min-w-[200px] cursor-pointer transition-all duration-200 ${
+                      isStatusDropdownOpen
+                        ? "bg-background border-primary ring-2 ring-primary/20 shadow-lg"
+                        : "bg-background/50 border-primary/10 hover:bg-background/80"
+                    }`}
+                    onClick={() =>
+                      setIsStatusDropdownOpen(!isStatusDropdownOpen)
+                    }
+                  >
+                    <div className="flex-1 flex gap-1 overflow-hidden">
+                      {statusFilter.length === 0 ? (
+                        <span className="text-sm text-muted-foreground font-medium">
+                          Filter by Status
+                        </span>
+                      ) : (
+                        <div className="flex gap-1">
+                          {statusFilter.slice(0, 2).map((s) => (
+                            <Badge
+                              key={s}
+                              variant="secondary"
+                              className="text-[10px] h-5 px-1 bg-primary/10 text-primary border-primary/20"
+                            >
+                              {s === "fit"
+                                ? "Fit"
+                                : s === "competitor"
+                                  ? "Comp"
+                                  : "DM"}
+                            </Badge>
+                          ))}
+                          {statusFilter.length > 2 && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] h-5 px-1"
+                            >
+                              +{statusFilter.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 opacity-50 transition-transform duration-200 ${isStatusDropdownOpen ? "rotate-180" : ""}`}
+                    />
+                  </div>
+
+                  {isStatusDropdownOpen && (
+                    <div className="absolute top-11 left-0 z-50 w-64 p-3 bg-background border border-primary/10 rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 origin-top">
+                      <div className="mb-2 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">
+                        Select Segments
+                      </div>
+                      <div className="space-y-1">
+                        {[
+                          {
+                            id: "fit",
+                            label: "Potential (Fit)",
+                            color: "bg-green-500",
+                            desc: "Identified as ICP match",
+                          },
+                          {
+                            id: "competitor",
+                            label: "Competitor",
+                            color: "bg-red-500",
+                            desc: "Working for competition",
+                          },
+                          {
+                            id: "dm",
+                            label: "Decision Maker",
+                            color: "bg-blue-500",
+                            desc: "High-level stakeholder",
+                          },
+                        ].map((s) => (
+                          <div
+                            key={s.id}
+                            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all duration-150 ${
+                              statusFilter.includes(s.id)
+                                ? "bg-primary/5 border border-primary/10"
+                                : "hover:bg-primary/5 border border-transparent"
+                            }`}
+                            onClick={() => {
+                              setStatusFilter((prev) =>
+                                prev.includes(s.id)
+                                  ? prev.filter((x) => x !== s.id)
+                                  : [...prev, s.id],
+                              );
+                              setPage(0);
+                            }}
+                          >
+                            <Checkbox
+                              checked={statusFilter.includes(s.id)}
+                              onCheckedChange={() => {}}
+                            />
+                            <div className="flex flex-col gap-0.5 flex-1">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`w-1.5 h-1.5 rounded-full ${s.color}`}
+                                />
+                                <span className="text-sm font-semibold">
+                                  {s.label}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {s.desc}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {statusFilter.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-primary/5 flex items-center justify-between">
+                          <span className="text-[10px] text-muted-foreground">
+                            {statusFilter.length} selected
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[10px] font-bold text-muted-foreground hover:text-primary transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStatusFilter([]);
+                              setPage(0);
+                            }}
+                          >
+                            Clear All
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center bg-muted/50 p-1 rounded-lg border">
+                <Button
+                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 px-3 gap-2"
+                  onClick={() => setViewMode("grid")}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  <span className="hidden sm:inline">Grid</span>
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 px-3 gap-2"
+                  onClick={() => setViewMode("list")}
+                >
+                  <List className="w-4 h-4" />
+                  <span className="hidden sm:inline">List</span>
+                </Button>
               </div>
             </div>
 
@@ -654,13 +1338,19 @@ export default function ProfilesPage() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="all">
-                {renderProfileGrid(profiles)}
+                {viewMode === "grid"
+                  ? renderProfileGrid(profiles)
+                  : renderProfileList(profiles)}
               </TabsContent>
               <TabsContent value="keyword">
-                {renderProfileGrid(keywordProfiles)}
+                {viewMode === "grid"
+                  ? renderProfileGrid(keywordProfiles)
+                  : renderProfileList(keywordProfiles)}
               </TabsContent>
               <TabsContent value="competitor">
-                {renderProfileGrid(competitorProfiles)}
+                {viewMode === "grid"
+                  ? renderProfileGrid(competitorProfiles)
+                  : renderProfileList(competitorProfiles)}
               </TabsContent>
             </Tabs>
           </>

@@ -3,9 +3,9 @@ import axios from 'axios';
 // Dynamically determine API URL based on environment
 const getApiUrl = () => {
     if (typeof window === 'undefined') return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    
+
     const hostname = window.location.hostname;
-    
+
     // 1. Localhost Check
     if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
         return 'http://localhost:8000';
@@ -16,7 +16,7 @@ const getApiUrl = () => {
     if (hostname.includes('staging')) {
         return 'https://glial-research-backend-service-staging-512561667165.us-central1.run.app';
     }
-    
+
     // 3. Default to Production
     return 'https://glial-research-backend-service-512561667165.us-central1.run.app';
 };
@@ -171,7 +171,7 @@ export const discoverLeads = async (data: LeadDiscoveryInput) => {
 };
 
 export const fetchHistory = async (
-    skip: number = 0, 
+    skip: number = 0,
     limit: number = 50,
     search: string = "",
     status: string = "all",
@@ -306,6 +306,33 @@ export const fetchDashboardStats = async (): Promise<DashboardStats | null> => {
         return response.data;
     } catch (e) {
         console.error("Failed to fetch dashboard stats", e);
+        return null;
+    }
+};
+
+export interface AnalyticsDataPoint {
+    date: string;
+    count: number;
+}
+
+export interface BreakdownItem {
+    name: string;
+    count: number;
+}
+
+export interface DashboardAnalytics {
+    daily_trends: AnalyticsDataPoint[];
+    lead_quality: Record<string, number>;
+    competitor_breakdown: BreakdownItem[];
+    keyword_breakdown: BreakdownItem[];
+}
+
+export const fetchDashboardAnalytics = async (): Promise<DashboardAnalytics | null> => {
+    try {
+        const response = await axios.get(`${API_URL}/api/dashboard/analytics`);
+        return response.data;
+    } catch (e) {
+        console.error("Failed to fetch dashboard analytics", e);
         return null;
     }
 };
@@ -503,8 +530,8 @@ export interface IdentifiedProfile {
 }
 
 export const getIdentifiedProfiles = async (
-    skip: number = 0, 
-    limit: number = 100, 
+    skip: number = 0,
+    limit: number = 100,
     search: string = "",
     status: string | string[] = "all",
     sort_by: string = "touchpoint_count",

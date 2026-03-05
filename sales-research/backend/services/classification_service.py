@@ -1,7 +1,9 @@
 import asyncio
 import json
 from typing import List
+from sqlalchemy import select
 from db.database import SessionLocal
+from db.models import IdentifiedProfile
 from db import batch_upsert_identified_profiles
 from agents.linkedin_agent import batch_classify_profiles_async
 from utils.activity_helper import log_activity_and_notify
@@ -55,10 +57,59 @@ async def run_classification_and_update(raw_leads: List[dict]):
         if not unique_profiles_list:
             return
 
+        # 1.5 Filter out profiles that already exist in the database
+        urls = list(unique_profiles_map.keys())
+        async with SessionLocal() as session:
+            result = await session.execute(
+                select(IdentifiedProfile.linkedin_url).where(
+                    IdentifiedProfile.linkedin_url.in_(urls),
+                    IdentifiedProfile.fit_reasoning != None,
+                    IdentifiedProfile.fit_reasoning != ""
+                )
+            )
+            existing_urls = {r[0] for r in result.all()}
+        
+        # Keep only profiles that are NOT in existing_urls
+        new_profiles_list = [p for p in unique_profiles_list if p["id"] not in existing_urls]
+        
+        print(f"DEBUG: Found {len(existing_urls)} existing profiles. Processing {len(new_profiles_list)} new profiles for AI classification.")
+        
+        # B. Handle Existing Profiles: Fetch their data and prepare for broadcast
+        existing_profile_data_map = {}
+        if existing_urls:
+            async with SessionLocal() as session:
+                existing_res = await session.execute(
+                    select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url.in_(list(existing_urls)))
+                )
+                for p in existing_res.scalars().all():
+                    existing_profile_data_map[p.linkedin_url] = {
+                        "linkedin_url": p.linkedin_url,
+                        "is_fit": p.is_fit,
+                        "is_competitor": p.is_competitor,
+                        "is_decision_maker": p.is_decision_maker,
+                        "fit_reasoning": p.fit_reasoning,
+                        "intent": p.intent,
+                        "sentiment": p.sentiment,
+                        "name": p.name,
+                        "headline": p.headline
+                    }
+
+        # If there are NO new profiles but there are existing ones, broadcast them now
+        if not new_profiles_list and existing_profile_data_map:
+            print("DEBUG: All discovered profiles already exist in DB. Broadcasting existing data.")
+            await event_manager.broadcast({
+                "type": "classification_update",
+                "leads": list(existing_profile_data_map.values())
+            })
+            return
+        
+        if not new_profiles_list:
+            return
+
         # 2. Batch Classify & Update Iteratively
         batch_size = 100
-        for i in range(0, len(unique_profiles_list), batch_size):
-            batch = unique_profiles_list[i : i + batch_size]
+        for i in range(0, len(new_profiles_list), batch_size):
+            batch = new_profiles_list[i : i + batch_size]
             
             # A. Native Async AI Call
             batch_res = await batch_classify_profiles_async(batch)
@@ -67,6 +118,10 @@ async def run_classification_and_update(raw_leads: List[dict]):
             batch_urls = set(item['id'] for item in batch)
             leads_to_update_batch = []
             event_leads_batch = []
+
+            # Include existing profile data in the first batch broadcast if available
+            if i == 0 and existing_profile_data_map:
+                event_leads_batch.extend(existing_profile_data_map.values())
 
             for lead in raw_leads:
                 if lead["linkedin_url"] in batch_urls:

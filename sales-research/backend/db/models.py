@@ -52,6 +52,12 @@ class ResearchReport(Base):
     created_by_id = Column(UUID(as_uuid=True), nullable=True) # Tagging the rep
     icp_context = Column(Text, nullable=True) # Snapshotted ICP used for this report
 
+    # Outreach Tracking
+    outreach_status = Column(String, nullable=True, server_default=text("'not_started'")) # 'not_started', 'in_progress', 'completed'
+    outreach_started_at = Column(DateTime(timezone=True), nullable=True)
+    is_outreach_edited = Column(Boolean, server_default=text("false"), nullable=False)
+    edit_depth_percentage = Column(Integer, nullable=True) # 0-100 percentage of modification
+
     # New Email & Intent Analysis
     email_history = Column(Text, nullable=True)  # JSON array of email objects
     intent_analysis = Column(Text, nullable=True)  # JSON object with intent data

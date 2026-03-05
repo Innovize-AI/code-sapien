@@ -48,6 +48,12 @@ class ResearchReportBase(BaseModel):
     intent_analysis: Optional[str] = None  # JSON string
     extra_metadata: Optional[str] = None   # JSON string
 
+    # Outreach Tracking
+    outreach_status: Optional[str] = "not_started"
+    outreach_started_at: Optional[datetime] = None
+    is_outreach_edited: bool = False
+    edit_depth_percentage: Optional[int] = None
+
 
 class ResearchReportCreate(ResearchReportBase):
     pass

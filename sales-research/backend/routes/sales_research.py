@@ -278,7 +278,23 @@ async def update_outreach(
     current_user: Profile = Depends(get_current_user)
 ):
     from db.crud import update_report_outreach
-    updated_report = await update_report_outreach(db, report_id, outreach_data)
+    updated_report = await update_report_outreach(db, report_id, outreach_data, is_manual=True)
+    if not updated_report:
+        return {"error": "Report not found"}
+    return {"status": "success", "data": _report_to_dict(updated_report)}
+
+@sales_router.put("/reports/{report_id}/outreach-status")
+async def update_outreach_status_route(
+    report_id: str,
+    status_data: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    from db.crud import update_report_outreach_status
+    status = status_data.get('status')
+    if not status:
+        return {"error": "Status is required"}
+    updated_report = await update_report_outreach_status(db, report_id, status)
     if not updated_report:
         return {"error": "Report not found"}
     return {"status": "success", "data": _report_to_dict(updated_report)}
@@ -291,7 +307,7 @@ async def update_cso_outreach(
     current_user: Profile = Depends(get_current_user)
 ):
     from db.crud import update_report_cso_outreach
-    updated_report = await update_report_cso_outreach(db, report_id, cso_data)
+    updated_report = await update_report_cso_outreach(db, report_id, cso_data, is_manual=True)
     if not updated_report:
         return {"error": "Report not found or update failed"}
     return {"status": "success", "data": _report_to_dict(updated_report)}
@@ -306,6 +322,45 @@ async def update_intent_email(
     from db.crud import update_report_intent_email
     email_text = email_data.get('email_text', '')
     updated_report = await update_report_intent_email(db, report_id, email_text)
+    if not updated_report:
+        return {"error": "Report not found or update failed"}
+    return {"status": "success", "data": _report_to_dict(updated_report)}
+
+@sales_router.put("/reports/{report_id}/executive-blueprint")
+async def update_executive_blueprint(
+    report_id: str,
+    blueprint_data: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    from db.crud import update_report_sales_research
+    updated_report = await update_report_sales_research(db, report_id, blueprint_data, is_manual=True)
+    if not updated_report:
+        return {"error": "Report not found or update failed"}
+    return {"status": "success", "data": _report_to_dict(updated_report)}
+
+@sales_router.put("/reports/{report_id}/intent-analysis")
+async def update_intent_analysis_route(
+    report_id: str,
+    intent_data: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    from db.crud import update_report_intent_analysis
+    updated_report = await update_report_intent_analysis(db, report_id, intent_data, is_manual=True)
+    if not updated_report:
+        return {"error": "Report not found or update failed"}
+    return {"status": "success", "data": _report_to_dict(updated_report)}
+
+@sales_router.put("/reports/{report_id}/buyer-journey")
+async def update_buyer_journey_route(
+    report_id: str,
+    journey_data: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    from db.crud import update_report_buyer_journey
+    updated_report = await update_report_buyer_journey(db, report_id, journey_data, is_manual=True)
     if not updated_report:
         return {"error": "Report not found or update failed"}
     return {"status": "success", "data": _report_to_dict(updated_report)}

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import axios from "axios";
 import {
   User,
   Target,
@@ -31,6 +32,7 @@ import {
   Edit2,
   Save,
   RotateCcw,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +62,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { API_URL } from "@/lib/api";
+import {
+  API_URL,
+  updateOutreachStatus,
+  updateExecutiveBlueprint,
+  updateIntentAnalysis,
+  updateBuyerJourney,
+} from "@/lib/api";
 import { ensureProtocol } from "@/lib/utils";
 
 interface ReportDisplayProps {
@@ -188,6 +196,21 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
 
   // --- Outreach Editing State ---
   const [isEditingOutreach, setIsEditingOutreach] = useState(false);
+  const [isEditingStrategicCommand, setIsEditingStrategicCommand] =
+    useState(false);
+  const [isEditingIntent, setIsEditingIntent] = useState(false);
+  const [isEditingJourney, setIsEditingJourney] = useState(false);
+
+  // States for edited content
+  const [editedStrategicCommand, setEditedStrategicCommand] = useState<any[]>(
+    [],
+  );
+  const [editedIntent, setEditedIntent] = useState<any>(null);
+  const [editedJourney, setEditedJourney] = useState<any>(null);
+
+  const [isSavingStrategic, setIsSavingStrategic] = useState(false);
+  const [isSavingIntent, setIsSavingIntent] = useState(false);
+  const [isSavingJourney, setIsSavingJourney] = useState(false);
   const [isSavingOutreach, setIsSavingOutreach] = useState(false);
   const [activeOutreachTab, setActiveOutreachTab] = useState<
     "tactical" | "strategic"
@@ -205,6 +228,12 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
   const [isEditingIntentEmail, setIsEditingIntentEmail] = useState(false);
   const [isSavingIntentEmail, setIsSavingIntentEmail] = useState(false);
   const [editedIntentEmail, setEditedIntentEmail] = useState("");
+
+  // --- Outreach Global Status ---
+  const [outreachStatus, setOutreachStatus] = useState<string>(
+    data?.outreach_status || "not_started",
+  );
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // --- Multi-Campaign State ---
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
@@ -233,8 +262,41 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     }
     if (data && data.intent_analysis) {
       setEditedIntentEmail(data.intent_analysis.recommended_email || "");
+      setEditedIntent({ ...data.intent_analysis });
+    }
+    if (data && data.buyer_journey_analysis) {
+      setEditedJourney({ ...data.buyer_journey_analysis });
+    }
+    if (data && data.sales_research_report) {
+      setEditedStrategicCommand(
+        data.sales_research_report.advanced_next_steps || [],
+      );
+    }
+    if (data) {
+      setOutreachStatus(data.outreach_status || "not_started");
     }
   }, [data]);
+
+  const handleUpdateStatus = async (newStatus: string) => {
+    if (!data?.id) return;
+    setIsUpdatingStatus(true);
+    try {
+      await updateOutreachStatus(data.id, newStatus);
+      setOutreachStatus(newStatus);
+      toast({
+        title: "Status Updated",
+        description: `Outreach status changed to ${newStatus.replace("_", " ")}`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update outreach status",
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   const handleSaveOutreach = async () => {
     const currentData = data;
@@ -243,23 +305,28 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     try {
       const isStrategic = activeOutreachTab === "strategic";
       const endpoint = isStrategic ? "cso-outreach" : "outreach";
+      const hasVariantsLocal =
+        currentData?.sales_research_report?.campaign_variants &&
+        currentData.sales_research_report.campaign_variants.length > 0;
+
       const body = isStrategic
         ? {
             refined_linkedin_message: editedStrategicOutreach.linkedin_message,
             refined_email_body: editedStrategicOutreach.email_body,
           }
-        : editedOutreach;
+        : {
+            ...editedOutreach,
+            ...(hasVariantsLocal
+              ? { variant_index: selectedVariantIndex }
+              : {}),
+          };
 
-      const response = await fetch(
+      const response = await axios.put(
         `${API_URL}/sales-research/reports/${currentData.id}/${endpoint}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
+        body,
       );
 
-      if (response.ok) {
+      if (response.status === 200) {
         toast({
           title: "Success",
           description: `${isStrategic ? "Strategic" : "Tactical"} strategy updated successfully`,
@@ -275,11 +342,66 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
               editedStrategicOutreach.email_body;
           }
         } else {
-          if (
+          if (hasVariantsLocal) {
+            if (currentData.sales_research_report?.campaign_variants) {
+              Object.assign(
+                currentData.sales_research_report.campaign_variants[
+                  selectedVariantIndex
+                ],
+                editedOutreach,
+              );
+            }
+          } else if (
             currentData.personalized_outreach &&
             typeof currentData.personalized_outreach === "object"
           ) {
             Object.assign(currentData.personalized_outreach, editedOutreach);
+          }
+        }
+
+        // Update edit stats from backend response if available
+        if (response.data?.data) {
+          const respData = response.data.data;
+          if (respData.is_outreach_edited !== undefined) {
+            currentData.is_outreach_edited = respData.is_outreach_edited;
+          }
+          if (respData.edit_depth_percentage !== undefined) {
+            currentData.edit_depth_percentage = respData.edit_depth_percentage;
+          }
+
+          if (isStrategic && respData.cso_strategic_briefing) {
+            if (currentData.cso_strategic_briefing) {
+              currentData.cso_strategic_briefing._edit_depths =
+                respData.cso_strategic_briefing._edit_depths;
+            }
+          } else if (
+            !isStrategic &&
+            hasVariantsLocal &&
+            respData.sales_research_report?.campaign_variants?.[
+              selectedVariantIndex
+            ]
+          ) {
+            if (
+              currentData.sales_research_report?.campaign_variants?.[
+                selectedVariantIndex
+              ]
+            ) {
+              currentData.sales_research_report.campaign_variants[
+                selectedVariantIndex
+              ]._edit_depths =
+                respData.sales_research_report.campaign_variants[
+                  selectedVariantIndex
+                ]._edit_depths;
+            }
+          } else if (
+            !isStrategic &&
+            !hasVariantsLocal &&
+            respData.personalized_outreach
+          ) {
+            if (currentData.personalized_outreach) {
+              currentData.personalized_outreach._edit_depths =
+                respData.personalized_outreach._edit_depths;
+            }
           }
         }
       } else {
@@ -296,21 +418,94 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     }
   };
 
+  const handleSaveStrategicCommand = async () => {
+    if (!data?.id) return;
+    setIsSavingStrategic(true);
+    try {
+      await updateExecutiveBlueprint(data.id, {
+        advanced_next_steps: editedStrategicCommand,
+      });
+      toast({
+        title: "Success",
+        description: "Strategic Command updated successfully",
+      });
+      setIsEditingStrategicCommand(false);
+      // Update local data
+      if (data.sales_research_report) {
+        data.sales_research_report.advanced_next_steps = editedStrategicCommand;
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update Strategic Command",
+      });
+    } finally {
+      setIsSavingStrategic(false);
+    }
+  };
+
+  const handleSaveIntent = async () => {
+    if (!data?.id) return;
+    setIsSavingIntent(true);
+    try {
+      await updateIntentAnalysis(data.id, editedIntent);
+      toast({
+        title: "Success",
+        description: "Intent Analysis updated successfully",
+      });
+      setIsEditingIntent(false);
+      // Update local data
+      if (data.intent_analysis) {
+        Object.assign(data.intent_analysis, editedIntent);
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update Intent Analysis",
+      });
+    } finally {
+      setIsSavingIntent(false);
+    }
+  };
+
+  const handleSaveJourney = async () => {
+    if (!data?.id) return;
+    setIsSavingJourney(true);
+    try {
+      await updateBuyerJourney(data.id, editedJourney);
+      toast({
+        title: "Success",
+        description: "Buyer Journey updated successfully",
+      });
+      setIsEditingJourney(false);
+      // Update local data
+      if (data.buyer_journey_analysis) {
+        Object.assign(data.buyer_journey_analysis, editedJourney);
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update Buyer Journey",
+      });
+    } finally {
+      setIsSavingJourney(false);
+    }
+  };
+
   const handleSaveIntentEmail = async () => {
     const currentData = data;
     if (!currentData || !currentData.id) return;
     setIsSavingIntentEmail(true);
     try {
-      const response = await fetch(
+      const response = await axios.put(
         `${API_URL}/sales-research/reports/${currentData.id}/intent-email`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email_text: editedIntentEmail }),
-        },
+        { email_text: editedIntentEmail },
       );
 
-      if (response.ok) {
+      if (response.status === 200) {
         toast({
           title: "Success",
           description: "Follow-up email updated successfully",
@@ -639,7 +834,32 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
       </div>
     );
 
-    if (content && typeof content === "object" && !Array.isArray(content)) {
+    const parsedContent = React.useMemo(() => {
+      if (!content) return null;
+      if (typeof content === "object" && !Array.isArray(content))
+        return content;
+
+      const strContent = String(content).trim();
+
+      // Try parsing if it's a JSON block
+      if (strContent.includes("{") && strContent.includes("}")) {
+        try {
+          // Extract JSON if wrapped in markdown
+          const jsonMatch =
+            strContent.match(/```json\s*([\s\S]*?)\s*```/) ||
+            strContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            return JSON.parse(jsonMatch[1] || jsonMatch[0]);
+          }
+        } catch (e) {
+          console.warn("Failed to parse DynamicContent JSON:", e);
+        }
+      }
+      return null;
+    }, [content]);
+
+    if (parsedContent) {
+      const contentToUse = parsedContent;
       return (
         <div className={cn("relative group space-y-8", className)}>
           <div className="absolute right-0 -top-14 opacity-0 group-hover:opacity-100 transition-all duration-300">
@@ -658,7 +878,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
             </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 p-12 rounded-[2.5rem] bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800/60 transition-all duration-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
-            {Object.entries(content).map(([key, value]) => {
+            {Object.entries(contentToUse).map(([key, value]) => {
               // Deduplication logic: skip outreach fields in synthesis/general views
               const outreachKeys = [
                 "personalized_outreach",
@@ -728,34 +948,136 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
               if (key === "advanced_next_steps") {
                 return (
                   <div key={key} className="md:col-span-2 space-y-8 pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="h-8 w-8 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
-                        <Zap className="h-4 w-4" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="h-8 w-8 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
+                          <Zap className="h-4 w-4" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] font-black text-primary uppercase tracking-[0.25em]">
+                            Strategic Command
+                          </span>
+                          <h4 className="text-xl font-black italic text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">
+                            Advanced Next Steps
+                          </h4>
+                        </div>
                       </div>
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] font-black text-primary uppercase tracking-[0.25em]">
-                          Strategic Command
-                        </span>
-                        <h4 className="text-xl font-black italic text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">
-                          Advanced Next Steps
-                        </h4>
+                      <div className="flex items-center gap-2">
+                        {isEditingStrategicCommand ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 gap-2 text-[10px] font-black uppercase"
+                              onClick={() => {
+                                setIsEditingStrategicCommand(false);
+                                setEditedStrategicCommand(value || []);
+                              }}
+                              disabled={isSavingStrategic}
+                            >
+                              <X className="h-3 w-3" /> Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-8 gap-2 text-[10px] font-black uppercase"
+                              onClick={handleSaveStrategicCommand}
+                              disabled={isSavingStrategic}
+                            >
+                              {isSavingStrategic ? (
+                                <RotateCcw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Save className="h-3 w-3" />
+                              )}
+                              Save Changes
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-2 text-[10px] font-black uppercase border-dashed"
+                            onClick={() => {
+                              setEditedStrategicCommand(value || []);
+                              setIsEditingStrategicCommand(true);
+                            }}
+                          >
+                            <Edit2 className="h-3 w-3" /> Edit Command
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 gap-6 relative pl-4">
                       <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-primary via-primary/20 to-transparent" />
-                      {Array.isArray(value) &&
-                        value.map((step: any, i: number) => (
+                      {Array.isArray(
+                        isEditingStrategicCommand
+                          ? editedStrategicCommand
+                          : value,
+                      ) &&
+                        (isEditingStrategicCommand
+                          ? editedStrategicCommand
+                          : value
+                        ).map((step: any, i: number) => (
                           <div key={i} className="relative pl-10 group/step">
                             <div className="absolute left-[-11px] top-4 h-5 w-5 rounded-full bg-white dark:bg-zinc-950 border-2 border-primary flex items-center justify-center text-[10px] font-black text-primary shadow-sm group-hover:scale-110 transition-transform">
                               {i + 1}
                             </div>
                             <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:border-primary/30 transition-all hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
-                              <div className="prose prose-zinc dark:prose-invert max-w-none text-[17px] font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed italic antialiased">
-                                <ReactMarkdown>{String(step)}</ReactMarkdown>
-                              </div>
+                              {isEditingStrategicCommand ? (
+                                <div className="space-y-4">
+                                  <Textarea
+                                    value={step}
+                                    onChange={(e) => {
+                                      const newSteps = [
+                                        ...editedStrategicCommand,
+                                      ];
+                                      newSteps[i] = e.target.value;
+                                      setEditedStrategicCommand(newSteps);
+                                    }}
+                                    className="min-h-[100px] text-[16px] font-bold italic leading-relaxed border-zinc-200 bg-white/50"
+                                    placeholder={`Step ${i + 1}...`}
+                                  />
+                                  <div className="flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 text-[9px] text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                                      onClick={() => {
+                                        const newSteps =
+                                          editedStrategicCommand.filter(
+                                            (_, idx) => idx !== i,
+                                          );
+                                        setEditedStrategicCommand(newSteps);
+                                      }}
+                                    >
+                                      Remove Step
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="prose prose-zinc dark:prose-invert max-w-none text-[17px] font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed italic antialiased">
+                                  <ReactMarkdown>{String(step)}</ReactMarkdown>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
+                      {isEditingStrategicCommand && (
+                        <div className="pl-10">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-10 w-full rounded-2xl border-dashed gap-2 text-[10px] font-black uppercase"
+                            onClick={() =>
+                              setEditedStrategicCommand([
+                                ...editedStrategicCommand,
+                                "",
+                              ])
+                            }
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Add Strategic Step
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1288,22 +1610,29 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
               activeOutreach.linkedin_message ||
               (activeOutreach as any).hook ||
               "",
+            editDepth:
+              (activeOutreach as any)._edit_depths?.linkedin_message || 0,
             icon: <Linkedin className="h-4 w-4" />,
           },
           {
             type: "email" as const,
             title: "Email Subject",
             content: activeOutreach.email_subject || "",
+            editDepth: (activeOutreach as any)._edit_depths?.email_subject || 0,
             icon: <Mail className="h-4 w-4" />,
           },
           {
             type: "email" as const,
             title: "Email Body",
             content: activeOutreach.email_body || "",
+            editDepth: (activeOutreach as any)._edit_depths?.email_body || 0,
             icon: <FileText className="h-4 w-4" />,
           },
         ].filter((a) => a.content)
-      : extractTacticalItems(data.sales_research_report);
+      : extractTacticalItems(data.sales_research_report).map((a) => ({
+          ...a,
+          editDepth: 0,
+        }));
 
   const briefing = data.cso_strategic_briefing;
   const strategicActions =
@@ -1313,12 +1642,14 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
             type: "linkedin" as const,
             title: "LinkedIn Message",
             content: briefing.refined_linkedin_message || "",
+            editDepth: briefing._edit_depths?.refined_linkedin_message || 0,
             icon: <Linkedin className="h-4 w-4" />,
           },
           {
             type: "email" as const,
             title: "Refined Email Content",
             content: briefing.refined_email_body || "",
+            editDepth: briefing._edit_depths?.refined_email_body || 0,
             icon: <FileText className="h-4 w-4" />,
           },
         ].filter((a) => a.content)
@@ -1479,6 +1810,89 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
               Re-run Analysis
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* Outreach Control Bar */}
+      <div className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 px-8 py-3 shadow-sm transition-all duration-300">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest px-1">
+                Status
+              </span>
+              <Badge
+                className={cn(
+                  "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border-none",
+                  outreachStatus === "not_started"
+                    ? "bg-zinc-100 text-zinc-500"
+                    : outreachStatus === "in_progress"
+                      ? "bg-amber-100 text-amber-600"
+                      : "bg-emerald-100 text-emerald-600 shadow-sm shadow-emerald-500/10",
+                )}
+              >
+                {outreachStatus.replace("_", " ")}
+              </Badge>
+            </div>
+
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 mx-2 hidden md:block" />
+
+            <div className="flex items-center gap-2">
+              {outreachStatus === "not_started" && (
+                <Button
+                  size="sm"
+                  onClick={() => handleUpdateStatus("in_progress")}
+                  disabled={isUpdatingStatus}
+                  className="h-8 rounded-lg text-[10px] font-black uppercase tracking-tight gap-2"
+                >
+                  <Zap className="h-3 w-3" /> Start Outreach
+                </Button>
+              )}
+              {outreachStatus === "in_progress" && (
+                <Button
+                  size="sm"
+                  onClick={() => handleUpdateStatus("completed")}
+                  disabled={isUpdatingStatus}
+                  className="h-8 rounded-lg text-[10px] font-black uppercase tracking-tight gap-2 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Check className="h-3.5 w-3.5" /> Mark Completed
+                </Button>
+              )}
+              {outreachStatus === "completed" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUpdateStatus("in_progress")}
+                  disabled={isUpdatingStatus}
+                  className="h-8 rounded-lg text-[10px] font-black uppercase tracking-tight gap-2"
+                >
+                  <RotateCcw className="h-3 w-3" /> Re-open
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const el = document.getElementById("intent-history");
+                if (el)
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                else {
+                  toast({
+                    title: "Coming Soon",
+                    description:
+                      "No intent history detected for this lead yet.",
+                  });
+                }
+              }}
+              className="h-8 rounded-lg text-[10px] font-black uppercase tracking-tight gap-2 text-zinc-500 hover:text-primary"
+            >
+              See Next Steps <ChevronRight className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1840,6 +2254,51 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                         </div>
 
                         <div className="flex items-center gap-3">
+                          {data.is_outreach_edited && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="outline"
+                                    className="h-10 px-4 rounded-xl border-amber-500/30 text-amber-600 bg-amber-500/5 gap-2 cursor-help"
+                                  >
+                                    <Edit2 className="h-3 w-3" />
+                                    <span className="text-[10px] font-black uppercase tracking-tight">
+                                      Manual Edit
+                                    </span>
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="p-3 max-w-xs bg-zinc-900 border-zinc-800 text-white">
+                                  <div className="space-y-1.5">
+                                    <div className="text-[10px] font-black uppercase text-amber-500 tracking-widest">
+                                      Modification Deep-Dive
+                                    </div>
+                                    <p className="text-xs font-medium leading-relaxed">
+                                      This outreach has been manually refined by
+                                      a user.
+                                    </p>
+                                    <div className="flex items-center justify-between pt-1">
+                                      <span className="text-[10px] font-bold text-zinc-400">
+                                        Edit Depth
+                                      </span>
+                                      <span className="text-[10px] font-black text-amber-500">
+                                        {data.edit_depth_percentage || 0}%
+                                        Modified
+                                      </span>
+                                    </div>
+                                    <div className="h-1 w-full bg-zinc-800 rounded-full mt-1 overflow-hidden">
+                                      <div
+                                        className="h-full bg-amber-500"
+                                        style={{
+                                          width: `${data.edit_depth_percentage || 0}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           {isEditingOutreach ? (
                             <>
                               <Button
@@ -1872,7 +2331,19 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                               size="sm"
                               variant="outline"
                               className="h-10 px-6 rounded-xl gap-2 text-[11px] font-black uppercase tracking-tight border-primary/20 hover:bg-primary/5 transition-all group"
-                              onClick={() => setIsEditingOutreach(true)}
+                              onClick={() => {
+                                setEditedOutreach({
+                                  linkedin_message:
+                                    activeOutreach?.linkedin_message ||
+                                    (activeOutreach as any)?.hook ||
+                                    "",
+                                  email_subject:
+                                    activeOutreach?.email_subject || "",
+                                  email_body: activeOutreach?.email_body || "",
+                                  hook: (activeOutreach as any)?.hook || "",
+                                });
+                                setIsEditingOutreach(true);
+                              }}
                             >
                               <Edit2 className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />{" "}
                               Edit Current Version
@@ -2039,6 +2510,41 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                       >
                                         Tactical
                                       </Badge>
+                                      {(action as any).editDepth > 0 && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Badge
+                                                variant="outline"
+                                                className="text-[8px] font-black uppercase tracking-tighter px-1.5 h-4 border-amber-500/30 text-amber-500 cursor-help flex items-center gap-1"
+                                              >
+                                                <Edit2 className="h-2 w-2" />
+                                                Edited
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="p-2 w-32 bg-zinc-900 border-zinc-800">
+                                              <div className="space-y-1">
+                                                <div className="flex items-center justify-between text-[10px]">
+                                                  <span className="font-bold text-zinc-400">
+                                                    Depth
+                                                  </span>
+                                                  <span className="font-black text-amber-500">
+                                                    {(action as any).editDepth}%
+                                                  </span>
+                                                </div>
+                                                <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
+                                                  <div
+                                                    className="h-full bg-amber-500"
+                                                    style={{
+                                                      width: `${(action as any).editDepth}%`,
+                                                    }}
+                                                  />
+                                                </div>
+                                              </div>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
                                     </div>
                                     <p
                                       className={cn(
@@ -2198,6 +2704,41 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                                       >
                                         CSO Refined
                                       </Badge>
+                                      {(action as any).editDepth > 0 && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Badge
+                                                variant="outline"
+                                                className="text-[8px] font-black uppercase tracking-tighter px-1.5 h-4 border-amber-500/30 text-amber-500 cursor-help flex items-center gap-1"
+                                              >
+                                                <Edit2 className="h-2 w-2" />
+                                                Edited
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="p-2 w-32 bg-zinc-900 border-zinc-800">
+                                              <div className="space-y-1">
+                                                <div className="flex items-center justify-between text-[10px]">
+                                                  <span className="font-bold text-zinc-400">
+                                                    Depth
+                                                  </span>
+                                                  <span className="font-black text-amber-500">
+                                                    {(action as any).editDepth}%
+                                                  </span>
+                                                </div>
+                                                <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
+                                                  <div
+                                                    className="h-full bg-amber-500"
+                                                    style={{
+                                                      width: `${(action as any).editDepth}%`,
+                                                    }}
+                                                  />
+                                                </div>
+                                              </div>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
                                     </div>
                                     <p
                                       className={cn(
@@ -2321,6 +2862,48 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
 
                   {section.isJourney && data.buyer_journey_analysis && (
                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                      <div className="flex justify-end mb-2">
+                        {isEditingJourney ? (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 gap-2 text-[10px] font-black uppercase"
+                              onClick={() => {
+                                setIsEditingJourney(false);
+                                setEditedJourney({
+                                  ...data.buyer_journey_analysis,
+                                });
+                              }}
+                              disabled={isSavingJourney}
+                            >
+                              <X className="h-3 w-3" /> Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-8 gap-2 text-[10px] font-black uppercase"
+                              onClick={handleSaveJourney}
+                              disabled={isSavingJourney}
+                            >
+                              {isSavingJourney ? (
+                                <RotateCcw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Save className="h-3 w-3" />
+                              )}
+                              Save Journey
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-2 text-[10px] font-black uppercase border-dashed"
+                            onClick={() => setIsEditingJourney(true)}
+                          >
+                            <Edit2 className="h-3 w-3" /> Edit Journey
+                          </Button>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
                         <div className="p-6 rounded-3xl bg-zinc-900 text-white border border-white/5 space-y-6 shadow-2xl relative overflow-hidden group">
                           <div className="absolute top-0 right-0 w-48 h-48 bg-primary/20 blur-[80px] rounded-full -mr-24 -mt-24 pointer-events-none group-hover:bg-primary/30 transition-all duration-700" />
@@ -2338,14 +2921,27 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                             </div>
                           </div>
                           <div className="text-4xl font-black text-white tracking-tight uppercase italic relative">
-                            {data.buyer_journey_analysis.journey_stage ||
-                              "Discovery"}
+                            {isEditingJourney ? (
+                              <Input
+                                value={editedJourney.journey_stage}
+                                onChange={(e) =>
+                                  setEditedJourney({
+                                    ...editedJourney,
+                                    journey_stage: e.target.value,
+                                  })
+                                }
+                                className="bg-white/10 border-white/20 text-white text-2xl h-12 uppercase"
+                              />
+                            ) : (
+                              data.buyer_journey_analysis.journey_stage ||
+                              "Discovery"
+                            )}
                           </div>
                           <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden relative">
                             <div
                               className="h-full bg-primary shadow-[0_0_15px_rgba(37,99,235,0.5)] transition-all duration-1000"
                               style={{
-                                width: `${data.buyer_journey_analysis.sentiment_score || 50}%`,
+                                width: `${(isEditingJourney ? editedJourney.sentiment_score : data.buyer_journey_analysis.sentiment_score) || 50}%`,
                               }}
                             />
                           </div>
@@ -2365,12 +2961,26 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                               </h4>
                             </div>
                           </div>
-                          <p className="text-[15px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 p-6 rounded-2xl border border-emerald-500/10 leading-relaxed italic">
-                            "
-                            {data.buyer_journey_analysis.optimal_play ||
-                              "Initiate high-value outreach sequence"}
-                            "
-                          </p>
+                          {isEditingJourney ? (
+                            <Textarea
+                              value={editedJourney.optimal_play}
+                              onChange={(e) =>
+                                setEditedJourney({
+                                  ...editedJourney,
+                                  optimal_play: e.target.value,
+                                })
+                              }
+                              className="min-h-[100px] rounded-2xl text-[15px] font-semibold italic border-emerald-500/20 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
+                              placeholder="Describe the optimal play..."
+                            />
+                          ) : (
+                            <p className="text-[15px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 p-6 rounded-2xl border border-emerald-500/10 leading-relaxed italic">
+                              "
+                              {data.buyer_journey_analysis.optimal_play ||
+                                "Initiate high-value outreach sequence"}
+                              "
+                            </p>
+                          )}
                         </div>
 
                         <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm hover:shadow-md transition-all duration-500">
@@ -2388,28 +2998,72 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                             </div>
                           </div>
                           <div className="flex items-end gap-3">
-                            <span className="text-5xl font-black text-amber-500 italic">
-                              {data.buyer_journey_analysis.sentiment_score ||
-                                50}
-                            </span>
-                            <span className="text-zinc-400 font-black uppercase tracking-[0.1em] text-[15px] pb-1.5 font-sans">
-                              / 100
-                            </span>
+                            {isEditingJourney ? (
+                              <div className="flex items-center gap-3 w-full">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={editedJourney.sentiment_score}
+                                  onChange={(e) =>
+                                    setEditedJourney({
+                                      ...editedJourney,
+                                      sentiment_score: parseInt(e.target.value),
+                                    })
+                                  }
+                                  className="text-3xl font-black text-amber-500 w-24 h-12 bg-amber-500/5 border-amber-500/20"
+                                />
+                                <span className="text-zinc-400 font-black uppercase tracking-[0.1em] text-[15px] pb-1.5 font-sans">
+                                  / 100
+                                </span>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="text-5xl font-black text-amber-500 italic">
+                                  {data.buyer_journey_analysis
+                                    .sentiment_score || 50}
+                                </span>
+                                <span className="text-zinc-400 font-black uppercase tracking-[0.1em] text-[15px] pb-1.5 font-sans">
+                                  / 100
+                                </span>
+                              </>
+                            )}
                           </div>
                           <Badge
                             className={cn(
                               "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-none",
-                              data.buyer_journey_analysis.urgency_level ===
+                              (isEditingJourney
+                                ? editedJourney.urgency_level
+                                : data.buyer_journey_analysis.urgency_level) ===
                                 "High" ||
-                                (data.buyer_journey_analysis.sentiment_score ||
-                                  0) > 70
+                                ((isEditingJourney
+                                  ? editedJourney.sentiment_score
+                                  : data.buyer_journey_analysis
+                                      .sentiment_score) || 0) > 70
                                 ? "bg-rose-500 text-white"
                                 : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
                             )}
                           >
-                            {data.buyer_journey_analysis.urgency_level ||
-                              "Normal"}{" "}
-                            Urgency Detected
+                            {isEditingJourney ? (
+                              <select
+                                value={editedJourney.urgency_level}
+                                onChange={(e) =>
+                                  setEditedJourney({
+                                    ...editedJourney,
+                                    urgency_level: e.target.value,
+                                  })
+                                }
+                                className="bg-transparent border-none text-white focus:outline-none"
+                              >
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                              </select>
+                            ) : (
+                              (data.buyer_journey_analysis.urgency_level ||
+                                "Normal") + " Urgency Detected"
+                            )}
                           </Badge>
                         </div>
                       </div>
@@ -2421,10 +3075,24 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                             Strategic Reasoning
                           </h4>
                         </div>
-                        <p className="text-[19px] leading-[1.8] font-medium text-zinc-700 dark:text-zinc-300 antialiased italic max-w-4xl">
-                          {data.buyer_journey_analysis.strategic_reasoning ||
-                            "Analysis based on profile seniority, recent hiring signals, and intent data points."}
-                        </p>
+                        {isEditingJourney ? (
+                          <Textarea
+                            value={editedJourney.strategic_reasoning}
+                            onChange={(e) =>
+                              setEditedJourney({
+                                ...editedJourney,
+                                strategic_reasoning: e.target.value,
+                              })
+                            }
+                            className="min-h-[120px] text-[18px] leading-[1.8] font-medium italic border-zinc-200 bg-white/50"
+                            placeholder="Enter strategic reasoning..."
+                          />
+                        ) : (
+                          <p className="text-[19px] leading-[1.8] font-medium text-zinc-700 dark:text-zinc-300 antialiased italic max-w-4xl">
+                            {data.buyer_journey_analysis.strategic_reasoning ||
+                              "Analysis based on profile seniority, recent hiring signals, and intent data points."}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2764,13 +3432,53 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                             )}
                         </>
                       ) : (
-                        <DynamicContent content={data.lead_score_analysis} />
+                        DynamicContent({ content: data.lead_score_analysis })
                       )}
                     </div>
                   )}
 
                   {section.id === "intent-history" && data.intent_analysis && (
                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                      <div className="flex justify-end mb-2">
+                        {isEditingIntent ? (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 gap-2 text-[10px] font-black uppercase"
+                              onClick={() => {
+                                setIsEditingIntent(false);
+                                setEditedIntent({ ...data.intent_analysis });
+                              }}
+                              disabled={isSavingIntent}
+                            >
+                              <X className="h-3 w-3" /> Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-8 gap-2 text-[10px] font-black uppercase"
+                              onClick={handleSaveIntent}
+                              disabled={isSavingIntent}
+                            >
+                              {isSavingIntent ? (
+                                <RotateCcw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Save className="h-3 w-3" />
+                              )}
+                              Save Intent
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-2 text-[10px] font-black uppercase border-dashed"
+                            onClick={() => setIsEditingIntent(true)}
+                          >
+                            <Edit2 className="h-3 w-3" /> Edit Intent
+                          </Button>
+                        )}
+                      </div>
                       {/* Intent Cards */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="p-8 rounded-2xl bg-primary/5 border border-primary/10">
@@ -2781,18 +3489,48 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                             </span>
                           </div>
                           <div className="text-2xl font-black text-primary capitalize mb-2">
-                            {data.intent_analysis.intent}
+                            {isEditingIntent ? (
+                              <Input
+                                value={editedIntent.intent}
+                                onChange={(e) =>
+                                  setEditedIntent({
+                                    ...editedIntent,
+                                    intent: e.target.value,
+                                  })
+                                }
+                                className="bg-primary/10 border-primary/20 text-primary text-xl h-10 uppercase"
+                              />
+                            ) : (
+                              data.intent_analysis.intent
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
                               Sentiment:
                             </span>
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] uppercase font-bold"
-                            >
-                              {data.intent_analysis.sentiment}
-                            </Badge>
+                            {isEditingIntent ? (
+                              <select
+                                value={editedIntent.sentiment}
+                                onChange={(e) =>
+                                  setEditedIntent({
+                                    ...editedIntent,
+                                    sentiment: e.target.value,
+                                  })
+                                }
+                                className="bg-white/10 border border-zinc-200 rounded px-2 py-1 text-[10px] uppercase font-bold text-zinc-900"
+                              >
+                                <option value="positive">Positive</option>
+                                <option value="neutral">Neutral</option>
+                                <option value="negative">Negative</option>
+                              </select>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] uppercase font-bold"
+                              >
+                                {data.intent_analysis.sentiment}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <div className="p-8 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
@@ -2803,7 +3541,21 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                             </span>
                           </div>
                           <div className="text-lg font-medium text-emerald-900 dark:text-emerald-100 italic leading-relaxed">
-                            "{data.intent_analysis.next_steps}"
+                            {isEditingIntent ? (
+                              <Textarea
+                                value={editedIntent.next_steps}
+                                onChange={(e) =>
+                                  setEditedIntent({
+                                    ...editedIntent,
+                                    next_steps: e.target.value,
+                                  })
+                                }
+                                className="min-h-[60px] bg-emerald-500/5 border-emerald-500/20 text-emerald-900 text-base"
+                                placeholder="Next best action..."
+                              />
+                            ) : (
+                              `"${data.intent_analysis.next_steps}"`
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2906,9 +3658,23 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                           <Info className="h-4 w-4 text-zinc-400" />
                           Conversation Summary
                         </h3>
-                        <div className="p-6 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 leading-relaxed text-[15px]">
-                          {data.intent_analysis.summary}
-                        </div>
+                        {isEditingIntent ? (
+                          <Textarea
+                            value={editedIntent.summary}
+                            onChange={(e) =>
+                              setEditedIntent({
+                                ...editedIntent,
+                                summary: e.target.value,
+                              })
+                            }
+                            className="min-h-[120px] p-6 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 leading-relaxed text-[15px] italic"
+                            placeholder="Conversation summary..."
+                          />
+                        ) : (
+                          <div className="p-6 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 leading-relaxed text-[15px]">
+                            {data.intent_analysis.summary}
+                          </div>
+                        )}
                       </div>
 
                       {/* Timeline */}
@@ -3050,20 +3816,19 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                     section.isJourney ||
                     section.id === "discovery" ||
                     section.id === "lead-score"
-                  ) && (
-                    <DynamicContent
-                      content={section.content}
-                      title={section.title}
-                      isSocial={section.id === "profile"}
-                      excludeKeys={[
+                  ) &&
+                    DynamicContent({
+                      content: section.content,
+                      title: section.title,
+                      isSocial: section.id === "profile",
+                      excludeKeys: [
                         "personalized_outreach",
                         "cso_strategic_briefing",
                         "intent_analysis",
                         "buyer_journey_analysis",
                         "lead_score_analysis",
-                      ]}
-                    />
-                  )}
+                      ],
+                    })}
                 </CardContent>
               </Card>
             </div>

@@ -25,13 +25,17 @@ import {
   fetchDashboardStats,
   fetchHistory,
   DashboardStats,
+  DashboardAnalytics,
+  fetchDashboardAnalytics,
   getOnboardingStatus,
 } from "@/lib/api";
 import { ActivityBoard } from "@/components/dashboard/activity-board";
+import { AnalyticsCharts } from "@/components/dashboard/analytics-charts";
 
 export default function Home() {
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
   const [recentReports, setRecentReports] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -45,11 +49,13 @@ export default function Home() {
           return;
         }
 
-        const [statsData, historyData] = await Promise.all([
+        const [statsData, historyData, analyticsData] = await Promise.all([
           fetchDashboardStats(),
           fetchHistory(),
+          fetchDashboardAnalytics(),
         ]);
         setStats(statsData);
+        setAnalytics(analyticsData);
         // Sort by date desc and take top 5
         const sortedHistory = (historyData?.items || [])
           .sort(
@@ -108,13 +114,13 @@ export default function Home() {
             title="Total Leads Found"
             value={stats?.total_leads.toLocaleString() || "0"}
             icon={Users}
-            // trend={{ value: 12, isPositive: true }} // Trend needs historical data diff
+          // trend={{ value: 12, isPositive: true }} // Trend needs historical data diff
           />
           <StatCard
             title="Avg. Lead Score"
             value={stats?.avg_lead_score.toString() || "0"}
             icon={BarChart3}
-            // trend={{ value: 4, isPositive: true }}
+          // trend={{ value: 4, isPositive: true }}
           />
           <StatCard
             title="High Potential Leads"
@@ -129,6 +135,9 @@ export default function Home() {
             description="Estimated (30m/lead)"
           />
         </div>
+
+        {/* Analytics Section */}
+        {analytics && <AnalyticsCharts data={analytics} />}
 
         {/* Main Content Grid */}
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">

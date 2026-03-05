@@ -189,6 +189,26 @@ export const fetchReport = async (id: string) => {
     return response.data;
 };
 
+export const updateOutreachStatus = async (reportId: string, status: string) => {
+    const response = await axios.put(`${API_URL}/sales-research/reports/${reportId}/outreach-status`, { status });
+    return response.data;
+};
+
+export const updateExecutiveBlueprint = async (reportId: string, data: any) => {
+    const response = await axios.put(`${API_URL}/sales-research/reports/${reportId}/executive-blueprint`, data);
+    return response.data;
+};
+
+export const updateIntentAnalysis = async (reportId: string, data: any) => {
+    const response = await axios.put(`${API_URL}/sales-research/reports/${reportId}/intent-analysis`, data);
+    return response.data;
+};
+
+export const updateBuyerJourney = async (reportId: string, data: any) => {
+    const response = await axios.put(`${API_URL}/sales-research/reports/${reportId}/buyer-journey`, data);
+    return response.data;
+};
+
 export const bulkAnalyzeLeads = async (
     leads: { url?: string, website?: string }[],
     options: Omit<LeadData, 'linkedin_url' | 'website' | 'email'>,
@@ -479,6 +499,7 @@ export interface IdentifiedProfile {
     latest_report_id?: string;
     rep_name?: string;
     touchpoint_count: number;
+    outreach_status?: string;
 }
 
 export const getIdentifiedProfiles = async (

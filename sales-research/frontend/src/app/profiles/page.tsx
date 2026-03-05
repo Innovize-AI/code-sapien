@@ -62,7 +62,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ensureProtocol } from "@/lib/utils";
+import { ensureProtocol, cn } from "@/lib/utils";
 
 function formatTimestamp(dateStr: string) {
   try {
@@ -469,6 +469,21 @@ export default function ProfilesPage() {
                             AI Analyzing...
                           </Badge>
                         )}
+                      {profile.outreach_status && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[9px] h-5 px-1.5",
+                            profile.outreach_status === "not_started"
+                              ? "bg-zinc-100 text-zinc-500 border-zinc-200"
+                              : profile.outreach_status === "in_progress"
+                                ? "bg-amber-50 text-amber-600 border-amber-200"
+                                : "bg-green-50 text-green-700 border-green-200",
+                          )}
+                        >
+                          {profile.outreach_status.replace("_", " ")}
+                        </Badge>
+                      )}
                       {profile.is_competitor && (
                         <Badge
                           variant="destructive"
@@ -910,6 +925,21 @@ export default function ProfilesPage() {
                           className="text-[9px] h-4 bg-blue-50 text-blue-700 border-blue-200"
                         >
                           DM
+                        </Badge>
+                      )}
+                      {profile.outreach_status && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[9px] h-4",
+                            profile.outreach_status === "not_started"
+                              ? "bg-zinc-100 text-zinc-500 border-zinc-200"
+                              : profile.outreach_status === "in_progress"
+                                ? "bg-amber-50 text-amber-600 border-amber-200"
+                                : "bg-green-50 text-green-700 border-green-200",
+                          )}
+                        >
+                          {profile.outreach_status.replace("_", " ")}
                         </Badge>
                       )}
                     </div>

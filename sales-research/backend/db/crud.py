@@ -1,5 +1,6 @@
 import json
 import datetime
+import difflib
 from typing import Iterable, Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -25,6 +26,39 @@ def _safe_json_load(val, default):
         return json.loads(val)
     except:
         return default
+
+def _calculate_text_modification_percentage(original: str, updated: str) -> int:
+    """Calculates what percentage of the text has been modified."""
+    if not original:
+        return 0
+    if not updated:
+        return 100
+    
+    matcher = difflib.SequenceMatcher(None, original, updated)
+    # total length of matching blocks / average length of strings
+    # ratio() is 2.0 * M / T where M is matches and T is total length
+    # Modification is 1 - match_ratio
+    match_ratio = matcher.ratio()
+    modification_pct = int((1.0 - match_ratio) * 100)
+    return min(100, max(0, modification_pct))
+
+def _calculate_json_modification_percentage(original: dict, updated: dict) -> int:
+    """Calculates average modification across JSON fields."""
+    if not original: return 0
+    if not updated: return 100
+    
+    total_mod = 0
+    count = 0
+    
+    # We only care about fields that are common to both or present in original
+    keys = set(original.keys()) | set(updated.keys())
+    for k in keys:
+        v_orig = str(original.get(k, ""))
+        v_upd = str(updated.get(k, ""))
+        total_mod += _calculate_text_modification_percentage(v_orig, v_upd)
+        count += 1
+        
+    return total_mod // count if count > 0 else 0
 
 def _report_to_dict(report):
     """Helper to convert ResearchReport model to final_state dictionary."""
@@ -65,7 +99,13 @@ def _report_to_dict(report):
         "company_stats": _safe_json_load(report.company_stats, {}),
         "lead_li_urn": report.lead_li_urn,
         "lead_company_linkedin_url": report.lead_company_linkedin_url,
-        "created_at": report.created_at.isoformat() if report.created_at else None
+        "created_at": report.created_at.isoformat() if report.created_at else None,
+        
+        # Outreach Tracking
+        "outreach_status": report.outreach_status,
+        "outreach_started_at": report.outreach_started_at.isoformat() if report.outreach_started_at else None,
+        "is_outreach_edited": report.is_outreach_edited,
+        "edit_depth_percentage": report.edit_depth_percentage
     }
 
 async def batch_upsert(
@@ -507,24 +547,103 @@ async def get_report(db: AsyncSession, report_id: str):
     result = await db.execute(query)
     return result.scalar_one_or_none()
 
-async def update_report_outreach(db: AsyncSession, report_id: str, outreach_data: dict):
+async def update_report_outreach(db: AsyncSession, report_id: str, outreach_data: dict, is_manual: bool = False):
     query = select(ResearchReport).where(ResearchReport.id == report_id)
     result = await db.execute(query)
     db_report = result.scalar_one_or_none()
     if db_report:
-        db_report.personalized_outreach = json.dumps(outreach_data)
+        variant_index = outreach_data.pop("variant_index", None)
+        edit_depths = {}
+        
+        if is_manual:
+            # Calculate modification amount
+            mod_pct = 0
+            if variant_index is not None:
+                report_data = _safe_deserialize(db_report.sales_research_report) or {}
+                if "campaign_variants" in report_data and len(report_data["campaign_variants"]) > variant_index:
+                    orig_data = report_data["campaign_variants"][variant_index]
+                    mod_pct = _calculate_json_modification_percentage(orig_data, outreach_data)
+                    existing_depths = orig_data.get("_edit_depths", {})
+                    for key, val in outreach_data.items():
+                        if isinstance(val, str) and key != "_edit_depths":
+                            field_mod = _calculate_text_modification_percentage(str(orig_data.get(key, "")), val)
+                            edit_depths[key] = max(existing_depths.get(key, 0), field_mod)
+            else:
+                orig_data = _safe_deserialize(db_report.personalized_outreach) or {}
+                if isinstance(orig_data, dict):
+                    mod_pct = _calculate_json_modification_percentage(orig_data, outreach_data)
+                    existing_depths = orig_data.get("_edit_depths", {})
+                    for key, val in outreach_data.items():
+                        if isinstance(val, str) and key != "_edit_depths":
+                            field_mod = _calculate_text_modification_percentage(str(orig_data.get(key, "")), val)
+                            edit_depths[key] = max(existing_depths.get(key, 0), field_mod)
+                else:
+                    mod_pct = _calculate_text_modification_percentage(str(orig_data), str(outreach_data))
+            
+            db_report.is_outreach_edited = True
+            db_report.edit_depth_percentage = max(db_report.edit_depth_percentage or 0, mod_pct)
+            
+            # If manually editing, consider outreach "in_progress" or "completed"
+            if db_report.outreach_status == 'not_started':
+                db_report.outreach_status = 'in_progress'
+                db_report.outreach_started_at = datetime.datetime.now(datetime.timezone.utc)
+
+        if edit_depths:
+            outreach_data["_edit_depths"] = edit_depths
+
+        if variant_index is not None:
+            report_data = _safe_deserialize(db_report.sales_research_report) or {}
+            if "campaign_variants" not in report_data:
+                report_data["campaign_variants"] = []
+            if len(report_data["campaign_variants"]) > variant_index:
+                # Merge existing _edit_depths if we only updated some fields
+                if "_edit_depths" in report_data["campaign_variants"][variant_index] and edit_depths:
+                    merged_depths = {**report_data["campaign_variants"][variant_index]["_edit_depths"], **edit_depths}
+                    outreach_data["_edit_depths"] = merged_depths
+                
+                report_data["campaign_variants"][variant_index].update(outreach_data)
+                db_report.sales_research_report = json.dumps(report_data)
+        else:
+            db_report.personalized_outreach = json.dumps(outreach_data)
+        
         await db.commit()
         await db.refresh(db_report)
         return db_report
     return None
 
-async def update_report_cso_outreach(db: AsyncSession, report_id: str, cso_data: dict):
+async def update_report_cso_outreach(db: AsyncSession, report_id: str, cso_data: dict, is_manual: bool = False):
     query = select(ResearchReport).where(ResearchReport.id == report_id)
     result = await db.execute(query)
     db_report = result.scalar_one_or_none()
     if db_report:
         try:
             current_cso = json.loads(db_report.cso_strategic_briefing) if db_report.cso_strategic_briefing else {}
+            
+            if is_manual:
+                # Calculate modification for specific fields
+                mod_pct_li = _calculate_text_modification_percentage(
+                    current_cso.get('refined_linkedin_message', ''), 
+                    cso_data.get('refined_linkedin_message', '')
+                )
+                mod_pct_email = _calculate_text_modification_percentage(
+                    current_cso.get('refined_email_body', ''), 
+                    cso_data.get('refined_email_body', '')
+                )
+                avg_mod = (mod_pct_li + mod_pct_email) // 2
+                
+                db_report.is_outreach_edited = True
+                db_report.edit_depth_percentage = max(db_report.edit_depth_percentage or 0, avg_mod)
+                
+                existing_depths = current_cso.get("_edit_depths", {})
+                current_cso["_edit_depths"] = {
+                    "refined_linkedin_message": max(existing_depths.get("refined_linkedin_message", 0), mod_pct_li),
+                    "refined_email_body": max(existing_depths.get("refined_email_body", 0), mod_pct_email)
+                }
+                
+                if db_report.outreach_status == 'not_started':
+                    db_report.outreach_status = 'in_progress'
+                    db_report.outreach_started_at = datetime.datetime.now(datetime.timezone.utc)
+
             if 'refined_linkedin_message' in cso_data:
                 current_cso['refined_linkedin_message'] = cso_data['refined_linkedin_message']
             if 'refined_email_body' in cso_data:
@@ -537,6 +656,19 @@ async def update_report_cso_outreach(db: AsyncSession, report_id: str, cso_data:
         except Exception as e:
             print(f"Error updating CSO outreach: {e}")
             return None
+    return None
+
+async def update_report_outreach_status(db: AsyncSession, report_id: str, status: str):
+    query = select(ResearchReport).where(ResearchReport.id == report_id)
+    result = await db.execute(query)
+    db_report = result.scalar_one_or_none()
+    if db_report:
+        db_report.outreach_status = status
+        if status != 'not_started' and not db_report.outreach_started_at:
+            db_report.outreach_started_at = datetime.datetime.now(datetime.timezone.utc)
+        await db.commit()
+        await db.refresh(db_report)
+        return db_report
     return None
 
 async def update_report_intent_email(db: AsyncSession, report_id: str, email_text: str):
@@ -553,6 +685,85 @@ async def update_report_intent_email(db: AsyncSession, report_id: str, email_tex
             return db_report
         except Exception as e:
             print(f"Error updating intent email: {e}")
+            return None
+    return None
+
+async def update_report_sales_research(db: AsyncSession, report_id: str, blueprint_data: dict, is_manual: bool = True):
+    query = select(ResearchReport).where(ResearchReport.id == report_id)
+    result = await db.execute(query)
+    db_report = result.scalar_one_or_none()
+    if db_report:
+        try:
+            current_report = json.loads(db_report.sales_research_report) if db_report.sales_research_report else {}
+            # Update specific keys from blueprint_data
+            for key, value in blueprint_data.items():
+                current_report[key] = value
+                
+            db_report.sales_research_report = json.dumps(current_report)
+            
+            if is_manual:
+                db_report.is_outreach_edited = True
+                if db_report.outreach_status == 'not_started':
+                    db_report.outreach_status = 'in_progress'
+                    db_report.outreach_started_at = datetime.datetime.now(datetime.timezone.utc)
+            
+            await db.commit()
+            await db.refresh(db_report)
+            return db_report
+        except Exception as e:
+            print(f"Error updating sales research: {e}")
+            return None
+    return None
+
+async def update_report_intent_analysis(db: AsyncSession, report_id: str, intent_data_update: dict, is_manual: bool = True):
+    query = select(ResearchReport).where(ResearchReport.id == report_id)
+    result = await db.execute(query)
+    db_report = result.scalar_one_or_none()
+    if db_report:
+        try:
+            current_intent = json.loads(db_report.intent_analysis) if db_report.intent_analysis else {}
+            for key, value in intent_data_update.items():
+                current_intent[key] = value
+                
+            db_report.intent_analysis = json.dumps(current_intent)
+            
+            if is_manual:
+                db_report.is_outreach_edited = True
+                if db_report.outreach_status == 'not_started':
+                    db_report.outreach_status = 'in_progress'
+                    db_report.outreach_started_at = datetime.datetime.now(datetime.timezone.utc)
+            
+            await db.commit()
+            await db.refresh(db_report)
+            return db_report
+        except Exception as e:
+            print(f"Error updating intent analysis: {e}")
+            return None
+    return None
+
+async def update_report_buyer_journey(db: AsyncSession, report_id: str, journey_data_update: dict, is_manual: bool = True):
+    query = select(ResearchReport).where(ResearchReport.id == report_id)
+    result = await db.execute(query)
+    db_report = result.scalar_one_or_none()
+    if db_report:
+        try:
+            current_journey = json.loads(db_report.buyer_journey_analysis) if db_report.buyer_journey_analysis else {}
+            for key, value in journey_data_update.items():
+                current_journey[key] = value
+                
+            db_report.buyer_journey_analysis = json.dumps(current_journey)
+            
+            if is_manual:
+                db_report.is_outreach_edited = True
+                if db_report.outreach_status == 'not_started':
+                    db_report.outreach_status = 'in_progress'
+                    db_report.outreach_started_at = datetime.datetime.now(datetime.timezone.utc)
+            
+            await db.commit()
+            await db.refresh(db_report)
+            return db_report
+        except Exception as e:
+            print(f"Error updating buyer journey: {e}")
             return None
     return None
 

@@ -11,10 +11,11 @@ spec:
     metadata:
       annotations:
         autoscaling.knative.dev/maxScale: "2"
+        run.googleapis.com/startup-cpu-boost: "true"
         run.googleapis.com/cpu-throttling: false
         run.googleapis.com/execution-environment: gen2
     spec:
-      containerConcurrency: 80
+      containerConcurrency: 30
       timeoutSeconds: 3600
       containers:
         - image: us-central1-docker.pkg.dev/innovize-ai/sales-research/glial-research-backend-image:latest
@@ -24,7 +25,7 @@ spec:
           resources:
             limits:
               cpu: "1000m"
-              memory: "1Gi"
+              memory: "4Gi"
           env:
             - name: ENVIRONMENT
               value: production

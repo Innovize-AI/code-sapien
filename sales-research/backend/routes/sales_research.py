@@ -9,11 +9,9 @@ from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedi
 from db.schemas import ResearchReportCreate
 from utils import add_https_if_missing
 from workflow.state import IdealProfile, InputLeadData
-from workflow.graph import graph, NODE_STATUS_MAPPING
+from workflow.graph import get_graph, NODE_STATUS_MAPPING
 from prompts.sales_prompts import COMPANY_CONTEXT
 from .lead_discovery import LeadDiscoveryInput, find_leads_tavily, find_leads_apollo
-from agents.linkedin_agent import discover_leads_from_keywords
-from services.classification_service import run_classification_and_update
 from utils.activity_helper import log_activity_and_notify
 from pydantic import BaseModel
 from dependencies import get_current_user
@@ -124,6 +122,8 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
         elif input_data.provider == "linkedin_keyword":
             if not input_data.keywords:
                 return {"error": "Keywords are required for this provider."}
+            
+            from agents.linkedin_agent import discover_leads_from_keywords
             leads_data = await discover_leads_from_keywords(input_data.keywords)
             
             # Prepare for DB and Frontend
@@ -169,6 +169,7 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
                      idempotency_key=idempotency_key
                  )
                  
+                 from services.classification_service import run_classification_and_update
                  background_tasks.add_task(run_classification_and_update, raw_leads_to_save)
         else:
             leads = find_leads_tavily(input_data, api_key=tavily_key)

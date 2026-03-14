@@ -9,7 +9,7 @@ from db.crud import save_report, get_report_by_email_or_linkedin
 from db.schemas import ResearchReportCreate
 from utils.activity_helper import log_activity_and_notify
 from workflow.state import IdealProfile, InputLeadData, AgentState
-from workflow.graph import graph, NODE_STATUS_MAPPING
+from workflow.graph import get_graph, NODE_STATUS_MAPPING
 from utils.common import add_https_if_missing
 from prompts.sales_prompts import COMPANY_CONTEXT
 
@@ -393,6 +393,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     final_state = initial_state.copy()
     
     try:
+        graph = get_graph()
         async for update in graph.astream(initial_state, thread, stream_mode="updates"):
             for node_name, state_update in update.items():
                 final_state.update(state_update)

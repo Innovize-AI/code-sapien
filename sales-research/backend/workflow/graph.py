@@ -1,21 +1,9 @@
 import re
-import json
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from workflow.state import AgentState
-from agents.linkedin_agent import get_linkedin_profile, get_linkedin_posts, get_linkedin_engagement, get_linkedin_company_data, linkedin_profile_analyzer
-from agents.website_agent import scrape_webpages, website_analyzer
-from agents.lead_scoring_agent import lead_data_extractor, lead_scorer
-from agents.report_agent import sales_research_report_generator
-from agents.intent_agent import email_history_fetcher_node, email_intent_analyzer_node
-from agents.strategy_agent import pain_point_node, solution_node, outreach_node
-from agents.recommender_agent import strategic_recommender_node
-from agents.follow_up_agent import follow_up_strategy_node
-from agents.cso_agent import narrative_arbitrator_node
-from agents.waterfall_agent import signal_waterfall_node
-from agents.rag_researcher import strategic_rag_researcher_node
-from agents.crm_agent import crm_lookup_node
 
+# --- Helper Functions (Lightweight) ---
 
 def discovery_router(state: AgentState):
     """
@@ -153,112 +141,141 @@ def enrich_website(state: AgentState):
 # nodes moved or integrated into router
 
 
-# Define the graph
-builder = StateGraph(AgentState)
+# --- Lazy Loading Configuration ---
 
-builder.add_node("collector", collector)
+_compiled_graph = None
 
-# LinkedIn Subgraph Nodes
-builder.add_node("linkedin_profile_fetcher", get_linkedin_profile)
-builder.add_node("linkedin_posts_fetcher", get_linkedin_posts)
-builder.add_node("linkedin_engagement_fetcher", get_linkedin_engagement)
-builder.add_node("linkedin_company_fetcher", get_linkedin_company_data)
-builder.add_node("linkedin_profile_analyzer", linkedin_profile_analyzer)
+def get_graph():
+    """
+    Lazy-loads agents and compiles the graph only when needed.
+    This prevents heavy imports from slowing down container startup.
+    """
+    global _compiled_graph
+    if _compiled_graph is not None:
+        return _compiled_graph
 
-# Website Nodes
-builder.add_node("website_scraper", scrape_webpages)
-builder.add_node("website_analyzer", website_analyzer)
+    print("🚀 Initializing Glial Research Graph (Lazy Loading Agents)...")
+    
+    # Deferred heavy imports
+    from agents.linkedin_agent import get_linkedin_profile, get_linkedin_posts, get_linkedin_engagement, get_linkedin_company_data, linkedin_profile_analyzer
+    from agents.website_agent import scrape_webpages, website_analyzer
+    from agents.lead_scoring_agent import lead_data_extractor, lead_scorer
+    from agents.report_agent import sales_research_report_generator
+    from agents.intent_agent import email_history_fetcher_node, email_intent_analyzer_node
+    from agents.strategy_agent import pain_point_node, solution_node, outreach_node
+    from agents.recommender_agent import strategic_recommender_node
+    from agents.follow_up_agent import follow_up_strategy_node
+    from agents.cso_agent import narrative_arbitrator_node
+    from agents.waterfall_agent import signal_waterfall_node
+    from agents.rag_researcher import strategic_rag_researcher_node
+    from agents.crm_agent import crm_lookup_node
 
-# Logic/Bridge Nodes
-builder.add_node("lead_data_extractor", lead_data_extractor, defer=True)
-builder.add_node("lead_scorer", lead_scorer)
+    # Define the graph
+    builder = StateGraph(AgentState)
 
-# Strategic Nodules
-builder.add_node("pain_point_discovery", pain_point_node)
-builder.add_node("strategic_rag_researcher", strategic_rag_researcher_node)
-builder.add_node("solution_mapping", solution_node)
-builder.add_node("outreach_designer", outreach_node)
-builder.add_node("follow_up_designer", follow_up_strategy_node)
-builder.add_node("strategic_recommender", strategic_recommender_node)
-builder.add_node("strategic_merger", strategic_merger, defer=True)
+    builder.add_node("collector", collector)
 
-builder.add_node("report_generator", sales_research_report_generator, defer=True)
-builder.add_node("enrich_linkedin", enrich_linkedin)
-builder.add_node("enrich_website", enrich_website)
-builder.add_node("email_history_fetcher", email_history_fetcher_node)
-builder.add_node("email_intent_analyzer", email_intent_analyzer_node)
-builder.add_node("signal_waterfall", signal_waterfall_node)
-builder.add_node("narrative_arbitrator", narrative_arbitrator_node)
-builder.add_node("crm_lookup", crm_lookup_node)
+    # LinkedIn Subgraph Nodes
+    builder.add_node("linkedin_profile_fetcher", get_linkedin_profile)
+    builder.add_node("linkedin_posts_fetcher", get_linkedin_posts)
+    builder.add_node("linkedin_engagement_fetcher", get_linkedin_engagement)
+    builder.add_node("linkedin_company_fetcher", get_linkedin_company_data)
+    builder.add_node("linkedin_profile_analyzer", linkedin_profile_analyzer)
 
-# Set entry point
-builder.set_entry_point("collector")
+    # Website Nodes
+    builder.add_node("website_scraper", scrape_webpages)
+    builder.add_node("website_analyzer", website_analyzer)
 
-# Add edges
+    # Logic/Bridge Nodes
+    builder.add_node("lead_data_extractor", lead_data_extractor)
+    builder.add_node("lead_scorer", lead_scorer)
 
-# LinkedIn Subgraph flow
-builder.add_edge("linkedin_profile_fetcher", "linkedin_posts_fetcher")
-builder.add_edge("linkedin_posts_fetcher", "linkedin_engagement_fetcher")
-builder.add_edge("linkedin_engagement_fetcher", "linkedin_company_fetcher")
-builder.add_edge("linkedin_company_fetcher", "linkedin_profile_analyzer")
+    # Strategic Nodules
+    builder.add_node("pain_point_discovery", pain_point_node)
+    builder.add_node("strategic_rag_researcher", strategic_rag_researcher_node)
+    builder.add_node("solution_mapping", solution_node)
+    builder.add_node("outreach_designer", outreach_node)
+    builder.add_node("follow_up_designer", follow_up_strategy_node)
+    builder.add_node("strategic_recommender", strategic_recommender_node)
+    builder.add_node("strategic_merger", strategic_merger)
 
-# Enrichment flow
-builder.add_edge("enrich_linkedin", "linkedin_profile_fetcher")
-builder.add_edge("enrich_website", "website_scraper")
+    builder.add_node("report_generator", sales_research_report_generator)
+    builder.add_node("enrich_linkedin", enrich_linkedin)
+    builder.add_node("enrich_website", enrich_website)
+    builder.add_node("email_history_fetcher", email_history_fetcher_node)
+    builder.add_node("email_intent_analyzer", email_intent_analyzer_node)
+    builder.add_node("signal_waterfall", signal_waterfall_node)
+    builder.add_node("narrative_arbitrator", narrative_arbitrator_node)
+    builder.add_node("crm_lookup", crm_lookup_node)
 
-# Cross-functional flows
-builder.add_edge("website_scraper", "website_analyzer")
+    # Set entry point
+    builder.set_entry_point("collector")
 
-# Convergence to Data Extraction
-builder.add_edge("linkedin_profile_analyzer", "lead_data_extractor")
-builder.add_edge("website_analyzer", "lead_data_extractor")
-builder.add_edge("email_history_fetcher", "lead_data_extractor")
-builder.add_edge("crm_lookup", "lead_data_extractor")
+    # Add edges
 
-# Sequential Logic
-builder.add_edge("lead_data_extractor", "lead_scorer")
-builder.add_edge("lead_scorer", "signal_waterfall")
+    # LinkedIn Subgraph flow
+    builder.add_edge("linkedin_profile_fetcher", "linkedin_posts_fetcher")
+    builder.add_edge("linkedin_posts_fetcher", "linkedin_engagement_fetcher")
+    builder.add_edge("linkedin_engagement_fetcher", "linkedin_company_fetcher")
+    builder.add_edge("linkedin_company_fetcher", "linkedin_profile_analyzer")
 
-# Strategic Discovery Branch
-builder.add_conditional_edges("signal_waterfall", discovery_router, {
-    "pain_point_discovery": "pain_point_discovery",
-    "strategic_merger": "strategic_merger"
-})
-builder.add_edge("pain_point_discovery", "strategic_rag_researcher")
-builder.add_edge("strategic_rag_researcher", "solution_mapping")
-builder.add_edge("solution_mapping", "strategic_merger")
+    # Enrichment flow
+    builder.add_edge("enrich_linkedin", "linkedin_profile_fetcher")
+    builder.add_edge("enrich_website", "website_scraper")
 
-# Narrative Arbitrator (CSO) runs BEFORE sub-agents
-builder.add_edge("strategic_merger", "narrative_arbitrator")
+    # Cross-functional flows
+    builder.add_edge("website_scraper", "website_analyzer")
 
-# Guided Parallel Execution
-builder.add_edge("narrative_arbitrator", "strategic_recommender")
-builder.add_edge("narrative_arbitrator", "email_intent_analyzer")
-builder.add_conditional_edges("narrative_arbitrator", strategy_router, {
-    "outreach_designer": "outreach_designer",
-    "follow_up_strategy": "follow_up_designer"
-})
+    # Convergence to Data Extraction
+    builder.add_edge("linkedin_profile_analyzer", "lead_data_extractor")
+    builder.add_edge("website_analyzer", "lead_data_extractor")
+    builder.add_edge("email_history_fetcher", "lead_data_extractor")
+    builder.add_edge("crm_lookup", "lead_data_extractor")
 
-# Convergence to Report
-builder.add_edge("outreach_designer", "report_generator")
-builder.add_edge("follow_up_designer", "report_generator")
-builder.add_edge("strategic_recommender", "report_generator")
-builder.add_edge("email_intent_analyzer", "report_generator")
+    # Sequential Logic
+    builder.add_edge("lead_data_extractor", "lead_scorer")
+    builder.add_edge("lead_scorer", "signal_waterfall")
 
-builder.add_edge("report_generator", END)
+    # Strategic Discovery Branch
+    builder.add_conditional_edges("signal_waterfall", discovery_router, {
+        "pain_point_discovery": "pain_point_discovery",
+        "strategic_merger": "strategic_merger"
+    })
+    builder.add_edge("pain_point_discovery", "strategic_rag_researcher")
+    builder.add_edge("strategic_rag_researcher", "solution_mapping")
+    builder.add_edge("solution_mapping", "strategic_merger")
 
-builder.add_conditional_edges("collector", research_router, {
-    "enrich_linkedin": "enrich_linkedin",
-    "linkedin_profile_fetcher": "linkedin_profile_fetcher",
-    "enrich_website": "enrich_website",
-    "website_scraper": "website_scraper",
-    "email_history_fetcher": "email_history_fetcher",
-    "crm_lookup": "crm_lookup"
-})
+    # Narrative Arbitrator (CSO) runs BEFORE sub-agents
+    builder.add_edge("strategic_merger", "narrative_arbitrator")
 
+    # Guided Parallel Execution
+    builder.add_edge("narrative_arbitrator", "strategic_recommender")
+    builder.add_edge("narrative_arbitrator", "email_intent_analyzer")
+    builder.add_conditional_edges("narrative_arbitrator", strategy_router, {
+        "outreach_designer": "outreach_designer",
+        "follow_up_strategy": "follow_up_designer"
+    })
 
-memory = MemorySaver()
-graph = builder.compile(checkpointer=memory)
+    # Convergence to Report
+    builder.add_edge("outreach_designer", "report_generator")
+    builder.add_edge("follow_up_designer", "report_generator")
+    builder.add_edge("strategic_recommender", "report_generator")
+    builder.add_edge("email_intent_analyzer", "report_generator")
+
+    builder.add_edge("report_generator", END)
+
+    builder.add_conditional_edges("collector", research_router, {
+        "enrich_linkedin": "enrich_linkedin",
+        "linkedin_profile_fetcher": "linkedin_profile_fetcher",
+        "enrich_website": "enrich_website",
+        "website_scraper": "website_scraper",
+        "email_history_fetcher": "email_history_fetcher",
+        "crm_lookup": "crm_lookup"
+    })
+
+    memory = MemorySaver()
+    _compiled_graph = builder.compile(checkpointer=memory)
+    return _compiled_graph
 
 NODE_STATUS_MAPPING = {
     "lead_data_extractor": "Extracting combined lead intelligence...",
@@ -281,4 +298,3 @@ NODE_STATUS_MAPPING = {
     "strategic_recommender": "Determining buyer journey stage & strategy...",
     "crm_lookup": "Matching lead with HubSpot CRM context...",
 }
-

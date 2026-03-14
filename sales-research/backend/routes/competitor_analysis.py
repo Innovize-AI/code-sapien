@@ -3,12 +3,10 @@ from fastapi.responses import StreamingResponse
 from typing import List, Dict, Optional
 import asyncio
 import json
-from agents.linkedin_agent import analyze_competitor_posts, discover_leads_from_competitor, batch_classify_profiles, batch_classify_profiles_async
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db, save_competitor_analysis, upsert_identified_profile, get_identified_profiles, batch_upsert_identified_profiles, count_identified_profiles
 from db.database import SessionLocal
-from services.classification_service import event_manager, run_classification_and_update
 from utils.activity_helper import log_activity_and_notify
 
 competitor_router = APIRouter(tags=['Competitor Analysis'], responses={404: {"description": "Not found"}},)
@@ -123,6 +121,7 @@ async def run_competitor_analysis(input_data: CompetitorInput, db: AsyncSession 
     Endpoint to analyze competitor LinkedIn posts.
     """
     try:
+        from agents.linkedin_agent import analyze_competitor_posts
         report = analyze_competitor_posts(input_data.urls)
         
         # Save to DB
@@ -139,6 +138,7 @@ async def sse_classification(request: Request):
     """
     Server-Sent Events endpoint for classification updates.
     """
+    from services.classification_service import event_manager
     queue = await event_manager.subscribe()
 
     async def event_generator():
@@ -155,6 +155,7 @@ async def sse_classification(request: Request):
         except asyncio.CancelledError:
             pass
         finally:
+            from services.classification_service import event_manager
             await event_manager.unsubscribe(queue)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
@@ -189,6 +190,7 @@ async def discover_leads(
         async def fetch_competitor_leads(url):
             try:
                 # wrapped in to_thread because requests is blocking
+                from agents.linkedin_agent import discover_leads_from_competitor
                 return await asyncio.to_thread(discover_leads_from_competitor, url)
             except Exception as e:
                 print(f"Error fetching leads for {url}: {e}")
@@ -236,6 +238,7 @@ async def discover_leads(
             )
             
         # 2. Trigger Background Classification
+        from services.classification_service import run_classification_and_update
         background_tasks.add_task(run_classification_and_update, raw_leads_to_save)
         
         print(f"DEBUG: Returning {len(all_leads)} leads immediately to frontend.")

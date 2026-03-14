@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from sqlalchemy import select, update
 from db.database import SessionLocal
 from db import crud, batch_upsert_identified_profiles
-from agents.linkedin_agent import discover_leads_from_competitor, discover_leads_from_keywords
 from routes.lead_discovery import find_leads_apollo, LeadDiscoveryInput
 from services.classification_service import run_classification_and_update
 from db.models import AutopilotRule, ScheduledTask
@@ -28,6 +27,7 @@ async def update_single_competitor_task(competitor_id: str):
             logger.info(f"Scanning competitor: {competitor.name} ({competitor.linkedin_url})")
             # discover_leads_from_competitor is synchronous (requests), 
             # so we run it in a thread to keep it non-blocking.
+            from agents.linkedin_agent import discover_leads_from_competitor
             leads = await asyncio.to_thread(discover_leads_from_competitor, competitor.linkedin_url)
             
             if leads:
@@ -80,7 +80,8 @@ async def keyword_discovery_rule_task(rule_id: str):
             logger.info(f"Processing keyword rule: {rule.value}")
             keywords = [rule.value]
             # discover_leads_from_keywords is already async!
-            leads_data = await discover_leads_from_keywords(keywords)
+            from agents.linkedin_agent import discover_leads_from_keywords
+            leads_data = await asyncio.to_thread(discover_leads_from_keywords, keywords) if not asyncio.iscoroutinefunction(discover_leads_from_keywords) else await discover_leads_from_keywords(keywords)
             
             raw_leads_to_save = []
             for l in leads_data:

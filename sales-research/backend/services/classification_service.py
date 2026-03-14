@@ -5,7 +5,6 @@ from sqlalchemy import select
 from db.database import SessionLocal
 from db.models import IdentifiedProfile
 from db import batch_upsert_identified_profiles
-from agents.linkedin_agent import batch_classify_profiles_async
 from utils.activity_helper import log_activity_and_notify
 
 class EventStreamManager:
@@ -112,6 +111,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
             batch = new_profiles_list[i : i + batch_size]
             
             # A. Native Async AI Call
+            from agents.linkedin_agent import batch_classify_profiles_async
             batch_res = await batch_classify_profiles_async(batch)
             
             # B. Identify which leads to update from this batch

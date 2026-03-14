@@ -1,5 +1,4 @@
 from typing import List, Optional
-from langchain_community.tools.tavily_search import TavilySearchResults
 from pydantic import BaseModel, Field
 import os
 from sqlalchemy import select
@@ -7,8 +6,7 @@ from db.models import OrganizationSettings
 from db.database import SessionLocal  # Need a synchronous way or run async
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-# We need to handle async properly if these functions are called from async routes.
-# But for now, let's allow passing keys in, or fetch them inside the router endpoint.
+# --- Construction logic remains same ---
 
 class LeadDiscoveryInput(BaseModel):
     industry: str = Field(..., description="Target industry, e.g., 'FinTech', 'Healthcare'")
@@ -56,6 +54,9 @@ def find_leads_tavily(input_data: LeadDiscoveryInput, api_key: str = None) -> Li
 
     query = generate_search_query(input_data)
     print(f"Executing Search Query: {query}")
+    
+    # Deferred heavy import
+    from langchain_community.tools.tavily_search import TavilySearchResults
     
     # max_results can be adjusted. 5-10 is usually good for a first pass.
     tavily_tool = TavilySearchResults(max_results=5)

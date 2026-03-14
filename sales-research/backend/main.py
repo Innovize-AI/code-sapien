@@ -87,13 +87,17 @@ app.include_router(auth_router, prefix="/api/auth")
 
 @app.on_event("startup")
 async def startup_event():
-    try:
-        from scheduler import start_scheduler
-        start_scheduler()
-    except ImportError:
-        logging.warning("APScheduler not installed. Background automation disabled.")
-    except Exception as e:
-        logging.error(f"Failed to start background scheduler: {e}")
+    if environment == "dev":
+        try:
+            from scheduler import start_scheduler
+            start_scheduler()
+            logging.info("APScheduler started (dev mode).")
+        except ImportError:
+            logging.warning("APScheduler not installed. Background automation disabled.")
+        except Exception as e:
+            logging.error(f"Failed to start background scheduler: {e}")
+    else:
+        logging.info("Running in production/staging. APScheduler disabled (relying on Google Cloud Scheduler).")
 
 
 if __name__ == "__main__":

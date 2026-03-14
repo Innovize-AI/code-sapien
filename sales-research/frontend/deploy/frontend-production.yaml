@@ -3,14 +3,15 @@ kind: Service
 metadata:
   name: glial-research-frontend-service
   annotations:
-    run.googleapis.com/minScale: "1"
+    run.googleapis.com/minScale: "0"
     run.googleapis.com/cpu-throttling: false
     run.googleapis.com/invoker-iam-disabled: true
 spec:
   template:
     metadata:
       annotations:
-        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/maxScale: "2"
+        run.googleapis.com/startup-cpu-boost: "true"
         run.googleapis.com/cpu-throttling: false
     spec:
       containerConcurrency: 80

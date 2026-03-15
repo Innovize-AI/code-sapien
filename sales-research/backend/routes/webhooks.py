@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Body, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db, save_lead_submission, get_db_session
 from db.schemas import LeadSubmissionCreate
-from routes.sales_research import run_single_research
+# run_single_research moved inside process_webhook_lead
 from workflow.state import InputLeadData
 from utils.activity_helper import log_activity_and_notify
 import asyncio
@@ -263,6 +263,7 @@ async def process_webhook_lead(submission_id, email, linkedin_url, extras, rep_i
     )
     
     try:
+        from services.research_service import run_single_research
         result = await run_single_research(
             linkedin_url=linkedin_url,
             email=email,

@@ -1,0 +1,37 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: glial-backend-migrate-production
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    spec:
+      template:
+        spec:
+          containers:
+            - image: us-central1-docker.pkg.dev/innovize-ai/sales-research/glial-research-backend-image:latest
+              command: ["alembic", "upgrade", "head"]
+              env:
+                - name: ENVIRONMENT
+                  value: production
+                - name: DB_SCHEMA
+                  value: public
+                - name: DB_USER
+                  value: "postgres"
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: DB_PASSWORD
+                      key: latest
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: DATABASE_URL
+                      key: latest
+              resources:
+                limits:
+                  cpu: "1000m"
+                  memory: "1Gi"
+          maxRetries: 3
+          timeoutSeconds: 600

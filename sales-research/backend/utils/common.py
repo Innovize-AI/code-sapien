@@ -1,7 +1,7 @@
 from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
-from langchain_community.tools.tavily_search import TavilySearchResults
+# langchain_community import moved inside function
 
 def add_https_if_missing(url):
     if not url:
@@ -19,6 +19,7 @@ def search_web_tavily(query: str):
     """
     Search the web using Tavily.
     """
+    from langchain_community.tools.tavily_search import TavilySearchResults
     tavily_tool = TavilySearchResults(max_results=5)
     try:
         results = tavily_tool.invoke({"query": query})

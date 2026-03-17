@@ -39,7 +39,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
-target_metadata.schema = None  # Ensure migrations never apply hardcoded schemas
+target_metadata.schema = DB_SCHEMA  # Ensure migrations never apply hardcoded schemas
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""

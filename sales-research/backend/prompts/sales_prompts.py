@@ -104,7 +104,14 @@ The ideal_customer profile is present in {content} as json.
 
 4. **Strategic Intent Strength (Outbound) (Discovery Source, Pain Point Depth) - Max 25**:
    - Discovery Source: Was the lead found via a high-value signal (e.g., Competitor Comment, Specific Search)? (Yes: +10 points, No: +0 points)
-    - Strategic Intent Depth: Has a specific, concrete pain point or buyer journey signal been identified? (Specific/Deep: +10 points, Generic: +2 points)
+    - **INTENT SIGNAL (REFINED)**:
+        - **Hand-Raiser (+15)**: Lead is a `hand_raiser` (explicit interest).
+        - **High-Intent Pain (+10)**: Categorized as `prospect_pain` AND the reasoning shows genuine internal practitioner struggle.
+        - **Sophisticated Expert (+5)**: Categorized as `passive_expert` BUT they are a decision-maker at a target company (indicates internal process ownership).
+        - **Sell Signal (0)**: If they are a `strategic_seller` (consultant/competitor trashing keywords or sharing frameworks to promote their own brand).
+        - **Low Signal (0)**: If categorized as `low_signal`.
+    
+    *NOTE: If your calculation exceeds 100 due to bonuses, you MUST cap the total score at exactly 100.*
    - Partner Referral/Lead: Did the lead come through a partner introduction or high-trust referral? (Yes: +5 points, No: +0 points)
     - CRM RELATIONSHIP (URGENT): If crm_context indicates they are a "champion" (past buyer), award +10 points automatically for "Trust Foundation". If they are a "lost_deal", award +5 points for "Historical Context" but note the reason.
     
@@ -119,6 +126,9 @@ The ideal_customer profile is present in {content} as json.
 
 ### CALCULATION RULE (STRICT):
 The `total_score` MUST be the summation of the four categorical scores (Firmographic + Persona + Behavioral + Strategic Intent) MINUS the `negative_penalty`. 
+**The total score MUST be strictly between 0 and 100.** 
+- If the calculation is > 100, cap it at 100.
+- If the calculation is < 0, floor it at 0.
 Example: (20 + 20 + 10 + 10) - 15 = 45.
 
 ### OUTPUT EXPECTATION:
@@ -223,7 +233,7 @@ Propose 2-3 tailored solutions.
 If `lead_segment` is **DIRECT_COMPETITOR**:
 - DO NOT pitch common product features that they already sell.
 - DO pitch **Glial** as the **"Internal Intelligence Infrastructure"** their own GTM team needs to automate deep research and remove the manual bottleneck from their discovery process.
-- Frame the solution as **"Research-as-a-Service (RaaS)"**—positioning {selling_company_name} as a provider of the underlying engine that saves their team thousands of hours of manual profiling.
+- Frame the solution as **"Research-as-a-Service (RaaS)"**, positioning {selling_company_name} as a provider of the underlying engine that saves their team thousands of hours of manual profiling.
 - DO pitch **Unbiased Intelligence** (e.g., "Why using third-party automated profiling provides a more objective lead score than internal gut feeling").
 
 ### CONTEXT RULES (STRICT):
@@ -239,17 +249,17 @@ If `lead_segment` is **DIRECT_COMPETITOR**:
     - If a lead has a technical pain point, solve it by leveraging **intelligence** (e.g., "Finding the exact decision makers who care about X") rather than performing the technical task itself.
 
 4. **LOGICAL GAP MAPPING (CRITICAL)**:
-    - You MUST NOT just pitch a solution. You must first identify the **"Silent Friction"**—the hidden cost of their current state that they might be ignoring (e.g., "While you're scaling SDR volume, you're likely paying a 'GTM Integrity Tax' where reps are burning high-value leads with low-fidelity research").
+    - You MUST NOT just pitch a solution. You must first identify the **"Logical Gap"**. Identify the real-world cost of their current manual process that they might be ignoring (e.g., "While you're scaling SDR volume, your team is likely wasting hours every week on manual research that doesn't actually help them close deals").
     - Frame every solution as the bridge across this specific logical gap.
 
 For each solution, provide:
 1. **The Solution Concept**: The exact product name from our suite or a "Strategic Pivot" move.
 2. **Logical Gap Mapping**: What is the "Silent Friction" or "Internal Bottleneck" that makes this solution necessary?
 3. **Pain Point Alignment**: Which specific problem from the previous phase does this solve?
-4. **The ROI Driver**: Quantify the expected impact.
+4. **The Value Driver**: Explain the expected impact in simple terms.
 
 ### OUTPUT EXPECTATION:
-Deliver a high-stakes Strategic Solution Blueprint in Markdown. Be concise, be powerful, be accurate.
+Deliver a high-stakes Strategic Solution Blueprint in Markdown. Be clear, powerful, and accurate. Use a 7th-grade reading level.
 '''
 
 GLOBAL_STRATEGY_ADVISOR_PROMPT = """
@@ -288,9 +298,9 @@ Generate a high-stakes outreach strategy based on specific signals. You must piv
 
 ### STRATEGIC DIMENSIONS (Pivotal):
 You MUST categorize the prospect into ONE of these 6 Strategic Angles and use the corresponding hook:
-1. **Competitor Conquest**: (Signal: Commented on competitor post). Use a specific 2-4 word "Punchy Quote" from their comment to challenge the status quo. Identify the gap in the competitor's approach that we solve.
+1. **Competitor Conquest**: (Signal: Commented on competitor post). Use a specific 2-4 word "Punchy Quote" from their comment to challenge the status quo. Identify why the competitor's approach might be holding them back and the gap in competitor's approach that we solve.
 2. **Executive Intelligence**: (Signal: Founding/News/Hiring). Link their expansion to a specific **"Narrative Gap"** (e.g., "Scaling revenue without scaling SDR headcount").
-3. **Pain-First Automation**: (Signal: Explicitly mentioned a struggle/keyword). Address the technical cost of the **"Manual Grind"** and the resulting **"GTM Integrity Tax."**
+3. **Pain-First Automation**: (Signal: Explicitly mentioned a struggle/keyword). Address the technical cost of the **"Manual Grind"** and the resulting **"Lost Team Productivity."**
 4. **Agentic Sales Ops**: (Signal: High-value activity). Focus on **"Leverage"** and **"Synthesis"** as the bridge for their team.
 5. **Inbound Intent**: (Signal: High-value page visit). Prescribe an "Optimal Play" based on their journey.
 6. **Competitor Strategic Pivot**: (Signal: `lead_segment` is DIRECT_COMPETITOR). Focus on "Advanced Data Integrity" or "Technical Integration" rather than basic product features. High-level technical dialogue.
@@ -301,15 +311,24 @@ You MUST categorize the prospect into ONE of these 6 Strategic Angles and use th
     - The LinkedIn note is a Handshake, NOT a Pitch or Discovery. 
     - **BANNED**: Asking deep business questions, probing for pain points, or offering "help to scale."
     - **MANDATORY**: Keep it under 250 characters. Focus on a **"Technical Critique"** or **"Peer Validation"** angle. 
-    - **TONE**: Intellectual peer. If it sounds like step 1 of a sales funnel, it is a FAILURE.
+    - **TONE**: Elite GTM Strategist. Intellectual peer. If it sounds like step 1 of a sales funnel, it is a FAILURE.
 3. **GAP SYNTHESIS (THE BODY)**: 
-    - You MUST identify a **"Logical Gap"** between the prospect's current signal and their likely operational bottleneck. 
-    - Show them the **"Silent Cost"** of their current path before offering a solution.
+    - You MUST identify a **"Logical Gap"** between the prospect's current signal and their likely operational struggle. 
+    - Show them the **"Silent Cost"** of their current path before offering a solution. Step into their shoes. What is making their life harder right now?
 4. **SIGNAL QUOTING**: You MUST use a direct quote or a highly specific concept from their `engagements`. (e.g., Instead of "your insights on AI," use "your take on 'AI as a productivity tax'").
 5. **NO FILLER VALUE**: BANNED phrases: "Leverage AI for strategic growth," "Operational efficiency," "Strategic alignment," "Drive innovation," "Unlock potential," "Transform your business."
-6. **AUTHORITY-FIRST CTA**: Never ask "can we chat?". Ask for validation: "Would love to get your 'Founding CEO' perspective on our synthesis logic."
-7. **THE "NARRATIVE OF OPPORTUNITY"**: Treat the outreach as if you are sharing a missed intelligence signal, not trying to sell a tool.
-8. **STRICT PRODUCT GROUNDING (CRITICAL)**:
+6. **AUTHORITY-FIRST CTA**: Never ask "can we chat?". Ask for validation: e.g: "Would love to get your 'Founding CEO' perspective on our research logic."
+7. **THE "NARRATIVE OF OPPORTUNITY"**: Treat the outreach as if you are sharing a missed signal, not trying to sell a tool.
+8. **LANGUAGE & TONE (CRITICAL)**:
+    - **7th-Grade Level**: Use clear, simple, and direct language. No complex metaphors or corporate jargon.
+    - **NO EM DASHES**: BANNED character: `—` (em dash). Use commas, periods, or colons instead.
+    - **Weighted Tone**: Be professional, calm, and expert. Avoid over-eager or "cowboy" energy.
+    - **Prospect-Centric**: The message is about THEM and THEIR needs. Avoid starting sentences with "I" or "We" where possible.
+    - **SKEPTICISM DEFUSING (CRITICAL)**: 
+        - If the lead is categorized as `strategic_seller` and `is_fit` is TRUE (e.g. a potential partner or non-direct competitor), acknowledge their "better way" first.
+        - If the intent is `prospect_pain`, you MUST open with **Shared Empathy**. Validate their frustration immediately (e.g., "You're right to be skeptical about...").
+        - If the intent is `passive_expert`, focus on **Peer Validation**. Quote a specific concept from their framework.
+9. **STRICT PRODUCT GROUNDING (CRITICAL)**:
     - You MUST NOT invent technical capabilities.
     - **Glial** is a **Revenue Intelligence & Prospect Research Engine**. 
     - It automates **Lead Discovery** and **Deep Prospect Profiling**.
@@ -394,6 +413,7 @@ A sales rep is about to read this. They don't need a summary of the labels you'v
    - Refine the "Hook" to connect the lead's own public theories (e.g., 'AI Teammates') to their internal operational gaps.
 6. **Advanced Next Steps (Unified Strategy)**:
    - Create a 3-5 step high-level strategy that synthesizes EVERYTHING.
+   - **TOPIC-SPECIFIC NEXT STEPS**: If `post_topic_depth` is `sharing_framework` or `tool_showcase`, suggest a **Technical Validation** move (e.g., "Rep should ask a clarifying question about their framework in the comments").
 6. **Internal Advisory**: Provide 2 "Insider Tips" for the rep.
 
 ### EXECUTION GUIDELINES:
@@ -420,7 +440,7 @@ COMPANY_CONTEXT = '''
         - **Data & Research Agents**: Provide predictive modeling, web scraping, and document synthesis.
     3. **AI Consulting & 9-Phase Framework**: We provide Strategic Roadmaps and Feasibility Assessments to ensure a guaranteed ROI within 90 days.
     
-    Our proprietary "TRUST Framework" ensures 90%+ user adoption of AI tools within 30 days. We focus on human-AI collaboration—amplifying human productivity rather than replacing it.
+    Our proprietary "TRUST Framework" ensures 90%+ user adoption of AI tools within 30 days. We focus on human-AI collaboration. We aim to amplify human productivity rather than replace it.
 '''
 
 
@@ -504,6 +524,27 @@ Profiles to Analyze:
     - **Pain Point (Poster/Commenter)**: Complaining about manual work, poor ROI, or technical bottlenecks.
     - **Thought Leadership (Poster)**: If they are posting high-value content but not expressing a specific need yet, mark as 'low_intent' or 'curious' but 'is_fit' if they match the ICP.
 
+### SIGNAL CATEGORIZATION (post_topic_depth):
+You MUST determine the EXACT nature of the post or comment:
+- `sharing_framework`: Sharing a technical/strategic framework or SOP.
+- `tool_showcase`: Showing a specific tool or automation they built.
+- `complaining_keywords`: Explicitly complaining about specific tools or industry keywords (e.g., "AI hype", "manual CRM entry").
+- `industry_synthesis`: Connecting multiple trends or signals into a strategic view.
+- `discovery_friction`: Specifically mentioning struggle with finding leads or data.
+- `generic_engagement`: Liking or short positive comments without specific depth.
+
+### THE SELLER VS BUYER HEURISTIC (CRITICAL):
+You MUST distinguish if the engagement is a "Sell Signal" or a "Buy Signal":
+1. **STRATEGIC SELLER (Low Lead Intent)**: 
+    - Person is a solo consultant, agency owner, or employee at a competitor.
+    - **Self-Serving Trashing**: They are complaining about a keyword/tool to promote their own "better way".
+    - **Framework Bait**: Sharing a framework to attract their own leads.
+    - Mark `intent` as `strategic_seller`.
+2. **BUY SIGNAL (High/Med Lead Intent)**: 
+    - Person is a practitioner (VP Sales, Head of Ops) at a target company.
+    - **Genuine Friction**: Complaint about a technical bottleneck they face. Mark `intent` as `prospect_pain`.
+    - **Expert Sharing**: Sharing an internal framework they actually use. Mark `intent` as `passive_expert`.
+
 ### CLASSIFICATION CRITERIA (STRICT):
 1. **is_competitor**: (boolean) Does the profile belong to someone at a rival AI/Automation company?
 2. **is_fit**: (boolean) ONLY mark as TRUE if they are a **High-Priority Target**. 
@@ -511,15 +552,17 @@ Profiles to Analyze:
    - If they are a generic employee or at a non-target industry, mark as FALSE.
 3. **is_decision_maker**: (boolean) C-Level, VP, Director, Founder, or Head of Department.
 4. **intent**: (string)
-    - 'interested': Explicitly asking for price, demo, or info.
-    - 'pain_point': Expressing frustration with current tools or manual work.
-    - 'curious': Generic positive engagement or sharing relevant expertise.
-    - 'competitor': They are a competitor.
-    - 'low_intent': Just liking, generic comments, or general industry updates.
+    - `hand_raiser`: Explicitly asking for price, demo, or more info.
+    - `prospect_pain`: Practitioner expressing frustration with current tools or manual work.
+    - `passive_expert`: Practitioner sharing relevant expertise or frameworks (Authority Signal).
+    - `strategic_seller`: Consultant/Competitor trashing keywords or sharing frameworks for self-promotion.
+    - `low_signal`: Generic positive engagement (likes, "great post") or irrelevant profiles.
 5. **sentiment**: (positive, neutral, negative).
 
 ### FOCUS ON REASONING:
-Explain WHY they are a fit. Distinguish if they are a **High-Intent Commenter** or a **Strategic Poster**. Reference their specific comment or post context to justify your intent mapping.
+Explain WHY they are a fit. Distinguish if they are a **High-Intent Commenter** or a **Strategic Poster**. 
+You MUST answer: **What exactly is the post about?** 
+Reference their specific comment or post context to justify your intent and `post_topic_depth` mapping.
 
 Output strictly in JSON format as a list of objects:
 {{
@@ -529,8 +572,9 @@ Output strictly in JSON format as a list of objects:
       "is_competitor": boolean,
       "is_fit": boolean,
       "is_decision_maker": boolean,
-      "reasoning": "Brief explanation focused on ICP alignment, lead mode (poster vs commenter), and intent signals.",
-      "intent": "string (interested, pain_point, curious, competitor, or low_intent)",
+      "reasoning": "Brief explanation focused on ICP alignment, lead mode (poster vs commenter), and intent signals. Answer: what exactly is the post about?",
+      "intent": "string (hand_raiser, prospect_pain, passive_expert, strategic_seller, or low_signal)",
+      "post_topic_depth": "string (sharing_framework, tool_showcase, complaining_keywords, industry_synthesis, discovery_friction, generic_engagement)",
       "sentiment": "string (positive, neutral, negative)"
     }},
     ...

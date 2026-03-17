@@ -19,7 +19,15 @@ def build_hot_lead_blocks(
     Builds a Slack Block Kit message for a Potential Lead discovery.
     """
     if not title:
-        status_emoji = "🔥" if intent == "interested" else "🚨" if intent == "pain_point" else "👀"
+        # Define emojis for new intent mapping
+        emoji_map = {
+            "hand_raiser": "🔥",
+            "prospect_pain": "🚨",
+            "passive_expert": "🧠",
+            "strategic_seller": "🗣️",
+            "low_signal": "👀"
+        }
+        status_emoji = emoji_map.get(intent, "👀")
         title = f"{status_emoji} *Potential Opportunity: {name}*"
     
     blocks = [

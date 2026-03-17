@@ -1,4 +1,4 @@
-from langchain_community.document_loaders import WebBaseLoader
+# langchain_community import moved inside function
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
 from prompts.sales_prompts import WEBSITE_ANALYZER_PROMPT
@@ -26,7 +26,8 @@ def scrape_webpages(state: AgentState) -> dict:
     
     if not website:
         return {"scraped_website_content": "Could not scrape empty website"}
-
+    
+    from langchain_community.document_loaders import WebBaseLoader
     loader = WebBaseLoader(website)
     docs = loader.load()
     scraped_content = "\n\n".join([doc.page_content for doc in docs])

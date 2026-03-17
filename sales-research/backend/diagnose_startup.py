@@ -1,50 +1,55 @@
 import time
-import os
 import sys
+import os
 
-def benchmark_startup():
-    print("--- ⏱️ Glial Backend Startup Diagnostic ---")
+# Set environment to dev for measurement consistency
+os.environ["ENVIRONMENT"] = "dev"
+
+def check_startup():
+    print("--- ⏱️ Glial Backend Comprehensive Startup Diagnostic ---")
     
-    # 1. Measure pure import time of FastAPI app
     start_time = time.time()
+    
+    # Track which modules are already loaded (should be minimal)
+    initial_modules = set(sys.modules.keys())
     
     try:
         from main import app
         end_time = time.time()
-        import_duration = end_time - start_time
+        duration = end_time - start_time
         
-        print(f"✅ Fast API initialized in: {import_duration:.2f} seconds")
+        print(f"✅ Fast API initialized in: {duration:.2f} seconds")
         
-        # 2. Check for "Import Avalanches"
-        # Since we use lazy loading, these should NOT be in sys.modules yet
-        heavy_modules = [
-            'agents.linkedin_agent',
-            'agents.website_agent',
-            'agents.lead_scoring_agent',
-            'workflow.graph'
+        # Check for "leak" candidates
+        leaks = []
+        heavy_packages = [
+            'langchain', 
+            'langchain_openai', 
+            'langchain_community', 
+            'langgraph', 
+            'pinecone',
+            'openai',
+            'agents.linkedin_agent'
         ]
         
-        avalanches = [m for m in heavy_modules if m in sys.modules]
+        for pkg in heavy_packages:
+            if pkg in sys.modules:
+                leaks.append(pkg)
         
-        if not avalanches:
-            print("✅ Success: No heavy agent modules were loaded during startup.")
-            print("🚀 Result: Your cold start will be extremely fast.")
-        else:
+        if leaks:
             print("⚠️ Warning: Some modules were loaded prematurely:")
-            for m in avalanches:
-                print(f"   - {m}")
+            for leak in leaks:
+                print(f"   - {leak}")
+        else:
+            print("✨ Pure Startup: No heavy modules loaded at top-level!")
+
+        # Predict Cloud Run time (usually ~2s overhead for infra + migrations)
+        print(f"\n📈 Predicted Cloud Run Cold Start: ~{duration + 2.0:.2f}s")
         
-        # 3. Predict Cloud Run Readiness
-        # Container is "Ready" once FastAPI is initialized. 
-        # Cloud Run adds ~2s for infrastructure setup.
-        predicted_cold_start = import_duration + 2.0
-        print(f"\n📈 Predicted Cloud Run Cold Start: ~{predicted_cold_start:.2f}s")
-        
-    except ImportError as e:
-        print(f"❌ Error: Missing dependencies to run diagnostic: {e}")
-        print("💡 Run this inside your virtual environment (e.g., source venv/bin/activate)")
     except Exception as e:
-        print(f"❌ Unexpected error during benchmark: {e}")
+        print(f"❌ Startup Failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
-    benchmark_startup()
+    check_startup()

@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from db.database import get_db
 from db.models import UserSettings
-from services.research_service import run_single_research
 import httpx
 
 slack_interactions_router = APIRouter(tags=['Slack Interactions'], responses={404: {"description": "Not found"}},)
@@ -60,7 +59,8 @@ async def handle_slack_interactions(
                     replace_original=False
                 )
             
-            # 2. Start research in background
+            # 2. Start research in background (Deferred heavy import)
+            from services.research_service import run_single_research
             background_tasks.add_task(run_single_research, linkedin_url=linkedin_url, user_id=internal_user_id)
         
         elif action_id == "ignore_lead":

@@ -1,16 +1,28 @@
-from typing import List, Dict, Any
-from langchain_openai import ChatOpenAI
-from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from skills.rag_skills import RAG_SKILLS
+import os
 import json
-from models.gemini_models import get_gemini_model
-from langchain_core.messages import SystemMessage, HumanMessage
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from services.knowledge_service import KnowledgeService
 
 # Global service instance (or instantiate within node)
 knowledge_service = KnowledgeService(index_name="glial-index")
+
+PIVOT_VALIADTION_PROMPT = """
+You are a strict qualification agent. You only approve leads that are a clear fit.
+Your task is to analyze if the prospect company is a good fit for the strategic pivot product based on the provided context.
+
+### PRODUCT QUALIFICATION CONTEXT (INTERNAL):
+{rag_context}
+
+### PROSPECT COMPANY PROFILE:
+{profile_context}
+
+### STRATEGIC PIVOT OFFER:
+{pivot_offer}
+
+Is this a high-potential fit? Return a boolean (is_fit) and clear reasoning based on the qualification context above.
+{format_instructions}
+"""
 
 class PivotFitCheck(BaseModel):
     is_fit: bool = Field(description="True if the company is a strong fit for the strategic pivot product.")
@@ -71,30 +83,40 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
             k=1
         )
 
-    prompt = f"""
-    Analyze if this company is a good fit for the product '{product_name}'.
+    # LLM Setup (Deferred imports)
+    from langchain_openai import ChatOpenAI
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import PromptTemplate
+
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
     
-    ### PRODUCT QUALIFICATION CONTEXT (INTERNAL):
-    {qualification_context if qualification_context.strip() else f"Standard qualification for {product_name}."}
-    
-    ### PROSPECT COMPANY PROFILE:
+    parser = JsonOutputParser(pydantic_object=PivotFitCheck)
+
+    prompt = PromptTemplate(
+        template=PIVOT_VALIADTION_PROMPT,
+        input_variables=["profile_context", "pivot_offer", "rag_context"],
+        partial_variables={"format_instructions": parser.get_format_instructions()},
+    )
+
+    chain = prompt | llm | parser
+
+    profile_context_str = f"""
     - Industry: {industry}
     - Description: {company_desc}
     - Size: {company_size}
-    
-    Target Roles: {target_roles} (Role matched: {job_title})
-    
-    Is this a high-potential fit? Return boolean and clear reasoning based on the qualification context above.
     """
     
+    pivot_offer_str = f"""
+    Product Name: {product_name}
+    Target Roles: {target_roles} (Role matched: {job_title})
+    """
+
     try:
-        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
-        structured_llm = model.with_structured_output(PivotFitCheck)
-        messages = [
-            SystemMessage(content="You are a strict qualification agent. You only approve leads that are a clear fit."),
-            HumanMessage(content=prompt)
-        ]
-        result = await structured_llm.ainvoke(messages)
+        result = await chain.ainvoke({
+            "profile_context": profile_context_str,
+            "pivot_offer": pivot_offer_str,
+            "rag_context": qualification_context if qualification_context.strip() else f"Standard qualification for {product_name}."
+        })
         return result
     except Exception as e:
         print(f"Error in verification: {e}")
@@ -104,6 +126,11 @@ def create_strategic_rag_agent():
     """
     Creates an autonomous researcher agent with specialized sales intelligence skills.
     """
+    from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+    from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+    from models.gemini_models import get_gemini_model
+    from skills.rag_skills import RAG_SKILLS
+
     llm = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
     
     prompt = ChatPromptTemplate.from_messages([
@@ -149,10 +176,6 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
     2. Specific playbook snippets or case studies you found.
     3. Verified feasibility and ROI metrics.
     """
-    
-    executor = create_strategic_rag_agent()
-    # Fill in the prompt variables via the input or by partially formatting the prompt
-    # Since prompt is inside create_strategic_rag_agent, I'll update that helper.
     
     pivot_fit_result = False
     pivot_name = ""

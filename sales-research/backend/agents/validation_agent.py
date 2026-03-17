@@ -5,8 +5,6 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from workflow.state import AgentState
 from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
 import json
 import re
 
@@ -188,21 +186,27 @@ def cross_validate_data(state: AgentState) -> Dict[str, Any]:
     Cross-validates data between different sources
     Identifies inconsistencies and conflicts
     """
+    # LLM Setup (Deferred imports)
+    from langchain_openai import ChatOpenAI
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import PromptTemplate
+    from langchain_core.messages import SystemMessage, HumanMessage
+
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     
     # Gather data from different sources
     linkedin_data = state.get("user_profile_details", {})
     website_analysis = state.get("website_analysis", {})
     email_history = state.get("email_history", [])
-    
-    validation_prompt = f"""
+
+    # Define the prompt template
+    VALIDATION_PROMPT = """
     Cross-validate the following data sources for consistency:
     
     LinkedIn Profile:
-    {json.dumps(linkedin_data, indent=2)[:1000]}
+    {profile_context}
     
     Website Analysis:
-    {json.dumps(website_analysis, indent=2)[:1000]}
     
     Email History Count: {len(email_history)}
     

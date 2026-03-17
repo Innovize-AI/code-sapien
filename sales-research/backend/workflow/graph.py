@@ -1,6 +1,4 @@
 import re
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
 from workflow.state import AgentState
 
 # --- Helper Functions (Lightweight) ---
@@ -157,6 +155,9 @@ def get_graph():
     print("🚀 Initializing Glial Research Graph (Lazy Loading Agents)...")
     
     # Deferred heavy imports
+    from langgraph.graph import StateGraph, START, END
+    from langgraph.checkpoint.memory import MemorySaver
+    
     from agents.linkedin_agent import get_linkedin_profile, get_linkedin_posts, get_linkedin_engagement, get_linkedin_company_data, linkedin_profile_analyzer
     from agents.website_agent import scrape_webpages, website_analyzer
     from agents.lead_scoring_agent import lead_data_extractor, lead_scorer

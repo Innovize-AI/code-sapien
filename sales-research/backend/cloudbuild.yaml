@@ -13,7 +13,25 @@ steps:
           --file-output=artifacts.json \
           -f skaffold.yaml
 
-  # 2. Create Cloud Deploy Release
+  # 2. Deploy and Run Migration Job (Staging)
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: run-migrations-staging
+    dir: "sales-research/backend"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        # Get the image with SHA from skaffold output
+        IMAGE_WITH_SHA=$$(jq -r '.builds[0].tag' artifacts.json)
+
+        # Replace image in Job manifest and deploy job
+        sed -i "s|image:.*|image: $${IMAGE_WITH_SHA}|" deploy/migration-job-staging.yaml
+        gcloud run jobs replace deploy/migration-job-staging.yaml --region=us-central1
+
+        # Execute the job
+        gcloud run jobs execute glial-backend-migrate-staging --region=us-central1 --wait
+
+  # 3. Create Cloud Deploy Release
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: trigger-deploy
     dir: "sales-research/backend"

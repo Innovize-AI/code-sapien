@@ -32,8 +32,9 @@ async def get_namespaces(current_user: Profile = Depends(get_current_user)):
     """
     Returns a list of available namespaces in the Knowledge Base with real counts.
     """
+    ks = get_knowledge_service()
     try:
-        stats = knowledge_service.get_index_stats()
+        stats = ks.get_index_stats()
         namespaces_stats = stats.get("namespaces", {})
         
         # Mapping names to friendly descriptions
@@ -93,6 +94,7 @@ async def ingest_file(request: IngestRequest, admin_user: Profile = Depends(requ
     """
     Ingests a specific file into a namespace.
     """
+    ks = get_knowledge_service()
     try:
         if request.file_path:
             # Ensure path is absolute or relative to project root
@@ -100,7 +102,7 @@ async def ingest_file(request: IngestRequest, admin_user: Profile = Depends(requ
             if not os.path.isabs(full_path):
                 full_path = os.path.join(os.getcwd(), full_path)
             
-            num_chunks = knowledge_service.ingest_markdown_file(
+            num_chunks = ks.ingest_markdown_file(
                 full_path, 
                 request.namespace, 
                 request.metadata
@@ -127,6 +129,7 @@ async def sync_defaults(background_tasks: BackgroundTasks, admin_user: Profile =
     files = [f for f in os.listdir(base_dir) if f.endswith(".md")]
     
     def process_sync():
+        ks = get_knowledge_service()
         for filename in files:
             path = os.path.join(base_dir, filename)
             # Route to namespaces based on filename
@@ -137,7 +140,7 @@ async def sync_defaults(background_tasks: BackgroundTasks, admin_user: Profile =
                 namespace = "solutions"
             
             try:
-                knowledge_service.ingest_markdown_file(path, namespace)
+                ks.ingest_markdown_file(path, namespace)
             except Exception as e:
                 print(f"Failed to ingest {filename}: {e}")
 
@@ -167,7 +170,8 @@ async def upload_knowledge_file(
             shutil.copyfileobj(file.file, buffer)
             
         # 2. Ingest
-        num_chunks = knowledge_service.ingest_markdown_file(file_path, namespace)
+        ks = get_knowledge_service()
+        num_chunks = ks.ingest_markdown_file(file_path, namespace)
         
         return {
             "status": "success", 

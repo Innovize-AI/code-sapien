@@ -1,23 +1,39 @@
 import os
 import logging
 from typing import List, Optional
-from langchain_openai import OpenAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
-from pinecone import Pinecone
-from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
-from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
 class KnowledgeService:
     def __init__(self, index_name: str = "sales-intelligence"):
-        self.pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-        # Match glial-index 1536 dimensions
-        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=1536)
+        # Deferred heavy imports inside initialization or methods
         self.index_name = index_name
-        self.index = self.pc.Index(self.index_name)
+        self._pc = None
+        self._embeddings = None
+        self._index = None
+
+    @property
+    def pc(self):
+        if self._pc is None:
+            from pinecone import Pinecone
+            self._pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+        return self._pc
+
+    @property
+    def embeddings(self):
+        if self._embeddings is None:
+            from langchain_openai import OpenAIEmbeddings
+            self._embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=1536)
+        return self._embeddings
+
+    @property
+    def index(self):
+        if self._index is None:
+            self._index = self.pc.Index(self.index_name)
+        return self._index
         
     def _get_vectorstore(self, namespace: str):
+        from langchain_pinecone import PineconeVectorStore
         return PineconeVectorStore(
             index=self.index,
             embedding=self.embeddings,
@@ -31,6 +47,8 @@ class KnowledgeService:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File {file_path} not found.")
 
+        from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+        
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
@@ -44,7 +62,6 @@ class KnowledgeService:
         md_header_splits = markdown_splitter.split_text(content)
 
         # Further split if chunks are too large, but increase size to keep tables intact
-        # Using a larger chunk size for tables to avoid breaking row structures
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, 
             chunk_overlap=100,

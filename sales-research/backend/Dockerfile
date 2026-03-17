@@ -43,5 +43,5 @@ EXPOSE 8080
 # Build path to ensure modules are found
 ENV PYTHONPATH=/app
 
-# Run migrations and start application
-CMD sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8080"
+# Start application (Alembic removed to prevent startup delay)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

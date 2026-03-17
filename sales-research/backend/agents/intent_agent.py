@@ -1,8 +1,5 @@
 import json
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_openai import ChatOpenAI
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import PromptTemplate
+# langchain imports moved inside functions
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from sqlalchemy import select
@@ -45,7 +42,11 @@ def analyze_email_intent(email_history: List[Dict[str, Any]]) -> Dict[str, Any]:
         
         conversation_text += f"---\n[{direction}] From: {sender}\nSubject: {subject}\nBody: {body}\n\n"
 
-    # LLM Setup
+    # LLM Setup (Deferred imports)
+    from langchain_openai import ChatOpenAI
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import PromptTemplate
+
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
     
     parser = JsonOutputParser(pydantic_object=IntentAnalysisResult)

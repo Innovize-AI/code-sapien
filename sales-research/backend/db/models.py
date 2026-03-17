@@ -202,6 +202,7 @@ class IdentifiedProfile(Base):
     is_decision_maker = Column(Boolean, default=False)
     fit_reasoning = Column(Text, nullable=True)
     intent = Column(String, nullable=True) # 'interested', 'pain_point', 'curious'
+    post_topic_depth = Column(String, nullable=True)
     sentiment = Column(String, nullable=True) # 'positive', 'neutral', 'negative'
 
     # Aggregated Data

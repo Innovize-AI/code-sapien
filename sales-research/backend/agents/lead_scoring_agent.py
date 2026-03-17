@@ -113,8 +113,8 @@ def lead_scorer(state: AgentState):
             breakdown.strategic_intent.score
         ) - response.negative_penalty
         
-        # Ensure floor of 0
-        calculated_total = max(0, calculated_total)
+        # Ensure floor of 0 and cap of 100
+        calculated_total = max(0, min(100, calculated_total))
         
         if response.total_score != calculated_total:
             logger.warning(f"Fixing LLM lead score math: LLM said {response.total_score}, Calculated {calculated_total}")

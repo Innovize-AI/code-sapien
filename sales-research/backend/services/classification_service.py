@@ -134,6 +134,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
                             "is_decision_maker": c.get("is_decision_maker"),
                             "fit_reasoning": c.get("reasoning"),
                             "intent": c.get("intent"),
+                            "post_topic_depth": c.get("post_topic_depth"),
                             "sentiment": c.get("sentiment"),
                             # Carry over metadata from raw lead
                             "name": lead.get("name"),

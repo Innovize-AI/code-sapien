@@ -28,7 +28,8 @@ ZERO TOLERANCE: Never use generic product terms. Use ONLY the validated product 
 ### THE STRATEGIC HANDSHAKE (LINKEDIN RULE):
 - **refined_linkedin_message** MUST be strictly under 250 characters.
 - It must be a **Handshake**, not a Pitch. No "helping to scale," no discovery questions, no sales jargon.
-- Use a **"Technical Critique"** or **"Peer Validation"** angle. disarm the prospect by acknowledging the status quo. 
+- Use a **"Technical Critique"** or **"Peer Validation"** angle. Disarm the prospect by acknowledging how their current manual work might be holding them back. 
+- **LANGUAGE**: Use a 7th-grade reading level. No complex metaphors. Focus on the prospect's needs.
 """
 
 def narrative_arbitrator_node(state: AgentState):
@@ -75,7 +76,7 @@ def narrative_arbitrator_node(state: AgentState):
 
     YOUR MISSION (Surgical Strategy & Evidence Selection):
     1. **VIABILITY CHECK (CRITICAL)**: Analyze the `Lead Score Analysis`. If the score is low (<50) or the `fit_assessment` from other agents suggests a "Poor Fit", your verdict MUST account for this. Do NOT blindly issue a "Green Light" if the data says "STOP".
-    2. **IDENTIFY LOGICAL GAPS**: For a "Good Fit", identify the **"Logical Gap"** or **"Silent Friction"** (e.g., GTM Integrity Tax) between their current activities and their strategic goals. 
+    2. **IDENTIFY LOGICAL GAPS**: For a "Good Fit", identify the **"Logical Gap"** or **"Silent Friction"** (e.g., lost productivity due to manual research) between their current activities and their goals. 
     3. STRATEGIZE: Based on the Lead Intelligence and Strategic Playbooks, determine the winning Narrative of Opportunity (OR Disqualification Reason).
     4. SELECT FRAMEWORK: Choose the optimal Messaging Framework (AIDA, PAS, BAB) from the playbooks. Explicitly explain WHY this framework fits the lead's persona (e.g., 'Skeptical technical buyers need PAS to validate pain first').
     5. IDENTIFY PROOF: From the "STRATEGIC PLAYBOOKS", identify 1-2 powerful "Proof Points".
@@ -84,6 +85,7 @@ def narrative_arbitrator_node(state: AgentState):
     8. **SCORE CITATION**: In your `strategic_reasoning`, you MUST explicitly cite the 'Total Lead Score' and the key drivers (e.g., 'High Demographic Fit', 'Low Engagement') that led to your verdict.
     9. EXTRACT PROOFS: List the underlying specific insights used in `strategic_proof_points`.
     10. GUIDANCE: Provide the `refined_linkedin_message` and `refined_email_body` as STRATEGIC BLUEPRINTS. Use the **Strategic Handshake** (LinkedIn) and **Logical Gap Body** (Email) rules.
+    11. **WEIGHTED TONE**: Ensure the final output is professional, calm, and focused on the prospect's needs. Use a 7th-grade reading level.
     """
 
     messages = [

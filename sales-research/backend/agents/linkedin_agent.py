@@ -24,7 +24,8 @@ class ProfileClassificationResult(BaseModel):
     is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
     reasoning: str = Field(description="Brief explanation of the classification.")
-    intent: Optional[str] = Field(None, description="The person's intent (interested, pain_point, curious, competitor)")
+    intent: Optional[str] = Field(None, description="The person's localized intent (hand_raiser, prospect_pain, passive_expert, strategic_seller, low_signal)")
+    post_topic_depth: Optional[str] = Field(None, description="Detailed nature of the post: sharing_framework, tool_showcase, complaining_keywords, industry_synthesis, etc.")
     sentiment: Optional[str] = Field(None, description="The sentiment of their interaction (positive, neutral, negative)")
 
 class BatchProfileClassification(BaseModel):
@@ -73,6 +74,7 @@ def batch_classify_profiles(profiles: List[Dict]):
                     "is_decision_maker": res.is_decision_maker,
                     "reasoning": res.reasoning,
                     "intent": res.intent,
+                    "post_topic_depth": res.post_topic_depth,
                     "sentiment": res.sentiment
                 }
                 
@@ -717,6 +719,7 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
                     "is_decision_maker": item.is_decision_maker,
                     "reasoning": item.reasoning,
                     "intent": item.intent,
+                    "post_topic_depth": item.post_topic_depth,
                     "sentiment": item.sentiment
                 }
                 

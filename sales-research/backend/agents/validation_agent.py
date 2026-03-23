@@ -152,7 +152,7 @@ def validate_lead_scoring(state: AgentState) -> Dict[str, Any]:
         return {"lead_scoring_validation": validation.model_dump()}
     
     # Validate score range
-    score_value = lead_score.get("score", 0)
+    score_value = lead_score.get("total_score", 0)
     if not (0 <= score_value <= 100):
         validation.is_valid = False
         validation.issues.append(f"Invalid score range: {score_value}")

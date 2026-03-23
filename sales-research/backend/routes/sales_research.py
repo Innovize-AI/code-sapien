@@ -153,6 +153,7 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
             # Upsert and trigger background task
             if raw_leads_to_save:
                  await batch_upsert_identified_profiles(db, raw_leads_to_save)
+                 await db.commit()
                  
                  # Log Activity: Keyword Discovery
                  import hashlib
@@ -191,6 +192,26 @@ async def run_research(
 
         final_state = {}
         try:
+            # Check for existing before streaming
+            from db.crud import get_report_by_email_or_linkedin, _report_to_dict
+            
+            # High intent signals bypass skipping
+            is_high_intent = any([
+                options.refresh,
+                options.trigger_context,
+                options.demo_requested,
+                options.download_marketing_material,
+                options.referral_partner_introduction,
+                options.discovery_source == 'form_fill'
+            ])
+
+            if not is_high_intent:
+                existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
+                if existing:
+                    print(f"DEBUG: Found existing report for {linkedin_url or email}. skipping research (low intent streaming).")
+                    yield f"data: {json.dumps({'status': 'Done', 'result': _report_to_dict(existing)})}\n\n"
+                    return
+
             async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):
                 final_state = current_state
                 message = NODE_STATUS_MAPPING.get(node_name, f"Processing {node_name}...")
@@ -240,6 +261,8 @@ async def run_bulk_research(
             lead_url = input_data.leads[i].url
             if isinstance(res, Exception):
                 processed_results.append({"linkedin_url": lead_url, "error": str(res)})
+            elif not res:
+                processed_results.append({"linkedin_url": lead_url, "error": "Task failed silently without returning a result."})
             else:
                 processed_results.append(res)
         

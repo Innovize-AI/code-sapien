@@ -9,11 +9,15 @@ class ResearchReportBase(BaseModel):
     website: Optional[str] = None
     fullname: Optional[str] = None
     profile_picture_url: Optional[str] = None
-
+    
+    # Redundant
     company_name: Optional[str] = None
     company_description: Optional[str] = None
-    company_industries: Optional[str] = None # JSON string
-    company_stats: Optional[str] = None      # JSON string
+    company_industries: Optional[str] = None
+    company_stats: Optional[str] = None
+
+    # Normalized Relation
+    company_id: Optional[UUID] = None
 
     sales_research_report: Optional[str] = None
     viability_analysis: Optional[str] = None
@@ -187,6 +191,7 @@ class IdentifiedProfileBase(BaseModel):
     headline: Optional[str] = None
     linkedin_url: str
     website: Optional[str] = None
+    email: Optional[str] = None
     
     # Classification
     is_fit: bool = False
@@ -202,8 +207,51 @@ class IdentifiedProfileBase(BaseModel):
     profile_metadata: Optional[str] = None
     created_by_id: Optional[UUID] = None
 
+    # Normalized Relation
+    company_id: Optional[UUID] = None
+
 class IdentifiedProfileCreate(IdentifiedProfileBase):
     pass
+
+class CompanyBase(BaseModel):
+    name: str
+    domain: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    website: Optional[str] = None
+    description: Optional[str] = None
+    industries: Optional[str] = None # JSON string
+    employee_count: Optional[int] = None
+    revenue: Optional[str] = None
+    market_cap: Optional[str] = None
+    total_funding: Optional[str] = None
+    headquarters: Optional[str] = None
+    follower_count: Optional[int] = None
+    employee_count_range: Optional[str] = None
+    
+    # New Signals
+    news: Optional[str] = None
+    hiring: Optional[str] = None
+    technologies: Optional[str] = None
+    technology_names: Optional[str] = None
+    funding_events: Optional[str] = None
+    latest_funding_stage: Optional[str] = None
+    latest_funding_date: Optional[str] = None
+    headcount_growth: Optional[str] = None
+    email: Optional[str] = None
+
+    apollo_id: Optional[str] = None
+    extra_metadata: Optional[str] = None # JSON string
+
+class CompanyCreate(CompanyBase):
+    pass
+
+class Company(CompanyBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 class IdentifiedProfile(IdentifiedProfileBase):
     id: UUID

@@ -63,6 +63,11 @@ class InputLeadData(BaseModel):
     
     extra_metadata: Optional[dict] = None # For webhook/form extras
     trigger_context: Optional[str] = None # 'email_update', 'crm_update'
+    
+    # Enrichment Fields (Deterministic)
+    industry: Optional[str] = None
+    employee_size: Optional[str] = None
+    revenue: Optional[str] = None
 
 class AgentState(TypedDict):
     email_id: str
@@ -101,6 +106,9 @@ class AgentState(TypedDict):
     company_stats: Annotated[Optional[dict], reduce_last]
     discovery_interaction_history: Annotated[List[dict], reduce_last]
     crm_context: Annotated[Optional[dict], reduce_last]
+
+    # Apollo Rich Metadata (from waterfall enrichment)
+    company_metadata: Annotated[Optional[dict], reduce_last]
 
 
     # Specialized Nodules

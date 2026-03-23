@@ -484,6 +484,7 @@ export interface IdentifiedProfile {
     headline?: string;
     linkedin_url: string;
     website?: string;
+    company_id?: string;
 
     // Classification
     is_fit?: boolean;
@@ -500,6 +501,18 @@ export interface IdentifiedProfile {
     rep_name?: string;
     touchpoint_count: number;
     outreach_status?: string;
+    company?: {
+        id: string;
+        name: string;
+        website?: string;
+        industries?: string; // JSON string from backend
+        employee_count?: number;
+        revenue_estimate?: string;
+        market_cap?: string;
+        total_funding?: string;
+        headquarters?: string;
+        description?: string;
+    };
 }
 
 export const getIdentifiedProfiles = async (

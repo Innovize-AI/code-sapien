@@ -63,6 +63,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ensureProtocol, cn } from "@/lib/utils";
+import { CompanyDetailModal, ReportDetailModal } from "@/components/modals";
 
 function formatTimestamp(dateStr: string) {
   try {
@@ -108,6 +109,13 @@ export default function ProfilesPage() {
     leadsStatus,
     globalError,
   } = useBulkAnalysis();
+
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(
+    null,
+  );
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -333,7 +341,7 @@ export default function ProfilesPage() {
     );
     const bulkPayload = selectedProfiles.map((p: IdentifiedProfile) => ({
       url: p.linkedin_url,
-      website: "", // Add website if available in profile metadata later
+      website: p.website || "",
     }));
 
     setBulkLeads(bulkPayload);
@@ -427,6 +435,67 @@ export default function ProfilesPage() {
                       <p className="text-xs text-muted-foreground mt-1 text-ellipsis overflow-hidden line-clamp-2">
                         {profile.headline}
                       </p>
+                    )}
+                    {/* Company Stats (New) */}
+                    {profile.company && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {profile.company.industries && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] bg-indigo-50 text-indigo-700 border-indigo-100"
+                          >
+                            {(() => {
+                              try {
+                                const inds = JSON.parse(
+                                  profile.company.industries,
+                                );
+                                return Array.isArray(inds) ? inds[0] : inds;
+                              } catch (e) {
+                                return profile.company.industries;
+                              }
+                            })()}
+                          </Badge>
+                        )}
+                        {profile.company.employee_count && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] bg-slate-50 text-slate-600 border-slate-100"
+                          >
+                            <Users className="w-2.5 h-2.5 mr-1" />
+                            {profile.company.employee_count.toLocaleString()}
+                          </Badge>
+                        )}
+                        {profile.company.revenue_estimate && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-100 font-bold"
+                          >
+                            $ {profile.company.revenue_estimate}
+                          </Badge>
+                        )}
+                        {profile.company.market_cap && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] bg-amber-50 text-amber-700 border-amber-100 font-bold"
+                          >
+                            MC: {profile.company.market_cap}
+                          </Badge>
+                        )}
+                        {profile.company.total_funding && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] bg-blue-50 text-blue-700 border-blue-100 font-bold cursor-pointer hover:bg-blue-100 transition-colors"
+                            onClick={() => {
+                              if (profile.company_id) {
+                                setSelectedCompanyId(profile.company_id);
+                                setIsCompanyModalOpen(true);
+                              }
+                            }}
+                          >
+                            Fund: {profile.company.total_funding}
+                          </Badge>
+                        )}
+                      </div>
                     )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {(() => {
@@ -618,8 +687,13 @@ export default function ProfilesPage() {
 
                   if (reportId) {
                     return (
-                      <a
-                        href={`/reports?id=${reportId}`}
+                      <div
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedReportId(reportId);
+                          setIsReportModalOpen(true);
+                        }}
                         className="group/report flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-2">
@@ -631,7 +705,7 @@ export default function ProfilesPage() {
                           </span>
                         </div>
                         <Eye className="w-3.5 h-3.5 text-primary opacity-60 group-hover/report:opacity-100 transition-opacity" />
-                      </a>
+                      </div>
                     );
                   }
                   return null;
@@ -823,6 +897,9 @@ export default function ProfilesPage() {
               <TableHead>
                 <SortButton column="name" label="Profile" />
               </TableHead>
+              <TableHead>Company</TableHead>
+              <TableHead>Industry</TableHead>
+              <TableHead>Stats</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>
                 <SortButton
@@ -892,6 +969,58 @@ export default function ProfilesPage() {
                         <p className="text-[10px] text-muted-foreground truncate italic mt-0.5">
                           {profile.headline}
                         </p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div
+                      className="flex flex-col group/company cursor-pointer"
+                      onClick={() => {
+                        if (profile.company_id) {
+                          setSelectedCompanyId(profile.company_id);
+                          setIsCompanyModalOpen(true);
+                        }
+                      }}
+                    >
+                      <span className="text-xs font-semibold truncate max-w-[150px] group-hover/company:text-primary group-hover/company:underline">
+                        {profile.company?.name || "—"}
+                      </span>
+                      {profile.company?.website && (
+                        <span className="text-[9px] text-muted-foreground truncate max-w-[150px] opacity-70">
+                          {profile.company.website.replace(/^https?:\/\//, "")}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="secondary"
+                      className="text-[9px] bg-indigo-50 text-indigo-700 border-indigo-100 max-w-[120px] truncate block text-center"
+                    >
+                      {(() => {
+                        try {
+                          const inds = JSON.parse(
+                            profile.company?.industries || "[]",
+                          );
+                          return Array.isArray(inds) ? inds[0] : inds || "—";
+                        } catch (e) {
+                          return profile.company?.industries || "—";
+                        }
+                      })()}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      {profile.company?.employee_count && (
+                        <div className="text-[9px] text-muted-foreground flex items-center gap-1">
+                          <Users className="w-2.5 h-2.5" />
+                          {profile.company.employee_count.toLocaleString()}
+                        </div>
+                      )}
+                      {profile.company?.revenue_estimate && (
+                        <div className="text-[9px] text-emerald-600 font-bold">
+                          $ {profile.company.revenue_estimate}
+                        </div>
                       )}
                     </div>
                   </TableCell>
@@ -1071,12 +1200,13 @@ export default function ProfilesPage() {
                           variant="ghost"
                           size="sm"
                           className="h-7 px-2 text-primary hover:text-primary hover:bg-primary/10"
-                          asChild
+                          onClick={() => {
+                            setSelectedReportId(reportId);
+                            setIsReportModalOpen(true);
+                          }}
                         >
-                          <a href={`/reports?id=${reportId}`}>
-                            <Eye className="w-3.5 h-3.5 mr-1" />
-                            Report
-                          </a>
+                          <Eye className="w-3.5 h-3.5 mr-1" />
+                          Report
                         </Button>
                       )}
                       {!status && !reportId && (
@@ -1085,8 +1215,19 @@ export default function ProfilesPage() {
                           size="sm"
                           className="h-7 px-2"
                           onClick={() => {
-                            setSelectedIds(new Set([profile.id]));
-                            handleBulkAnalyze();
+                            const payload = [
+                              {
+                                url: profile.linkedin_url,
+                                website: profile.website || "",
+                              },
+                            ];
+                            setBulkLeads(payload);
+                            setIsBulkModalOpen(true);
+                            startBulkAnalysis(payload, {
+                              project_urgency: 2,
+                              lead_source: "Competitor Analysis",
+                              refresh: false,
+                            });
                           }}
                         >
                           <Play className="w-3.5 h-3.5 mr-1" />
@@ -1397,6 +1538,18 @@ export default function ProfilesPage() {
         onRetry={handleBulkAnalyze}
         onReset={resetBulkAnalysis}
         onCancel={() => setIsBulkModalOpen(false)}
+      />
+
+      <CompanyDetailModal
+        companyId={selectedCompanyId}
+        isOpen={isCompanyModalOpen}
+        onClose={() => setIsCompanyModalOpen(false)}
+      />
+
+      <ReportDetailModal
+        reportId={selectedReportId}
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
       />
     </DashboardLayout>
   );

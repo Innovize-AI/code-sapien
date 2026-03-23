@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, Body, BackgroundTasks, Request, Query
+import time
+from sqlalchemy import select, func, or_, desc
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Optional
 import asyncio
@@ -24,14 +26,35 @@ async def get_profiles(
     """
     Fetch all identified profiles with rep attribution.
     """
-    from db.models import IdentifiedProfile, Profile
-    from sqlalchemy import select, func, or_
-    
-    import time
+    from db.models import IdentifiedProfile, Profile, ResearchReport, Company
     start_time = time.time()
     try:
+        # Subquery for latest reports to avoid duplicates and ensure we get the newest one
+        latest_reports_sub = select(
+            ResearchReport.id,
+            ResearchReport.normalized_linkedin_url,
+            ResearchReport.created_at
+        ).distinct(
+            ResearchReport.normalized_linkedin_url
+        ).order_by(
+            ResearchReport.normalized_linkedin_url,
+            ResearchReport.created_at.desc()
+        ).alias("latest_reports")
+
         # Base query for profiles
-        query = select(IdentifiedProfile, Profile.full_name).outerjoin(Profile, IdentifiedProfile.created_by_id == Profile.id)
+        query = select(
+            IdentifiedProfile, 
+            Profile.full_name, 
+            latest_reports_sub.c.id.label("report_id"),
+            Company
+        ).outerjoin(
+            Profile, IdentifiedProfile.created_by_id == Profile.id
+        ).outerjoin(
+            Company, IdentifiedProfile.company_id == Company.id
+        ).outerjoin(
+            latest_reports_sub,
+            IdentifiedProfile.normalized_linkedin_url == latest_reports_sub.c.normalized_linkedin_url
+        )
         
         if search:
             search_filter = or_(
@@ -75,12 +98,26 @@ async def get_profiles(
         fetch_end = time.time()
         print(f"DEBUG: get_profiles Fetch rows: {fetch_end - db_end:.4f}s")
         
-        for profile, rep_name in rows:
+        for profile, rep_name, report_id, company in rows:
             p_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns}
             # Convert UUIDs to strings for JSON
             for k, v in p_dict.items():
                 if hasattr(v, 'hex'): p_dict[k] = str(v)
+            
             p_dict["rep_name"] = rep_name or "System"
+            p_dict["latest_report_id"] = str(report_id) if report_id else None
+            
+            # Include Company data
+            if company:
+                p_dict["company"] = {
+                    c.name: getattr(company, c.name) for c in company.__table__.columns
+                }
+                # Sanitize company UUIDs
+                for ck, cv in p_dict["company"].items():
+                    if hasattr(cv, 'hex'): p_dict["company"][ck] = str(cv)
+            else:
+                p_dict["company"] = None
+                
             enriched_profiles.append(p_dict)
             
         map_end = time.time()
@@ -222,6 +259,7 @@ async def discover_leads(
         if raw_leads_to_save:
             print(f"DEBUG: Saving {len(raw_leads_to_save)} raw leads to DB...")
             await batch_upsert_identified_profiles(db, raw_leads_to_save)
+            await db.commit()
             
             # Log Activity (One summary activity for the batch)
             import hashlib

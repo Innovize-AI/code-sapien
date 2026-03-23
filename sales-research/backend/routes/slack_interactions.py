@@ -51,6 +51,32 @@ async def handle_slack_interactions(
                 print(f"Error resolving Slack user: {e}")
 
         if action_id == "analyze_lead" and linkedin_url:
+            # Normalize URL for consistent locking
+            from utils.url_normalize import normalize_linkedin_url
+            norm_url = normalize_linkedin_url(linkedin_url)
+            
+            # Check for existing lock to provide immediate feedback
+            from db.models import Activity
+            from sqlalchemy import select
+            import datetime
+            
+            lock_key = f"research_lock_{norm_url}"
+            lock_check = await db.execute(select(Activity).where(Activity.idempotency_key == lock_key))
+            existing_lock = lock_check.scalars().first()
+            
+            # If a recent lock exists, notify user and skip
+            if existing_lock:
+                stale_threshold = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
+                if existing_lock.created_at.replace(tzinfo=datetime.timezone.utc) > stale_threshold:
+                    if response_url:
+                        background_tasks.add_task(
+                            send_slack_response,
+                            url=response_url,
+                            text=f"⚠️ *Already In Progress!* {user}, I'm already working on this research for {linkedin_url}. I'll notify you when it's ready!",
+                            replace_original=False
+                        )
+                    return {"ok": True}
+
             # 1. Respond to Slack in background (to avoid 3s timeout) IMMEDIATELY
             if response_url:
                 background_tasks.add_task(
@@ -60,8 +86,8 @@ async def handle_slack_interactions(
                     replace_original=False
                 )
             
-            # 2. Start research in background
-            background_tasks.add_task(run_single_research, linkedin_url=linkedin_url, user_id=internal_user_id)
+            # 2. Start research in background (run_single_research handles internal locking too)
+            background_tasks.add_task(run_single_research, linkedin_url=norm_url, user_id=internal_user_id)
         
         elif action_id == "ignore_lead":
             if response_url:

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { LeadStatus } from "@/components/bulk-analysis-modal";
 import { bulkAnalyzeLeads } from "@/lib/api";
+import { normalizeUrl } from "@/lib/utils";
 
 interface BulkAnalysisContextType {
   leadsStatus: LeadStatus[];
@@ -130,9 +131,10 @@ export function BulkAnalysisProvider({ children }: { children: ReactNode }) {
       await bulkAnalyzeLeads(leadsToProcess, options, (update) => {
         if (update.url) {
           const milestoneProgress = NODE_PROGRESS_MAP[update.status] || 0;
+          const normalizedUpdateUrl = normalizeUrl(update.url);
           setLeadsStatus((prev) =>
             prev.map((lead) => {
-              if (lead.url === update.url) {
+              if (normalizeUrl(lead.url) === normalizedUpdateUrl || lead.url === update.url) {
                 // If research is finishing, it might say "Synthesizing research..."
                 // We want to maintain the highest progress reached.
                 const currentProgress = lead.progress || 0;
@@ -156,8 +158,9 @@ export function BulkAnalysisProvider({ children }: { children: ReactNode }) {
       }).then((results) => {
         setLeadsStatus((prev) =>
           prev.map((lead) => {
+            const leadUrl = normalizeUrl(lead.url);
             const found = results?.find(
-              (r: any) => r && r.linkedin_url === lead.url,
+              (r: any) => r && (normalizeUrl(r.linkedin_url) === leadUrl || r.linkedin_url === lead.url),
             );
             if (!found) return lead;
 

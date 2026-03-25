@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime
 from uuid import UUID
 
@@ -94,10 +94,10 @@ class ResearchReport(ResearchReportBase):
 
 # ICP Schemas
 class IdealProfileData(BaseModel):
-    industry: str
-    company_size: Optional[str] = None
-    revenue: Optional[str] = None
-    job_title: str
+    industry: Union[str, List[str]]
+    company_size: Optional[Union[str, List[str]]] = None
+    revenue: Optional[Union[str, List[str]]] = None
+    job_title: Union[str, List[str]]
     value_proposition: Optional[str] = None
 
 class ProductConfig(BaseModel):

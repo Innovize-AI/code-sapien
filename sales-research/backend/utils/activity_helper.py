@@ -74,7 +74,15 @@ async def log_activity_and_notify(
                 source=source_text,
                 post_link=metadata.get("source_post_url"),
                 rep_name=rep_name,
-                title=title
+                title=title,
+                company_name=metadata.get("company_name"),
+                company_description=metadata.get("company_description"),
+                company_industries=metadata.get("company_industries"),
+                employee_count=metadata.get("employee_count"),
+                revenue=metadata.get("revenue"),
+                is_buy_signal=metadata.get("is_buy_signal", False),
+                is_strategic_seller=metadata.get("is_strategic_seller", False),
+                email=metadata.get("email")
             )
         elif type == "analysis" and metadata and metadata.get("report_id"):
             blocks = build_research_completed_blocks(
@@ -87,8 +95,14 @@ async def log_activity_and_notify(
                 journey_stage=metadata.get("journey_stage"),
                 heat_rating=metadata.get("heat_rating"),
                 urgency=metadata.get("urgency"),
-                pain_points=metadata.get("pain_points")
+                pain_points=metadata.get("pain_points"),
+                company_name=metadata.get("company_name"),
+                company_description=metadata.get("company_description"),
+                company_industries=metadata.get("company_industries"),
+                employee_count=metadata.get("employee_count"),
+                revenue=metadata.get("revenue")
             )
+
         else:
             blocks = build_generic_activity_blocks(title, description, rep_name=rep_name)
 

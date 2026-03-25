@@ -275,7 +275,7 @@ class Company(Base):
     latest_funding_stage = Column(Text, nullable=True)
     latest_funding_date = Column(Text, nullable=True)
     headcount_growth = Column(Text, nullable=True)  # JSON object
-    email = Column(Text, nullable=True)             # Company contact email
+    # email = Column(Text, nullable=True)             # Removed (moved to IdentifiedProfile)
 
     # Source Metadata
     apollo_id = Column(String, nullable=True, index=True)

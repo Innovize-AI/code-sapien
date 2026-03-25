@@ -33,6 +33,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Zap,
+  TrendingUp,
 } from "lucide-react";
 import {
   Tooltip,
@@ -46,6 +48,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useBulkAnalysis } from "@/context/bulk-analysis-context";
 import { BulkAnalysisModal } from "@/components/bulk-analysis-modal";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -62,7 +65,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ensureProtocol, cn } from "@/lib/utils";
+import { ensureProtocol, cn, normalizeUrl } from "@/lib/utils";
 import { CompanyDetailModal, ReportDetailModal } from "@/components/modals";
 
 function formatTimestamp(dateStr: string) {
@@ -93,6 +96,7 @@ export default function ProfilesPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sortBy, setSortBy] = useState<string>("touchpoint_count");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [dateFilter, setDateFilter] = useState<string>("all");
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
 
@@ -130,6 +134,25 @@ export default function ProfilesPage() {
             statusFilter.length > 0 ? statusFilter : "all",
             sortBy,
             sortOrder,
+            ...(() => {
+              const now = new Date();
+              if (dateFilter === "today") {
+                return [`${now.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`];
+              }
+              if (dateFilter === "yesterday") {
+                const y = new Date(now); y.setDate(y.getDate() - 1);
+                return [`${y.toISOString().split('T')[0]}T00:00:00Z`, `${y.toISOString().split('T')[0]}T23:59:59Z`];
+              }
+              if (dateFilter === "last_week") {
+                const w = new Date(now); w.setDate(w.getDate() - 7);
+                return [`${w.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`];
+              }
+              if (dateFilter === "last_month") {
+                const m = new Date(now); m.setDate(m.getDate() - 30);
+                return [`${m.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`];
+              }
+              return [undefined, undefined];
+            })()
           );
           setProfiles(data.profiles || []);
           setTotal(data.total || 0);
@@ -144,7 +167,7 @@ export default function ProfilesPage() {
     }, 500); // Debounce search
 
     return () => clearTimeout(timeoutId);
-  }, [page, searchQuery, statusFilter, sortBy, sortOrder]);
+  }, [page, searchQuery, statusFilter, sortBy, sortOrder, dateFilter]);
 
   // Click outside for status filter
   useEffect(() => {
@@ -499,18 +522,28 @@ export default function ProfilesPage() {
                     )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {(() => {
-                        const status = leadsStatus?.find(
-                          (s) => s.url === profile.linkedin_url,
-                        )?.status;
+                        const profileUrl = normalizeUrl(profile.linkedin_url);
+                        const leadStatusObj = leadsStatus?.find(
+                          (s) => normalizeUrl(s.url) === profileUrl || s.url === profile.linkedin_url,
+                        );
+                        const status = leadStatusObj?.status;
+                        const currentStep = leadStatusObj?.currentStep;
+
                         if (status === "analyzing") {
                           return (
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] h-5 px-1.5 bg-blue-100 text-blue-700 animate-pulse border-blue-200"
-                            >
-                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              Researching...
-                            </Badge>
+                            <div className="flex flex-col gap-2 p-3 rounded-lg bg-blue-50 border border-blue-100 animate-pulse w-full">
+                              <div className="flex items-center justify-between text-[10px] font-bold text-blue-700">
+                                <span className="flex items-center gap-2">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  {currentStep || "Researching..."}
+                                </span>
+                                <span>{leadStatusObj?.progress || 0}%</span>
+                              </div>
+                              <Progress
+                                value={leadStatusObj?.progress || 0}
+                                className="h-1 bg-blue-200/50"
+                              />
+                            </div>
                           );
                         }
                         if (status === "pending") {
@@ -528,9 +561,12 @@ export default function ProfilesPage() {
                       {!profile.fit_reasoning &&
                         !profile.is_fit &&
                         !profile.is_competitor &&
-                        !leadsStatus?.find(
-                          (s) => s.url === profile.linkedin_url,
-                        ) && (
+                        !(() => {
+                          const profileUrl = normalizeUrl(profile.linkedin_url);
+                          return leadsStatus?.find(
+                            (s) => normalizeUrl(s.url) === profileUrl || s.url === profile.linkedin_url,
+                          );
+                        })() && (
                           <Badge
                             variant="secondary"
                             className="text-[9px] h-5 px-1.5 bg-gray-100 text-gray-500 animate-pulse"
@@ -569,6 +605,24 @@ export default function ProfilesPage() {
                         >
                           <CheckCircle2 className="w-3 h-3 mr-1" />
                           Potential Fit
+                        </Badge>
+                      )}
+                      {profile.is_buy_signal && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] h-5 px-1.5 bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100"
+                        >
+                          <Zap className="w-3 h-3 mr-1" />
+                          Buy Signal
+                        </Badge>
+                      )}
+                      {profile.is_strategic_seller && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] h-5 px-1.5 bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                        >
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                          Strategic Seller
                         </Badge>
                       )}
                       {profile.is_decision_maker && (
@@ -671,15 +725,13 @@ export default function ProfilesPage() {
               </CardHeader>
               <CardContent className="flex-1 flex flex-col space-y-6">
                 {(() => {
-                  const status = leadsStatus?.find(
-                    (s) => s.url === profile.linkedin_url,
-                  )?.status;
-                  const result = leadsStatus?.find(
-                    (s) => s.url === profile.linkedin_url,
-                  )?.result;
-
-                  // Use the fresh result ID if available (completed this session), otherwise fallback to stored ID
-                  // Ensure we strictly use the ID and never 'latest' to avoid race conditions
+                  const leadStatusObj = leadsStatus?.find(
+                    (s) =>
+                      normalizeUrl(s.url) === normalizeUrl(profile.linkedin_url),
+                  );
+                  const status = leadStatusObj?.status;
+                  const result = leadStatusObj?.result;
+                  const currentStep = leadStatusObj?.currentStep;
                   const reportId =
                     status === "completed" && result?.id
                       ? result.id
@@ -847,9 +899,8 @@ export default function ProfilesPage() {
     return (
       <button
         onClick={() => toggleSort(column)}
-        className={`flex items-center gap-1 hover:text-primary transition-colors ${
-          isActive ? "text-primary font-bold" : ""
-        }`}
+        className={`flex items-center gap-1 hover:text-primary transition-colors ${isActive ? "text-primary font-bold" : ""
+          }`}
       >
         {label}
         {isActive ? (
@@ -913,12 +964,13 @@ export default function ProfilesPage() {
           </TableHeader>
           <TableBody>
             {profileList.map((profile) => {
-              const status = leadsStatus?.find(
-                (s) => s.url === profile.linkedin_url,
-              )?.status;
-              const result = leadsStatus?.find(
-                (s) => s.url === profile.linkedin_url,
-              )?.result;
+              const profileUrl = normalizeUrl(profile.linkedin_url);
+              const leadStatusObj = leadsStatus?.find(
+                (s) => normalizeUrl(s.url) === profileUrl || s.url === profile.linkedin_url,
+              );
+              const status = leadStatusObj?.status;
+              const result = leadStatusObj?.result;
+              const currentStep = leadStatusObj?.currentStep;
               const reportId =
                 status === "completed" && result?.id
                   ? result.id
@@ -929,7 +981,7 @@ export default function ProfilesPage() {
                 interactionHistory = JSON.parse(
                   profile.interaction_history || "[]",
                 );
-              } catch (e) {}
+              } catch (e) { }
 
               return (
                 <TableRow key={profile.id}>
@@ -1026,14 +1078,6 @@ export default function ProfilesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {status === "analyzing" && (
-                        <Badge
-                          variant="secondary"
-                          className="text-[9px] h-4 bg-blue-100 text-blue-700 animate-pulse"
-                        >
-                          Researching...
-                        </Badge>
-                      )}
                       {profile.is_competitor && (
                         <Badge variant="destructive" className="text-[9px] h-4">
                           Comp
@@ -1046,6 +1090,22 @@ export default function ProfilesPage() {
                           title={profile.fit_reasoning}
                         >
                           Fit
+                        </Badge>
+                      )}
+                      {profile.is_buy_signal && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] h-4 bg-violet-50 text-violet-700 border-violet-200"
+                        >
+                          Buyer
+                        </Badge>
+                      )}
+                      {profile.is_strategic_seller && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] h-4 bg-zinc-50 text-zinc-700 border-zinc-200"
+                        >
+                          Seller
                         </Badge>
                       )}
                       {profile.is_decision_maker && (
@@ -1195,6 +1255,15 @@ export default function ProfilesPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {status === "analyzing" && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[9px] h-7 bg-blue-100/50 text-blue-700 animate-pulse border-blue-200"
+                        >
+                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                          {currentStep ? currentStep : "Processing..."}
+                        </Badge>
+                      )}
                       {reportId && (
                         <Button
                           variant="ghost"
@@ -1338,13 +1407,26 @@ export default function ProfilesPage() {
                     }}
                   />
                 </div>
+                <div className="flex items-center gap-2">
+                  <Select value={dateFilter} onValueChange={(v) => { setDateFilter(v); setPage(0); }}>
+                    <SelectTrigger className="h-10 w-[150px] text-xs font-semibold bg-background border-primary/20 text-foreground">
+                      <SelectValue placeholder="Date Range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="yesterday">Yesterday</SelectItem>
+                      <SelectItem value="last_week">Last 7 Days</SelectItem>
+                      <SelectItem value="last_month">Last 30 Days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="relative" ref={statusRef}>
                   <div
-                    className={`flex items-center gap-2 p-1.5 px-3 rounded-lg border h-10 min-w-[200px] cursor-pointer transition-all duration-200 ${
-                      isStatusDropdownOpen
-                        ? "bg-background border-primary ring-2 ring-primary/20 shadow-lg"
-                        : "bg-background/50 border-primary/10 hover:bg-background/80"
-                    }`}
+                    className={`flex items-center gap-2 p-1.5 px-3 rounded-lg border h-10 min-w-[200px] cursor-pointer transition-all duration-200 ${isStatusDropdownOpen
+                      ? "bg-background border-primary ring-2 ring-primary/20 shadow-lg"
+                      : "bg-background/50 border-primary/10 hover:bg-background/80"
+                      }`}
                     onClick={() =>
                       setIsStatusDropdownOpen(!isStatusDropdownOpen)
                     }
@@ -1410,14 +1492,25 @@ export default function ProfilesPage() {
                             color: "bg-blue-500",
                             desc: "High-level stakeholder",
                           },
+                          {
+                            id: "buy_signal",
+                            label: "Buy Signal",
+                            color: "bg-violet-500",
+                            desc: "Genuine pain or intent",
+                          },
+                          {
+                            id: "strategic_seller",
+                            label: "Strategic Seller",
+                            color: "bg-zinc-500",
+                            desc: "Self-promoting poster",
+                          },
                         ].map((s) => (
                           <div
                             key={s.id}
-                            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all duration-150 ${
-                              statusFilter.includes(s.id)
-                                ? "bg-primary/5 border border-primary/10"
-                                : "hover:bg-primary/5 border border-transparent"
-                            }`}
+                            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all duration-150 ${statusFilter.includes(s.id)
+                              ? "bg-primary/5 border border-primary/10"
+                              : "hover:bg-primary/5 border border-transparent"
+                              }`}
                             onClick={() => {
                               setStatusFilter((prev) =>
                                 prev.includes(s.id)
@@ -1429,7 +1522,7 @@ export default function ProfilesPage() {
                           >
                             <Checkbox
                               checked={statusFilter.includes(s.id)}
-                              onCheckedChange={() => {}}
+                              onCheckedChange={() => { }}
                             />
                             <div className="flex flex-col gap-0.5 flex-1">
                               <div className="flex items-center gap-2">

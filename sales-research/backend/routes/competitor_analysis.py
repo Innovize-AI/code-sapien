@@ -19,6 +19,8 @@ async def get_profiles(
     limit: int = 100, 
     search: str = None, 
     status: List[str] = Query(["all"]),
+    date_start: str = None,
+    date_end: str = None,
     sort_by: str = "touchpoint_count",
     sort_order: str = "desc",
     db: AsyncSession = Depends(get_db)
@@ -72,6 +74,16 @@ async def get_profiles(
             if "dm" in status:
                 query = query.where(IdentifiedProfile.is_decision_maker == True)
             
+        if date_start:
+            from datetime import datetime
+            dt_start = datetime.fromisoformat(date_start.replace("Z", "+00:00"))
+            query = query.where(IdentifiedProfile.created_at >= dt_start)
+            
+        if date_end:
+            from datetime import datetime
+            dt_end = datetime.fromisoformat(date_end.replace("Z", "+00:00"))
+            query = query.where(IdentifiedProfile.created_at <= dt_end)
+            
         # Dynamic Sorting
         sort_attr = None
         if sort_by == "rep_name":
@@ -107,6 +119,14 @@ async def get_profiles(
             p_dict["rep_name"] = rep_name or "System"
             p_dict["latest_report_id"] = str(report_id) if report_id else None
             
+            # Unpack profile_metadata into p_dict
+            try:
+                meta = json.loads(profile.profile_metadata or "{}") if isinstance(profile.profile_metadata, str) else (profile.profile_metadata or {})
+                if isinstance(meta, dict):
+                    p_dict.update(meta)
+            except Exception as e:
+                print(f"Error parsing profile_metadata for {profile.id}: {e}")
+            
             # Include Company data
             if company:
                 p_dict["company"] = {
@@ -135,6 +155,16 @@ async def get_profiles(
                 count_query = count_query.where(IdentifiedProfile.is_competitor == True)
             if "dm" in status:
                 count_query = count_query.where(IdentifiedProfile.is_decision_maker == True)
+                
+        if date_start:
+            from datetime import datetime
+            dt_start = datetime.fromisoformat(date_start.replace("Z", "+00:00"))
+            count_query = count_query.where(IdentifiedProfile.created_at >= dt_start)
+            
+        if date_end:
+            from datetime import datetime
+            dt_end = datetime.fromisoformat(date_end.replace("Z", "+00:00"))
+            count_query = count_query.where(IdentifiedProfile.created_at <= dt_end)
                 
         total_result = await db.execute(count_query)
         total = total_result.scalar()

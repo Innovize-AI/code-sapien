@@ -23,6 +23,8 @@ class ProfileClassificationResult(BaseModel):
     is_competitor: bool = Field(description="Is the person a competitor working for a rival company?")
     is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
+    is_buy_signal: bool = Field(default=False, description="Does the profile exhibit a genuine buy signal/pain point?")
+    is_strategic_seller: bool = Field(default=False, description="Is the profile a strategic seller/consultant self-promoting?")
     reasoning: str = Field(description="Brief explanation of the classification.")
     intent: Optional[str] = Field(None, description="The person's localized intent (hand_raiser, prospect_pain, passive_expert, strategic_seller, low_signal)")
     post_topic_depth: Optional[str] = Field(None, description="Detailed nature of the post: sharing_framework, tool_showcase, complaining_keywords, industry_synthesis, etc.")
@@ -35,6 +37,8 @@ class ProfileClassification(BaseModel):
     is_competitor: bool = Field(description="Is the person a competitor working for a rival company?")
     is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
+    is_buy_signal: bool = Field(default=False, description="Does the profile exhibit a genuine buy signal/pain point?")
+    is_strategic_seller: bool = Field(default=False, description="Is the profile a strategic seller/consultant self-promoting?")
     reasoning: str = Field(description="Brief explanation of the classification.")
 
 # Using LinkedInAnalysis from models.structured_output
@@ -72,6 +76,8 @@ def batch_classify_profiles(profiles: List[Dict]):
                     "is_fit": res.is_fit,
                     "is_competitor": res.is_competitor,
                     "is_decision_maker": res.is_decision_maker,
+                    "is_buy_signal": res.is_buy_signal,
+                    "is_strategic_seller": res.is_strategic_seller,
                     "reasoning": res.reasoning,
                     "intent": res.intent,
                     "post_topic_depth": res.post_topic_depth,
@@ -485,7 +491,7 @@ async def enrich_company_waterfall(person_url: str = None, company_url: str = No
         "news": news[:5],
         "hiring": hiring[:5],
         "website": stats.get("website"),
-        "email": apollo_data.get("email"),
+        "person_email": apollo_data.get("person_email"),
         "linkedin_url": apollo_data.get("company_linkedin_url"),
         "domain": apollo_data.get("domain") or (stats.get("website").replace("http://", "").replace("https://", "").split("/")[0] if stats.get("website") else None),
 
@@ -664,9 +670,8 @@ async def get_apollo_company_data(linkedin_url: str):
                     "headquarters": f"{org.get('city', '')}, {org.get('state', '')}, {org.get('country', '')}".strip(", "),
                     # Keywords
                     # "keywords": org.get("keywords") or [],
-                    # Lead email + context
-                    "email": person.get("email"),
-
+                    # Lead person_email + context
+                    "person_email": person.get("email"),
                 }
             else:
                 print(f"DEBUG: Apollo enrichment failed ({response.status_code}): {response.text}")
@@ -945,6 +950,8 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
                     "is_fit": item.is_fit,
                     "is_competitor": item.is_competitor,
                     "is_decision_maker": item.is_decision_maker,
+                    "is_buy_signal": item.is_buy_signal,
+                    "is_strategic_seller": item.is_strategic_seller,
                     "reasoning": item.reasoning,
                     "intent": item.intent,
                     "post_topic_depth": item.post_topic_depth,

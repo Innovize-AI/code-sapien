@@ -11,6 +11,19 @@ from db.schemas import ResearchReportCreate, LeadSubmissionCreate, OrganizationS
 from utils.url_normalize import normalize_linkedin_url
 from uuid import UUID
 
+async def get_active_icp(db: AsyncSession) -> dict | None:
+    """
+    Fetches the global organization ICP from settings.
+    """
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    settings = result.scalars().first()
+    if settings and settings.icp_json:
+        try:
+            return json.loads(settings.icp_json)
+        except:
+            return None
+    return None
+
 async def upsert_company(
     db: AsyncSession,
     company_data: dict,
@@ -35,6 +48,10 @@ async def upsert_company(
         "domain": normalized_domain,
         "updated_at": datetime.datetime.now(datetime.timezone.utc)
     }
+    
+    # EXPLICIT GUARD: Never save prospect email to company table
+    insert_data.pop("email", None)
+    insert_data.pop("person_email", None)
 
     # Filter to only valid columns
     valid_columns = Company.__table__.columns.keys()
@@ -48,9 +65,10 @@ async def upsert_company(
     else:
         raise ValueError("Cannot upsert company without a unique identifier (linkedin_url or domain).")
 
-    # Handle dictionary for extra_metadata
-    if "extra_metadata" in insert_data and isinstance(insert_data["extra_metadata"], dict):
-        insert_data["extra_metadata"] = json.dumps(insert_data["extra_metadata"])
+    # Handle dictionary/list fields for Text columns (JSON storage)
+    for key, value in insert_data.items():
+        if isinstance(value, (dict, list)):
+            insert_data[key] = json.dumps(value)
 
     # Remove fields that should not be updated on conflict
     update_data = {k: v for k, v in insert_data.items() if k not in ['id', 'created_at', 'linkedin_url', 'domain']}
@@ -63,8 +81,7 @@ async def upsert_company(
 
     result = await db.execute(stmt)
     company = result.scalar_one()
-    await db.commit()
-    await db.refresh(company)
+    # Let the caller handle commitment/refreshing for better transaction control
     return company
 
 def _safe_deserialize(val):
@@ -118,12 +135,12 @@ def _calculate_json_modification_percentage(original: dict, updated: dict) -> in
         
     return total_mod // count if count > 0 else 0
 
-def _report_to_dict(report):
+def _report_to_dict(report, email_fallback=None):
     """Helper to convert ResearchReport model to final_state dictionary."""
     return {
         "id": str(report.id),
         "linkedin_url": report.linkedin_url,
-        "email_id": report.email_id,
+        "email_id": report.email_id or email_fallback,
         "website": report.website,
         "sales_research_report": _safe_deserialize(report.sales_research_report),
         "lead_score_analysis": _safe_deserialize(report.lead_score_analysis),
@@ -229,6 +246,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "sentiment": l.get("sentiment"),
                 "email": l.get("email"),
                 "company_id": l.get("company_id"),
+                "profile_metadata": l.get("profile_metadata") or {},
                 "interactions": []
             }
         elif l.get("headline") and not batch_map[url].get("headline"):
@@ -244,6 +262,12 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
         if l.get("sentiment"): batch_map[url]["sentiment"] = l.get("sentiment")
         if l.get("company_id") and not batch_map[url].get("company_id"):
             batch_map[url]["company_id"] = l.get("company_id")
+        
+        # Merge profile_metadata if provided
+        if l.get("profile_metadata"):
+            if not isinstance(batch_map[url]["profile_metadata"], dict):
+                batch_map[url]["profile_metadata"] = {}
+            batch_map[url]["profile_metadata"].update(l.get("profile_metadata"))
         
         # Helper for URL normalization (strip query and trailing slash)
         n_source_url = normalize_linkedin_url(l.get("source_post_url"))
@@ -348,6 +372,10 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "touchpoint_count": tp_count,
                 "last_interaction_at": now,
                 "company_id": data.get("company_id") or p.company_id,
+                "profile_metadata": json.dumps({
+                    **(json.loads(p.profile_metadata or "{}") if isinstance(p.profile_metadata, str) else (p.profile_metadata or {})),
+                    **(data.get("profile_metadata") or {})
+                }),
                 "normalized_linkedin_url": url
             })
         else:
@@ -405,6 +433,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "touchpoint_count": tp_count,
                 "last_interaction_at": now,
                 "company_id": data.get("company_id"),
+                "profile_metadata": json.dumps(data.get("profile_metadata") or {}),
                 "normalized_linkedin_url": url
             })
 
@@ -415,7 +444,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             IdentifiedProfile.__table__,
             upsert_rows,
             conflict_cols=["linkedin_url"],
-            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "normalized_linkedin_url"]
+            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "profile_metadata", "normalized_linkedin_url"]
         )
         print(f"DEBUG: Batch upsert executed. Results count: {len(results)}")
         return results

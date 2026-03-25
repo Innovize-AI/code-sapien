@@ -27,6 +27,8 @@ import {
   Sparkles,
   Activity,
   FileText,
+  MessageSquare,
+  Zap,
 } from "lucide-react";
 import { ensureProtocol, cn } from "@/lib/utils";
 
@@ -65,7 +67,14 @@ interface CompanyData {
     email?: string;
     is_fit: boolean;
     is_decision_maker: boolean;
+    is_buy_signal?: boolean;
+    is_strategic_seller?: boolean;
+    intent?: string;
+    sentiment?: string;
+    post_topic_depth?: string;
     fit_reasoning?: string;
+    interaction_history?: string;
+    last_interaction_at?: string;
     latest_report_id?: string;
   }[];
 }
@@ -514,16 +523,216 @@ export function CompanyDetailModal({
 
               <TabsContent
                 value="activity"
-                className="flex-1 p-6 m-0 flex items-center justify-center"
+                className="flex-1 p-0 m-0 overflow-y-auto"
               >
-                <div className="text-center space-y-2 max-w-xs">
-                  <Activity className="w-10 h-10 text-muted-foreground/20 mx-auto" />
-                  <h4 className="text-sm font-bold">In-Depth Activity Logs</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed italic">
-                    Activity feed showing specific LinkedIn interactions from
-                    multiple reps will appear here.
-                  </p>
-                </div>
+                {(() => {
+                  const news = parseJson(company.news);
+                  const hiring = parseJson(company.hiring);
+                  const funding = parseJson(company.funding_events);
+                  const people = company.people || [];
+
+                  // Prepare unified feed items
+                  const feedItems: any[] = [];
+
+                  // 1. Social Signals (Identified Profiles)
+                  people.forEach((p) => {
+                    console.log(p)
+                    try {
+                      const history = p.interaction_history
+                        ? JSON.parse(p.interaction_history as any)
+                        : [];
+                      console.log(history)
+                      history.forEach((h: any) => {
+                        const isKeyword = h.competitor?.startsWith("Keyword:");
+                        const typeLabel = isKeyword ? "Intent via Keyword" : `Engaged with ${h.competitor}`;
+
+                        (h.posts || []).forEach((post: any) => {
+                          // If there are comments, push one entry per comment for full visibility
+                          if (post.comments && post.comments.length > 0) {
+                            post.comments.forEach((comment: string) => {
+                              feedItems.push({
+                                type: "social",
+                                date: post.date || p.last_interaction_at || company.updated_at,
+                                title: `${p.name || "A lead"} (${typeLabel})`,
+                                description: `Commented: "${comment}" on "${post.title}"`,
+                                icon: <MessageSquare className="w-4 h-4" />,
+                                color: isKeyword ? "text-amber-600 bg-amber-50 border-amber-100" : "text-blue-600 bg-blue-50 border-blue-100",
+                                url: post.url,
+                                is_buy_signal: p.is_buy_signal,
+                                is_strategic_seller: p.is_strategic_seller,
+                                sentiment: p.sentiment,
+                              });
+                            });
+                          } else {
+                            // If no comments, just show the post interaction (likely the reason they were identified)
+                            feedItems.push({
+                              type: "social",
+                              date: post.date || p.last_interaction_at || company.updated_at,
+                              title: `${p.name || "A lead"} (${typeLabel})`,
+                              description: `Interacted with post: "${post.title}"`,
+                              icon: <Activity className="w-4 h-4" />,
+                              color: isKeyword ? "text-amber-600 bg-amber-50 border-amber-100" : "text-blue-600 bg-blue-50 border-blue-100",
+                              url: post.url,
+                              is_buy_signal: p.is_buy_signal,
+                              is_strategic_seller: p.is_strategic_seller,
+                              sentiment: p.sentiment,
+                            });
+                          }
+                        });
+                      });
+                    } catch (e) {
+                      console.error("Error parsing interaction history for feed", e);
+                    }
+                  });
+
+                  // 2. Funding Events (Apollo)
+                  funding.forEach((f: any) => {
+                    feedItems.push({
+                      type: "funding",
+                      date: f.date,
+                      title: `${f.type || "Funding Round"} Announced`,
+                      description: `Raised ${f.amount || "a significant amount"} ${f.currency || "USD"}${f.investors ? ` from ${f.investors}` : ""}.`,
+                      icon: <DollarSign className="w-4 h-4" />,
+                      color: "text-amber-600 bg-amber-50 border-amber-100",
+                      url: f.news_url,
+                    });
+                  });
+
+                  // 3. News Items (LinkedIn Scraper)
+                  news.forEach((n: any) => {
+                    const isStr = typeof n === "string";
+                    feedItems.push({
+                      type: "news",
+                      date: isStr ? company.updated_at : n.date,
+                      title: isStr ? "Company Update" : n.title,
+                      description: isStr ? n : (n.source || "Corporate announcement"),
+                      icon: <Newspaper className="w-4 h-4" />,
+                      color: "text-indigo-600 bg-indigo-50 border-indigo-100",
+                      url: isStr ? null : n.url || n.link,
+                    });
+                  });
+
+                  // 4. Hiring (LinkedIn Scraper)
+                  hiring.forEach((h: any) => {
+                    const isStr = typeof h === "string";
+                    feedItems.push({
+                      type: "hiring",
+                      date: isStr ? company.updated_at : h.posted_at || company.updated_at,
+                      title: "New Job Opening",
+                      description: isStr ? h : h.title,
+                      icon: <Briefcase className="w-4 h-4" />,
+                      color: "text-emerald-600 bg-emerald-50 border-emerald-100",
+                      url: isStr ? null : h.url,
+                    });
+                  });
+
+                  // Sort by date desc
+                  feedItems.sort(
+                    (a, b) =>
+                      new Date(b.date || 0).getTime() -
+                      new Date(a.date || 0).getTime(),
+                  );
+
+                  if (feedItems.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center h-[400px] text-center space-y-2 opacity-50">
+                        <Activity className="w-10 h-10 mb-2" />
+                        <h4 className="text-sm font-bold">No Activity Recorded</h4>
+                        <p className="text-xs">
+                          We haven't detected any recent news, hiring, or social
+                          signals for this company.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="p-6 relative">
+                      {/* Timeline Line */}
+                      <div className="absolute left-8 top-8 bottom-8 w-0.5 bg-muted-foreground/10" />
+
+                      <div className="space-y-8">
+                        {feedItems.map((item, i) => (
+                          <div key={i} className="relative pl-10 group">
+                            {/* Dot/Icon */}
+                            <div
+                              className={cn(
+                                "absolute left-[0.45rem] top-0 w-8 h-8 rounded-full border flex items-center justify-center z-10 shadow-sm transition-transform group-hover:scale-110",
+                                item.color,
+                              )}
+                            >
+                              {item.icon}
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                                  {item.date
+                                    ? new Date(item.date).toLocaleDateString(
+                                      undefined,
+                                      {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      },
+                                    )
+                                    : "Recently"}
+                                </span>
+                                <div className="h-px flex-1 bg-muted-foreground/5" />
+                              </div>
+
+                              <div className="bg-muted/5 border border-muted/50 rounded-xl p-4 hover:bg-muted/10 transition-all hover:border-primary/20 shadow-sm relative overflow-hidden">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <h5 className="text-sm font-bold tracking-tight mb-1 group-hover:text-primary transition-colors flex items-center gap-2">
+                                      {item.title}
+                                      {item.sentiment === "positive" && (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" title="Positive Sentiment" />
+                                      )}
+                                      {item.sentiment === "negative" && (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" title="Negative Sentiment" />
+                                      )}
+                                    </h5>
+                                    <p className="text-xs text-muted-foreground leading-relaxed italic">
+                                      {item.description}
+                                    </p>
+                                  </div>
+
+                                  {/* Signals */}
+                                  <div className="flex flex-col gap-1 items-end shrink-0">
+                                    {item.is_buy_signal && (
+                                      <Badge variant="outline" className="text-[8px] h-4 bg-violet-50 text-violet-700 border-violet-200 uppercase font-bold px-1 animate-pulse">
+                                        <Zap className="w-2 h-2 mr-0.5" />
+                                        Buy Signal
+                                      </Badge>
+                                    )}
+                                    {item.is_strategic_seller && (
+                                      <Badge variant="outline" className="text-[8px] h-4 bg-zinc-100 text-zinc-600 border-zinc-200 uppercase font-bold px-1">
+                                        Strategic Seller
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {item.url && (
+                                  <a
+                                    href={item.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:underline mt-3 uppercase tracking-tight"
+                                  >
+                                    View Source
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </TabsContent>
 
               <TabsContent
@@ -544,13 +753,29 @@ export function CompanyDetailModal({
                         key={person.id}
                         className="p-5 rounded-2xl border border-muted/50 bg-muted/5 hover:bg-muted/10 transition-all group/person relative overflow-hidden"
                       >
-                        <div className="absolute top-0 right-0 p-4">
+                        <div className="absolute top-0 right-0 p-4 flex flex-col gap-1 items-end">
                           <Badge
                             variant={person.is_fit ? "default" : "secondary"}
                             className="text-[10px] font-bold"
                           >
                             {person.is_fit ? "FIT" : "REJECTED"}
                           </Badge>
+                          {person.is_buy_signal && (
+                            <Badge variant="outline" className="text-[9px] h-5 bg-violet-50 text-violet-700 border-violet-200 uppercase font-bold px-1.5 animate-pulse">
+                              <Zap className="w-2.5 h-2.5 mr-1" />
+                              Buy Signal
+                            </Badge>
+                          )}
+                          {person.is_strategic_seller && (
+                            <Badge variant="outline" className="text-[9px] h-5 bg-zinc-100 text-zinc-600 border-zinc-200 uppercase font-bold px-1.5">
+                              Strategic Seller
+                            </Badge>
+                          )}
+                          {person.intent && (
+                            <Badge variant="outline" className="text-[9px] h-5 bg-blue-50 text-blue-700 border-blue-200 uppercase font-bold px-1.5">
+                              {person.intent}
+                            </Badge>
+                          )}
                         </div>
 
                         <div className="flex items-start gap-4">

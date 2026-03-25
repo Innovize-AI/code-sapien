@@ -18,7 +18,14 @@ class PeopleSchema(BaseModel):
     email: Optional[str]
     is_fit: bool
     is_decision_maker: bool
+    is_buy_signal: bool = False
+    is_strategic_seller: bool = False
+    intent: Optional[str] = None
+    sentiment: Optional[str] = None
+    post_topic_depth: Optional[str] = None
     fit_reasoning: Optional[str]
+    interaction_history: Optional[str] = None
+    last_interaction_at: Optional[datetime] = None
     latest_report_id: Optional[UUID] = None
 
     class Config:
@@ -48,8 +55,8 @@ class CompanySchema(BaseModel):
     funding_events: Optional[str]
     latest_funding_stage: Optional[str]
     latest_funding_date: Optional[str]
-    headcount_growth: Optional[str]
-    email: Optional[str]
+    headcount_growth: Optional[str] = None
+    email: Optional[str] = None
     apollo_id: Optional[str]
     people: List[PeopleSchema] = []
 
@@ -99,6 +106,20 @@ async def get_company(company_id: UUID, db: AsyncSession = Depends(get_db)):
             
             for p in profiles:
                 p.latest_report_id = report_mapping.get(p.normalized_linkedin_url)
+                
+                # Unpack AI signals from metadata if not already on the object
+                if p.profile_metadata:
+                    import json
+                    try:
+                        meta = json.loads(p.profile_metadata) if isinstance(p.profile_metadata, str) else p.profile_metadata
+                        if isinstance(meta, dict):
+                            p.is_buy_signal = meta.get("is_buy_signal", False)
+                            p.is_strategic_seller = meta.get("is_strategic_seller", False)
+                            # Intent/Sentiment fallback
+                            if not p.intent: p.intent = meta.get("intent")
+                            if not p.sentiment: p.sentiment = meta.get("sentiment")
+                    except Exception as e:
+                        print(f"Error unpacking metadata for {p.id}: {e}")
     
     # Attach to Pydantic model
     setattr(company, "people", profiles)

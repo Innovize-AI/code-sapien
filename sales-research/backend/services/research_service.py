@@ -5,7 +5,7 @@ import re
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import SessionLocal
-from db.crud import save_report, get_report_by_email_or_linkedin
+from db.crud import save_report, get_report_by_email_or_linkedin, upsert_company
 from db.schemas import ResearchReportCreate
 from utils.activity_helper import log_activity_and_notify
 from workflow.state import IdealProfile, InputLeadData, AgentState
@@ -161,21 +161,72 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
         company_stats=json.dumps(final_state.get("company_stats") or {}),
         icp_context=json.dumps(final_state.get("ideal_profile").model_dump() if hasattr(final_state.get("ideal_profile"), "model_dump") else (final_state.get("ideal_profile") or {}))
     )
+
+    # Autopopulate Company Details
+    company_id = None
+    company_name = final_state.get("company_name")
     
+    # We need a unique identifier: LinkedIn URL or Domain
+    company_li_url = final_state.get("lead_company_linkedin_url")
+    company_domain = final_state.get("website") or website
+    
+    if company_name and (company_li_url or company_domain):
+        try:
+            print(f"DEBUG: Autopopulating company '{company_name}'...")
+            company_data = {
+                "name": company_name,
+                "description": final_state.get("company_description"),
+                "website": final_state.get("website") or website,
+                "industries": json.dumps(final_state.get("company_industries") or []),
+                "employee_count": final_state.get("company_stats", {}).get("employee_count") if isinstance(final_state.get("company_stats"), dict) else None,
+                "extra_metadata": final_state.get("company_stats") or {}
+            }
+            
+            # Map stats fields if available
+            stats = final_state.get("company_stats") or {}
+            if isinstance(stats, dict):
+                company_data.update({
+                    "employee_count_range": stats.get("employee_count_range"),
+                    "revenue": stats.get("revenue"),
+                    "headquarters": stats.get("location"),
+                    "follower_count": stats.get("follower_count")
+                })
+
+            company = await upsert_company(
+                db, 
+                company_data, 
+                linkedin_url=company_li_url, 
+                domain=company_domain
+            )
+            company_id = company.id
+            print(f"DEBUG: Company linked with ID: {company_id}")
+            report_data.company_id = company_id
+        except Exception as ce:
+            print(f"Error during company autopopulation: {ce}")
+
     saved_report = await save_report(db, report_data, user_id=user_id)
+
     
     if saved_report:
-        # Sync website back to IdentifiedProfile if missing
-        if saved_report.website and saved_report.linkedin_url:
+        # Sync website and company_id back to IdentifiedProfile
+        if saved_report.linkedin_url:
             from db.models import IdentifiedProfile
             from sqlalchemy import update
-            await db.execute(
-                update(IdentifiedProfile)
-                .where(IdentifiedProfile.linkedin_url == saved_report.linkedin_url)
-                .where(IdentifiedProfile.website == None)
-                .values(website=saved_report.website)
-            )
-            await db.commit()
+            
+            update_values = {}
+            if saved_report.website:
+                update_values["website"] = saved_report.website
+            if saved_report.company_id:
+                update_values["company_id"] = saved_report.company_id
+                
+            if update_values:
+                await db.execute(
+                    update(IdentifiedProfile)
+                    .where(IdentifiedProfile.linkedin_url == saved_report.linkedin_url)
+                    .values(**update_values)
+                )
+                await db.commit()
+
         # Log Activity: Analysis Completed
         fullname = final_state.get("fullname") or linkedin_url or final_state.get("email_id") or "Unknown Lead"
         
@@ -192,8 +243,17 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
             "journey_stage": journey_analysis.get("journey_stage"),
             "heat_rating": journey_analysis.get("sentiment_score"),
             "urgency": journey_analysis.get("urgency_level"),
-            "pain_points": pain_point_analysis.get("points", []) if isinstance(pain_point_analysis, dict) else []
+            "pain_points": pain_point_analysis.get("points", []) if isinstance(pain_point_analysis, dict) else [],
+            
+            # Company Details
+            "company_name": company_name,
+            "company_description": final_state.get("company_description"),
+            "company_industries": final_state.get("company_industries", []),
+            "company_website": final_state.get("website") or website,
+            "employee_count": final_state.get("company_stats", {}).get("employee_count") if isinstance(final_state.get("company_stats"), dict) else None,
+            "revenue": final_state.get("company_stats", {}).get("revenue") if isinstance(final_state.get("company_stats"), dict) else None
         }
+
         
         print(f"DEBUG: Notification metadata for {fullname}: {json.dumps(metadata)}")
         
@@ -209,15 +269,18 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
         
         # Log Activity: High Potential Lead
         if lead_score and lead_score >= 80:
+            # Re-use metadata for consistency in high-potential alerts
+            hp_metadata = {**metadata, "is_fit": True}
             await log_activity_and_notify(
                 db,
                 type="high_potential",
                 title=f"🔥 High Potential Lead Identified: {fullname}",
                 description=f"Match score {lead_score}/100 exceeds threshold.",
-                metadata={"report_id": str(saved_report.id), "lead_score": lead_score, "name": fullname, "is_fit": True},
+                metadata=hp_metadata,
                 user_id=user_id,
                 idempotency_key=f"high_potential_alert:{saved_report.id}"
             )
+
             
         return saved_report
     else:
@@ -466,7 +529,11 @@ async def run_single_research(
                 # HubSpot Bidirectional Sync
                 await _push_to_hubspot_if_enabled(db, user_id, saved_report, final_state)
                 
-        return {"linkedin_url": linkedin_url, "result": _prepare_state_for_json(final_state)}
+        result_payload = _prepare_state_for_json(final_state)
+        if saved_report:
+            result_payload["id"] = str(saved_report.id)
+            
+        return {"linkedin_url": linkedin_url, "result": result_payload}
     except Exception as e:
         print(f"Error in run_single_research: {e}")
         # Return error/none but don't crash caller

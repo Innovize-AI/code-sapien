@@ -93,10 +93,18 @@ async def check_existing_reports(
             
         key = linkedin_url or email
         if found_report and key:
+             # Fallback email from IdentifiedProfile if missing in report
+             email_fallback = None
+             if not found_report.email_id and found_report.linkedin_url:
+                 from db.models import IdentifiedProfile
+                 stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == found_report.linkedin_url)
+                 res_prof = await db.execute(stmt_prof)
+                 email_fallback = res_prof.scalar_one_or_none()
+
              results[key] = {
                 "exists": True,
                 "report_id": str(found_report.id),
-                "data": _report_to_dict(found_report)
+                "data": _report_to_dict(found_report, email_fallback=email_fallback)
             }
 
     return results
@@ -209,7 +217,15 @@ async def run_research(
                 existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
                 if existing:
                     print(f"DEBUG: Found existing report for {linkedin_url or email}. skipping research (low intent streaming).")
-                    yield f"data: {json.dumps({'status': 'Done', 'result': _report_to_dict(existing)})}\n\n"
+                    
+                    email_fallback = None
+                    if not existing.email_id and existing.linkedin_url:
+                        from db.models import IdentifiedProfile
+                        stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == existing.linkedin_url)
+                        res_prof = await db.execute(stmt_prof)
+                        email_fallback = res_prof.scalar_one_or_none()
+                        
+                    yield f"data: {json.dumps({'status': 'Done', 'result': _report_to_dict(existing, email_fallback=email_fallback)})}\n\n"
                     return
 
             async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):
@@ -221,12 +237,17 @@ async def run_research(
             return
 
         # Persist results to DB
+        saved_report = None
         try:
-            await _persist_results(db, linkedin_url, website, final_state, options)
+            saved_report = await _persist_results(db, linkedin_url, website, final_state, options)
         except Exception as e:
             print(f"Failed to save report: {e}")
 
-        yield f"data: {json.dumps({'status': 'Done', 'result': _prepare_state_for_json(final_state)})}\n\n"
+        result_payload = _prepare_state_for_json(final_state)
+        if saved_report:
+            result_payload["id"] = str(saved_report.id)
+
+        yield f"data: {json.dumps({'status': 'Done', 'result': result_payload})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -305,7 +326,15 @@ async def update_outreach(
     updated_report = await update_report_outreach(db, report_id, outreach_data, is_manual=True)
     if not updated_report:
         return {"error": "Report not found"}
-    return {"status": "success", "data": _report_to_dict(updated_report)}
+        
+    email_fallback = None
+    if not updated_report.email_id and updated_report.linkedin_url:
+        from db.models import IdentifiedProfile
+        stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == updated_report.linkedin_url)
+        res_prof = await db.execute(stmt_prof)
+        email_fallback = res_prof.scalar_one_or_none()
+        
+    return {"status": "success", "data": _report_to_dict(updated_report, email_fallback=email_fallback)}
 
 @sales_router.put("/reports/{report_id}/outreach-status")
 async def update_outreach_status_route(
@@ -321,7 +350,15 @@ async def update_outreach_status_route(
     updated_report = await update_report_outreach_status(db, report_id, status)
     if not updated_report:
         return {"error": "Report not found"}
-    return {"status": "success", "data": _report_to_dict(updated_report)}
+        
+    email_fallback = None
+    if not updated_report.email_id and updated_report.linkedin_url:
+        from db.models import IdentifiedProfile
+        stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == updated_report.linkedin_url)
+        res_prof = await db.execute(stmt_prof)
+        email_fallback = res_prof.scalar_one_or_none()
+        
+    return {"status": "success", "data": _report_to_dict(updated_report, email_fallback=email_fallback)}
 
 @sales_router.put("/reports/{report_id}/cso-outreach")
 async def update_cso_outreach(
@@ -334,7 +371,15 @@ async def update_cso_outreach(
     updated_report = await update_report_cso_outreach(db, report_id, cso_data, is_manual=True)
     if not updated_report:
         return {"error": "Report not found or update failed"}
-    return {"status": "success", "data": _report_to_dict(updated_report)}
+        
+    email_fallback = None
+    if not updated_report.email_id and updated_report.linkedin_url:
+        from db.models import IdentifiedProfile
+        stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == updated_report.linkedin_url)
+        res_prof = await db.execute(stmt_prof)
+        email_fallback = res_prof.scalar_one_or_none()
+        
+    return {"status": "success", "data": _report_to_dict(updated_report, email_fallback=email_fallback)}
 
 @sales_router.put("/reports/{report_id}/intent-email")
 async def update_intent_email(
@@ -348,7 +393,15 @@ async def update_intent_email(
     updated_report = await update_report_intent_email(db, report_id, email_text)
     if not updated_report:
         return {"error": "Report not found or update failed"}
-    return {"status": "success", "data": _report_to_dict(updated_report)}
+        
+    email_fallback = None
+    if not updated_report.email_id and updated_report.linkedin_url:
+        from db.models import IdentifiedProfile
+        stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == updated_report.linkedin_url)
+        res_prof = await db.execute(stmt_prof)
+        email_fallback = res_prof.scalar_one_or_none()
+        
+    return {"status": "success", "data": _report_to_dict(updated_report, email_fallback=email_fallback)}
 
 @sales_router.put("/reports/{report_id}/executive-blueprint")
 async def update_executive_blueprint(
@@ -361,7 +414,15 @@ async def update_executive_blueprint(
     updated_report = await update_report_sales_research(db, report_id, blueprint_data, is_manual=True)
     if not updated_report:
         return {"error": "Report not found or update failed"}
-    return {"status": "success", "data": _report_to_dict(updated_report)}
+        
+    email_fallback = None
+    if not updated_report.email_id and updated_report.linkedin_url:
+        from db.models import IdentifiedProfile
+        stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == updated_report.linkedin_url)
+        res_prof = await db.execute(stmt_prof)
+        email_fallback = res_prof.scalar_one_or_none()
+        
+    return {"status": "success", "data": _report_to_dict(updated_report, email_fallback=email_fallback)}
 
 @sales_router.put("/reports/{report_id}/intent-analysis")
 async def update_intent_analysis_route(
@@ -374,7 +435,15 @@ async def update_intent_analysis_route(
     updated_report = await update_report_intent_analysis(db, report_id, intent_data, is_manual=True)
     if not updated_report:
         return {"error": "Report not found or update failed"}
-    return {"status": "success", "data": _report_to_dict(updated_report)}
+        
+    email_fallback = None
+    if not updated_report.email_id and updated_report.linkedin_url:
+        from db.models import IdentifiedProfile
+        stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == updated_report.linkedin_url)
+        res_prof = await db.execute(stmt_prof)
+        email_fallback = res_prof.scalar_one_or_none()
+        
+    return {"status": "success", "data": _report_to_dict(updated_report, email_fallback=email_fallback)}
 
 @sales_router.put("/reports/{report_id}/buyer-journey")
 async def update_buyer_journey_route(
@@ -387,4 +456,12 @@ async def update_buyer_journey_route(
     updated_report = await update_report_buyer_journey(db, report_id, journey_data, is_manual=True)
     if not updated_report:
         return {"error": "Report not found or update failed"}
-    return {"status": "success", "data": _report_to_dict(updated_report)}
+        
+    email_fallback = None
+    if not updated_report.email_id and updated_report.linkedin_url:
+        from db.models import IdentifiedProfile
+        stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == updated_report.linkedin_url)
+        res_prof = await db.execute(stmt_prof)
+        email_fallback = res_prof.scalar_one_or_none()
+        
+    return {"status": "success", "data": _report_to_dict(updated_report, email_fallback=email_fallback)}

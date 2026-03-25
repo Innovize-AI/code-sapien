@@ -34,7 +34,7 @@ else:
     DATABASE_URL = raw_url
     
 DB_SCHEMA = os.getenv("DB_SCHEMA")
-env = (os.getenv("ENVIRONMENT") or "production").lower().strip() # Default to production for safety
+env = (os.getenv("ENVIRONMENT") or "staging").lower().strip() # Default to production for safety
 
 # Handle cases where Cloud Deploy placeholders are not resolved or env is missing
 if not DB_SCHEMA or DB_SCHEMA == "${db_schema}":

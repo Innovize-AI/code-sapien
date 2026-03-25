@@ -9,7 +9,7 @@ import { Book, FileText, Award, Terminal, RefreshCw, CheckCircle2, AlertCircle, 
 import { useEffect, useState, useRef } from "react";
 import { StrategyModal, StrategyConfig } from "@/components/knowledge/StrategyModal";
 import { ProductModal, ProductConfig } from "@/components/knowledge/ProductModal";
-import { fetchKnowledgeNamespaces, syncKnowledgeBase, fetchKnowledgeFiles, ingestKnowledgeFile, NamespaceInfo, KnowledgeFile } from "@/lib/api";
+import { fetchKnowledgeNamespaces, syncKnowledgeBase, fetchKnowledgeFiles, ingestKnowledgeFile, NamespaceInfo, KnowledgeFile, fetchStrategy, configureStrategy, uploadKnowledgeFile } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
@@ -17,39 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-
-// Add API function placeholders (assuming these are in @/lib/api or will be added)
-// import { configureStrategy, fetchStrategy, uploadKnowledgeFile } from "@/lib/api";
-
-// Helper to simulate API call if not exists yet
-const configureStrategy = async (config: StrategyConfig) => {
-    const res = await fetch('/api/knowledge/configure-strategy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
-    });
-    if (!res.ok) throw new Error('Failed to save strategy');
-    return res.json();
-};
-
-const fetchStrategy = async () => {
-   const res = await fetch('/api/knowledge/strategy');
-    if (!res.ok) return { products: [] };
-    return res.json();
-};
-
-const uploadKnowledgeFile = async (file: File, namespace: string) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('namespace', namespace);
-    
-    const res = await fetch('/api/knowledge/upload', {
-        method: 'POST',
-        body: formData
-    });
-    if (!res.ok) throw new Error('Upload failed');
-    return res.json();
-};
 
 import { useAuth } from "@/context/auth-context";
 
@@ -74,7 +41,7 @@ export default function KnowledgeBasePage() {
     const [newNamespace, setNewNamespace] = useState("playbooks");
     const [isIngesting, setIsIngesting] = useState(false);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
-    
+
     // Upload State
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -210,7 +177,7 @@ export default function KnowledgeBasePage() {
     // Solutions are now driven by DB products, not files
     const products = strategyProfile?.products || [];
     const caseStudies = knowledgeFiles.filter(f => f.name.includes("case-study"));
-    
+
     // Categorize files for modal selection
     const availableFilesForModal = knowledgeFiles.map(f => ({
         name: f.name,
@@ -259,16 +226,16 @@ export default function KnowledgeBasePage() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        
+
                                         <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                                             <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
                                             <p className="text-sm font-medium">Click to Upload File</p>
                                             <p className="text-xs text-muted-foreground">Markdown files (.md) supported</p>
-                                            <input 
-                                                type="file" 
-                                                ref={fileInputRef} 
-                                                className="hidden" 
-                                                accept=".md" 
+                                            <input
+                                                type="file"
+                                                ref={fileInputRef}
+                                                className="hidden"
+                                                accept=".md"
                                                 onChange={handleFileUpload}
                                             />
                                         </div>
@@ -284,9 +251,9 @@ export default function KnowledgeBasePage() {
 
                                         <div className="grid gap-2">
                                             <Label htmlFor="path">Server File Path</Label>
-                                            <Input 
-                                                id="path" 
-                                                placeholder="market_validation/innovize-ai/example.md" 
+                                            <Input
+                                                id="path"
+                                                placeholder="market_validation/innovize-ai/example.md"
                                                 value={newFilePath}
                                                 onChange={(e) => setNewFilePath(e.target.value)}
                                             />
@@ -300,9 +267,9 @@ export default function KnowledgeBasePage() {
                                     </SheetFooter>
                                 </SheetContent>
                             </Sheet>
-                            <Button 
-                                variant="default" 
-                                onClick={handleSync} 
+                            <Button
+                                variant="default"
+                                onClick={handleSync}
                                 disabled={isSyncing}
                                 className="gap-2"
                             >
@@ -324,11 +291,10 @@ export default function KnowledgeBasePage() {
                             </div>
                             <CardHeader>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <div className={`p-2 rounded-lg ${
-                                        ns.name === 'playbooks' ? 'bg-blue-500/10 text-blue-500' :
+                                    <div className={`p-2 rounded-lg ${ns.name === 'playbooks' ? 'bg-blue-500/10 text-blue-500' :
                                         ns.name === 'solutions' ? 'bg-purple-500/10 text-purple-500' :
-                                        'bg-orange-500/10 text-orange-500'
-                                    }`}>
+                                            'bg-orange-500/10 text-orange-500'
+                                        }`}>
                                         {ns.name === 'playbooks' && <Book className="w-4 h-4" />}
                                         {ns.name === 'solutions' && <Terminal className="w-4 h-4" />}
                                         {ns.name === 'case-studies' && <Award className="w-4 h-4" />}
@@ -365,14 +331,14 @@ export default function KnowledgeBasePage() {
                                 <TabsTrigger value="solutions">Products & Services</TabsTrigger>
                                 <TabsTrigger value="case-studies">Case Studies</TabsTrigger>
                             </TabsList>
-                            
+
                             <TabsContent value="playbooks" className="space-y-4">
                                 <div className="grid gap-4">
                                     {playbooks.length > 0 ? playbooks.map(f => (
-                                        <DocumentItem 
+                                        <DocumentItem
                                             key={f.path}
-                                            name={f.name} 
-                                            status="Available" 
+                                            name={f.name}
+                                            status="Available"
                                             date={`Size: ${(f.size / 1024).toFixed(1)} KB`}
                                         />
                                     )) : (
@@ -380,7 +346,7 @@ export default function KnowledgeBasePage() {
                                     )}
                                 </div>
                             </TabsContent>
-                            
+
                             <TabsContent value="solutions" className="space-y-4">
                                 <div className="flex justify-between items-center bg-muted/20 p-4 rounded-lg border border-dashed">
                                     <div className="space-y-1">
@@ -397,15 +363,15 @@ export default function KnowledgeBasePage() {
                                 <div className="grid gap-4 md:grid-cols-2">
                                     {products.length > 0 ? products.map((p: any) => (
                                         <Card key={p.name} className="relative overflow-hidden hover:border-primary/50 transition-colors group cursor-pointer" onClick={() => {
-                                             if (!isAdmin) return;
-                                             setEditingProduct({
+                                            if (!isAdmin) return;
+                                            setEditingProduct({
                                                 product_name: p.name,
                                                 description: p.description,
                                                 is_strategic_pivot: p.is_strategic_pivot,
                                                 target_roles: p.target_roles,
                                                 relevant_files: p.relevant_files || []
-                                             });
-                                             setIsProductModalOpen(true);
+                                            });
+                                            setIsProductModalOpen(true);
                                         }}>
                                             <CardHeader className="pb-2">
                                                 <div className="flex justify-between items-start">
@@ -442,10 +408,10 @@ export default function KnowledgeBasePage() {
                             <TabsContent value="case-studies" className="space-y-4">
                                 <div className="grid gap-4">
                                     {caseStudies.length > 0 ? caseStudies.map(f => (
-                                        <DocumentItem 
+                                        <DocumentItem
                                             key={f.path}
-                                            name={f.name} 
-                                            status="Available" 
+                                            name={f.name}
+                                            status="Available"
                                             date={`Size: ${(f.size / 1024).toFixed(1)} KB`}
                                             isAdmin={isAdmin}
                                         />
@@ -466,7 +432,7 @@ export default function KnowledgeBasePage() {
                 </Card>
 
                 {isProductModalOpen && (
-                    <ProductModal 
+                    <ProductModal
                         isOpen={isProductModalOpen}
                         onClose={() => setIsProductModalOpen(false)}
                         onSave={handleSaveProduct}
@@ -506,11 +472,11 @@ function DocumentItem({ name, status, date, onStrategyClick, pivotInfo, isAdmin 
                     <CheckCircle2 className="w-3 h-3" />
                     {status}
                 </Badge>
-                
+
                 {onStrategyClick && isAdmin && (
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         className={`h-8 w-8 transition-all ${pivotInfo ? 'text-amber-500 opacity-100' : 'text-muted-foreground opacity-20 group-hover:opacity-100'}`}
                         onClick={(e) => { e.stopPropagation(); onStrategyClick(); }}
                         title="Configure Strategic Pivot"

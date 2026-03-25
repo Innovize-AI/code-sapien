@@ -89,3 +89,16 @@ CSV upload of prospects (linkedin url and websites)
 - [ ] **Settings Changes**: Log when ICP, Integration Keys, or Selling Profiles are updated.
 - [ ] **Account Setup**: Log when users update their personal Slack Member ID or IMAP configuration.
 - [ ] **Team Actions**: Log when a rep "Ignores" a lead or triggers specific research.
+
+
+
+Create daily rep actions
+create a sheet with with who was contacted and when and what was the result sheet
+Follow up sequence agent using commad senter and lead score recommendations
+create a seperater AI layer to generate comments etc.. for posts and comments
+
+
+create a automation for signal based playbook and monitoring specific profiles... 
+create a leadscore trends
+see if we are passing tech to leads and also outreach agents
+Add a way to manually add signals etc. like we saw a case study or you appreaded on competitor page etc...

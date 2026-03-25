@@ -41,6 +41,26 @@ async def get_icp(
     except:
         return None
 
+@settings_router.get("/settings/global-icp", response_model=Optional[IdealProfileData])
+async def get_global_icp(
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    """
+    Get the Global Organization ICP.
+    """
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    settings = result.scalars().first()
+    
+    if not settings or not settings.icp_json:
+        return None
+        
+    try:
+        data = json.loads(settings.icp_json)
+        return IdealProfileData(**data)
+    except:
+        return None
+
 @settings_router.post("/settings/icp", response_model=IdealProfileData)
 async def save_icp(
     icp_data: IdealProfileData, 

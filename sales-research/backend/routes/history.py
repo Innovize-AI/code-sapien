@@ -110,12 +110,21 @@ async def read_history(
 @history_router.get("/history/{report_id}")
 async def read_report_item(report_id: str, db: AsyncSession = Depends(get_db)):
     import time
+    from db.models import IdentifiedProfile
+    from sqlalchemy import select
+    
     start_time = time.time()
     report = await get_report(db, report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     
-    result = _report_to_dict(report)
+    email_fallback = None
+    if not report.email_id and report.linkedin_url:
+        stmt = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == report.linkedin_url)
+        res = await db.execute(stmt)
+        email_fallback = res.scalar_one_or_none()
+
+    result = _report_to_dict(report, email_fallback=email_fallback)
     duration = time.time() - start_time
     print(f"DEBUG: read_report_item({report_id}) took {duration:.4f}s")
     return result

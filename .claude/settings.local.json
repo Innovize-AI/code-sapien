@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /mnt/d/innovizeai/code-sapien/sales-research/backend/knowledge_base/playbooks)",
+      "Bash(mkdir -p /mnt/d/innovizeai/code-sapien/sales-research/backend/knowledge_base/solutions)",
+      "Bash(mkdir -p /mnt/d/innovizeai/code-sapien/sales-research/backend/knowledge_base/case-studies)"
+    ]
+  }
+}

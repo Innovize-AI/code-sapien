@@ -26,20 +26,22 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
     
     # 1. Hard Filter: Role Match
     user_details = state.get("user_profile_details", {})
-    job_title = user_details.get("headline", "") or state.get("ideal_profile", {}).job_title or ""
     
+    # need to adjust this
+    job_title = user_details.get("basic_info", {}).get("headline", "")
+    ideal_job_titles= state.get("ideal_profile", {}).job_title or ""
     # Handle the case where job_title is a list from the ICP
-    if isinstance(job_title, list):
-        job_title = " ".join(str(j) for j in job_title)
+    if isinstance(ideal_job_titles, list):
+        ideal_job_titles_str = " ".join(str(j) for j in ideal_job_titles)
     
     job_title_lower = str(job_title).lower()
     
     role_match = False
-    if not target_roles:
+    if not ideal_job_titles:
         role_match = True # No specific roles defined, assume fit
     else:
-        for role in target_roles:
-            if role.lower() in job_title_lower:
+        for role in ideal_job_titles:
+            if role.lower() in ideal_job_titles_str.lower():
                 role_match = True
                 break
     
@@ -182,10 +184,17 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
             pivot_name = strategic_pivot.name
             
             # Retrieve specific context from relevant files
-            relevant_files = getattr(strategic_pivot, "relevant_files", [])
+            attached_playbooks = getattr(strategic_pivot, "attached_playbooks", [])
+            attached_case_studies = getattr(strategic_pivot, "attached_case_studies", [])
+            relevant_files = attached_playbooks + attached_case_studies
+            
+            # Fallback to legacy relevant_files if new ones are empty (migration safety)
+            if not relevant_files:
+                relevant_files = getattr(strategic_pivot, "relevant_files", [])
+
             specific_context = ""
             if relevant_files:
-                print(f"Retrieving context from {len(relevant_files)} relevant files: {relevant_files}")
+                print(f"Retrieving context from {len(relevant_files)} files: {relevant_files}")
                 specific_context = knowledge_service.retrieve_from_files(relevant_files, strategic_pivot.name + " " + " ".join(pain_points.keys() if isinstance(pain_points, dict) else []), k=10)
             
             # Fallback to legacy rag_context if no specific files or empty result

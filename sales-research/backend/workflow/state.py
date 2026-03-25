@@ -117,7 +117,8 @@ class AgentState(TypedDict):
     strategic_rag_briefing: Annotated[str, reduce_last]
     lead_segment: Annotated[str, reduce_last] # new field
     strategic_solutions: Annotated[Union[dict, str], reduce_last]
-    personalized_outreach: Annotated[dict, reduce_last]
+    personalized_outreach: Annotated[List[dict], reduce_last]
+
     follow_up_strategy: Annotated[Union[dict, str], reduce_last]
     viability_analysis: Annotated[str, reduce_last]
     cso_strategic_briefing: Annotated[dict, reduce_last]

@@ -41,7 +41,7 @@ async def test_modular_graph():
         "viability_analysis": "",
         "target_pain_points": "",
         "strategic_solutions": "",
-        "personalized_outreach": "",
+        "personalized_outreach": [],
         "post_engagements": [],
         "company_news": [],
         "hiring_data": []

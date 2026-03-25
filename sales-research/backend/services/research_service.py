@@ -148,7 +148,8 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
         # Modular Nodules
         target_pain_points=json.dumps(final_state.get("target_pain_points") or {}),
         strategic_solutions=json.dumps(final_state.get("strategic_solutions") or {}),
-        personalized_outreach=json.dumps(final_state.get("personalized_outreach") or {}),
+        personalized_outreach=json.dumps(final_state.get("personalized_outreach") or []),
+
         follow_up_strategy=_safe_serialize(final_state.get("follow_up_strategy")),
         cso_strategic_briefing=json.dumps(final_state.get("cso_strategic_briefing") or {}),
         buyer_journey_analysis=json.dumps(final_state.get("buyer_journey_analysis") or {}),
@@ -429,7 +430,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "lead_score_analysis": existing_state.get("lead_score_analysis", {}),
         "target_pain_points": existing_state.get("target_pain_points", {}),
         "strategic_solutions": existing_state.get("strategic_solutions", {}),
-        "personalized_outreach": existing_state.get("personalized_outreach", {}),
+        "personalized_outreach": existing_state.get("personalized_outreach", []),
         "follow_up_strategy": existing_state.get("follow_up_strategy", {}),
         "buyer_journey_analysis": existing_state.get("buyer_journey_analysis", {}),
         "cso_strategic_briefing": existing_state.get("cso_strategic_briefing", {}),

@@ -100,12 +100,12 @@ async def ingest_file(request: IngestRequest, admin_user: Profile = Depends(requ
             if not os.path.isabs(full_path):
                 full_path = os.path.join(os.getcwd(), full_path)
             
-            num_chunks = knowledge_service.ingest_markdown_file(
+            result = await knowledge_service.ingest_markdown_file(
                 full_path, 
                 request.namespace, 
                 request.metadata
             )
-            return {"status": "success", "chunks": num_chunks}
+            return {"status": "success", "result": result}
         else:
             raise HTTPException(status_code=400, detail="Only file_path ingestion is currently supported.")
     except Exception as e:
@@ -126,7 +126,7 @@ async def sync_defaults(background_tasks: BackgroundTasks, admin_user: Profile =
 
     files = [f for f in os.listdir(base_dir) if f.endswith(".md")]
     
-    def process_sync():
+    async def process_sync():
         for filename in files:
             path = os.path.join(base_dir, filename)
             # Route to namespaces based on filename
@@ -137,7 +137,7 @@ async def sync_defaults(background_tasks: BackgroundTasks, admin_user: Profile =
                 namespace = "solutions"
             
             try:
-                knowledge_service.ingest_markdown_file(path, namespace)
+                await knowledge_service.ingest_markdown_file(path, namespace)
             except Exception as e:
                 print(f"Failed to ingest {filename}: {e}")
 
@@ -167,13 +167,13 @@ async def upload_knowledge_file(
             shutil.copyfileobj(file.file, buffer)
             
         # 2. Ingest
-        num_chunks = knowledge_service.ingest_markdown_file(file_path, namespace)
+        result = await knowledge_service.ingest_markdown_file(file_path, namespace)
         
         return {
             "status": "success", 
             "filename": file.filename, 
-            "chunks": num_chunks,
-            "path": os.path.relpath(file_path, os.getcwd())
+            "result": result,
+            "path": os.relpath(file_path, os.getcwd())
         }
     except Exception as e:
         print(f"Upload failed: {e}")
@@ -185,6 +185,8 @@ class StrategyConfig(BaseModel):
     target_roles: List[str]
     product_name: Optional[str] = None
     description: Optional[str] = None
+    attached_playbooks: List[str] = []
+    attached_case_studies: List[str] = []
     relevant_files: List[str] = []
 
 @router.post("/configure-strategy")
@@ -239,6 +241,8 @@ async def configure_strategy(
                 p.description = config.description
             p.is_strategic_pivot = config.is_strategic_pivot
             p.target_roles = config.target_roles
+            p.attached_playbooks = config.attached_playbooks
+            p.attached_case_studies = config.attached_case_studies
             p.relevant_files = config.relevant_files
             
             # Legacy fields update
@@ -255,14 +259,17 @@ async def configure_strategy(
     if not found:
         # Default relevant files to include the current filename if provided
         initial_files = config.relevant_files
-        if config.filename and config.filename not in initial_files:
-            initial_files.append(config.filename)
+        if flag_filename := config.filename:
+            if flag_filename not in initial_files:
+                initial_files.append(flag_filename)
 
         new_product = ProductConfig(
             name=p_name,
             description=config.description or "Strategic Product from Knowledge Base",
             is_strategic_pivot=config.is_strategic_pivot,
             target_roles=config.target_roles,
+            attached_playbooks=config.attached_playbooks,
+            attached_case_studies=config.attached_case_studies,
             relevant_files=initial_files,
             rag_context=config.filename
         )

@@ -34,7 +34,7 @@ class ResearchReport(Base):
     viability_analysis = Column(Text, nullable=True)
     target_pain_points = Column(Text, nullable=True)
     strategic_solutions = Column(Text, nullable=True)
-    personalized_outreach = Column(Text, nullable=True)
+    personalized_outreach = Column(Text, nullable=True) #JSON array
     follow_up_strategy = Column(Text, nullable=True)
     buyer_journey_analysis = Column(Text, nullable=True) # JSON object
     meeting_notes = Column(Text, nullable=True)

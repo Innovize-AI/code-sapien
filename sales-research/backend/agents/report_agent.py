@@ -73,33 +73,42 @@ def sales_research_report_generator(state: AgentState):
     # New Modular Content
     pain_points = state.get("target_pain_points", "")
     solutions = state.get("strategic_solutions", "")
-    outreach = state.get("personalized_outreach", "")
-    
+    outreach_campaign_variants= state.get("campaign_outreach_variants", "")
     # Strategy Section (Outreach vs Follow-up)
-    outreach_data = state.get("personalized_outreach", "")
+    outreach_list = state.get("personalized_outreach") or []
+    if not isinstance(outreach_list, list):
+        outreach_list = [outreach_list] if outreach_list else []
     follow_up = state.get("follow_up_strategy", "")
     cso_briefing = state.get("cso_strategic_briefing", {})
     
     outreach_str = ""
-    if isinstance(outreach_data, dict) and outreach_data:
-        # Use CSO Refined content if available
-        li_msg = cso_briefing.get("refined_linkedin_message") or outreach_data.get('linkedin_message')
-        email_body = cso_briefing.get("refined_email_body") or outreach_data.get('email_body')
-        
+    if isinstance(outreach_list, list) and outreach_list:
+        for i, variant in enumerate(outreach_list):
+            v_name = variant.get('variant_name', f"Variant {i+1}")
+            outreach_str += f"""
+        VARIANT: {v_name}
+        Hook: {variant.get('hook')}
+        LinkedIn: {variant.get('linkedin_message')}
+        Email Subject: {variant.get('email_subject')}
+        Email Body: {variant.get('email_body')}
+        ---"""
+    elif isinstance(outreach_list, dict) and outreach_list:
+        # Backward compatibility for single dict
         outreach_str = f"""
-        Hook: {outreach_data.get('hook')}
-        LinkedIn: {li_msg}
-        Email Subject: {outreach_data.get('email_subject')}
-        Email Body: {email_body}
+        Hook: {outreach_list.get('hook')}
+        LinkedIn: {outreach_list.get('linkedin_message')}
+        Email Subject: {outreach_list.get('email_subject')}
+        Email Body: {outreach_list.get('email_body')}
         """
     else:
-        outreach_str = str(outreach_data)
+        outreach_str = str(outreach_list)
 
     strategy_output = ""
     if follow_up:
         strategy_output = f"- High-Impact Follow-up Strategy: {follow_up}"
     else:
-        strategy_output = f"- Outreach Strategy Design: {outreach_str}"
+        strategy_output = f"- Outreach Strategy Design:\n{outreach_str}"
+
 
     company_name = state.get("company_name", "")
     company_description = state.get("company_description", "")

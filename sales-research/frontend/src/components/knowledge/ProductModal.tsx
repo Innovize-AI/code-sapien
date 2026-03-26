@@ -22,33 +22,42 @@ export interface ProductConfig {
     description: string;
     is_strategic_pivot: boolean;
     target_roles: string[];
-    relevant_files: string[];
+    attached_playbooks: string[];
+    attached_case_studies: string[];
+    relevant_files?: string[];
 }
 
 const COMMON_ROLES = ["Founder", "CEO", "CRO", "VP Sales", "Head of Growth", "CTO", "COO", "Director of Sales"];
 
 export function ProductModal({ isOpen, onClose, onSave, initialConfig, availableFiles, isAdmin }: ProductModalProps) {
     const [isSaving, setIsSaving] = useState(false);
-    
+
     // Form State
     const [name, setName] = useState(initialConfig?.product_name || "");
     const [description, setDescription] = useState(initialConfig?.description || "");
     const [isPivot, setIsPivot] = useState(initialConfig?.is_strategic_pivot || false);
     const [selectedRoles, setSelectedRoles] = useState<string[]>(initialConfig?.target_roles || []);
-    const [selectedFiles, setSelectedFiles] = useState<string[]>(initialConfig?.relevant_files || []);
+    const [selectedPlaybooks, setSelectedPlaybooks] = useState<string[]>(initialConfig?.attached_playbooks || []);
+    const [selectedCaseStudies, setSelectedCaseStudies] = useState<string[]>(initialConfig?.attached_case_studies || []);
 
     // Filter files for selection
     const playbooks = availableFiles.filter(f => f.type === 'playbooks');
     const caseStudies = availableFiles.filter(f => f.type === 'case-studies');
 
     const handleRoleToggle = (role: string) => {
-        setSelectedRoles(prev => 
+        setSelectedRoles(prev =>
             prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
         );
     };
 
-    const handleFileToggle = (fname: string) => {
-        setSelectedFiles(prev => 
+    const handlePlaybookToggle = (fname: string) => {
+        setSelectedPlaybooks(prev =>
+            prev.includes(fname) ? prev.filter(f => f !== fname) : [...prev, fname]
+        );
+    };
+
+    const handleCaseStudyToggle = (fname: string) => {
+        setSelectedCaseStudies(prev =>
             prev.includes(fname) ? prev.filter(f => f !== fname) : [...prev, fname]
         );
     };
@@ -62,7 +71,9 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                 description,
                 is_strategic_pivot: isPivot,
                 target_roles: selectedRoles,
-                relevant_files: selectedFiles
+                attached_playbooks: selectedPlaybooks,
+                attached_case_studies: selectedCaseStudies,
+                relevant_files: [...selectedPlaybooks, ...selectedCaseStudies] // Sync for legacy
             });
             onClose();
         } catch (e) {
@@ -87,19 +98,19 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                     <div className="grid gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="name">Product / Service Name</Label>
-                            <Input 
-                                id="name" 
-                                value={name} 
-                                onChange={(e) => setName(e.target.value)} 
+                            <Input
+                                id="name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
                                 placeholder="e.g. Glial Enterprise, Sales Audit"
                             />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="desc">Short Description</Label>
-                            <Textarea 
-                                id="desc" 
-                                value={description} 
-                                onChange={(e) => setDescription(e.target.value)} 
+                            <Textarea
+                                id="desc"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
                                 placeholder="Briefly describe the value proposition..."
                                 className="h-20"
                             />
@@ -123,13 +134,13 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                             <div className="grid grid-cols-2 gap-2">
                                 {COMMON_ROLES.map(role => (
                                     <div key={role} className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id={`role-${role}`} 
+                                        <Checkbox
+                                            id={`role-${role}`}
                                             checked={selectedRoles.includes(role)}
                                             onCheckedChange={() => handleRoleToggle(role)}
                                         />
-                                        <label 
-                                            htmlFor={`role-${role}`} 
+                                        <label
+                                            htmlFor={`role-${role}`}
                                             className="text-sm cursor-pointer"
                                         >
                                             {role}
@@ -143,7 +154,7 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                     {/* Asset Linking */}
                     <div className="space-y-4">
                         <h3 className="font-medium text-sm text-foreground/80 border-b pb-2">Knowledge Assets</h3>
-                        
+
                         {/* Playbooks */}
                         <div className="grid gap-2">
                             <Label className="flex items-center gap-2 text-blue-600">
@@ -152,10 +163,10 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                             <div className="border rounded-md p-2 h-32 overflow-y-auto space-y-2 bg-background/50">
                                 {playbooks.length > 0 ? playbooks.map(file => (
                                     <div key={file.path} className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id={`pb-${file.name}`} 
-                                            checked={selectedFiles.includes(file.name)}
-                                            onCheckedChange={() => handleFileToggle(file.name)}
+                                        <Checkbox
+                                            id={`pb-${file.name}`}
+                                            checked={selectedPlaybooks.includes(file.name)}
+                                            onCheckedChange={() => handlePlaybookToggle(file.name)}
                                         />
                                         <label htmlFor={`pb-${file.name}`} className="text-sm truncate w-full cursor-pointer" title={file.name}>
                                             {file.name}
@@ -173,10 +184,10 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                             <div className="border rounded-md p-2 h-32 overflow-y-auto space-y-2 bg-background/50">
                                 {caseStudies.length > 0 ? caseStudies.map(file => (
                                     <div key={file.path} className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id={`cs-${file.name}`} 
-                                            checked={selectedFiles.includes(file.name)}
-                                            onCheckedChange={() => handleFileToggle(file.name)}
+                                        <Checkbox
+                                            id={`cs-${file.name}`}
+                                            checked={selectedCaseStudies.includes(file.name)}
+                                            onCheckedChange={() => handleCaseStudyToggle(file.name)}
                                         />
                                         <label htmlFor={`cs-${file.name}`} className="text-sm truncate w-full cursor-pointer" title={file.name}>
                                             {file.name}

@@ -162,7 +162,7 @@ def _report_to_dict(report, email_fallback=None):
         "viability_analysis": _safe_deserialize(report.viability_analysis),
         "target_pain_points": _safe_deserialize(report.target_pain_points),
         "strategic_solutions": _safe_deserialize(report.strategic_solutions),
-        "personalized_outreach": _safe_json_load(report.personalized_outreach, {}),
+        "personalized_outreach": _safe_json_load(report.personalized_outreach, []),
         "follow_up_strategy": _safe_deserialize(report.follow_up_strategy),
         "buyer_journey_analysis": _safe_json_load(report.buyer_journey_analysis, {}),
         "meeting_notes": report.meeting_notes,
@@ -716,19 +716,26 @@ async def update_report_outreach(db: AsyncSession, report_id: str, outreach_data
             outreach_data["_edit_depths"] = edit_depths
 
         if variant_index is not None:
-            report_data = _safe_deserialize(db_report.sales_research_report) or {}
-            if "campaign_variants" not in report_data:
-                report_data["campaign_variants"] = []
-            if len(report_data["campaign_variants"]) > variant_index:
+            # Load list from personalized_outreach
+            variants = _safe_json_load(db_report.personalized_outreach, [])
+            if not isinstance(variants, list):
+                variants = [variants] if variants else []
+            
+            if len(variants) > variant_index:
                 # Merge existing _edit_depths if we only updated some fields
-                if "_edit_depths" in report_data["campaign_variants"][variant_index] and edit_depths:
-                    merged_depths = {**report_data["campaign_variants"][variant_index]["_edit_depths"], **edit_depths}
+                if "_edit_depths" in variants[variant_index] and edit_depths:
+                    merged_depths = {**variants[variant_index]["_edit_depths"], **edit_depths}
                     outreach_data["_edit_depths"] = merged_depths
                 
-                report_data["campaign_variants"][variant_index].update(outreach_data)
-                db_report.sales_research_report = json.dumps(report_data)
+                variants[variant_index].update(outreach_data)
+                db_report.personalized_outreach = json.dumps(variants)
         else:
-            db_report.personalized_outreach = json.dumps(outreach_data)
+            # If no index, either replace entire list or it's a single update (assume replace for now)
+            if isinstance(outreach_data, list):
+                db_report.personalized_outreach = json.dumps(outreach_data)
+            else:
+                db_report.personalized_outreach = json.dumps([outreach_data])
+
         
         await db.commit()
         await db.refresh(db_report)

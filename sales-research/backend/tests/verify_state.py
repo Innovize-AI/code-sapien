@@ -35,7 +35,7 @@ async def main():
         "lead_score_analysis": {},
         "target_pain_points": {},
         "strategic_solutions": {},
-        "personalized_outreach": {},
+        "personalized_outreach": [],
         "buyer_journey_analysis": {},
         "sales_research_report": {}
     }

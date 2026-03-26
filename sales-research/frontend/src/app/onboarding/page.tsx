@@ -42,13 +42,18 @@ import {
 } from "@/lib/api";
 
 import { MultiSelect } from "@/components/ui/multi-select";
-import { LINKEDIN_INDUSTRIES, COMPANY_SIZE_OPTIONS, REVENUE_OPTIONS, JOB_TITLE_OPTIONS } from "@/lib/constants";
+import {
+  LINKEDIN_INDUSTRIES,
+  COMPANY_SIZE_OPTIONS,
+  REVENUE_OPTIONS,
+  JOB_TITLE_OPTIONS,
+} from "@/lib/constants";
 
 const icpFormSchema = z.object({
-  industry: z.union([z.string(), z.array(z.string())]).optional(),
+  industry: z.union([z.string(), z.array(z.string())]),
   company_size: z.union([z.string(), z.array(z.string())]).optional(),
   revenue: z.union([z.string(), z.array(z.string())]).optional(),
-  job_title: z.union([z.string(), z.array(z.string())]).optional(),
+  job_title: z.union([z.string(), z.array(z.string())]),
   value_proposition: z.string().optional(),
 });
 
@@ -86,8 +91,13 @@ export default function OnboardingPage() {
             revenue: existingIcp.revenue || [],
             job_title: Array.isArray(existingIcp.job_title)
               ? existingIcp.job_title
-              : (existingIcp.job_title ? (existingIcp.job_title as string).split(",").map(s => s.trim()).filter(Boolean) : []),
-            value_proposition: existingIcp.value_proposition || ""
+              : existingIcp.job_title
+                ? (existingIcp.job_title as string)
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                : [],
+            value_proposition: existingIcp.value_proposition || "",
           });
         }
       } catch (e) {
@@ -139,7 +149,8 @@ export default function OnboardingPage() {
               Define Your Ideal Customer Profile
             </CardTitle>
             <CardDescription className="text-base text-muted-foreground/80">
-              Tell us about your target audience. We'll use this to calibrate our AI for your specific market.
+              Tell us about your target audience. We'll use this to calibrate
+              our AI for your specific market.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -164,7 +175,9 @@ export default function OnboardingPage() {
                             allowCustom
                           />
                         </FormControl>
-                        <FormDescription>Select all industries that apply to your product.</FormDescription>
+                        <FormDescription>
+                          Select all industries that apply to your product.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -180,7 +193,7 @@ export default function OnboardingPage() {
                             <MultiSelect
                               label="Company Size"
                               options={COMPANY_SIZE_OPTIONS}
-                              value={field.value}
+                              value={field.value || []}
                               onChange={field.onChange}
                               placeholder="Select sizes..."
                               hideSearch
@@ -199,7 +212,7 @@ export default function OnboardingPage() {
                             <MultiSelect
                               label="Annual Revenue"
                               options={REVENUE_OPTIONS}
-                              value={field.value}
+                              value={field.value || []}
                               onChange={field.onChange}
                               placeholder="Select revenue..."
                               hideSearch

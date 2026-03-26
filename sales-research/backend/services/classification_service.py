@@ -160,6 +160,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
                             },
                             # Carry over metadata from raw lead
                             "name": lead.get("name"),
+                            "headline": lead.get("headline"),
                             "comment": lead.get("comment"),
                             "source_post": lead.get("source_post"),
                             "source_post_url": lead.get("source_post_url"),
@@ -185,7 +186,9 @@ async def run_classification_and_update(raw_leads: List[dict]):
                             print(f"DEBUG: Skipping notification for Strategic Seller {lu.get('name')}")
                             continue
 
-                        is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"])
+                        has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
+                        has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
+                        is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
                         is_qualified = lu.get("is_fit") and not lu.get("is_buy_signal") and not lu.get("is_strategic_seller")
                         
                         if is_hot or lu.get("intent") in ["prospect_pain", "pain_point"] or is_qualified:
@@ -240,7 +243,9 @@ async def run_classification_and_update(raw_leads: List[dict]):
                             except Exception as ee:
                                 print(f"Error enriching lead {lu.get('name')}: {ee}")
                                 
-                            is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"])
+                            has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
+                            has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
+                            is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
 
                             import hashlib
                             import os

@@ -82,7 +82,9 @@ async def log_activity_and_notify(
                 revenue=metadata.get("revenue"),
                 is_buy_signal=metadata.get("is_buy_signal", False),
                 is_strategic_seller=metadata.get("is_strategic_seller", False),
-                email=metadata.get("email")
+                email=metadata.get("email"),
+                post_topic_depth=metadata.get("post_topic_depth"),
+                is_decision_maker=metadata.get("is_decision_maker", False)
             )
         elif type == "analysis" and metadata and metadata.get("report_id"):
             blocks = build_research_completed_blocks(

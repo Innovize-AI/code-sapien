@@ -21,7 +21,9 @@ def build_hot_lead_blocks(
     revenue: str = None,
     is_buy_signal: bool = False,
     is_strategic_seller: bool = False,
-    email: str = None
+    email: str = None,
+    post_topic_depth: str = None,
+    is_decision_maker: bool = False
 ) -> List[Dict[str, Any]]:
 
     """
@@ -77,14 +79,20 @@ def build_hot_lead_blocks(
             "elements": signal_elements
         })
 
+    fields = [
+        {"type": "mrkdwn", "text": f"*Intent:* {intent.capitalize()}"},
+        {"type": "mrkdwn", "text": f"*Sentiment:* {sentiment.capitalize()}"},
+        {"type": "mrkdwn", "text": f"*Competitor:* {competitor or 'Unknown'}"},
+        {"type": "mrkdwn", "text": f"*Source:* {source}"}
+    ]
+    if post_topic_depth:
+        fields.append({"type": "mrkdwn", "text": f"*Topic Depth:* {post_topic_depth.replace('_', ' ').title()}"})
+    if is_decision_maker:
+        fields.append({"type": "mrkdwn", "text": f"*Role Level:* Decision Maker 🎯"})
+
     blocks.append({
         "type": "section",
-        "fields": [
-            {"type": "mrkdwn", "text": f"*Intent:* {intent.capitalize()}"},
-            {"type": "mrkdwn", "text": f"*Sentiment:* {sentiment.capitalize()}"},
-            {"type": "mrkdwn", "text": f"*Competitor:* {competitor or 'Unknown'}"},
-            {"type": "mrkdwn", "text": f"*Source:* {source}"}
-        ]
+        "fields": fields
     })
 
     # Add Company Info

@@ -11,16 +11,18 @@ class ResearchReport(Base):
     
     # Input Data
     linkedin_url = Column(Text, nullable=True)
+    normalized_linkedin_url = Column(Text, nullable=True, index=True)
     email_id = Column(Text, nullable=True)
     website = Column(Text, nullable=True)
     fullname = Column(Text, nullable=True)
     profile_picture_url = Column(Text, nullable=True)
+    
+    # Redundant fields (to be kept until production migration)
     company_name = Column(Text, nullable=True)
     company_description = Column(Text, nullable=True)
-    company_industries = Column(Text, nullable=True) # JSON array
-    company_stats = Column(Text, nullable=True)      # JSON object
+    company_industries = Column(Text, nullable=True)
+    company_stats = Column(Text, nullable=True)
 
-    
     # Analysis Results (Markdown Content)
     sales_research_report = Column(Text, nullable=True)
     lead_score_analysis = Column(Text, nullable=True)
@@ -57,6 +59,9 @@ class ResearchReport(Base):
     outreach_started_at = Column(DateTime(timezone=True), nullable=True)
     is_outreach_edited = Column(Boolean, server_default=text("false"), nullable=False)
     edit_depth_percentage = Column(Integer, nullable=True) # 0-100 percentage of modification
+    
+    # Normalized Relation
+    company_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
     # New Email & Intent Analysis
     email_history = Column(Text, nullable=True)  # JSON array of email objects
@@ -193,7 +198,9 @@ class IdentifiedProfile(Base):
     name = Column(String, nullable=True)
     headline = Column(Text, nullable=True)
     linkedin_url = Column(Text, nullable=False, unique=True)
-    website = Column(Text, nullable=True)
+    normalized_linkedin_url = Column(Text, nullable=True, index=True)
+    website = Column(Text, nullable=True) 
+    email = Column(String, nullable=True)
     created_by_id = Column(UUID(as_uuid=True), nullable=True)
     
     # Classification
@@ -214,6 +221,9 @@ class IdentifiedProfile(Base):
     last_interaction_at = Column(DateTime(timezone=True), server_default=text("now()"))
     touchpoint_count = Column(Integer, default=0, server_default=text("0"))
     profile_metadata = Column(Text, nullable=True)         # JSON for flexibility
+    
+    # Normalized Relation
+    company_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
 class Activity(Base):
     __tablename__ = "activities"
@@ -229,6 +239,47 @@ class Activity(Base):
     sentiment = Column(String, nullable=True)
     idempotency_key = Column(String, unique=True, nullable=True)
     created_by_id = Column(UUID(as_uuid=True), nullable=True)
+    
+    # New Normalized Relation
+    company_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+
+class Company(Base):
+    __tablename__ = "companies"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))
+
+    name = Column(Text, nullable=False)
+    domain = Column(String, unique=True, index=True, nullable=True) # e.g. "innovize.ai"
+    linkedin_url = Column(Text, unique=True, index=True, nullable=True)
+    website = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    industries = Column(Text, nullable=True) # JSON array
+    
+    # Extended Stats
+    employee_count = Column(Integer, nullable=True)
+    revenue = Column(Text, nullable=True)
+    market_cap = Column(Text, nullable=True)
+    total_funding = Column(Text, nullable=True)
+    headquarters = Column(Text, nullable=True)
+    follower_count = Column(Integer, nullable=True)
+    employee_count_range = Column(Text, nullable=True)
+    
+    # New Signals & Metadata
+    news = Column(Text, nullable=True)              # JSON array
+    hiring = Column(Text, nullable=True)            # JSON array
+    technologies = Column(Text, nullable=True)      # JSON array
+    technology_names = Column(Text, nullable=True)  # JSON array
+    funding_events = Column(Text, nullable=True)    # JSON array
+    latest_funding_stage = Column(Text, nullable=True)
+    latest_funding_date = Column(Text, nullable=True)
+    headcount_growth = Column(Text, nullable=True)  # JSON object
+    # email = Column(Text, nullable=True)             # Removed (moved to IdentifiedProfile)
+
+    # Source Metadata
+    apollo_id = Column(String, nullable=True, index=True)
+    extra_metadata = Column(Text, nullable=True) # JSON for flexible enrichment
 
 class Profile(Base):
     __tablename__ = "profiles"

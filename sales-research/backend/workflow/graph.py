@@ -187,7 +187,7 @@ def get_graph():
     builder.add_node("website_analyzer", website_analyzer)
 
     # Logic/Bridge Nodes
-    builder.add_node("lead_data_extractor", lead_data_extractor)
+    builder.add_node("lead_data_extractor", lead_data_extractor, defer= True)
     builder.add_node("lead_scorer", lead_scorer)
 
     # Strategic Nodules
@@ -197,9 +197,9 @@ def get_graph():
     builder.add_node("outreach_designer", outreach_node)
     builder.add_node("follow_up_designer", follow_up_strategy_node)
     builder.add_node("strategic_recommender", strategic_recommender_node)
-    builder.add_node("strategic_merger", strategic_merger)
+    builder.add_node("strategic_merger", strategic_merger, defer= True)
 
-    builder.add_node("report_generator", sales_research_report_generator)
+    builder.add_node("report_generator", sales_research_report_generator, defer=True)
     builder.add_node("enrich_linkedin", enrich_linkedin)
     builder.add_node("enrich_website", enrich_website)
     builder.add_node("email_history_fetcher", email_history_fetcher_node)

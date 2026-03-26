@@ -23,6 +23,8 @@ class ProfileClassificationResult(BaseModel):
     is_competitor: bool = Field(description="Is the person a competitor working for a rival company?")
     is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
+    is_buy_signal: bool = Field(default=False, description="Does the profile exhibit a genuine buy signal/pain point?")
+    is_strategic_seller: bool = Field(default=False, description="Is the profile a strategic seller/consultant self-promoting?")
     reasoning: str = Field(description="Brief explanation of the classification.")
     intent: Optional[str] = Field(None, description="The person's localized intent (hand_raiser, prospect_pain, passive_expert, strategic_seller, low_signal)")
     post_topic_depth: Optional[str] = Field(None, description="Detailed nature of the post: sharing_framework, tool_showcase, complaining_keywords, industry_synthesis, etc.")
@@ -35,6 +37,8 @@ class ProfileClassification(BaseModel):
     is_competitor: bool = Field(description="Is the person a competitor working for a rival company?")
     is_fit: bool = Field(description="Is the person a potential fit/customer based on ICP?")
     is_decision_maker: bool = Field(description="Is the person a decision maker (C-Level, VP, Director, etc)?")
+    is_buy_signal: bool = Field(default=False, description="Does the profile exhibit a genuine buy signal/pain point?")
+    is_strategic_seller: bool = Field(default=False, description="Is the profile a strategic seller/consultant self-promoting?")
     reasoning: str = Field(description="Brief explanation of the classification.")
 
 # Using LinkedInAnalysis from models.structured_output
@@ -72,6 +76,8 @@ def batch_classify_profiles(profiles: List[Dict]):
                     "is_fit": res.is_fit,
                     "is_competitor": res.is_competitor,
                     "is_decision_maker": res.is_decision_maker,
+                    "is_buy_signal": res.is_buy_signal,
+                    "is_strategic_seller": res.is_strategic_seller,
                     "reasoning": res.reasoning,
                     "intent": res.intent,
                     "post_topic_depth": res.post_topic_depth,
@@ -374,35 +380,126 @@ def get_company_details(company_identifier: str):
         print(f"Error fetching company details: {e}")
         return None
 
-def get_linkedin_company_data(state: AgentState):
-    """Gathers hiring status and recent company news, and enriches website if missing."""
-    # Skip if already fetched
-    if state.get("company_news") or state.get("hiring_data"):
-        print("Company news/hiring already fetched, skipping duplicate call.")
-        return {}
-
+async def get_linkedin_company_data(state: AgentState):
+    """LangGraph node wrapper for waterfall enrichment."""
+    lead_url = state.get("linkedin_url") or state.get("user_linkedin_url")
     company_url = state.get("lead_company_linkedin_url")
-    if not company_url:
+    
+    # Use the centralized waterfall helper
+    enriched_data = await enrich_company_waterfall(
+        person_url=lead_url, 
+        company_url=company_url,
+        existing_stats=state.get("company_stats")
+    )
+    
+    if not enriched_data:
         return {}
 
-    company_data = get_company_details(company_url)
-    if not company_data:
-        return {}
-
-    # Extract website if missing in state
-    basic_info = company_data.get("basic_info", {})
-    
-    # Extract hiring and news (updates and jobs)
-    news = company_data.get("updates", [])
-    hiring = company_data.get("jobs", [])
-    
     return {
-        "company_name": basic_info.get("name"),
-        "company_description": basic_info.get("description"),
-        "company_industries": basic_info.get("industries", []),
-        "company_stats": company_data.get("stats", {}),
-        "company_news": news[:5],
-        "hiring_data": hiring[:5],
+        "company_name": enriched_data.get("name"),
+        "company_description": enriched_data.get("description"),
+        "company_industries": enriched_data.get("industries", []),
+        "company_stats": enriched_data.get("company_stats", {}),
+        "company_news": enriched_data.get("news", []),
+        "hiring_data": enriched_data.get("hiring", []),
+        "company_website": enriched_data.get("website"),
+
+        # Lead email surfaced to top-level for quick access
+        "email_id": enriched_data.get("email"),
+        "company_linkedin_url": enriched_data.get("company_linkedin_url"),
+
+    }
+
+async def enrich_company_waterfall(person_url: str = None, company_url: str = None, existing_stats: dict = None):
+    """
+    Centralized enrichment coordinator:
+    1. Apollo Match (via person_url)
+    2. LinkedIn Details (via company_url) - Only if Apollo falls short
+    """
+    apollo_data = {}
+    linkedin_data = {}
+    news = []
+    hiring = []
+
+    # 1. Primary: Apollo match by person profile
+    if person_url:
+        print(f"DEBUG: CENTRAL WATERFALL: Trialing Apollo for {person_url}")
+        apollo_data = await get_apollo_company_data(person_url)
+
+    # 2. Check if we need LinkedIn fallback
+    # Skip if Apollo was successful AND provided core stats
+    core_found = apollo_data.get("employee_count")
+    
+    if company_url and not core_found:
+        print(f"DEBUG: CENTRAL WATERFALL: Falling back to LinkedIn for {company_url}")
+        company_res = get_company_details(company_url)
+        if company_res:
+            linkedin_data = company_res.get("stats", {})
+            news = company_res.get("updates", [])
+            hiring = company_res.get("jobs", [])
+            # Also capture basic info if we can
+            if "basic_info" in company_res:
+                 linkedin_data["basic_info"] = company_res["basic_info"]
+
+    # 3. Merge Strategy
+    stats = {**linkedin_data}
+    if apollo_data:
+        stats.update({
+            "employee_count": apollo_data.get("employee_count") or stats.get("employee_count"),
+            "revenue": apollo_data.get("revenue_estimate") or stats.get("revenue"),
+            "market_cap": apollo_data.get("market_cap") or stats.get("market_cap"),
+            "total_funding": apollo_data.get("total_funding") or stats.get("total_funding"),
+            "apollo_id": apollo_data.get("apollo_id"),
+            "website": apollo_data.get("website") or stats.get("website"),
+            "headcount_growth": apollo_data.get("headcount_growth"),
+        })
+
+    # Backup from existing injections
+    if existing_stats:
+        for k, v in existing_stats.items():
+            if k not in stats or not stats[k]:
+                stats[k] = v
+
+    # Final payload
+    basic = linkedin_data.get("basic_info", {})
+    # Prepare nested stats for backward compatibility
+    company_stats = {
+        "employee_count": apollo_data.get("employee_count"),
+        "revenue": apollo_data.get("revenue_estimate"),
+        "market_cap": apollo_data.get("market_cap"),
+        "total_funding": apollo_data.get("total_funding"),
+        "follower_count": apollo_data.get("follower_count"),
+        "employee_count_range": apollo_data.get("employee_count_range"),
+        "technologies": apollo_data.get("technologies"),
+        "technology_names": apollo_data.get("technology_names"),
+        # Funding details
+        "funding_events": apollo_data.get("funding_events"),
+        "latest_funding_stage": apollo_data.get("latest_funding_stage"),
+        "latest_funding_date": apollo_data.get("latest_funding_date"),
+        # Headcount growth (hiring signal)
+        "headcount_growth": apollo_data.get("headcount_growth"),
+        "apollo_id": str(apollo_data.get("apollo_id")) if apollo_data.get("apollo_id") else None,
+        "headquarters": apollo_data.get("headquarters"),
+        "domain": apollo_data.get("domain") or (stats.get("website").replace("http://", "").replace("https://", "").split("/")[0] if stats.get("website") else None),
+        "apollo_id": str(apollo_data.get("apollo_id")) if apollo_data.get("apollo_id") else None,
+    }
+
+    return {
+        "name": stats.get("name") or apollo_data.get("company_name") or basic.get("name") or "Unknown Company",
+        "description": apollo_data.get("description") or basic.get("description") or apollo_data.get("company_name"),
+        "industries": apollo_data.get("industries") or basic.get("industries", []) or ([apollo_data.get("industry")] if apollo_data.get("industry") else []),
+        "news": news[:5],
+        "hiring": hiring[:5],
+        "website": stats.get("website"),
+        "person_email": apollo_data.get("person_email"),
+        "linkedin_url": apollo_data.get("company_linkedin_url"),
+        "domain": apollo_data.get("domain") or (stats.get("website").replace("http://", "").replace("https://", "").split("/")[0] if stats.get("website") else None),
+
+        # Compatibility
+        "company_stats": company_stats,
+        
+        # Flattened fields for table sync
+        **company_stats
     }
 
 def linkedin_profile_analyzer(state: AgentState):
@@ -446,6 +543,142 @@ def linkedin_profile_analyzer(state: AgentState):
     except Exception as e:
         print(f"Error in linkedin_profile_analyzer: {e}")
         return {"user_profile_analysis": "Error generating structured analysis."}
+
+async def get_apollo_company_data(linkedin_url: str):
+    """
+    Enrichment using Apollo People Match API.
+    Extracts company stats, technologies, funding events,
+    headcount growth, keywords and lead details.
+    """
+    api_key = os.getenv("APOLLO_API_KEY").strip() if os.getenv("APOLLO_API_KEY") else None
+    if not api_key:
+        return {}
+
+    url = "https://api.apollo.io/v1/people/match"
+    headers = {
+        "Cache-Control": "no-cache",
+        "Content-Type": "application/json",
+        "X-Api-Key": api_key
+    }
+    
+    data = {"linkedin_url": linkedin_url, "reveal_personal_emails": True}
+    
+    import httpx
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=data, timeout=10.0)
+            if response.status_code == 200:
+                res = response.json()
+                person = res.get("person", {})
+                org = person.get("organization", {})
+                
+                if org:
+                    # --- Revenue ---
+                    raw_rev = org.get("annual_revenue") or org.get("organization_revenue")
+                    rev_str = org.get("annual_revenue_printed") or org.get("organization_revenue_printed")
+                    if not rev_str and raw_rev:
+                        if raw_rev >= 1_000_000_000:
+                            rev_str = f"{raw_rev / 1_000_000_000:.1f}B"
+                        elif raw_rev >= 1_000_000:
+                            rev_str = f"{raw_rev / 1_000_000:.1f}M"
+                        else:
+                            rev_str = str(raw_rev)
+
+                # --- Technologies ---
+                # Full list with uid + name + category
+                technologies = [
+                    {"uid": t.get("uid"), "name": t.get("name"), "category": t.get("category")}
+                    for t in (org.get("current_technologies") or [])
+                ]
+                technology_names = org.get("technology_names") or [t["name"] for t in technologies]
+
+                # --- Funding Events ---
+                funding_events = [
+                    {
+                        "date": e.get("date"),
+                        "type": e.get("type"),
+                        "amount": e.get("amount"),
+                        "currency": e.get("currency"),
+                        "investors": e.get("investors"),
+                        "news_url": e.get("news_url")
+                    }
+                    for e in (org.get("funding_events") or [])
+                ]
+
+                # --- Headcount Growth (Hiring Signal) ---
+                headcount_growth = {
+                    "6_month": org.get("organization_headcount_six_month_growth"),
+                    "12_month": org.get("organization_headcount_twelve_month_growth"),
+                    "24_month": org.get("organization_headcount_twenty_four_month_growth"),
+                }
+
+                # --- Lead Context ---
+                # lead_employment_history = person.get("employment_history") or []
+                # lead_context = {
+                #     "title": person.get("title"),
+                #     "seniority": person.get("seniority"),
+                #     "departments": person.get("departments") or [],
+                #     "functions": person.get("functions") or [],
+                #     "city": person.get("city"),
+                #     "state": person.get("state"),
+                #     "country": person.get("country"),
+                #     "employment_history": [
+                #         {
+                #             "company": e.get("organization_name"),
+                #             "title": e.get("title"),
+                #             "start_date": e.get("start_date"),
+                #             "end_date": e.get("end_date"),
+                #             "current": e.get("current")
+                #         }
+                #         for e in lead_employment_history[:10]
+                #     ]
+                # }
+
+                # --- Parent / Owner ---
+                # owned_by = org.get("owned_by_organization")
+                # parent_company = {
+                #     "id": owned_by.get("id"),
+                #     "name": owned_by.get("name"),
+                #     "website": owned_by.get("website_url")
+                # } if owned_by else None
+
+                return {
+                    # Core stats
+                    "revenue_estimate": rev_str,
+                    "employee_count": org.get("estimated_num_employees") or org.get("num_employees"),
+                    "market_cap": org.get("market_cap"),
+                    "total_funding": org.get("total_funding_printed"),
+                    "total_funding_raw": org.get("total_funding"),
+                    "apollo_id": org.get("id"),
+                    "industry": org.get("primary_industry") or org.get("industry"),
+                    "industries": org.get("industries") or [],
+                    "secondary_industries": org.get("secondary_industries") or [],
+                    "website": org.get("website_url"),
+                    "company_name": org.get("name"),
+                    "description": org.get("short_description"),
+                    # Tech stack
+                    "technologies": technologies,
+                    "technology_names": technology_names,
+                    # Funding
+                    "funding_events": funding_events,
+                    "latest_funding_stage": org.get("latest_funding_stage"),
+                    "latest_funding_date": org.get("latest_funding_round_date"),
+                    # Hiring signals
+                    "headcount_growth": headcount_growth,
+                    "follower_count": org.get("num_followers") or org.get("linkedin_follower_count"),
+                    "employee_count_range": org.get("employee_count_range"),
+                    "headquarters": f"{org.get('city', '')}, {org.get('state', '')}, {org.get('country', '')}".strip(", "),
+                    # Keywords
+                    # "keywords": org.get("keywords") or [],
+                    # Lead person_email + context
+                    "person_email": person.get("email"),
+                }
+            else:
+                print(f"DEBUG: Apollo enrichment failed ({response.status_code}): {response.text}")
+    except Exception as e:
+        print(f"Error calling Apollo API: {e}")
+        
+    return {}
 
 def analyze_competitor_posts(competitor_urls: list[str]):
     """Fetches and analyzes posts from multiple competitor LinkedIn profiles."""
@@ -509,7 +742,7 @@ def get_post_commenters(post_id: str):
 def analyze_lead_with_ai(lead: dict, icp_data: dict):
     """Evaluates a single lead against the ICP using AI."""
     try:
-        model = get_gemini_model(model="gemini-1.5-flash", temperature=0) # Use 0 temp for consistent scoring
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0) # Use 0 temp for consistent scoring
         
         prompt = AI_LEAD_EVALUATOR_PROMPT.format(
             name=lead.get("name"),
@@ -717,6 +950,8 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
                     "is_fit": item.is_fit,
                     "is_competitor": item.is_competitor,
                     "is_decision_maker": item.is_decision_maker,
+                    "is_buy_signal": item.is_buy_signal,
+                    "is_strategic_seller": item.is_strategic_seller,
                     "reasoning": item.reasoning,
                     "intent": item.intent,
                     "post_topic_depth": item.post_topic_depth,

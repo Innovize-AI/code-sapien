@@ -104,6 +104,14 @@ interface ReportDisplayProps {
     target_pain_points?: string;
     strategic_solutions?: string;
     personalized_outreach?:
+    | Array<{
+      hook: string;
+      linkedin_message: string;
+      email_subject: string;
+      email_body: string;
+      variant_name?: string;
+      _edit_depths?: Record<string, number>;
+    }>
     | {
       hook: string;
       linkedin_message: string;
@@ -247,12 +255,20 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
   React.useEffect(() => {
     if (data && data.personalized_outreach) {
       const outreach = data.personalized_outreach;
-      if (typeof outreach === "object") {
+      if (Array.isArray(outreach) && outreach.length > 0) {
+        const primary = outreach[selectedVariantIndex] || outreach[0];
         setEditedOutreach({
-          linkedin_message: outreach.linkedin_message || "",
-          email_subject: outreach.email_subject || "",
-          email_body: outreach.email_body || "",
-          hook: outreach.hook || "",
+          linkedin_message: primary.linkedin_message || "",
+          email_subject: primary.email_subject || "",
+          email_body: primary.email_body || "",
+          hook: primary.hook || "",
+        });
+      } else if (typeof outreach === "object" && !Array.isArray(outreach)) {
+        setEditedOutreach({
+          linkedin_message: (outreach as any).linkedin_message || "",
+          email_subject: (outreach as any).email_subject || "",
+          email_body: (outreach as any).email_body || "",
+          hook: (outreach as any).hook || "",
         });
       }
     }
@@ -278,7 +294,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
     if (data) {
       setOutreachStatus(data.outreach_status || "not_started");
     }
-  }, [data]);
+  }, [data, selectedVariantIndex]);
 
   const handleUpdateStatus = async (newStatus: string) => {
     if (!data?.id) return;
@@ -309,8 +325,9 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
       const isStrategic = activeOutreachTab === "strategic";
       const endpoint = isStrategic ? "cso-outreach" : "outreach";
       const hasVariantsLocal =
-        currentData?.sales_research_report?.campaign_variants &&
-        currentData.sales_research_report.campaign_variants.length > 0;
+        (Array.isArray(currentData?.personalized_outreach) && currentData.personalized_outreach.length > 0) ||
+        (currentData?.sales_research_report?.campaign_variants &&
+          currentData.sales_research_report.campaign_variants.length > 0);
 
       const body = isStrategic
         ? {
@@ -346,15 +363,15 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
           }
         } else {
           if (hasVariantsLocal) {
-            if (currentData.sales_research_report?.campaign_variants) {
-              Object.assign(
-                currentData.sales_research_report.campaign_variants[
-                selectedVariantIndex
-                ],
-                editedOutreach,
-              );
+            const variants = Array.isArray(currentData.personalized_outreach)
+              ? currentData.personalized_outreach
+              : currentData.sales_research_report?.campaign_variants;
+
+            if (variants && variants[selectedVariantIndex]) {
+              Object.assign(variants[selectedVariantIndex], editedOutreach);
             }
-          } else if (
+          }
+          else if (
             currentData.personalized_outreach &&
             typeof currentData.personalized_outreach === "object"
           ) {
@@ -379,24 +396,25 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
             }
           } else if (
             !isStrategic &&
-            hasVariantsLocal &&
-            respData.sales_research_report?.campaign_variants?.[
-            selectedVariantIndex
-            ]
+            hasVariantsLocal
           ) {
-            if (
-              currentData.sales_research_report?.campaign_variants?.[
-              selectedVariantIndex
-              ]
-            ) {
-              currentData.sales_research_report.campaign_variants[
-                selectedVariantIndex
-              ]._edit_depths =
-                respData.sales_research_report.campaign_variants[
-                  selectedVariantIndex
-                ]._edit_depths;
+            // Update depths for the selected variant in either personalized_outreach or campaign_variants
+            const sourceVariants = respData.personalized_outreach && Array.isArray(respData.personalized_outreach)
+              ? respData.personalized_outreach
+              : respData.sales_research_report?.campaign_variants;
+
+            const localVariants = Array.isArray(currentData.personalized_outreach)
+              ? currentData.personalized_outreach
+              : currentData.sales_research_report?.campaign_variants;
+
+            if (sourceVariants?.[selectedVariantIndex] && localVariants?.[selectedVariantIndex]) {
+              localVariants[selectedVariantIndex]._edit_depths =
+                sourceVariants[selectedVariantIndex]._edit_depths;
             }
-          } else if (
+          }
+
+          else if (
+
             !isStrategic &&
             !hasVariantsLocal &&
             respData.personalized_outreach
@@ -1602,7 +1620,9 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
   };
 
   // --- Multi-Campaign Logic ---
-  const campaignVariants = data.sales_research_report?.campaign_variants || [];
+  const campaignVariants = Array.isArray(data.personalized_outreach)
+    ? data.personalized_outreach
+    : (data.sales_research_report?.campaign_variants || []);
   const hasVariants = campaignVariants.length > 0;
 
   const activeOutreach = hasVariants
@@ -1642,6 +1662,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
         ...a,
         editDepth: 0,
       }));
+
 
   const briefing = data.cso_strategic_briefing;
   const strategicActions =

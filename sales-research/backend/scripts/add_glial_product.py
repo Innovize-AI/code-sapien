@@ -35,6 +35,8 @@ async def add_glial_product():
             "description": "Autonomous 'Sales Brain' infrastructure that turns raw market signals into analyst-grade execution. Bridges the 'Context Gap' using a multi-agent architecture (Intent, Scoring, Strategy) to tell teams who to contact, when, and why with hyper-personalized decision briefings.",
             "is_strategic_pivot": True,
             "target_roles": ["Founders", "VP Sales", "Marketing Directors", "RevOps Managers", "Growth Leads"],
+            "attached_playbooks": ["market_validation/innovize-ai/glial-one-pager.md"],
+            "attached_case_studies": [],
             "relevant_files": ["market_validation/innovize-ai/glial-one-pager.md"],
             "rag_context": "market_validation/innovize-ai/glial-one-pager.md"
         }

@@ -14,7 +14,7 @@ interface StrategyModalProps {
     description: string;
     onSave: (config: StrategyConfig) => Promise<void>;
     initialConfig?: StrategyConfig;
-    availableFiles: { name: string; path: string }[];
+    availableFiles: { name: string; path: string; type: 'playbooks' | 'case-studies' | 'solutions' }[];
 }
 
 export interface StrategyConfig {
@@ -22,6 +22,8 @@ export interface StrategyConfig {
     is_strategic_pivot: boolean;
     target_roles: string[];
     product_name?: string;
+    attached_playbooks: string[];
+    attached_case_studies: string[];
     relevant_files: string[];
 }
 
@@ -32,21 +34,31 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
     const [isPivot, setIsPivot] = useState(initialConfig?.is_strategic_pivot || false);
     const [productName, setProductName] = useState(initialConfig?.product_name || filename.replace(".md", "").replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase()));
     const [selectedRoles, setSelectedRoles] = useState<string[]>(initialConfig?.target_roles || []);
-    const [selectedFiles, setSelectedFiles] = useState<string[]>(initialConfig?.relevant_files || (filename ? [filename] : []));
+
+    // Categorized selection
+    const [selectedPlaybooks, setSelectedPlaybooks] = useState<string[]>(initialConfig?.attached_playbooks || (filename && filename.includes('playbook') ? [filename] : []));
+    const [selectedCaseStudies, setSelectedCaseStudies] = useState<string[]>(initialConfig?.attached_case_studies || (filename && filename.includes('case-study') ? [filename] : []));
+
+    const playbooks = availableFiles.filter(f => f.type === 'playbooks');
+    const caseStudies = availableFiles.filter(f => f.type === 'case-studies');
 
     const handleRoleToggle = (role: string) => {
-        setSelectedRoles(prev => 
-            prev.includes(role) 
-                ? prev.filter(r => r !== role) 
+        setSelectedRoles(prev =>
+            prev.includes(role)
+                ? prev.filter(r => r !== role)
                 : [...prev, role]
         );
     };
 
-    const handleFileToggle = (fname: string) => {
-        setSelectedFiles(prev => 
-            prev.includes(fname)
-                ? prev.filter(f => f !== fname)
-                : [...prev, fname]
+    const handlePlaybookToggle = (fname: string) => {
+        setSelectedPlaybooks(prev =>
+            prev.includes(fname) ? prev.filter(f => f !== fname) : [...prev, fname]
+        );
+    };
+
+    const handleCaseStudyToggle = (fname: string) => {
+        setSelectedCaseStudies(prev =>
+            prev.includes(fname) ? prev.filter(f => f !== fname) : [...prev, fname]
         );
     };
 
@@ -58,7 +70,9 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                 is_strategic_pivot: isPivot,
                 target_roles: selectedRoles,
                 product_name: productName,
-                relevant_files: selectedFiles
+                attached_playbooks: selectedPlaybooks,
+                attached_case_studies: selectedCaseStudies,
+                relevant_files: Array.from(new Set([...selectedPlaybooks, ...selectedCaseStudies, filename]))
             });
             onClose();
         } catch (e) {
@@ -91,12 +105,12 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
 
                     {isPivot && (
                         <>
-                             <div className="grid gap-2">
+                            <div className="grid gap-2">
                                 <Label htmlFor="name">Product Name (for Outreach)</Label>
-                                <Input 
-                                    id="name" 
-                                    value={productName} 
-                                    onChange={(e) => setProductName(e.target.value)} 
+                                <Input
+                                    id="name"
+                                    value={productName}
+                                    onChange={(e) => setProductName(e.target.value)}
                                 />
                             </div>
 
@@ -105,13 +119,13 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                                 <div className="grid grid-cols-2 gap-2">
                                     {COMMON_ROLES.map(role => (
                                         <div key={role} className="flex items-center space-x-2">
-                                            <Checkbox 
-                                                id={`role-${role}`} 
+                                            <Checkbox
+                                                id={`role-${role}`}
                                                 checked={selectedRoles.includes(role)}
                                                 onCheckedChange={() => handleRoleToggle(role)}
                                             />
-                                            <label 
-                                                htmlFor={`role-${role}`} 
+                                            <label
+                                                htmlFor={`role-${role}`}
                                                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                                             >
                                                 {role}
@@ -124,29 +138,58 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                                 </p>
                             </div>
 
-                            <div className="grid gap-2">
-                                <Label className="mb-2">Relevant Knowledge Assets</Label>
-                                <div className="border rounded-md p-2 h-40 overflow-y-auto space-y-2 bg-background">
-                                    {availableFiles.map(file => (
-                                        <div key={file.path} className="flex items-center space-x-2">
-                                            <Checkbox 
-                                                id={`file-${file.name}`} 
-                                                checked={selectedFiles.includes(file.name)}
-                                                onCheckedChange={() => handleFileToggle(file.name)}
-                                            />
-                                            <label 
-                                                htmlFor={`file-${file.name}`} 
-                                                className="text-sm leading-none cursor-pointer truncate w-full"
-                                                title={file.name}
-                                            >
-                                                {file.name}
-                                            </label>
-                                        </div>
-                                    ))}
+                            <div className="space-y-4">
+                                <Label className="mb-2 block font-semibold">Knowledge Mapping</Label>
+
+                                {/* Playbooks */}
+                                <div className="grid gap-2">
+                                    <Label className="flex items-center gap-2 text-xs text-blue-600">
+                                        Attached Playbooks
+                                    </Label>
+                                    <div className="border rounded-md p-2 h-32 overflow-y-auto space-y-2 bg-background">
+                                        {playbooks.map(file => (
+                                            <div key={file.path} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`pb-${file.name}`}
+                                                    checked={selectedPlaybooks.includes(file.name)}
+                                                    onCheckedChange={() => handlePlaybookToggle(file.name)}
+                                                />
+                                                <label
+                                                    htmlFor={`pb-${file.name}`}
+                                                    className="text-xs leading-none cursor-pointer truncate w-full"
+                                                    title={file.name}
+                                                >
+                                                    {file.name}
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Select all documents (Playbooks, Case Studies, etc.) that provide context for this product.
-                                </p>
+
+                                {/* Case Studies */}
+                                <div className="grid gap-2">
+                                    <Label className="flex items-center gap-2 text-xs text-orange-600">
+                                        Attached Case Studies
+                                    </Label>
+                                    <div className="border rounded-md p-2 h-32 overflow-y-auto space-y-2 bg-background">
+                                        {caseStudies.map(file => (
+                                            <div key={file.path} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`cs-${file.name}`}
+                                                    checked={selectedCaseStudies.includes(file.name)}
+                                                    onCheckedChange={() => handleCaseStudyToggle(file.name)}
+                                                />
+                                                <label
+                                                    htmlFor={`cs-${file.name}`}
+                                                    className="text-xs leading-none cursor-pointer truncate w-full"
+                                                    title={file.name}
+                                                >
+                                                    {file.name}
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </>
                     )}

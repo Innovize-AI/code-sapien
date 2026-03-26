@@ -230,7 +230,7 @@ DO NOT generate a second variant.
             # For now, let's just ensure we return what we have or empty.
             # But better: if we have a legacy path, we could wrap it. 
             # Since we are enforcing structured output, let's trust it or return empty.
-            return {"personalized_outreach": {}, "campaign_outreach_variants": []}
+            return {"personalized_outreach": [], "campaign_outreach_variants": []}
 
         # Select primary (Best Fit) for backward compatibility
         primary_variant = variants[0]
@@ -240,21 +240,17 @@ DO NOT generate a second variant.
                 primary_variant = v
                 break
         
-        # Convert CampaignVariant to OutreachStrategy format for backward compatibility
-        legacy_outreach = {
-            "hook": primary_variant.hook,
-            "linkedin_message": primary_variant.linkedin_message,
-            "email_subject": primary_variant.email_subject,
-            "email_body": primary_variant.email_body
-        }
+        # Convert all variants to dict for storage
+        variant_dicts = [v.model_dump() for v in variants]
         
-        # ALWAYS return the variants list
+        # ALWAYS return the variants list in personalized_outreach
         return {
-            "personalized_outreach": legacy_outreach,
-            "campaign_outreach_variants": [v.dict() for v in variants]
+            "personalized_outreach": variant_dicts,
+            "campaign_outreach_variants": variant_dicts
         }
 
     except Exception as e:
         print(f"Error in outreach_node: {e}")
-        return {"personalized_outreach": {}, "campaign_outreach_variants": []}
+        return {"personalized_outreach": [], "campaign_outreach_variants": []}
+
 

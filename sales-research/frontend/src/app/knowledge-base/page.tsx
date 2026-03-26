@@ -369,6 +369,8 @@ export default function KnowledgeBasePage() {
                                                 description: p.description,
                                                 is_strategic_pivot: p.is_strategic_pivot,
                                                 target_roles: p.target_roles,
+                                                attached_playbooks: p.attached_playbooks || [],
+                                                attached_case_studies: p.attached_case_studies || [],
                                                 relevant_files: p.relevant_files || []
                                             });
                                             setIsProductModalOpen(true);
@@ -386,8 +388,11 @@ export default function KnowledgeBasePage() {
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                                    <span className="flex items-center gap-1">
-                                                        <FileText className="w-3 h-3" /> {(p.relevant_files || []).length} Linked Assets
+                                                    <span className="flex items-center gap-1" title="Playbooks">
+                                                        <Book className="w-3 h-3 text-blue-500" /> {(p.attached_playbooks || []).length}
+                                                    </span>
+                                                    <span className="flex items-center gap-1" title="Case Studies">
+                                                        <Award className="w-3 h-3 text-orange-500" /> {(p.attached_case_studies || []).length}
                                                     </span>
                                                     {(p.target_roles || []).length > 0 && (
                                                         <span className="flex items-center gap-1">

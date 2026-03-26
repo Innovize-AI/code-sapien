@@ -99,6 +99,6 @@ create a seperater AI layer to generate comments etc.. for posts and comments
 
 
 create a automation for signal based playbook and monitoring specific profiles... 
-create a leadscore trends
+create a lead score trends
 see if we are passing tech to leads and also outreach agents
-Add a way to manually add signals etc. like we saw a case study or you appreaded on competitor page etc...
+Add a way to manually add signals etc. like we saw a case study or you appreaded on competitor page etc...`

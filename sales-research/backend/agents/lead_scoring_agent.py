@@ -128,3 +128,52 @@ def lead_scorer(state: AgentState):
     except Exception as e:
         print(f"Error in lead_scorer: {e}")
         return {"lead_score_analysis": {}}
+
+class RevalidatedFit(BaseModel):
+    is_fit: bool = Field(description="Updated fit status based on new company metrics")
+    reasoning: str = Field(description="Concise explanation for the fit status, specifically calling out deviations in headcount, revenue, or industry if they exist.")
+
+async def revalidate_lead_fit_async(lead_data: dict, company_metrics: dict, icp_data: dict | None = None):
+    """
+    Refines the fit status and reasoning based on confirmed firmographic data (Apollo/RapidAPI).
+    If icp_data is provided, it uses the actual organization ICP from the database.
+    """
+    try:
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
+        structured_llm = model.with_structured_output(RevalidatedFit)
+        
+        # Use provided ICP or fallback to default
+        if icp_data:
+             icp_context = f"ICP STRATEGY: {json.dumps(icp_data)}"
+        else:
+             icp_context = "ICP: B2B SaaS companies, 50-500 employees, series A-D, technology space."
+        
+        context = {
+            "initial_lead_info": {
+                "name": lead_data.get("name"),
+                "headline": lead_data.get("headline"),
+                "initial_fit": lead_data.get("is_fit"),
+                "initial_reasoning": lead_data.get("fit_reasoning")
+            },
+            "new_company_metrics": company_metrics,
+            "icp_constraints": icp_context
+        }
+        
+        messages = [
+            SystemMessage(content="You are an ICP Validation Agent. Your goal is to refine a lead's fit status based on NEWLY confirmed company firmographic data from Apollo/RapidAPI. \n"
+                                  "IMPORTANT: The ICP fields (industry, company_size, revenue, etc.) may be lists of strings. \n"
+                                  "A match is confirmed if the company's metrics align with ANY of the provided values in those lists. \n"
+                                  "Do not simply discard the 'initial_reasoning' provided in the context. \n"
+                                  "Instead, **MERGE** the discovery insights with the new firmographic facts. \n"
+                                  "A final reasoning should look like: '[Initial discovery context] + [Firmographic confirmation or rejection]'. \n"
+                                  "If the new metrics cause a change in status, explain exactly which metric overrode the initial fit."),
+            HumanMessage(content=f"RE-VALIDATE THIS LEAD: {json.dumps(context)}")
+        ]
+        
+        response: RevalidatedFit = await structured_llm.ainvoke(messages)
+        if response:
+            return response.is_fit, response.reasoning
+        return lead_data.get("is_fit"), lead_data.get("fit_reasoning")
+    except Exception as e:
+        print(f"Error in revalidate_lead_fit_async: {e}")
+        return lead_data.get("is_fit"), lead_data.get("fit_reasoning")

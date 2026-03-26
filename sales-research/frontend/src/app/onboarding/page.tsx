@@ -41,11 +41,14 @@ import {
   getICP,
 } from "@/lib/api";
 
+import { MultiSelect } from "@/components/ui/multi-select";
+import { LINKEDIN_INDUSTRIES, COMPANY_SIZE_OPTIONS, REVENUE_OPTIONS, JOB_TITLE_OPTIONS } from "@/lib/constants";
+
 const icpFormSchema = z.object({
-  industry: z.string().min(2, "Industry is required"),
-  company_size: z.string().optional(),
-  revenue: z.string().optional(),
-  job_title: z.string().min(2, "Available job titles are required"),
+  industry: z.union([z.string(), z.array(z.string())]).optional(),
+  company_size: z.union([z.string(), z.array(z.string())]).optional(),
+  revenue: z.union([z.string(), z.array(z.string())]).optional(),
+  job_title: z.union([z.string(), z.array(z.string())]).optional(),
   value_proposition: z.string().optional(),
 });
 
@@ -58,9 +61,9 @@ export default function OnboardingPage() {
   const form = useForm<IdealProfileData>({
     resolver: zodResolver(icpFormSchema),
     defaultValues: {
-      industry: "",
-      company_size: "",
-      revenue: "",
+      industry: [],
+      company_size: [],
+      revenue: [],
       job_title: "",
       value_proposition: "",
     },
@@ -77,7 +80,15 @@ export default function OnboardingPage() {
 
         const existingIcp = await getICP();
         if (existingIcp) {
-          form.reset(existingIcp);
+          form.reset({
+            industry: existingIcp.industry || [],
+            company_size: existingIcp.company_size || [],
+            revenue: existingIcp.revenue || [],
+            job_title: Array.isArray(existingIcp.job_title)
+              ? existingIcp.job_title
+              : (existingIcp.job_title ? (existingIcp.job_title as string).split(",").map(s => s.trim()).filter(Boolean) : []),
+            value_proposition: existingIcp.value_proposition || ""
+          });
         }
       } catch (e) {
         console.error("Failed to check status", e);
@@ -112,111 +123,93 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 animate-in fade-in duration-700">
       <div className="w-full max-w-2xl">
-        <Card className="border-border shadow-lg">
+        <Card className="border-border shadow-2xl bg-card/50 backdrop-blur-sm">
           <CardHeader className="space-y-1">
             <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shadow-sm">
                 1
               </div>
-              <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                 Onboarding
               </span>
             </div>
-            <CardTitle className="text-2xl">
+            <CardTitle className="text-3xl font-extrabold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
               Define Your Ideal Customer Profile
             </CardTitle>
-            <CardDescription>
-              Tell us about your target audience. We'll use this to personalize
-              your sales research reports.
+            <CardDescription className="text-base text-muted-foreground/80">
+              Tell us about your target audience. We'll use this to calibrate our AI for your specific market.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-6"
+                className="space-y-8"
               >
-                <FormField
-                  control={form.control}
-                  name="industry"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Target Industry</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g. Fintech, Healthcare, SaaS"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="industry"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <MultiSelect
+                            label="Target Industries"
+                            options={LINKEDIN_INDUSTRIES}
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Search & select industries (e.g. Computer Software, Marketing...)"
+                            allowCustom
+                          />
+                        </FormControl>
+                        <FormDescription>Select all industries that apply to your product.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="company_size"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Size</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="company_size"
+                      render={({ field }) => (
+                        <FormItem>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Any size" />
-                            </SelectTrigger>
+                            <MultiSelect
+                              label="Company Size"
+                              options={COMPANY_SIZE_OPTIONS}
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Select sizes..."
+                              hideSearch
+                            />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="1-10">1-10 employees</SelectItem>
-                            <SelectItem value="11-50">
-                              11-50 employees
-                            </SelectItem>
-                            <SelectItem value="51-200">
-                              51-200 employees
-                            </SelectItem>
-                            <SelectItem value="201-500">
-                              201-500 employees
-                            </SelectItem>
-                            <SelectItem value="500+">500+ employees</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="revenue"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Annual Revenue</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="revenue"
+                      render={({ field }) => (
+                        <FormItem>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Any revenue" />
-                            </SelectTrigger>
+                            <MultiSelect
+                              label="Annual Revenue"
+                              options={REVENUE_OPTIONS}
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Select revenue..."
+                              hideSearch
+                            />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="<$1M">Less than $1M</SelectItem>
-                            <SelectItem value="$1M-$10M">$1M - $10M</SelectItem>
-                            <SelectItem value="$10M-$50M">
-                              $10M - $50M
-                            </SelectItem>
-                            <SelectItem value="$50M+">$50M+</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 <FormField
@@ -224,15 +217,18 @@ export default function OnboardingPage() {
                   name="job_title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Target Job Titles</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="e.g. CTO, VP of Engineering, Product Manager"
-                          {...field}
+                        <MultiSelect
+                          label="Target Job Titles"
+                          options={JOB_TITLE_OPTIONS}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="e.g. CTO, VP Engineering..."
+                          allowCustom
                         />
                       </FormControl>
                       <FormDescription>
-                        Separate multiple titles with commas.
+                        Select common titles or type your own and press Enter.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

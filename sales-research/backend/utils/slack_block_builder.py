@@ -13,8 +13,17 @@ def build_hot_lead_blocks(
     source: str = "Competitor Comment",
     post_link: str = None,
     rep_name: str = None,
-    title: str = None
+    title: str = None,
+    company_name: str = None,
+    company_description: str = None,
+    company_industries: List[str] = None,
+    employee_count: int = None,
+    revenue: str = None,
+    is_buy_signal: bool = False,
+    is_strategic_seller: bool = False,
+    email: str = None
 ) -> List[Dict[str, Any]]:
+
     """
     Builds a Slack Block Kit message for a Potential Lead discovery.
     """
@@ -28,6 +37,13 @@ def build_hot_lead_blocks(
             "low_signal": "👀"
         }
         status_emoji = emoji_map.get(intent, "👀")
+        
+        # Override emoji if explicit signals are present
+        if is_buy_signal:
+            status_emoji = "⚡"
+        elif is_strategic_seller:
+            status_emoji = "🗣️"
+            
         title = f"{status_emoji} *Potential Opportunity: {name}*"
     
     blocks = [
@@ -43,19 +59,65 @@ def build_hot_lead_blocks(
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*{name}* ({headline or 'No headline'})\n<{linkedin_url}|View LinkedIn Profile>"
+                "text": f"*{name}* ({headline or 'No headline'})" + (f"\n📧 {email}" if email else "") + f"\n<{linkedin_url}|View LinkedIn Profile>"
             }
-        },
-        {
-            "type": "section",
-            "fields": [
-                {"type": "mrkdwn", "text": f"*Intent:* {intent.capitalize()}"},
-                {"type": "mrkdwn", "text": f"*Sentiment:* {sentiment.capitalize()}"},
-                {"type": "mrkdwn", "text": f"*Competitor:* {competitor or 'Unknown'}"},
-                {"type": "mrkdwn", "text": f"*Source:* {source}"}
-            ]
         }
     ]
+
+    # Add Signals / Badges
+    signal_elements = []
+    if is_buy_signal:
+        signal_elements.append({"type": "mrkdwn", "text": "⚡ *BUY SIGNAL* (High Intent)"})
+    if is_strategic_seller:
+        signal_elements.append({"type": "mrkdwn", "text": "🗣️ *STRATEGIC SELLER* (Low Priority)"})
+    
+    if signal_elements:
+        blocks.append({
+            "type": "context",
+            "elements": signal_elements
+        })
+
+    blocks.append({
+        "type": "section",
+        "fields": [
+            {"type": "mrkdwn", "text": f"*Intent:* {intent.capitalize()}"},
+            {"type": "mrkdwn", "text": f"*Sentiment:* {sentiment.capitalize()}"},
+            {"type": "mrkdwn", "text": f"*Competitor:* {competitor or 'Unknown'}"},
+            {"type": "mrkdwn", "text": f"*Source:* {source}"}
+        ]
+    })
+
+    # Add Company Info
+    if company_name:
+        company_text = f"🏢 *Company:* {company_name}"
+        if company_industries:
+            company_text += f" ({', '.join(company_industries[:2])})"
+        
+        company_details = []
+        if employee_count:
+            company_details.append(f"👥 {employee_count} employees")
+        if revenue:
+            company_details.append(f"💰 {revenue} revenue")
+        
+        if company_details:
+            company_text += f"\n_{' • '.join(company_details)}_"
+            
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": company_text
+            }
+        })
+        
+        if company_description:
+            blocks.append({
+                "type": "context",
+                "elements": [
+                    {"type": "mrkdwn", "text": f"*About:* {company_description[:200]}..." if len(company_description) > 200 else f"*About:* {company_description}"}
+                ]
+            })
+
 
     if rep_name:
         blocks.insert(1, {
@@ -145,8 +207,14 @@ def build_research_completed_blocks(
     journey_stage: str = None,
     heat_rating: int = None,
     urgency: str = None,
-    pain_points: List[str] = None
+    pain_points: List[str] = None,
+    company_name: str = None,
+    company_description: str = None,
+    company_industries: List[str] = None,
+    employee_count: int = None,
+    revenue: str = None
 ) -> List[Dict[str, Any]]:
+
     """
     Builds a Slack Block Kit message when a deep research analysis is finished.
     """
@@ -182,6 +250,40 @@ def build_research_completed_blocks(
             ]
         }
     ]
+
+    # Add Company Data
+    if company_name:
+        stats_line = ""
+        if employee_count:
+            stats_line += f"👥 {employee_count} employees  "
+        if revenue:
+            stats_line += f"💰 {revenue} revenue"
+            
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"🏢 *{company_name}*\n{stats_line}"
+            }
+        })
+        
+        if company_industries:
+            blocks.append({
+                "type": "context",
+                "elements": [
+                    {"type": "mrkdwn", "text": f"📍 *Industries:* {', '.join(company_industries)}"}
+                ]
+            })
+
+        if company_description:
+            blocks.append({
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Company Overview:*\n{company_description[:300]}..." if len(company_description) > 300 else f"*Company Overview:*\n{company_description}"
+                }
+            })
+
 
     if rep_name:
         blocks.insert(1, {

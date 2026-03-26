@@ -28,7 +28,7 @@
       "urn": "ACoAAAMTiScBxKMHVdAqcdCJ6MrQeNPZXgjUewY",
       "follower_count": 221,
       "connection_count": 133,
-      "current_company": "Innovize AI",
+      "current_company": "Glial",
       "current_company_urn": "102060167",
       "current_company_url": "https://www.linkedin.com/company/innovize-ai",
       "top_skills": [
@@ -43,7 +43,7 @@
     "experience": [
       {
         "title": "Founder",
-        "company": "Innovize AI",
+        "company": "Glial",
         "location": "Remote",
         "description": "Key Projects: \n\nAutomated Chart Generation and AI Summaries from CSV Data: Developed AI- powered system designed to automate the process of generating charts and summaries from CSV data enabling businesses to extract valuable insights quickly, providing a seamless and efficient data analysis process that reduced the time spent on manual data analysis by over 80% from about 4hrs to 10min (+30 min to review the results).\n\nSales Research Agents: Automated and enhanced the sales research process which integrated from data sources such as LinkedIn and website providing sales teams with in-depth prospect analysis of the prospect and personalized messaging recommendations reducing research time by over 70%.\nSlack Internal Knowledge Base Integration: Developed AI agents for real-time access to internal information directly from slack.\n\nHIPAA Compliant Inbox Manager: Designed and developed a secure, AI-powered inbox manager tailored for an insurance benefits consultant handling sensitive client data.\nAchieved HIPAA compliance with secure data handling (encryption at rest and in transit) on Google Cloud Platform\nBuilt an automated system that parsed incoming emails, categorized them, and generated context-aware draft responses\nIntegrated with the client’s internal knowledge base for intelligent follow-ups and status tracking\nIncluded logic to identify missing information and auto-trigger clarification requests",
         "duration": "Dec 2023 - Present · 2 yrs 1 mo",
@@ -176,7 +176,7 @@
       {
         "name": "Intent Based Inbox Manager",
         "description": "Intent-Based Inbox Pro is a powerful hybrid system to manage your inbox and streamline follow-up workflows. This system automatically identifies high-priority emails based on intent, categorizes messages, and triggers personalized responses or follow-up actions. With its smart prioritization and automation, sales and operations teams can efficiently manage high volumes of emails without missing critical opportunities.\n\nhttps://github.com/Innovize-AI/code-sapien/tree/inbox-manager/inbox-manager",
-        "associated_with": "Innovize AI",
+        "associated_with": "Glial",
         "is_current": false
       }
     ],
@@ -205,7 +205,7 @@
       },
       {
         "type": "link",
-        "title": "Discovery and AI- Readiness Call | Innovize AI | Cal.com",
+        "title": "Discovery and AI- Readiness Call | Glial | Cal.com",
         "description": "Cal.com",
         "url": "https://cal.com/innovizeai/ai-readiness-call",
         "image_url": "https://media.licdn.com/dms/image/sync/v2/D4D27AQFZRJIH0Epy_w/articleshare-shrink_1280_800/articleshare-shrink_1280_800/0/1760581820236?e=1767009600&v=beta&t=17Kn5QFeQR_snJnHDr5In-e9iO9UcN6f9c2QG2MnWtc"

@@ -30,10 +30,10 @@ def reduce_last(left: any, right: any):
 from pydantic import BaseModel, Field
 
 class IdealProfile(BaseModel):
-    industry: str = Field(..., description="Industry of the lead's company")
-    company_size: Optional[str] = Field(..., description="Number of employees in the lead's company")
-    revenue: Optional[str] = Field(None, description="Annual revenue of the lead's company in millions")
-    job_title: str = Field(..., description="Job title of the lead")
+    industry: Union[str, List[str]] = Field(..., description="Target industries for the Ideal Customer Profile (ICP)")
+    company_size: Optional[Union[str, List[str]]] = Field(..., description="Target company sizes or employee counts for the ICP")
+    revenue: Optional[Union[str, List[str]]] = Field(None, description="Target annual revenues for the ICP")
+    job_title: Union[str, List[str]] = Field(..., description="Target job titles or roles for the ICP")
 
 class Product(BaseModel):
     name: str
@@ -63,6 +63,11 @@ class InputLeadData(BaseModel):
     
     extra_metadata: Optional[dict] = None # For webhook/form extras
     trigger_context: Optional[str] = None # 'email_update', 'crm_update'
+    
+    # Enrichment Fields (Deterministic)
+    industry: Optional[str] = None
+    employee_size: Optional[str] = None
+    revenue: Optional[str] = None
 
 class AgentState(TypedDict):
     email_id: str
@@ -101,6 +106,9 @@ class AgentState(TypedDict):
     company_stats: Annotated[Optional[dict], reduce_last]
     discovery_interaction_history: Annotated[List[dict], reduce_last]
     crm_context: Annotated[Optional[dict], reduce_last]
+
+    # Apollo Rich Metadata (from waterfall enrichment)
+    company_metadata: Annotated[Optional[dict], reduce_last]
 
 
     # Specialized Nodules

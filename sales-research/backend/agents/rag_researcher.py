@@ -28,12 +28,18 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
     user_details = state.get("user_profile_details", {})
     job_title = user_details.get("headline", "") or state.get("ideal_profile", {}).job_title or ""
     
+    # Handle the case where job_title is a list from the ICP
+    if isinstance(job_title, list):
+        job_title = " ".join(str(j) for j in job_title)
+    
+    job_title_lower = str(job_title).lower()
+    
     role_match = False
     if not target_roles:
         role_match = True # No specific roles defined, assume fit
     else:
         for role in target_roles:
-            if role.lower() in job_title.lower():
+            if role.lower() in job_title_lower:
                 role_match = True
                 break
     

@@ -3,9 +3,9 @@ import axios from 'axios';
 // Dynamically determine API URL based on environment
 const getApiUrl = () => {
     if (typeof window === 'undefined') return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    
+
     const hostname = window.location.hostname;
-    
+
     // 1. Localhost Check
     if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
         return 'http://localhost:8000';
@@ -16,7 +16,7 @@ const getApiUrl = () => {
     if (hostname.includes('staging')) {
         return 'https://glial-research-backend-service-staging-512561667165.us-central1.run.app';
     }
-    
+
     // 3. Default to Production
     return 'https://glial-research-backend-service-512561667165.us-central1.run.app';
 };
@@ -171,7 +171,7 @@ export const discoverLeads = async (data: LeadDiscoveryInput) => {
 };
 
 export const fetchHistory = async (
-    skip: number = 0, 
+    skip: number = 0,
     limit: number = 50,
     search: string = "",
     status: string = "all",
@@ -269,16 +269,28 @@ export const bulkAnalyzeLeads = async (
 };
 
 export interface IdealProfileData {
-    industry: string;
-    company_size?: string;
-    revenue?: string;
-    job_title: string;
+    industry: string | string[];
+    company_size?: string | string[];
+    revenue?: string | string[];
+    job_title: string | string[];
     value_proposition?: string;
 }
 
 export const getICP = async (): Promise<IdealProfileData | null> => {
     try {
         const response = await axios.get(`${API_URL}/api/settings/icp`);
+        return response.data;
+    } catch (e: any) {
+        if (e.response?.status === 401) {
+            throw e; // Let auth provider handle it
+        }
+        return null;
+    }
+};
+
+export const getGlobalICP = async (): Promise<IdealProfileData | null> => {
+    try {
+        const response = await axios.get(`${API_URL}/api/settings/global-icp`);
         return response.data;
     } catch (e: any) {
         if (e.response?.status === 401) {
@@ -484,11 +496,14 @@ export interface IdentifiedProfile {
     headline?: string;
     linkedin_url: string;
     website?: string;
+    company_id?: string;
 
     // Classification
     is_fit?: boolean;
     is_competitor?: boolean;
     is_decision_maker?: boolean;
+    is_buy_signal?: boolean;
+    is_strategic_seller?: boolean;
     fit_reasoning?: string;
 
     comment_history?: string; // JSON string
@@ -500,18 +515,32 @@ export interface IdentifiedProfile {
     rep_name?: string;
     touchpoint_count: number;
     outreach_status?: string;
+    company?: {
+        id: string;
+        name: string;
+        website?: string;
+        industries?: string; // JSON string from backend
+        employee_count?: number;
+        revenue_estimate?: string;
+        market_cap?: string;
+        total_funding?: string;
+        headquarters?: string;
+        description?: string;
+    };
 }
 
 export const getIdentifiedProfiles = async (
-    skip: number = 0, 
-    limit: number = 100, 
+    skip: number = 0,
+    limit: number = 100,
     search: string = "",
     status: string | string[] = "all",
     sort_by: string = "touchpoint_count",
-    sort_order: string = "desc"
+    sort_order: string = "desc",
+    date_start?: string,
+    date_end?: string
 ): Promise<{ profiles: IdentifiedProfile[], total: number }> => {
     const response = await axios.get(`${API_URL}/api/competitor-analysis/profiles`, {
-        params: { skip, limit, search, status, sort_by, sort_order }
+        params: { skip, limit, search, status, sort_by, sort_order, date_start, date_end }
     });
     return response.data;
 };
@@ -567,6 +596,29 @@ export const ingestKnowledgeFile = async (filePath: string, namespace: string) =
     const response = await axios.post(`${API_URL}/api/knowledge/ingest`, {
         file_path: filePath,
         namespace
+    });
+    return response.data;
+};
+
+export const fetchStrategy = async () => {
+    const response = await axios.get(`${API_URL}/api/knowledge/strategy`);
+    return response.data;
+};
+
+export const configureStrategy = async (config: any) => {
+    const response = await axios.post(`${API_URL}/api/knowledge/configure-strategy`, config);
+    return response.data;
+};
+
+export const uploadKnowledgeFile = async (file: File, namespace: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('namespace', namespace);
+
+    const response = await axios.post(`${API_URL}/api/knowledge/upload`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
     });
     return response.data;
 };

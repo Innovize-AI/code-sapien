@@ -4,10 +4,85 @@ import difflib
 from typing import Iterable, Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete, update, desc, func, or_, Table, text
-from sqlalchemy.dialects.postgresql import insert, JSONB
-from db.models import ResearchReport, CompetitorAnalysis, Competitor, IdentifiedProfile, Activity, OrganizationSettings, UserSettings, AutopilotRule, Profile
-from db.schemas import ResearchReportCreate
+from sqlalchemy import select, update, delete, desc, func, and_, or_, Table, text
+from sqlalchemy.dialects.postgresql import insert
+from db.models import ResearchReport, LeadSubmission, OrganizationSettings, CRMContext, Competitor, IdentifiedProfile, Activity, Company, Profile, CompetitorAnalysis, UserSettings, AutopilotRule, ScheduledTask
+from db.schemas import ResearchReportCreate, LeadSubmissionCreate, OrganizationSettingsCreate, CompetitorCreate, IdentifiedProfileCreate, ActivityCreate, CompanyCreate
+from utils.url_normalize import normalize_linkedin_url
+from uuid import UUID
+
+async def get_active_icp(db: AsyncSession) -> dict | None:
+    """
+    Fetches the global organization ICP from settings.
+    """
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    settings = result.scalars().first()
+    if settings and settings.icp_json:
+        try:
+            return json.loads(settings.icp_json)
+        except:
+            return None
+    return None
+
+async def upsert_company(
+    db: AsyncSession,
+    company_data: dict,
+    linkedin_url: str | None = None,
+    domain: str | None = None
+) -> Company:
+    """
+    Creates or updates a Company record based on linkedin_url or domain.
+    If a company exists, it updates its fields.
+    """
+    if not linkedin_url and not domain:
+        raise ValueError("Either linkedin_url or domain must be provided for upsert_company.")
+
+    # Normalize inputs
+    normalized_linkedin_url = normalize_linkedin_url(linkedin_url) if linkedin_url else None
+    normalized_domain = domain.lower().strip() if domain else None
+
+    # Prepare data for upsert
+    insert_data = {
+        **company_data,
+        "linkedin_url": normalized_linkedin_url,
+        "domain": normalized_domain,
+        "updated_at": datetime.datetime.now(datetime.timezone.utc)
+    }
+    
+    # EXPLICIT GUARD: Never save prospect email to company table
+    insert_data.pop("email", None)
+    insert_data.pop("person_email", None)
+
+    # Filter to only valid columns
+    valid_columns = Company.__table__.columns.keys()
+    insert_data = {k: v for k, v in insert_data.items() if k in valid_columns}
+    
+    # Build conflict target
+    if normalized_linkedin_url:
+        conflict_target = [Company.linkedin_url]
+    elif normalized_domain:
+        conflict_target = [Company.domain]
+    else:
+        raise ValueError("Cannot upsert company without a unique identifier (linkedin_url or domain).")
+
+    # Handle dictionary/list fields for Text columns (JSON storage)
+    for key, value in insert_data.items():
+        if isinstance(value, (dict, list)):
+            insert_data[key] = json.dumps(value)
+
+    # Remove fields that should not be updated on conflict
+    update_data = {k: v for k, v in insert_data.items() if k not in ['id', 'created_at', 'linkedin_url', 'domain']}
+
+    stmt = insert(Company).values(**insert_data)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=conflict_target,
+        set_=update_data
+    ).returning(Company)
+
+    result = await db.execute(stmt)
+    company = result.scalar_one()
+    # Let the caller handle commitment/refreshing for better transaction control
+    return company
 
 def _safe_deserialize(val):
     if val and isinstance(val, str) and val.strip().startswith(('{', '[')):
@@ -60,12 +135,12 @@ def _calculate_json_modification_percentage(original: dict, updated: dict) -> in
         
     return total_mod // count if count > 0 else 0
 
-def _report_to_dict(report):
+def _report_to_dict(report, email_fallback=None):
     """Helper to convert ResearchReport model to final_state dictionary."""
     return {
         "id": str(report.id),
         "linkedin_url": report.linkedin_url,
-        "email_id": report.email_id,
+        "email_id": report.email_id or email_fallback,
         "website": report.website,
         "sales_research_report": _safe_deserialize(report.sales_research_report),
         "lead_score_analysis": _safe_deserialize(report.lead_score_analysis),
@@ -156,12 +231,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
         url = l.get("linkedin_url")
         if not url: continue
         
-        # Helper for URL normalization (strip query and trailing slash)
-        def normalize(u):
-            return u.split("?")[0].strip().strip("/") if u else ""
-
         # Normalize URL: remove query params, trailing slashes, strip whitespace
-        url = normalize(url)
+        url = normalize_linkedin_url(url)
         
         if url not in batch_map:
             batch_map[url] = {
@@ -173,6 +244,9 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "fit_reasoning": l.get("fit_reasoning"),
                 "intent": l.get("intent"),
                 "sentiment": l.get("sentiment"),
+                "email": l.get("email"),
+                "company_id": l.get("company_id"),
+                "profile_metadata": l.get("profile_metadata") or {},
                 "interactions": []
             }
         elif l.get("headline") and not batch_map[url].get("headline"):
@@ -186,9 +260,17 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             batch_map[url]["fit_reasoning"] = l.get("fit_reasoning")
         if l.get("intent"): batch_map[url]["intent"] = l.get("intent")
         if l.get("sentiment"): batch_map[url]["sentiment"] = l.get("sentiment")
+        if l.get("company_id") and not batch_map[url].get("company_id"):
+            batch_map[url]["company_id"] = l.get("company_id")
+        
+        # Merge profile_metadata if provided
+        if l.get("profile_metadata"):
+            if not isinstance(batch_map[url]["profile_metadata"], dict):
+                batch_map[url]["profile_metadata"] = {}
+            batch_map[url]["profile_metadata"].update(l.get("profile_metadata"))
         
         # Helper for URL normalization (strip query and trailing slash)
-        n_source_url = normalize(l.get("source_post_url"))
+        n_source_url = normalize_linkedin_url(l.get("source_post_url"))
         
         # Add interaction event
         batch_map[url]["interactions"].append({
@@ -196,15 +278,15 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             "source_post": l.get("source_post"),
             "source_post_url": l.get("source_post_url"), # Original URL
             "n_source_post_url": n_source_url,           # Normalized URL for matching
-            "competitor": l.get("competitor")
+            "competitor": l.get("competitor"),
+            "normalized_linkedin_url": normalize_linkedin_url(l.get("linkedin_url"))
         })
 
     # 2. Fetch all existing profiles in one query
-    # Normalize all URLs in batch_map keys (should already be normalized, but to be sure)
-    urls = [u.split("?")[0].strip().strip("/") for u in batch_map.keys()]
+    urls = [normalize_linkedin_url(u) for u in batch_map.keys()]
     query = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url.in_(urls))
     result = await db.execute(query)
-    existing_profiles = {p.linkedin_url.split("?")[0].strip().strip("/"): p for p in result.scalars().all()}
+    existing_profiles = {normalize_linkedin_url(p.linkedin_url): p for p in result.scalars().all()}
 
     # 3. Prepare data for native batch upsert
     upsert_rows = []
@@ -237,7 +319,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             for i in data["interactions"]:
                 if not i["source_post_url"]: continue
                 n_s_url = i["n_source_post_url"]
-                if not any(normalize(ds.get("url")) == n_s_url for ds in db_sources):
+                if not any(normalize_linkedin_url(ds.get("url")) == n_s_url for ds in db_sources):
                     db_sources.append({
                         "title": i["source_post"],
                         "url": i["source_post_url"],
@@ -261,7 +343,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 
                 # 2. Find or create post entry
                 n_lead_url = interaction["n_source_post_url"]
-                post_entry = next((p for p in comp_entry["posts"] if normalize(p["url"]) == n_lead_url), None)
+                post_entry = next((p for p in comp_entry["posts"] if normalize_linkedin_url(p["url"]) == n_lead_url), None)
                 if not post_entry:
                     post_entry = {"url": interaction["source_post_url"], "title": interaction["source_post"], "comments": []}
                     comp_entry["posts"].append(post_entry)
@@ -280,14 +362,21 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "is_fit": data.get("is_fit") or p.is_fit,
                 "is_competitor": data.get("is_competitor") or p.is_competitor,
                 "is_decision_maker": data.get("is_decision_maker") or p.is_decision_maker,
-                "fit_reasoning": data.get("fit_reasoning") or p.fit_reasoning,
+                "fit_reasoning": data.get("fit_reasoning") if data.get("fit_reasoning") not in [None, ""] else p.fit_reasoning,
                 "intent": data.get("intent") or p.intent,
                 "sentiment": data.get("sentiment") or p.sentiment,
+                "email": data.get("email") or p.email,
                 "comment_history": json.dumps(db_comments),
                 "source_posts": json.dumps(db_sources),
                 "interaction_history": json.dumps(db_history),
                 "touchpoint_count": tp_count,
-                "last_interaction_at": now
+                "last_interaction_at": now,
+                "company_id": data.get("company_id") or p.company_id,
+                "profile_metadata": json.dumps({
+                    **(json.loads(p.profile_metadata or "{}") if isinstance(p.profile_metadata, str) else (p.profile_metadata or {})),
+                    **(data.get("profile_metadata") or {})
+                }),
+                "normalized_linkedin_url": url
             })
         else:
             # Create new row
@@ -303,7 +392,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                     new_history.append(comp_entry)
                 
                 n_lead_url = interaction["n_source_post_url"]
-                post_entry = next((p for p in comp_entry["posts"] if normalize(p["url"]) == n_lead_url), None)
+                post_entry = next((p for p in comp_entry["posts"] if normalize_linkedin_url(p["url"]) == n_lead_url), None)
                 if not post_entry:
                     post_entry = {"url": interaction["source_post_url"], "title": interaction["source_post"], "comments": []}
                     comp_entry["posts"].append(post_entry)
@@ -337,11 +426,15 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "fit_reasoning": data.get("fit_reasoning"),
                 "intent": data.get("intent"),
                 "sentiment": data.get("sentiment"),
+                "email": data.get("email"),
                 "comment_history": json.dumps(legacy_comments),
                 "source_posts": json.dumps(legacy_sources),
                 "interaction_history": json.dumps(new_history),
                 "touchpoint_count": tp_count,
-                "last_interaction_at": now
+                "last_interaction_at": now,
+                "company_id": data.get("company_id"),
+                "profile_metadata": json.dumps(data.get("profile_metadata") or {}),
+                "normalized_linkedin_url": url
             })
 
     if upsert_rows:
@@ -351,15 +444,14 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             IdentifiedProfile.__table__,
             upsert_rows,
             conflict_cols=["linkedin_url"],
-            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at"]
+            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "profile_metadata", "normalized_linkedin_url"]
         )
-        await db.commit()
-        print(f"DEBUG: Batch upsert committed successfully. Results count: {len(results)}")
+        print(f"DEBUG: Batch upsert executed. Results count: {len(results)}")
         return results
     
     return []
 
-async def upsert_identified_profile(db: AsyncSession, profile_data: dict):
+async def upsert_identified_profile(db: AsyncSession, profile_data: dict, company_id: UUID | None = None):
     """
     profile_data: {
         "linkedin_url": str,
@@ -413,18 +505,36 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict):
         db_profile.last_interaction_at = datetime.datetime.now(datetime.timezone.utc)
         if profile_data.get("name") and not db_profile.name:
             db_profile.name = profile_data["name"]
+        
+        if profile_data.get("email"):
+            db_profile.email = profile_data["email"]
+
+        if profile_data.get("profile_metadata"):
+            md = profile_data["profile_metadata"]
+            db_profile.profile_metadata = json.dumps(md) if isinstance(md, dict) else md
+
+        if company_id:
+            db_profile.company_id = company_id
+            
+        # Ensure URL is normalized even for existing profiles if they have mismatches
+        db_profile.linkedin_url = normalize_linkedin_url(db_profile.linkedin_url)
+        db_profile.normalized_linkedin_url = normalize_linkedin_url(db_profile.linkedin_url)
     else:
         # Create new
         # Calculate touchpoint_count
         tp_count = len(new_sources)
         
         db_profile = IdentifiedProfile(
-            linkedin_url=profile_data["linkedin_url"],
+            linkedin_url=normalize_linkedin_url(profile_data["linkedin_url"]),
             name=profile_data.get("name"),
+            email=profile_data.get("email"),
+            profile_metadata=json.dumps(profile_data.get("profile_metadata")) if isinstance(profile_data.get("profile_metadata"), dict) else profile_data.get("profile_metadata"),
             comment_history=json.dumps([new_comment]) if new_comment else "[]",
             source_posts=json.dumps(new_sources),
             touchpoint_count=tp_count,
-            last_interaction_at=datetime.datetime.now(datetime.timezone.utc)
+            last_interaction_at=datetime.datetime.now(datetime.timezone.utc),
+            company_id=company_id,
+            normalized_linkedin_url=normalize_linkedin_url(profile_data["linkedin_url"])
         )
         db.add(db_profile)
     
@@ -434,16 +544,20 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict):
 
 async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100, search_query: str = None, user_id: str = None):
     # Sort by number of touchpoints (length of source_posts array)
-    # Join with ResearchReport to check if report exists
-    query = select(IdentifiedProfile, ResearchReport.id.label("report_id")).outerjoin(
-        ResearchReport, IdentifiedProfile.linkedin_url == ResearchReport.linkedin_url
+    from sqlalchemy.dialects.postgresql import JSONB
+    
+    # Fuzzy join to handle trailing slashes and parameter mismatches (e.g. "linkedin.com/in/user/" matches "linkedin.com/in/user")
+    join_condition = func.trim(func.split_part(IdentifiedProfile.linkedin_url, '?', 1), '/') == \
+                     func.trim(func.split_part(ResearchReport.linkedin_url, '?', 1), '/')
+
+    query = select(IdentifiedProfile, ResearchReport.id.label("report_id"), Company).outerjoin(
+        ResearchReport, join_condition
+    ).outerjoin(
+        Company, IdentifiedProfile.company_id == Company.id
     )
     
     if user_id:
-        # Note: In "Collaborative" model, we might want to show all leads but highlight owned ones.
-        # However, following the "Identify where it came from" request, we filter if user_id is provided
-        # or we just allow admins to see all.
-        query = query.where(or_(IdentifiedProfile.created_by_id == user_id, IdentifiedProfile.created_by_id == None))
+        query = query.where(or_(IdentifiedProfile.created_by_id == user_id, IdentifiedProfile.created_by_id.is_(None)))
     
     if search_query:
         search = f"%{search_query}%"
@@ -452,7 +566,8 @@ async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 
                 IdentifiedProfile.name.ilike(search),
                 IdentifiedProfile.headline.ilike(search),
                 IdentifiedProfile.fit_reasoning.ilike(search),
-                IdentifiedProfile.intent.ilike(search)
+                IdentifiedProfile.intent.ilike(search),
+                Company.name.ilike(search)
             )
         )
         
@@ -492,7 +607,10 @@ async def count_identified_profiles(db: AsyncSession, search_query: str = None):
     return result.scalar()
 
 async def save_report(db: AsyncSession, report_data: ResearchReportCreate, user_id: str = None):
-    db_report = ResearchReport(**report_data.model_dump())
+    data = report_data.model_dump()
+    if 'linkedin_url' in data and data['linkedin_url']:
+        data['normalized_linkedin_url'] = normalize_linkedin_url(data['linkedin_url'])
+    db_report = ResearchReport(**data)
     if user_id:
         db_report.created_by_id = user_id
     db.add(db_report)
@@ -528,7 +646,13 @@ async def get_report_by_email_or_linkedin(db: AsyncSession, email_id: str = None
     if email_id:
         conditions.append(ResearchReport.email_id == email_id)
     if linkedin_url:
-        conditions.append(ResearchReport.linkedin_url == linkedin_url)
+        normalized_li = normalize_linkedin_url(linkedin_url)
+        # Match both exact and normalized just in case
+        conditions.append(or_(
+            ResearchReport.linkedin_url == linkedin_url,
+            ResearchReport.linkedin_url == normalized_li,
+            func.trim(func.split_part(ResearchReport.linkedin_url, '?', 1), '/') == func.trim(func.split_part(normalized_li, '?', 1), '/')
+        ))
         
     query = select(ResearchReport).where(or_(*conditions)).order_by(desc(ResearchReport.created_at)).limit(1)
     result = await db.execute(query)
@@ -855,6 +979,13 @@ async def create_activity(db: AsyncSession, type: str, title: str, description: 
     
     # scalars().first() will be None if conflict occurred
     return result.scalars().first()
+
+async def delete_activity_by_key(db: AsyncSession, idempotency_key: str):
+    from sqlalchemy import delete
+    stmt = delete(Activity).where(Activity.idempotency_key == idempotency_key)
+    await db.execute(stmt)
+    await db.commit()
+    return True
 
 async def get_activities(db: AsyncSession, limit: int = 50, user_id: str = None):
     query = select(Activity, func.coalesce(Profile.full_name, Profile.email).label("creator_name")).outerjoin(

@@ -572,6 +572,8 @@ Output strictly in JSON format as a list of objects:
       "is_competitor": boolean,
       "is_fit": boolean,
       "is_decision_maker": boolean,
+      "is_buy_signal": boolean,
+      "is_strategic_seller": boolean,
       "reasoning": "Brief explanation focused on ICP alignment, lead mode (poster vs commenter), and intent signals. Answer: what exactly is the post about?",
       "intent": "string (hand_raiser, prospect_pain, passive_expert, strategic_seller, or low_signal)",
       "post_topic_depth": "string (sharing_framework, tool_showcase, complaining_keywords, industry_synthesis, discovery_friction, generic_engagement)",

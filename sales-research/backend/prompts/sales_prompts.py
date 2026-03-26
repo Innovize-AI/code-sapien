@@ -520,8 +520,8 @@ Profiles to Analyze:
     - **Poster Mode**: If it starts with "Posted about keywords:", the lead is the **Original Author** of the post. They are sharing their own thoughts/expertise on this topic.
 - **source_post**: This is the context of the post they were engaging with (or wrote).
 - **Use these fields to determine 'intent' and 'sentiment'**:
-    - **Interested (Commenter)**: Asking a question, requesting a demo, or expressing interest in a competitor's solution.
-    - **Pain Point (Poster/Commenter)**: Complaining about manual work, poor ROI, or technical bottlenecks.
+    - **Hand Raiser (Commenter)**: Asking a question, requesting a demo, or expressing interest in a competitor's solution.
+    - **Prospect Pain (Poster/Commenter)**: Complaining about manual work, poor ROI, or technical bottlenecks.
     - **Thought Leadership (Poster)**: If they are posting high-value content but not expressing a specific need yet, mark as 'low_intent' or 'curious' but 'is_fit' if they match the ICP.
 
 ### SIGNAL CATEGORIZATION (post_topic_depth):

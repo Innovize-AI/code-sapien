@@ -31,6 +31,7 @@ import {
   Zap,
 } from "lucide-react";
 import { ensureProtocol, cn } from "@/lib/utils";
+import { API_URL } from "@/lib/api";
 
 interface CompanyDetailModalProps {
   companyId: string | null;
@@ -97,7 +98,7 @@ export function CompanyDetailModal({
   const fetchCompanyDetails = async (id: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/companies/${id}`);
+      const response = await fetch(`${API_URL}/api/companies/${id}`);
       if (response.ok) {
         const data = await response.json();
         setCompany(data);
@@ -536,15 +537,17 @@ export function CompanyDetailModal({
 
                   // 1. Social Signals (Identified Profiles)
                   people.forEach((p) => {
-                    console.log(p)
+                    console.log(p);
                     try {
                       const history = p.interaction_history
                         ? JSON.parse(p.interaction_history as any)
                         : [];
-                      console.log(history)
+                      console.log(history);
                       history.forEach((h: any) => {
                         const isKeyword = h.competitor?.startsWith("Keyword:");
-                        const typeLabel = isKeyword ? "Intent via Keyword" : `Engaged with ${h.competitor}`;
+                        const typeLabel = isKeyword
+                          ? "Intent via Keyword"
+                          : `Engaged with ${h.competitor}`;
 
                         (h.posts || []).forEach((post: any) => {
                           // If there are comments, push one entry per comment for full visibility
@@ -552,11 +555,16 @@ export function CompanyDetailModal({
                             post.comments.forEach((comment: string) => {
                               feedItems.push({
                                 type: "social",
-                                date: post.date || p.last_interaction_at || company.updated_at,
+                                date:
+                                  post.date ||
+                                  p.last_interaction_at ||
+                                  company.updated_at,
                                 title: `${p.name || "A lead"} (${typeLabel})`,
                                 description: `Commented: "${comment}" on "${post.title}"`,
                                 icon: <MessageSquare className="w-4 h-4" />,
-                                color: isKeyword ? "text-amber-600 bg-amber-50 border-amber-100" : "text-blue-600 bg-blue-50 border-blue-100",
+                                color: isKeyword
+                                  ? "text-amber-600 bg-amber-50 border-amber-100"
+                                  : "text-blue-600 bg-blue-50 border-blue-100",
                                 url: post.url,
                                 is_buy_signal: p.is_buy_signal,
                                 is_strategic_seller: p.is_strategic_seller,
@@ -567,11 +575,16 @@ export function CompanyDetailModal({
                             // If no comments, just show the post interaction (likely the reason they were identified)
                             feedItems.push({
                               type: "social",
-                              date: post.date || p.last_interaction_at || company.updated_at,
+                              date:
+                                post.date ||
+                                p.last_interaction_at ||
+                                company.updated_at,
                               title: `${p.name || "A lead"} (${typeLabel})`,
                               description: `Interacted with post: "${post.title}"`,
                               icon: <Activity className="w-4 h-4" />,
-                              color: isKeyword ? "text-amber-600 bg-amber-50 border-amber-100" : "text-blue-600 bg-blue-50 border-blue-100",
+                              color: isKeyword
+                                ? "text-amber-600 bg-amber-50 border-amber-100"
+                                : "text-blue-600 bg-blue-50 border-blue-100",
                               url: post.url,
                               is_buy_signal: p.is_buy_signal,
                               is_strategic_seller: p.is_strategic_seller,
@@ -581,7 +594,10 @@ export function CompanyDetailModal({
                         });
                       });
                     } catch (e) {
-                      console.error("Error parsing interaction history for feed", e);
+                      console.error(
+                        "Error parsing interaction history for feed",
+                        e,
+                      );
                     }
                   });
 
@@ -605,7 +621,9 @@ export function CompanyDetailModal({
                       type: "news",
                       date: isStr ? company.updated_at : n.date,
                       title: isStr ? "Company Update" : n.title,
-                      description: isStr ? n : (n.source || "Corporate announcement"),
+                      description: isStr
+                        ? n
+                        : n.source || "Corporate announcement",
                       icon: <Newspaper className="w-4 h-4" />,
                       color: "text-indigo-600 bg-indigo-50 border-indigo-100",
                       url: isStr ? null : n.url || n.link,
@@ -617,11 +635,14 @@ export function CompanyDetailModal({
                     const isStr = typeof h === "string";
                     feedItems.push({
                       type: "hiring",
-                      date: isStr ? company.updated_at : h.posted_at || company.updated_at,
+                      date: isStr
+                        ? company.updated_at
+                        : h.posted_at || company.updated_at,
                       title: "New Job Opening",
                       description: isStr ? h : h.title,
                       icon: <Briefcase className="w-4 h-4" />,
-                      color: "text-emerald-600 bg-emerald-50 border-emerald-100",
+                      color:
+                        "text-emerald-600 bg-emerald-50 border-emerald-100",
                       url: isStr ? null : h.url,
                     });
                   });
@@ -637,7 +658,9 @@ export function CompanyDetailModal({
                     return (
                       <div className="flex flex-col items-center justify-center h-[400px] text-center space-y-2 opacity-50">
                         <Activity className="w-10 h-10 mb-2" />
-                        <h4 className="text-sm font-bold">No Activity Recorded</h4>
+                        <h4 className="text-sm font-bold">
+                          No Activity Recorded
+                        </h4>
                         <p className="text-xs">
                           We haven't detected any recent news, hiring, or social
                           signals for this company.
@@ -669,13 +692,13 @@ export function CompanyDetailModal({
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
                                   {item.date
                                     ? new Date(item.date).toLocaleDateString(
-                                      undefined,
-                                      {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                      },
-                                    )
+                                        undefined,
+                                        {
+                                          month: "short",
+                                          day: "numeric",
+                                          year: "numeric",
+                                        },
+                                      )
                                     : "Recently"}
                                 </span>
                                 <div className="h-px flex-1 bg-muted-foreground/5" />
@@ -687,10 +710,16 @@ export function CompanyDetailModal({
                                     <h5 className="text-sm font-bold tracking-tight mb-1 group-hover:text-primary transition-colors flex items-center gap-2">
                                       {item.title}
                                       {item.sentiment === "positive" && (
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" title="Positive Sentiment" />
+                                        <div
+                                          className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
+                                          title="Positive Sentiment"
+                                        />
                                       )}
                                       {item.sentiment === "negative" && (
-                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" title="Negative Sentiment" />
+                                        <div
+                                          className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
+                                          title="Negative Sentiment"
+                                        />
                                       )}
                                     </h5>
                                     <p className="text-xs text-muted-foreground leading-relaxed italic">
@@ -701,13 +730,19 @@ export function CompanyDetailModal({
                                   {/* Signals */}
                                   <div className="flex flex-col gap-1 items-end shrink-0">
                                     {item.is_buy_signal && (
-                                      <Badge variant="outline" className="text-[8px] h-4 bg-violet-50 text-violet-700 border-violet-200 uppercase font-bold px-1 animate-pulse">
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[8px] h-4 bg-violet-50 text-violet-700 border-violet-200 uppercase font-bold px-1 animate-pulse"
+                                      >
                                         <Zap className="w-2 h-2 mr-0.5" />
                                         Buy Signal
                                       </Badge>
                                     )}
                                     {item.is_strategic_seller && (
-                                      <Badge variant="outline" className="text-[8px] h-4 bg-zinc-100 text-zinc-600 border-zinc-200 uppercase font-bold px-1">
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[8px] h-4 bg-zinc-100 text-zinc-600 border-zinc-200 uppercase font-bold px-1"
+                                      >
                                         Strategic Seller
                                       </Badge>
                                     )}
@@ -761,18 +796,27 @@ export function CompanyDetailModal({
                             {person.is_fit ? "FIT" : "REJECTED"}
                           </Badge>
                           {person.is_buy_signal && (
-                            <Badge variant="outline" className="text-[9px] h-5 bg-violet-50 text-violet-700 border-violet-200 uppercase font-bold px-1.5 animate-pulse">
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] h-5 bg-violet-50 text-violet-700 border-violet-200 uppercase font-bold px-1.5 animate-pulse"
+                            >
                               <Zap className="w-2.5 h-2.5 mr-1" />
                               Buy Signal
                             </Badge>
                           )}
                           {person.is_strategic_seller && (
-                            <Badge variant="outline" className="text-[9px] h-5 bg-zinc-100 text-zinc-600 border-zinc-200 uppercase font-bold px-1.5">
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] h-5 bg-zinc-100 text-zinc-600 border-zinc-200 uppercase font-bold px-1.5"
+                            >
                               Strategic Seller
                             </Badge>
                           )}
                           {person.intent && (
-                            <Badge variant="outline" className="text-[9px] h-5 bg-blue-50 text-blue-700 border-blue-200 uppercase font-bold px-1.5">
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] h-5 bg-blue-50 text-blue-700 border-blue-200 uppercase font-bold px-1.5"
+                            >
                               {person.intent}
                             </Badge>
                           )}

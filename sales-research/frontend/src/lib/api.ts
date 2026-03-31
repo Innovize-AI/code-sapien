@@ -276,9 +276,9 @@ export interface IdealProfileData {
     value_proposition?: string;
 }
 
-export const getICP = async (): Promise<IdealProfileData | null> => {
+export const getPersonalICP = async (): Promise<IdealProfileData | null> => {
     try {
-        const response = await axios.get(`${API_URL}/api/settings/icp`);
+        const response = await axios.get(`${API_URL}/api/settings/personal-icp`);
         return response.data;
     } catch (e: any) {
         if (e.response?.status === 401) {
@@ -300,8 +300,13 @@ export const getGlobalICP = async (): Promise<IdealProfileData | null> => {
     }
 };
 
-export const saveICP = async (data: IdealProfileData) => {
-    const response = await axios.post(`${API_URL}/api/settings/icp`, data);
+export const savePersonalICP = async (data: IdealProfileData) => {
+    const response = await axios.post(`${API_URL}/api/settings/personal-icp`, data);
+    return response.data;
+};
+
+export const saveGlobalICP = async (data: IdealProfileData) => {
+    const response = await axios.post(`${API_URL}/api/settings/global-icp`, data);
     return response.data;
 };
 

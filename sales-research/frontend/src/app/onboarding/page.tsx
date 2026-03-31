@@ -34,11 +34,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  saveICP,
+  saveGlobalICP,
   IdealProfileData,
   getOnboardingStatus,
   setOnboardingComplete,
-  getICP,
+  getGlobalICP,
 } from "@/lib/api";
 
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -83,7 +83,7 @@ export default function OnboardingPage() {
           return;
         }
 
-        const existingIcp = await getICP();
+        const existingIcp = await getGlobalICP();
         if (existingIcp) {
           form.reset({
             industry: existingIcp.industry || [],
@@ -113,7 +113,7 @@ export default function OnboardingPage() {
     setIsLoading(true);
     setError(null);
     try {
-      await saveICP(values);
+      await saveGlobalICP(values);
       await setOnboardingComplete();
       // Redirect to dashboard after saving
       router.push("/");

@@ -15,8 +15,8 @@ from dependencies import get_current_user, require_admin
 
 settings_router = APIRouter(tags=['Settings'])
 
-@settings_router.get("/settings/icp", response_model=Optional[IdealProfileData])
-async def get_icp(
+@settings_router.get("/settings/personal-icp", response_model=Optional[IdealProfileData])
+async def get_personal_icp(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
@@ -64,31 +64,39 @@ async def get_global_icp(
     except:
         return None
 
-@settings_router.post("/settings/icp", response_model=IdealProfileData)
-async def save_icp(
+@settings_router.post("/settings/personal-icp", response_model=IdealProfileData)
+async def save_personal_icp(
     icp_data: IdealProfileData, 
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
     """
-    Save ICP. Admins save to Global, Reps save to their Personal Override.
+    Save Personal ICP Override for the current user.
     """
-    if current_user.role == 'admin':
-        # Admin saves to Global
-        result = await db.execute(select(OrganizationSettings).limit(1))
-        settings = result.scalars().first()
-        icp_json_str = icp_data.json()
-        if settings:
-            settings.icp_json = icp_json_str
-        else:
-            settings = OrganizationSettings(icp_json=icp_json_str)
-            db.add(settings)
-        await db.commit()
-    else:
-        # Rep saves to personal override
-        from db.crud import upsert_user_settings
-        await upsert_user_settings(db, str(current_user.id), {"icp_json": icp_data.json()})
+    from db.crud import upsert_user_settings
+    await upsert_user_settings(db, str(current_user.id), {"icp_json": icp_data.json()})
+    return icp_data
+
+@settings_router.post("/settings/global-icp", response_model=IdealProfileData)
+async def save_global_icp(
+    icp_data: IdealProfileData, 
+    db: AsyncSession = Depends(get_db),
+    admin_user: Profile = Depends(require_admin)
+):
+    """
+    Save Global Organization ICP. Admin only.
+    """
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    settings = result.scalars().first()
+    icp_json_str = icp_data.json()
     
+    if settings:
+        settings.icp_json = icp_json_str
+    else:
+        settings = OrganizationSettings(icp_json=icp_json_str)
+        db.add(settings)
+    
+    await db.commit()
     return icp_data
 
 @settings_router.get("/settings/user-integrations")

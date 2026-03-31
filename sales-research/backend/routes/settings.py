@@ -71,10 +71,52 @@ async def save_personal_icp(
     current_user: Profile = Depends(get_current_user)
 ):
     """
-    Save Personal ICP Override for the current user.
+    Save Personal ICP Override for the current user. 
+    If the settings match the Global ICP, we clear the personal override 
+    to prevent redundant data and enable automatic fallback.
+    If the settings are completely empty, we skip the update to avoid accidental clearing.
     """
-    from db.crud import upsert_user_settings
-    await upsert_user_settings(db, str(current_user.id), {"icp_json": icp_data.json()})
+    from db.crud import upsert_user_settings, delete_user_icp_override
+
+    # 0. Check if data is truly empty across all fields
+    def is_val_empty(v):
+        if v is None: return True
+        if isinstance(v, list): return len(v) == 0
+        if isinstance(v, str): return not v.strip()
+        return False
+
+    is_empty = all([
+        is_val_empty(icp_data.industry),
+        is_val_empty(icp_data.company_size),
+        is_val_empty(icp_data.revenue),
+        is_val_empty(icp_data.job_title),
+        is_val_empty(icp_data.value_proposition)
+    ])
+    
+    if is_empty:
+        logger.info(f"Skipping update for completely empty ICP data for user {current_user.id}")
+        return icp_data
+    
+    # 1. Fetch Global ICP to compare
+    result = await db.execute(select(OrganizationSettings).limit(1))
+    global_settings = result.scalars().first()
+    
+    is_redundant = False
+    if global_settings and global_settings.icp_json:
+        try:
+            global_icp_data = json.loads(global_settings.icp_json)
+            # Compare the incoming data with global (ignoring small formatting diffs via dict compare)
+            if icp_data.dict() == global_icp_data:
+                is_redundant = True
+        except:
+            pass
+
+    if is_redundant:
+        logger.info(f"Clearing redundant ICP override for user {current_user.id}")
+        await delete_user_icp_override(db, str(current_user.id))
+    else:
+        await upsert_user_settings(db, str(current_user.id), {"icp_json": icp_data.json()})
+    
     return icp_data
 
 @settings_router.post("/settings/global-icp", response_model=IdealProfileData)

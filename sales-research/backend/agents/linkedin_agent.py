@@ -550,15 +550,20 @@ async def get_apollo_company_data(linkedin_url: str):
     Extracts company stats, technologies, funding events,
     headcount growth, keywords and lead details.
     """
-    api_key = os.getenv("APOLLO_API_KEY").strip() if os.getenv("APOLLO_API_KEY") else None
+    api_key = os.getenv("APOLLO_API_KEY", "").strip()
     if not api_key:
+        logger.warning("APOLLO_API_KEY not found in environment.")
         return {}
+    
+    # Masked log for diagnosis of 401
+    masked = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 8 else "***"
+    logger.debug(f"DEBUG: Apollo API Call with key: {masked} (Len: {len(api_key)})")
 
     url = "https://api.apollo.io/v1/people/match"
     headers = {
         "Cache-Control": "no-cache",
         "Content-Type": "application/json",
-        "X-Api-Key": api_key
+        "x-api-key": api_key
     }
     
     data = {"linkedin_url": linkedin_url, "reveal_personal_emails": True}
@@ -567,22 +572,25 @@ async def get_apollo_company_data(linkedin_url: str):
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=data, timeout=10.0)
-            if response.status_code == 200:
-                res = response.json()
-                person = res.get("person", {})
-                org = person.get("organization", {})
-                
-                if org:
-                    # --- Revenue ---
-                    raw_rev = org.get("annual_revenue") or org.get("organization_revenue")
-                    rev_str = org.get("annual_revenue_printed") or org.get("organization_revenue_printed")
-                    if not rev_str and raw_rev:
-                        if raw_rev >= 1_000_000_000:
-                            rev_str = f"{raw_rev / 1_000_000_000:.1f}B"
-                        elif raw_rev >= 1_000_000:
-                            rev_str = f"{raw_rev / 1_000_000:.1f}M"
-                        else:
-                            rev_str = str(raw_rev)
+            if response.status_code != 200:
+                logger.error(f"Apollo API Error: {response.status_code} - {response.text}")
+                return {}
+
+            res = response.json()
+            person = res.get("person", {})
+            org = person.get("organization", {})
+            
+            if org:
+                # --- Revenue ---
+                raw_rev = org.get("annual_revenue") or org.get("organization_revenue")
+                rev_str = org.get("annual_revenue_printed") or org.get("organization_revenue_printed")
+                if not rev_str and raw_rev:
+                    if raw_rev >= 1_000_000_000:
+                        rev_str = f"{raw_rev / 1_000_000_000:.1f}B"
+                    elif raw_rev >= 1_000_000:
+                        rev_str = f"{raw_rev / 1_000_000:.1f}M"
+                    else:
+                        rev_str = str(raw_rev)
 
                 # --- Technologies ---
                 # Full list with uid + name + category
@@ -612,36 +620,6 @@ async def get_apollo_company_data(linkedin_url: str):
                     "24_month": org.get("organization_headcount_twenty_four_month_growth"),
                 }
 
-                # --- Lead Context ---
-                # lead_employment_history = person.get("employment_history") or []
-                # lead_context = {
-                #     "title": person.get("title"),
-                #     "seniority": person.get("seniority"),
-                #     "departments": person.get("departments") or [],
-                #     "functions": person.get("functions") or [],
-                #     "city": person.get("city"),
-                #     "state": person.get("state"),
-                #     "country": person.get("country"),
-                #     "employment_history": [
-                #         {
-                #             "company": e.get("organization_name"),
-                #             "title": e.get("title"),
-                #             "start_date": e.get("start_date"),
-                #             "end_date": e.get("end_date"),
-                #             "current": e.get("current")
-                #         }
-                #         for e in lead_employment_history[:10]
-                #     ]
-                # }
-
-                # --- Parent / Owner ---
-                # owned_by = org.get("owned_by_organization")
-                # parent_company = {
-                #     "id": owned_by.get("id"),
-                #     "name": owned_by.get("name"),
-                #     "website": owned_by.get("website_url")
-                # } if owned_by else None
-
                 return {
                     # Core stats
                     "revenue_estimate": rev_str,
@@ -668,13 +646,10 @@ async def get_apollo_company_data(linkedin_url: str):
                     "follower_count": org.get("num_followers") or org.get("linkedin_follower_count"),
                     "employee_count_range": org.get("employee_count_range"),
                     "headquarters": f"{org.get('city', '')}, {org.get('state', '')}, {org.get('country', '')}".strip(", "),
-                    # Keywords
-                    # "keywords": org.get("keywords") or [],
                     # Lead person_email + context
                     "person_email": person.get("email"),
                 }
-            else:
-                logger.debug(f"Apollo enrichment failed ({response.status_code}): {response.text}")
+            return {}
     except Exception as e:
         logger.error(f"Error calling Apollo API: {e}")
         

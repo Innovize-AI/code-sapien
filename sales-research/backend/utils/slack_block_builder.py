@@ -168,7 +168,7 @@ def build_hot_lead_blocks(
             "value": linkedin_url
         }
     ]
-
+    
     if post_link:
         actions_elements.insert(1, {
             "type": "button",

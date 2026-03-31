@@ -632,6 +632,8 @@ async def get_apollo_company_data(linkedin_url: str):
                     "industries": org.get("industries") or [],
                     "secondary_industries": org.get("secondary_industries") or [],
                     "website": org.get("website_url"),
+                    "domain": org.get("domain"),
+                    "company_linkedin_url": org.get("linkedin_url"),
                     "company_name": org.get("name"),
                     "description": org.get("short_description"),
                     # Tech stack

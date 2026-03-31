@@ -188,15 +188,18 @@ async def run_classification_and_update(raw_leads: List[dict]):
                         logger.info(f"Skipping notification for Strategic Seller {lu.get('name')}")
                         continue
 
-                    has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
+                    # Define High Intent and Friction (Decision maker filter applied later)
+                    has_high_intent = lu.get("intent") in ["prospect_pain", "pain_point"]
                     has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
-                    is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
-                    is_qualified = lu.get("is_fit") and not lu.get("is_buy_signal") and not lu.get("is_strategic_seller")
                     
-                    if is_hot or lu.get("intent") in ["prospect_pain", "pain_point"] or is_qualified:
+                    # Logic for determining if we should even bother enriching/notifying (Apollo Costs)
+                    # ONLY enrich if it is a "Hot Lead" candidate (Decision Maker + Signal)
+                    is_hot_candidate = lu.get("is_fit") and lu.get("is_decision_maker") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
+                    
+                    if is_hot_candidate:
                         # Apollo Enrichment (External Network Call - No Session Open)
                         try:
-                            logger.info(f"Enriching high-priority lead {lu.get('name')} via Apollo...")
+                            logger.info(f"Enriching priority lead {lu.get('name')} via Apollo...")
                             enriched = await enrich_company_waterfall(person_url=lu.get("linkedin_url"))
                             if enriched:
                                 # 3. Save Enrichment (Clean isolated sub-session)
@@ -210,23 +213,32 @@ async def run_classification_and_update(raw_leads: List[dict]):
                                         if person_email:
                                             lu["email"] = person_email
                                         
-                                        company = await upsert_company(
-                                            session, 
-                                            company_data_for_upsert, 
-                                            linkedin_url=enriched.get("linkedin_url"),
-                                            domain=enriched.get("domain")
-                                        )
-                                        lu.update({
-                                            "company_id": str(company.id),
-                                            "company_name": enriched.get("name"),
-                                            "company_description": enriched.get("description"),
-                                            "company_industries": enriched.get("industries"),
-                                            "employee_count": enriched.get("employee_count"),
-                                            "revenue": enriched.get("revenue")
-                                        })
-                                        update_vals = {"company_id": company.id}
+                                        update_vals = {}
                                         if person_email:
                                             update_vals["email"] = person_email
+
+                                        # Guard: Only upsert company if we have a valid identifier (LinkedIn URL or Domain)
+                                        if enriched.get("linkedin_url") or enriched.get("domain"):
+                                            try:
+                                                company = await upsert_company(
+                                                    session, 
+                                                    company_data_for_upsert, 
+                                                    linkedin_url=enriched.get("linkedin_url"),
+                                                    domain=enriched.get("domain")
+                                                )
+                                                lu.update({
+                                                    "company_id": str(company.id),
+                                                    "company_name": enriched.get("name"),
+                                                    "company_description": enriched.get("description"),
+                                                    "company_industries": enriched.get("industries"),
+                                                    "employee_count": enriched.get("employee_count"),
+                                                    "revenue": enriched.get("revenue")
+                                                })
+                                                update_vals["company_id"] = company.id
+                                            except Exception as upsert_e:
+                                                logger.error(f"Failed to upsert company for {lu.get('name')}: {upsert_e}")
+                                        else:
+                                            logger.warning(f"Skipping company upsert for {lu.get('name')}: No LinkedIn URL or Domain found in enrichment data.")
                                             
                                         # 4. RE-VALIDATE Fit with confirmed firmographics (using cached icp_data)
                                         try:
@@ -239,20 +251,23 @@ async def run_classification_and_update(raw_leads: List[dict]):
                                         except Exception as re_e:
                                             logger.error(f"Error re-validating lead {lu.get('name')}: {re_e}")
                                             
-                                        await session.execute(
-                                            update(IdentifiedProfile)
-                                            .where(IdentifiedProfile.linkedin_url == lu.get("linkedin_url"))
-                                            .values(**update_vals)
-                                        )
+                                        if update_vals:
+                                            await session.execute(
+                                                update(IdentifiedProfile)
+                                                .where(IdentifiedProfile.linkedin_url == lu.get("linkedin_url"))
+                                                .values(**update_vals)
+                                            )
                         except Exception as ee:
                             logger.error(f"Error enriching lead {lu.get('name')}: {ee}")
                             
-                        has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
-                        has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
-                        is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
+                        # FINAL CLASSIFICATION for Slack
+                        # Re-check intent flags after potential local update loop
+                        has_high_intent = lu.get("intent") in ["prospect_pain", "pain_point"]
+                        
+                        # STRICTOR HOT LEAD: Must be a Decision Maker AND have genuine intent/signal (NOT just a hand-raiser)
+                        is_hot = lu.get("is_fit") and lu.get("is_decision_maker") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
 
                         import hashlib
-                        import os
                         
                         # Slack Notification (Only if fit after re-evaluation)
                         if lu.get("is_fit"):
@@ -261,9 +276,15 @@ async def run_classification_and_update(raw_leads: List[dict]):
                             raw_key = f"{lead_url}:{current_comment}"
                             idempotency_key = f"lead_interaction:{hashlib.md5(raw_key.encode()).hexdigest()}"
 
-                            title_prefix = "🔥 Hot Lead" if is_hot else "👀 Qualified Lead"
-                            if lu.get("intent") == "pain_point":
+                            # Determine Title Prefix based on seniority and intent
+                            if is_hot:
+                                title_prefix = "🔥 Hot Lead"
+                            elif lu.get("intent") == "hand_raiser":
+                                title_prefix = "🙋 Hand Raiser"
+                            elif lu.get("intent") == "pain_point":
                                 title_prefix = "🚨 Pain Point"
+                            else:
+                                title_prefix = "👀 Qualified Lead"
 
                             # 5. Log activity (Clean isolated sub-session)
                             async with SessionLocal() as session:

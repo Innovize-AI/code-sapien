@@ -102,7 +102,7 @@ def find_leads_apollo(input_data: LeadDiscoveryInput, api_key: str = None) -> Li
     headers = {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
-        "X-Api-Key": final_api_key
+        "x-api-key": final_api_key
     }
     
     # Construct filters

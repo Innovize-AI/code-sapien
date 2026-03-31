@@ -174,33 +174,34 @@ async def run_classification_and_update(raw_leads: List[dict]):
 
             # C/D. Save, Enrich & Notify
             if leads_to_update_batch:
+                # 1. Batch Upsert Profiles (Clean isolated session)
                 async with SessionLocal() as session:
-                    # 1. Batch Upsert Profiles
                     async with session.begin():
-                        # Fetch ICP once per batch for efficiency
                         icp_data = await get_active_icp(session)
                         await batch_upsert_identified_profiles(session, leads_to_update_batch)
-                    
-                    logger.info(f"Batch {i//batch_size + 1} - Updated {len(leads_to_update_batch)} profiles")
-                    
-                    # 2. Individual Enrichment & Notifications
-                    for lu in leads_to_update_batch:
-                        if lu.get("is_strategic_seller"):
-                            logger.info(f"Skipping notification for Strategic Seller {lu.get('name')}")
-                            continue
+                
+                logger.info(f"Batch {i//batch_size + 1} - Updated {len(leads_to_update_batch)} profiles")
+                
+                # 2. Individual Enrichment & Notifications
+                for lu in leads_to_update_batch:
+                    if lu.get("is_strategic_seller"):
+                        logger.info(f"Skipping notification for Strategic Seller {lu.get('name')}")
+                        continue
 
-                        has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
-                        has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
-                        is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
-                        is_qualified = lu.get("is_fit") and not lu.get("is_buy_signal") and not lu.get("is_strategic_seller")
-                        
-                        if is_hot or lu.get("intent") in ["prospect_pain", "pain_point"] or is_qualified:
-                            # Apollo Enrichment
-                            try:
-                                logger.info(f"Enriching high-priority lead {lu.get('name')} via Apollo...")
-                                enriched = await enrich_company_waterfall(person_url=lu.get("linkedin_url"))
-                                if enriched:
-                                    async with session.begin(): # Sub-transaction for company enrichment
+                    has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
+                    has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
+                    is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
+                    is_qualified = lu.get("is_fit") and not lu.get("is_buy_signal") and not lu.get("is_strategic_seller")
+                    
+                    if is_hot or lu.get("intent") in ["prospect_pain", "pain_point"] or is_qualified:
+                        # Apollo Enrichment (External Network Call - No Session Open)
+                        try:
+                            logger.info(f"Enriching high-priority lead {lu.get('name')} via Apollo...")
+                            enriched = await enrich_company_waterfall(person_url=lu.get("linkedin_url"))
+                            if enriched:
+                                # 3. Save Enrichment (Clean isolated sub-session)
+                                async with SessionLocal() as session:
+                                    async with session.begin():
                                         # Create a mutable copy for upsert_company and extract person_email
                                         company_data_for_upsert = enriched.copy()
                                         person_email = company_data_for_upsert.pop("person_email", None)
@@ -227,7 +228,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
                                         if person_email:
                                             update_vals["email"] = person_email
                                             
-                                        # 4. RE-VALIDATE Fit with confirmed firmographics (using actual ICP)
+                                        # 4. RE-VALIDATE Fit with confirmed firmographics (using cached icp_data)
                                         try:
                                             new_fit, new_reasoning = await revalidate_lead_fit_async(lu, enriched, icp_data)
                                             update_vals["is_fit"] = new_fit
@@ -243,28 +244,29 @@ async def run_classification_and_update(raw_leads: List[dict]):
                                             .where(IdentifiedProfile.linkedin_url == lu.get("linkedin_url"))
                                             .values(**update_vals)
                                         )
-                            except Exception as ee:
-                                logger.error(f"Error enriching lead {lu.get('name')}: {ee}")
-                                
-                            has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
-                            has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
-                            is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
-
-                            import hashlib
-                            import os
+                        except Exception as ee:
+                            logger.error(f"Error enriching lead {lu.get('name')}: {ee}")
                             
-                            # Slack Notification (Only if fit after re-evaluation)
-                            if lu.get("is_fit"):
-                                lead_url = lu.get("linkedin_url")
-                                current_comment = (lu.get("comment") or "").strip()
-                                raw_key = f"{lead_url}:{current_comment}"
-                                idempotency_key = f"lead_interaction:{hashlib.md5(raw_key.encode()).hexdigest()}"
+                        has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
+                        has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
+                        is_hot = lu.get("is_fit") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
 
-                                title_prefix = "🔥 Hot Lead" if is_hot else "👀 Qualified Lead"
-                                if lu.get("intent") == "pain_point":
-                                    title_prefix = "🚨 Pain Point"
+                        import hashlib
+                        import os
+                        
+                        # Slack Notification (Only if fit after re-evaluation)
+                        if lu.get("is_fit"):
+                            lead_url = lu.get("linkedin_url")
+                            current_comment = (lu.get("comment") or "").strip()
+                            raw_key = f"{lead_url}:{current_comment}"
+                            idempotency_key = f"lead_interaction:{hashlib.md5(raw_key.encode()).hexdigest()}"
 
-                                # Use the same session for logging
+                            title_prefix = "🔥 Hot Lead" if is_hot else "👀 Qualified Lead"
+                            if lu.get("intent") == "pain_point":
+                                title_prefix = "🚨 Pain Point"
+
+                            # 5. Log activity (Clean isolated sub-session)
+                            async with SessionLocal() as session:
                                 await log_activity_and_notify(
                                     session,
                                     type="high_potential" if is_hot else "comment",

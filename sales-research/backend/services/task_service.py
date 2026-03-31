@@ -34,8 +34,9 @@ async def update_single_competitor_task(competitor_id: str):
             
             if leads:
                 await batch_upsert_identified_profiles(db, leads)
-                await run_classification_and_update(leads)
                 await db.commit()
+                # Run classification AFTER commit to prevent deadlocks
+                await run_classification_and_update(leads)
                 logger.info(f"Saved and classified {len(leads)} leads for {competitor.name}")
             
         except Exception as e:
@@ -61,8 +62,9 @@ async def strategic_seller_discovery_task(seller_url: str, user_id: str = None):
                         lead["created_by_id"] = user_id
 
                 await batch_upsert_identified_profiles(db, leads)
-                await run_classification_and_update(leads)
                 await db.commit()
+                # Run classification AFTER commit to prevent deadlocks
+                await run_classification_and_update(leads)
                 
                 # Log Activity
                 from utils.activity_helper import log_activity_and_notify
@@ -147,10 +149,13 @@ async def keyword_discovery_rule_task(rule_id: str):
 
             if raw_leads_to_save:
                 await batch_upsert_identified_profiles(db, raw_leads_to_save)
-                await run_classification_and_update(raw_leads_to_save)
             
             rule.last_run_at = datetime.now(timezone.utc)
             await db.commit()
+
+            # Run classification AFTER commit to prevent deadlocks
+            if raw_leads_to_save:
+                await run_classification_and_update(raw_leads_to_save)
         except Exception as e:
             logger.error(f"Error in keyword rule task {rule_id}: {e}")
             raise # Propagate to worker for Pub/Sub retry
@@ -217,10 +222,13 @@ async def apollo_discovery_rule_task(rule_id: str):
             
             if all_raw_leads:
                 await batch_upsert_identified_profiles(db, all_raw_leads)
-                await run_classification_and_update(all_raw_leads)
             
             rule.last_run_at = datetime.now(timezone.utc)
             await db.commit()
+
+            # Run classification AFTER commit to prevent deadlocks
+            if all_raw_leads:
+                await run_classification_and_update(all_raw_leads)
         except Exception as e:
             logger.error(f"Error in Apollo rule task {rule_id}: {e}")
             raise # Propagate to worker for Pub/Sub retry

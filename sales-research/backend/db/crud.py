@@ -192,13 +192,23 @@ async def batch_upsert(
     rows: Sequence[dict],
     conflict_cols: Sequence[str],
     update_cols: Sequence[str] | None = None,
-    chunk_size: int = 1000,
+    chunk_size: int = 100,
 ):
     if not rows:
         return []
 
     if update_cols is None:
         update_cols = [c.name for c in table.columns if c.name not in conflict_cols]
+
+    # VERY IMPORTANT: Sort rows by conflict columns to prevent concurrent Postgres deadlocks.
+    # When multiple concurrent workers try to ON CONFLICT UPDATE the same overlapping rows
+    # in different orders, Postgres will trigger a transaction deadlock or statement timeout.
+    try:
+        if conflict_cols:
+            primary_col = conflict_cols[0]
+            rows = sorted(rows, key=lambda x: str(x.get(primary_col, "")))
+    except Exception as e:
+        logger.warning(f"Could not sort batch upsert rows: {e}")
 
     results = []
     for i in range(0, len(rows), chunk_size):
@@ -447,7 +457,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             IdentifiedProfile.__table__,
             upsert_rows,
             conflict_cols=["linkedin_url"],
-            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "profile_metadata", "normalized_linkedin_url"]
+            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "profile_metadata", "normalized_linkedin_url"],
+            chunk_size=100
         )
         logger.info(f"DEBUG: Batch upsert executed. Results count: {len(results)}")
         return results

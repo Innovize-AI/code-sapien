@@ -1,5 +1,8 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from workflow.state import AgentState
 from prompts.sales_prompts import GLOBAL_STRATEGY_ADVISOR_PROMPT
 from models.gemini_models import get_gemini_model
@@ -66,5 +69,5 @@ def strategic_recommender_node(state: AgentState):
              
         return {"buyer_journey_analysis": response.model_dump()}
     except Exception as e:
-        print(f"Error in strategic_recommender_node: {e}")
+        logger.info(f"Error in strategic_recommender_node: {e}")
         return {"buyer_journey_analysis": {}}

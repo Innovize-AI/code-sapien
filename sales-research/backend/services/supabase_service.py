@@ -1,5 +1,8 @@
 
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 import json
 import datetime
 from supabase import create_client, Client
@@ -29,7 +32,7 @@ class SupabaseService:
             try:
                 self.client = create_client(self.url, self.key)
             except Exception as e:
-                print(f"Failed to create Supabase client: {e}")
+                logger.info(f"Failed to create Supabase client: {e}")
 
     def batch_upsert_profiles(self, profiles: list[dict]):
         """
@@ -37,7 +40,7 @@ class SupabaseService:
         profiles: list of {linkedin_url, name, comment, source_post, source_post_url, competitor}
         """
         if not self.client or not profiles:
-            print("Supabase client not initialized or no profiles provided")
+            logger.info("Supabase client not initialized or no profiles provided")
             return []
 
         # 1. Aggregate incoming batch in memory

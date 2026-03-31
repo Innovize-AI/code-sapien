@@ -1,7 +1,10 @@
 import asyncio
 import json
+import logging
 from typing import List
 from sqlalchemy import select, update
+
+logger = logging.getLogger(__name__)
 from db.database import SessionLocal
 from db.models import IdentifiedProfile
 from db.crud import batch_upsert_identified_profiles, upsert_company, get_active_icp

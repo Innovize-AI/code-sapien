@@ -1,4 +1,7 @@
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 import datetime
 import difflib
 from typing import Iterable, Sequence
@@ -292,7 +295,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
     upsert_rows = []
     now = datetime.datetime.now(datetime.timezone.utc)
     
-    print(f"DEBUG: Preparing upsert for {len(batch_map)} unique profiles")
+    logger.info(f"DEBUG: Preparing upsert for {len(batch_map)} unique profiles")
     for url, data in batch_map.items():
         if url in existing_profiles:
             # Prepare merged data for update
@@ -438,7 +441,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             })
 
     if upsert_rows:
-        print(f"DEBUG: Executing batch_upsert with {len(upsert_rows)} rows")
+        logger.info(f"DEBUG: Executing batch_upsert with {len(upsert_rows)} rows")
         results = await batch_upsert(
             db,
             IdentifiedProfile.__table__,
@@ -446,7 +449,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             conflict_cols=["linkedin_url"],
             update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "profile_metadata", "normalized_linkedin_url"]
         )
-        print(f"DEBUG: Batch upsert executed. Results count: {len(results)}")
+        logger.info(f"DEBUG: Batch upsert executed. Results count: {len(results)}")
         return results
     
     return []
@@ -785,7 +788,7 @@ async def update_report_cso_outreach(db: AsyncSession, report_id: str, cso_data:
             await db.refresh(db_report)
             return db_report
         except Exception as e:
-            print(f"Error updating CSO outreach: {e}")
+            logger.info(f"Error updating CSO outreach: {e}")
             return None
     return None
 
@@ -815,7 +818,7 @@ async def update_report_intent_email(db: AsyncSession, report_id: str, email_tex
             await db.refresh(db_report)
             return db_report
         except Exception as e:
-            print(f"Error updating intent email: {e}")
+            logger.info(f"Error updating intent email: {e}")
             return None
     return None
 
@@ -842,7 +845,7 @@ async def update_report_sales_research(db: AsyncSession, report_id: str, bluepri
             await db.refresh(db_report)
             return db_report
         except Exception as e:
-            print(f"Error updating sales research: {e}")
+            logger.info(f"Error updating sales research: {e}")
             return None
     return None
 
@@ -868,7 +871,7 @@ async def update_report_intent_analysis(db: AsyncSession, report_id: str, intent
             await db.refresh(db_report)
             return db_report
         except Exception as e:
-            print(f"Error updating intent analysis: {e}")
+            logger.info(f"Error updating intent analysis: {e}")
             return None
     return None
 
@@ -894,7 +897,7 @@ async def update_report_buyer_journey(db: AsyncSession, report_id: str, journey_
             await db.refresh(db_report)
             return db_report
         except Exception as e:
-            print(f"Error updating buyer journey: {e}")
+            logger.info(f"Error updating buyer journey: {e}")
             return None
     return None
 

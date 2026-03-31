@@ -1,4 +1,7 @@
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 import json
 import uuid
 import re
@@ -42,7 +45,7 @@ async def _get_organization_settings(user_id: str = None) -> dict:
             try:
                 icp = IdealProfile(**json.loads(global_settings.icp_json))
             except Exception as e:
-                print(f"Error parsing global ICP settings: {e}")
+                logger.info(f"Error parsing global ICP settings: {e}")
                 
         # 5. Apply User ICP Override if available
         if user_settings and user_settings.icp_json:
@@ -51,7 +54,7 @@ async def _get_organization_settings(user_id: str = None) -> dict:
                 if user_icp_data: # If not empty dict
                     icp = IdealProfile(**user_icp_data)
             except Exception as e:
-                print(f"Error parsing user ICP settings: {e}")
+                logger.info(f"Error parsing user ICP settings: {e}")
 
         # 6. Resolve Identity (User-private URLs/Config)
         # Priority: User Settings > Global Settings > None
@@ -69,7 +72,7 @@ async def _get_organization_settings(user_id: str = None) -> dict:
                 from db.schemas import SellingProfileConfig
                 selling_profile = SellingProfileConfig(**json.loads(global_settings.selling_profile_json))
             except Exception as e:
-                print(f"Error parsing Selling Profile: {e}")
+                logger.info(f"Error parsing Selling Profile: {e}")
 
         return {
             "icp": icp,
@@ -102,7 +105,7 @@ def _prepare_state_for_json(state):
 async def _persist_results(db, linkedin_url, website, final_state, options, user_id=None):
     """Common logic to save research results to DB with multi-tenant support."""
     if not final_state.get("sales_research_report"):
-        print("Skipping database save: No research report generated.")
+        logger.info("Skipping database save: No research report generated.")
         return None
 
     # Extract numeric lead score if possible
@@ -173,7 +176,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
     
     if company_name and (company_li_url or company_domain):
         try:
-            print(f"DEBUG: Autopopulating company '{company_name}'...")
+            logger.info(f"DEBUG: Autopopulating company '{company_name}'...")
             company_data = {
                 "name": company_name,
                 "description": final_state.get("company_description"),
@@ -200,10 +203,10 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
                 domain=company_domain
             )
             company_id = company.id
-            print(f"DEBUG: Company linked with ID: {company_id}")
+            logger.info(f"DEBUG: Company linked with ID: {company_id}")
             report_data.company_id = company_id
         except Exception as ce:
-            print(f"Error during company autopopulation: {ce}")
+            logger.info(f"Error during company autopopulation: {ce}")
 
     saved_report = await save_report(db, report_data, user_id=user_id)
 
@@ -256,7 +259,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
         }
 
         
-        print(f"DEBUG: Notification metadata for {fullname}: {json.dumps(metadata)}")
+        logger.info(f"DEBUG: Notification metadata for {fullname}: {json.dumps(metadata)}")
         
         await log_activity_and_notify(
             db,
@@ -311,7 +314,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                 profile = result.scalars().first()
                 
                 if profile:
-                    print(f"DEBUG: Found identified profile for {linkedin_url}. Injecting context.")
+                    logger.info(f"DEBUG: Found identified profile for {linkedin_url}. Injecting context.")
                     
                     try:
                         import json
@@ -319,7 +322,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                         sources = json.loads(profile.source_posts or "[]")
                         interactions = json.loads(profile.interaction_history or "[]")
                     except Exception as e:
-                        print(f"Error parsing profile data: {e}")
+                        logger.info(f"Error parsing profile data: {e}")
                         comments = []
                         sources = []
                         interactions = []
@@ -369,7 +372,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                         }
 
         except Exception as e:
-            print(f"Error loading identified profile context in _run_research_gen: {e}")
+            logger.info(f"Error loading identified profile context in _run_research_gen: {e}")
 
     # --- Persistent Agentic Memory: Load existing data from DB ---
     existing_state = {}
@@ -383,7 +386,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         async with SessionLocal() as db:
             existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
             if existing:
-                print(f"Loading persistent memory for {email or linkedin_url}")
+                logger.info(f"Loading persistent memory for {email or linkedin_url}")
                 # We need access to _report_to_dict which is in db.crud usually, importing here or duplicating
                 # Ideally, reuse from crud
                 from db.crud import _report_to_dict
@@ -463,7 +466,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                 final_state.update(state_update)
                 yield node_name, state_update, final_state
     except Exception as e:
-        print(f"Error during graph execution: {e}")
+        logger.info(f"Error during graph execution: {e}")
         raise e
 
 async def _push_to_hubspot_if_enabled(db, user_id, report, final_state):
@@ -497,9 +500,9 @@ async def _push_to_hubspot_if_enabled(db, user_id, report, final_state):
                 content += f"<p><a href='{frontend_url}/reports/{report.id}'>View Full Report in Innovize AI</a></p>"
                 
                 await hs.push_note("contact", target_id, content)
-                print(f"Successfully pushed research note to HubSpot for {email}")
+                logger.info(f"Successfully pushed research note to HubSpot for {email}")
         except Exception as e:
-            print(f"Failed to push HubSpot note: {e}")
+            logger.info(f"Failed to push HubSpot note: {e}")
 
 async def run_single_research(
     linkedin_url: Optional[str] = None,
@@ -536,5 +539,5 @@ async def run_single_research(
             
         return {"linkedin_url": linkedin_url, "result": result_payload}
     except Exception as e:
-        print(f"Error in run_single_research: {e}")
+        logger.info(f"Error in run_single_research: {e}")
         # Return error/none but don't crash caller

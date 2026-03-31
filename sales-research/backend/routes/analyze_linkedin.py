@@ -25,7 +25,7 @@ def analyze_linkedin(linkedin_url):
 
     profile_details= response.json()
 
-    # print(response.json())
+    # logger.info(response.json())
 
     posts_url = linkedin_base_url + "/profile/posts"
 
@@ -34,14 +34,14 @@ def analyze_linkedin(linkedin_url):
     response = requests.get(posts_url, headers=headers, params=querystring)
 
     profile_posts= response.json()
-    print( profile_posts.keys())    
+    logger.info( profile_posts.keys())    
     profile_posts= profile_posts["data"][:3] #get latest 3 posts
 
-    print(profile_posts)
+    logger.info(profile_posts)
     # return profile data ans postscle
     
     merged_json = merge_json(profile_details.copy(), profile_posts)
-    print(merged_json)
+    logger.info(merged_json)
     return merged_json
 
 def merge_json(json1, json2):

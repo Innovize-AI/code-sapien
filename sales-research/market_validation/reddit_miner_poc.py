@@ -1,4 +1,7 @@
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 import json
 from typing import List
 
@@ -21,13 +24,13 @@ MOCK_REDDIT_POSTS = [
 class RedditScout:
     """Agent 1: Scrapes Reddit for relevant keywords/subreddits."""
     def get_raw_posts(self, subreddits: List[str]):
-        print(f"[Scout] Mining subreddits: {subreddits}...")
+        logger.info(f"[Scout] Mining subreddits: {subreddits}...")
         return MOCK_REDDIT_POSTS
 
 class PainAnalyzer:
     """Agent 2: Categorizes posts into specific pain points."""
     def analyze_pain(self, posts: List[dict]):
-        print("[Analyzer] Analyzing posts for intent and urgency...")
+        logger.info("[Analyzer] Analyzing posts for intent and urgency...")
         analyzed = []
         for post in posts:
             # In production, this would be an LLM call
@@ -41,7 +44,7 @@ class PainAnalyzer:
 class ProductIdeator:
     """Agent 3: Generates product names and value props from pain clusters."""
     def generate_ideas(self, analyzed_posts: List[dict]):
-        print("[Ideator] Generating SaaS concepts from pain points...")
+        logger.info("[Ideator] Generating SaaS concepts from pain points...")
         ideas = []
         for post in analyzed_posts:
             if post["type"] == "Automation Pain":
@@ -72,11 +75,11 @@ def run_reddit_pipeline():
     # 3. Ideate
     saas_ideas = ideator.generate_ideas(analyzed_data)
 
-    print("\n--- NEW SAAS IDEAS FROM REDDIT ---")
+    logger.info("\n--- NEW SAAS IDEAS FROM REDDIT ---")
     for idea in saas_ideas:
-        print(f"Product: {idea['name']}")
-        print(f"Solve: {idea['pain']}")
-        print(f"Angle: {idea['value_prop']}\n")
+        logger.info(f"Product: {idea['name']}")
+        logger.info(f"Solve: {idea['pain']}")
+        logger.info(f"Angle: {idea['value_prop']}\n")
 
 if __name__ == "__main__":
     run_reddit_pipeline()

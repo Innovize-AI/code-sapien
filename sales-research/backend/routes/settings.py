@@ -4,6 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 from db.database import get_db
 from db.models import OrganizationSettings, Profile
@@ -243,7 +246,7 @@ async def get_selling_profile(
         data = json.loads(settings.selling_profile_json)
         return SellingProfileConfig(**data)
     except Exception as e:
-        print(f"Error parsing selling profile: {e}")
+        logger.error(f"Error parsing selling profile: {e}")
         return None
 
 @settings_router.post("/settings/selling-profile", response_model=SellingProfileConfig)

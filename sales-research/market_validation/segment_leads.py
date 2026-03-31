@@ -1,4 +1,7 @@
 import csv
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 
 def segment_leads():
@@ -6,7 +9,7 @@ def segment_leads():
     output_file = 'market_validation/segmented_outreach_list.csv'
     
     if not os.path.exists(input_file):
-        print(f"Error: {input_file} not found.")
+        logger.info(f"Error: {input_file} not found.")
         return
 
     segmented_leads = []
@@ -52,11 +55,11 @@ def segment_leads():
             angle = l['strategic_angle']
             stats[angle] = stats.get(angle, 0) + 1
             
-        print("--- Segmentation Results ---")
+        logger.info("--- Segmentation Results ---")
         for angle, count in stats.items():
-            print(f"{angle}: {count} leads")
-        print(f"Total Segmented: {len(segmented_leads)}")
-        print(f"File saved to: {output_file}")
+            logger.info(f"{angle}: {count} leads")
+        logger.info(f"Total Segmented: {len(segmented_leads)}")
+        logger.info(f"File saved to: {output_file}")
 
 if __name__ == "__main__":
     segment_leads()

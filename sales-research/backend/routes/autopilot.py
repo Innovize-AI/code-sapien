@@ -31,6 +31,14 @@ async def create_autopilot_rule(
     """
     Create a new autopilot rule.
     """
+    if rule_data.type == 'keyword':
+        existing_rules = await crud.get_autopilot_rules(db, rule_type='keyword')
+        if len(existing_rules) >= 5:
+            raise HTTPException(
+                status_code=400, 
+                detail="Maximum limit of 5 keywords reached. Please delete an existing keyword to add a new one."
+            )
+            
     rule_dict = rule_data.model_dump()
     # Ensure organization_id is set if available (fallback to None if single-tenant for now)
     return await crud.create_autopilot_rule(db, rule_dict, user_id=current_user.id)
@@ -74,6 +82,13 @@ async def create_autopilot_competitor(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
+    existing_competitors = await crud.get_competitors(db)
+    if len(existing_competitors) >= 3:
+        raise HTTPException(
+            status_code=400, 
+            detail="Maximum limit of 3 competitors reached. Please delete an existing competitor to add a new one."
+        )
+        
     comp_dict = comp_data.model_dump()
     return await crud.create_competitor(db, comp_dict, user_id=current_user.id)
 

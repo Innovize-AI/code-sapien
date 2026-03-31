@@ -1,4 +1,7 @@
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 import csv
 import sys
@@ -17,7 +20,7 @@ async def main():
     output_file = os.path.join(os.path.dirname(__file__), 'qualified_leads.csv')
     
     if not os.path.exists(input_file):
-        print(f"Error: {input_file} not found.")
+        logger.info(f"Error: {input_file} not found.")
         return
 
     leads = []
@@ -25,7 +28,7 @@ async def main():
         reader = csv.DictReader(f)
         leads = list(reader)
 
-    print(f"Total leads to qualify: {len(leads)}")
+    logger.info(f"Total leads to qualify: {len(leads)}")
     
     # Batch size for classification
     BATCH_SIZE = 15
@@ -33,7 +36,7 @@ async def main():
     
     for i in range(0, len(leads), BATCH_SIZE):
         batch = leads[i:i+BATCH_SIZE]
-        print(f"Qualifying batch {i//BATCH_SIZE + 1}/{(len(leads)-1)//BATCH_SIZE + 1}...")
+        logger.info(f"Qualifying batch {i//BATCH_SIZE + 1}/{(len(leads)-1)//BATCH_SIZE + 1}...")
         
         # Prepare data for classifier
         # needs [{'id': 'url', 'headline': '...'}]
@@ -62,10 +65,10 @@ async def main():
                     qualified_leads.append(l)
                     
         except Exception as e:
-            print(f"Error classifying batch: {e}")
+            logger.info(f"Error classifying batch: {e}")
 
-    print(f"\n--- Qualification Complete ---")
-    print(f"Total qualified leads found: {len(qualified_leads)}")
+    logger.info(f"\n--- Qualification Complete ---")
+    logger.info(f"Total qualified leads found: {len(qualified_leads)}")
     
     if qualified_leads:
         keys = qualified_leads[0].keys()
@@ -73,9 +76,9 @@ async def main():
             dict_writer = csv.DictWriter(f, fieldnames=keys)
             dict_writer.writeheader()
             dict_writer.writerows(qualified_leads)
-        print(f"Qualified leads saved to {output_file}")
+        logger.info(f"Qualified leads saved to {output_file}")
     else:
-        print("No qualified leads found.")
+        logger.info("No qualified leads found.")
 
 if __name__ == "__main__":
     asyncio.run(main())

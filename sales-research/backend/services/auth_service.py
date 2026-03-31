@@ -1,5 +1,8 @@
 from dotenv import load_dotenv
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 from supabase import create_client, Client
 # Load .env from root project directory if not already loaded
 # This is a bit tricky, let's try standard load_dotenv first
@@ -28,13 +31,13 @@ class AuthService:
             try:
                 self.client = create_client(self.url, self.anon_key)
             except Exception as e:
-                print(f"Failed to create Supabase client: {e}")
+                logger.info(f"Failed to create Supabase client: {e}")
             
     def sign_in(self, email, password):
         try:
             return self.client.auth.sign_in_with_password({"email": email, "password": password})
         except Exception as e:
-            print(f"Sign in failed: {e}")
+            logger.info(f"Sign in failed: {e}")
             return None
 
     def get_user(self, token):

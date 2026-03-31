@@ -11,6 +11,8 @@ import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
+import os
+HEARTBEAT_DELAY = int(os.getenv("HEARTBEAT_DELAY", "10"))
 
 async def update_single_competitor_task(competitor_id: str):
     """Processes a single competitor for lead discovery."""
@@ -52,7 +54,7 @@ async def update_competitor_leads_task():
 
             for competitor in competitors:
                 await update_single_competitor_task(str(competitor.id))
-                await asyncio.sleep(5) # Delay for local pacing
+                await asyncio.sleep(HEARTBEAT_DELAY) # Delay for local pacing
 
             # Update last run
             await db.execute(
@@ -121,7 +123,7 @@ async def keyword_discovery_task(rule_id: str = None):
                 for rule in rules:
                     if rule:
                         await keyword_discovery_rule_task(str(rule.id))
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(HEARTBEAT_DELAY)
             
             logger.info("Keyword discovery task completed.")
         except Exception as e:
@@ -191,7 +193,7 @@ async def apollo_discovery_task(rule_id: str = None):
                 for rule in rules:
                     if rule:
                         await apollo_discovery_rule_task(str(rule.id))
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(HEARTBEAT_DELAY)
 
             logger.info("Apollo discovery task completed.")
         except Exception as e:

@@ -124,7 +124,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
             
             # A. Native Async AI Call
             batch_res = await batch_classify_profiles_async(batch)
-            print(f"DEBUG: AI returned {len(batch_res)} results: {list(batch_res.keys())}")
+            print(f"DEBUG: AI returned {len(batch_res)} results: {list(batch_res.keys())} | Values: {list(batch_res.values())}")
             
             # B. Identify which leads to update from this batch
             batch_urls = set(item['id'] for item in batch)
@@ -134,7 +134,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
             # Include existing profile data in the first batch broadcast if available
             if i == 0 and existing_profile_data_map:
                 event_leads_batch.extend(existing_profile_data_map.values())
-
+            print(f"DEBUG: Raw Lead Count: {event_leads_batch}")
             for lead in raw_leads:
                 lead_n_url = normalize_linkedin_url(lead["linkedin_url"])
                 print(f"DEBUG: Checking lead {lead_n_url} against batch_urls...")

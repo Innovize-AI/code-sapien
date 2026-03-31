@@ -1,4 +1,7 @@
+import logging
 from langchain_core.messages import SystemMessage, HumanMessage
+
+logger = logging.getLogger(__name__)
 import json
 from workflow.state import AgentState
 from prompts.sales_prompts import FOLLOW_UP_STRATEGY_PROMPT
@@ -33,5 +36,5 @@ def follow_up_strategy_node(state: AgentState):
         response = model.invoke(messages)
         return {"follow_up_strategy": response.content}
     except Exception as e:
-        print(f"Error in follow_up_strategy_node: {e}")
+        logger.error(f"Error in follow_up_strategy_node: {e}")
         return {"follow_up_strategy": "Error generating follow-up strategy."}

@@ -1,10 +1,13 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 import json
+import logging
 from workflow.state import AgentState
 from prompts.sales_prompts import LEAD_SCORER_SYSTEM_PROMPT, LEAD_DATA_EXTRACTOR_PROMPT
 from models.gemini_models import get_gemini_model
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
+
+logger = logging.getLogger(__name__)
 
 class ExtractedLeadData(BaseModel):
     industry: str = Field(description="The industry of the lead's company")
@@ -82,7 +85,7 @@ def lead_data_extractor(state: AgentState):
              
         return {"lead_extracted_data": response.model_dump()}
     except Exception as e:
-        print(f"Error in lead_data_extractor: {e}")
+        logger.error(f"Error in lead_data_extractor: {e}")
         return {"lead_extracted_data": {}}
 
 def lead_scorer(state: AgentState):
@@ -126,7 +129,7 @@ def lead_scorer(state: AgentState):
             "viability_analysis": res_dict.get("viability_analysis", "")
         }
     except Exception as e:
-        print(f"Error in lead_scorer: {e}")
+        logger.error(f"Error in lead_scorer: {e}")
         return {"lead_score_analysis": {}}
 
 class RevalidatedFit(BaseModel):
@@ -175,5 +178,5 @@ async def revalidate_lead_fit_async(lead_data: dict, company_metrics: dict, icp_
             return response.is_fit, response.reasoning
         return lead_data.get("is_fit"), lead_data.get("fit_reasoning")
     except Exception as e:
-        print(f"Error in revalidate_lead_fit_async: {e}")
+        logger.error(f"Error in revalidate_lead_fit_async: {e}")
         return lead_data.get("is_fit"), lead_data.get("fit_reasoning")

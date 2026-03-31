@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
@@ -7,6 +8,8 @@ from db.models import Company
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
 
@@ -119,7 +122,7 @@ async def get_company(company_id: UUID, db: AsyncSession = Depends(get_db)):
                             if not p.intent: p.intent = meta.get("intent")
                             if not p.sentiment: p.sentiment = meta.get("sentiment")
                     except Exception as e:
-                        print(f"Error unpacking metadata for {p.id}: {e}")
+                        logger.error(f"Error unpacking metadata for {p.id}: {e}")
     
     # Attach to Pydantic model
     setattr(company, "people", profiles)

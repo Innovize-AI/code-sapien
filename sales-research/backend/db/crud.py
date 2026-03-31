@@ -14,10 +14,25 @@ from db.schemas import ResearchReportCreate, LeadSubmissionCreate, OrganizationS
 from utils.url_normalize import normalize_linkedin_url
 from uuid import UUID
 
-async def get_active_icp(db: AsyncSession) -> dict | None:
+async def get_active_icp(db: AsyncSession, user_id: UUID | str | None = None) -> dict | None:
     """
-    Fetches the global organization ICP from settings.
+    Fetches the active ICP. 
+    1. If user_id is provided, checks UserSettings for a personal override.
+    2. Falls back to OrganizationSettings.
     """
+    # 1. Check for User Override
+    if user_id:
+        try:
+            # Convert string to UUID if needed for the query
+            u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+            result = await db.execute(select(UserSettings).where(UserSettings.user_id == u_id))
+            u_settings = result.scalars().first()
+            if u_settings and u_settings.icp_json:
+                return json.loads(u_settings.icp_json)
+        except Exception as e:
+            logger.warning(f"Error fetching personal ICP override for user {user_id}: {e}")
+
+    # 2. Fallback to Organization Global Settings
     result = await db.execute(select(OrganizationSettings).limit(1))
     settings = result.scalars().first()
     if settings and settings.icp_json:

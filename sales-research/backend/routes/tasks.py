@@ -20,9 +20,12 @@ TASK_SECRET = os.getenv("TASK_SECRET", "dev_secret")
 logger.info(f"Task security initialized with secret: {TASK_SECRET[:4]}...")
 
 async def verify_task_secret(x_task_secret: str = Header(None)):
+    logger.info(f"DEBUG: Task secret verification attempt. Header exists: {x_task_secret is not None}")
     if x_task_secret != TASK_SECRET:
-        logger.warning(f"Heartbeat 403: Secret mismatch. Expected: {TASK_SECRET[:4]}... Received: {x_task_secret[:4] if x_task_secret else 'None'}...")
+        received = x_task_secret[:4] if x_task_secret else "NONE"
+        logger.warning(f"Heartbeat 403: Secret mismatch. Expected: {TASK_SECRET[:4]}... Received: {received}...")
         raise HTTPException(status_code=403, detail="Invalid task secret")
+    logger.info("Task secret verified successfully.")
 
 # Pub/Sub Configuration
 PUBSUB_PROJECT_ID = os.getenv("PUBSUB_PROJECT_ID")

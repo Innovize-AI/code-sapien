@@ -36,7 +36,7 @@ async def update_single_competitor_task(competitor_id: str):
                 await batch_upsert_identified_profiles(db, leads)
                 await db.commit()
                 # Run classification AFTER commit to prevent deadlocks
-                await run_classification_and_update(leads)
+                await run_classification_and_update(leads, user_id=str(competitor.created_by_id) if competitor.created_by_id else None)
                 logger.info(f"Saved and classified {len(leads)} leads for {competitor.name}")
             
         except Exception as e:
@@ -64,7 +64,7 @@ async def strategic_seller_discovery_task(seller_url: str, user_id: str = None):
                 await batch_upsert_identified_profiles(db, leads)
                 await db.commit()
                 # Run classification AFTER commit to prevent deadlocks
-                await run_classification_and_update(leads)
+                await run_classification_and_update(leads, user_id=user_id)
                 
                 # Log Activity
                 from utils.activity_helper import log_activity_and_notify
@@ -130,7 +130,6 @@ async def keyword_discovery_rule_task(rule_id: str):
             # discover_leads_from_keywords is already async!
             from agents.linkedin_agent import discover_leads_from_keywords
             leads_data = await asyncio.to_thread(discover_leads_from_keywords, keywords) if not asyncio.iscoroutinefunction(discover_leads_from_keywords) else await discover_leads_from_keywords(keywords)
-            
             raw_leads_to_save = []
             for l in leads_data:
                 raw_leads_to_save.append({
@@ -144,7 +143,8 @@ async def keyword_discovery_rule_task(rule_id: str):
                     "is_fit": False,
                     "is_competitor": False,
                     "is_decision_maker": False,
-                    "fit_reasoning": ""
+                    "fit_reasoning": "",
+                    "created_by_id": rule.created_by_id
                 })
 
             if raw_leads_to_save:
@@ -155,7 +155,7 @@ async def keyword_discovery_rule_task(rule_id: str):
 
             # Run classification AFTER commit to prevent deadlocks
             if raw_leads_to_save:
-                await run_classification_and_update(raw_leads_to_save)
+                await run_classification_and_update(raw_leads_to_save, user_id=str(rule.created_by_id))
         except Exception as e:
             logger.error(f"Error in keyword rule task {rule_id}: {e}")
             raise # Propagate to worker for Pub/Sub retry
@@ -228,7 +228,7 @@ async def apollo_discovery_rule_task(rule_id: str):
 
             # Run classification AFTER commit to prevent deadlocks
             if all_raw_leads:
-                await run_classification_and_update(all_raw_leads)
+                await run_classification_and_update(all_raw_leads, user_id=str(rule.created_by_id))
         except Exception as e:
             logger.error(f"Error in Apollo rule task {rule_id}: {e}")
             raise # Propagate to worker for Pub/Sub retry

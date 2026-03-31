@@ -1,4 +1,7 @@
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from agents.report_agent import get_gemini_model
@@ -45,7 +48,7 @@ class DocumentClassifier:
             result = await structured_llm.ainvoke(messages)
             return result
         except Exception as e:
-            print(f"Error classifying document {filename}: {e}")
+            logger.info(f"Error classifying document {filename}: {e}")
             # Fallback
             return DocumentMetadata(
                 industry="General",

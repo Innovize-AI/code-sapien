@@ -181,6 +181,40 @@ async def get_profiles(
         logger.error(f"Error: {e}", exc_info=True)
         return {"error": str(e)}
 
+@competitor_router.post("/profiles/{profile_id}/discover-audience")
+async def trigger_audience_discovery(
+    profile_id: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually triggers audience discovery (fetching commenters) for a specific profile.
+    Useful for 'Strategic Sellers' spotted in the UI, avoiding automated infinite loops.
+    """
+    try:
+        from db.models import IdentifiedProfile
+        result = await db.execute(select(IdentifiedProfile).where(IdentifiedProfile.id == profile_id))
+        profile = result.scalar_one_or_none()
+        
+        if not profile or not profile.linkedin_url:
+            return {"error": "Profile or LinkedIn URL not found"}
+            
+        from services.task_service import strategic_seller_discovery_task
+        # Dispatch to background
+        background_tasks.add_task(
+            strategic_seller_discovery_task, 
+            seller_url=profile.linkedin_url, 
+            user_id=str(profile.created_by_id) if profile.created_by_id else None
+        )
+        
+        return {
+            "status": "success", 
+            "message": f"Started background discovery for {profile.name}'s audience."
+        }
+    except Exception as e:
+        logger.error(f"Error triggering audience discovery: {e}", exc_info=True)
+        return {"error": str(e)}
+
 class CompetitorInput(BaseModel):
     urls: List[str] = []
 

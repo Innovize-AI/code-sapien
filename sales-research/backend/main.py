@@ -5,6 +5,13 @@ load_dotenv()
 import logging
 import os, sys
 
+logging.basicConfig(
+    stream=sys.stdout, 
+    level=logging.INFO,
+    format="%(levelname)s: [%(filename)s -> %(name)s] %(message)s",
+    force=True
+)
+
 # LangSmith Tracking Configuration
 if os.getenv("LANGCHAIN_API_KEY"):
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
@@ -33,8 +40,6 @@ from routes.knowledge import router as knowledge_router
 from routes.autopilot import autopilot_router
 from routes.tasks import tasks_router
 from routes.companies import router as companies_router
-
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 app = FastAPI()
 

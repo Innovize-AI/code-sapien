@@ -5,6 +5,9 @@ from langgraph.graph import StateGraph, START, END
 
 
 import getpass
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 
 from pydantic import BaseModel, Json
@@ -65,17 +68,17 @@ class AgentState(TypedDict):
     # companyProfile: 
 
 def collector(state:AgentState):
-    print("WEBSITE COLLECTOR ", state["website"])
+    logger.info("WEBSITE COLLECTOR ", state["website"])
     return {"linkedin_url":state["linkedin_url"], "website":state["website"]}
 
 #scrape webpages node
 def scrape_webpages(state:AgentState) -> str:
     """Use requests and bs4 to scrape the provided web pages for detailed information."""
-    print("website " , state["website"])
+    logger.info("website " , state["website"])
     loader = WebBaseLoader(state["website"])
 
     docs = loader.load()
-    print("docs", docs)
+    logger.info("docs", docs)
     scraped_content= "\n\n".join(
         [
             f'{doc.page_content}'
@@ -105,7 +108,7 @@ def get_linkedin_data(state: AgentState):
 
     profile_details= response.json()
 
-    print(response.json())
+    logger.info(response.json())
 
     posts_url = "https://linkedin-api8.p.rapidapi.com/get-profile-posts"
 
@@ -452,4 +455,4 @@ def run_graph():
 if __name__== "__main__":
     
     reponse= run_graph()
-    print(reponse)
+    logger.info(reponse)

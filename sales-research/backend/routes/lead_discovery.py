@@ -164,4 +164,4 @@ if __name__ == "__main__":
         provider="tavily"
     )
     urls = find_leads_tavily(test_input)
-    print("Found URLs (Tavily):", urls)
+    logger.info("Found URLs (Tavily):", urls)

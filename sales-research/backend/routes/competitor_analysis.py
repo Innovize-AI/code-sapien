@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Body, BackgroundTasks, Request, Query
 import time
+import logging
 from sqlalchemy import select, func, or_, desc
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Optional
@@ -10,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db, save_competitor_analysis, upsert_identified_profile, get_identified_profiles, batch_upsert_identified_profiles, count_identified_profiles
 from db.database import SessionLocal
 from utils.activity_helper import log_activity_and_notify
+
+logger = logging.getLogger(__name__)
 
 competitor_router = APIRouter(tags=['Competitor Analysis'], responses={404: {"description": "Not found"}},)
 
@@ -103,12 +106,12 @@ async def get_profiles(
         db_start = time.time()
         result = await db.execute(query)
         db_end = time.time()
-        print(f"DEBUG: get_profiles DB execution: {db_end - db_start:.4f}s")
+        logger.debug(f"get_profiles DB execution: {db_end - db_start:.4f}s")
         
         enriched_profiles = []
         rows = result.all()
         fetch_end = time.time()
-        print(f"DEBUG: get_profiles Fetch rows: {fetch_end - db_end:.4f}s")
+        logger.debug(f"get_profiles Fetch rows: {fetch_end - db_end:.4f}s")
         
         for profile, rep_name, report_id, company in rows:
             p_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns}
@@ -125,7 +128,7 @@ async def get_profiles(
                 if isinstance(meta, dict):
                     p_dict.update(meta)
             except Exception as e:
-                print(f"Error parsing profile_metadata for {profile.id}: {e}")
+                logger.error(f"Error parsing profile_metadata for {profile.id}: {e}")
             
             # Include Company data
             if company:
@@ -141,7 +144,7 @@ async def get_profiles(
             enriched_profiles.append(p_dict)
             
         map_end = time.time()
-        print(f"DEBUG: get_profiles Mapping: {map_end - fetch_end:.4f}s")
+        logger.debug(f"get_profiles Mapping: {map_end - fetch_end:.4f}s")
             
         # Count for pagination
         count_query = select(func.count(IdentifiedProfile.id))
@@ -170,13 +173,12 @@ async def get_profiles(
         total = total_result.scalar()
         
         count_end = time.time()
-        print(f"DEBUG: get_profiles Count query: {count_end - map_end:.4f}s")
-        print(f"DEBUG: get_profiles TOTAL: {count_end - start_time:.4f}s")
+        logger.debug(f"get_profiles Count query: {count_end - map_end:.4f}s")
+        logger.debug(f"get_profiles TOTAL: {count_end - start_time:.4f}s")
         
         return {"profiles": enriched_profiles, "total": total}
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error: {e}", exc_info=True)
         return {"error": str(e)}
 
 class CompetitorInput(BaseModel):
@@ -251,7 +253,7 @@ async def discover_leads(
         all_leads = []
         raw_leads_to_save = []
         
-        print(f"DEBUG: Starting parallel discovery for {len(urls)} competitors")
+        logger.debug(f"Starting parallel discovery for {len(urls)} competitors")
         
         # Parallel Execution Wrapper
         async def fetch_competitor_leads(url):
@@ -260,7 +262,7 @@ async def discover_leads(
                 from agents.linkedin_agent import discover_leads_from_competitor
                 return await asyncio.to_thread(discover_leads_from_competitor, url)
             except Exception as e:
-                print(f"Error fetching leads for {url}: {e}")
+                logger.error(f"Error fetching leads for {url}: {e}")
                 return []
 
         # Launch all tasks
@@ -287,7 +289,7 @@ async def discover_leads(
         
         # 1. Save Raw Leads Immediately
         if raw_leads_to_save:
-            print(f"DEBUG: Saving {len(raw_leads_to_save)} raw leads to DB...")
+            logger.debug(f"Saving {len(raw_leads_to_save)} raw leads to DB...")
             await batch_upsert_identified_profiles(db, raw_leads_to_save)
             await db.commit()
             
@@ -309,9 +311,8 @@ async def discover_leads(
         from services.classification_service import run_classification_and_update
         background_tasks.add_task(run_classification_and_update, raw_leads_to_save)
         
-        print(f"DEBUG: Returning {len(all_leads)} leads immediately to frontend.")
+        logger.debug(f"Returning {len(all_leads)} leads immediately to frontend.")
         return {"leads": all_leads}
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error: {e}", exc_info=True)
         return {"error": str(e)}

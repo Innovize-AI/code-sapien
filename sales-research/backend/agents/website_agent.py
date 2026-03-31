@@ -8,6 +8,10 @@ from typing import List, Optional
 import json
 from utils import add_https_if_missing
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class WebsiteAnalysis(BaseModel):
     summary: str = Field(description="High-level synthesis of company's value proposition and mission.")
     industry: str = Field(description="Identified industry sector.")
@@ -64,5 +68,5 @@ def website_analyzer(state: AgentState):
             "lead_segment": analysis_data.get("lead_segment", "UNKNOWN")
         }
     except Exception as e:
-        print(f"Error in website_analyzer: {e}")
+        logger.error(f"Error in website_analyzer: {e}")
         return {"website_analysis": {}}

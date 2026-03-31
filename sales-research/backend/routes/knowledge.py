@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
+import logging
 from typing import List, Optional
 from pydantic import BaseModel
 import os
@@ -12,6 +13,9 @@ from db.schemas import SellingProfileConfig, ProductConfig
 from services.knowledge_service import KnowledgeService
 from dependencies import get_current_user, require_admin
 
+
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=['Knowledge Base'])
 knowledge_service = KnowledgeService(index_name="glial-index")
@@ -52,7 +56,7 @@ async def get_namespaces(current_user: Profile = Depends(get_current_user)):
             ))
         return results
     except Exception as e:
-        print(f"Error fetching Pinecone stats: {e}")
+        logger.error(f"Error fetching Pinecone stats: {e}")
         # Fallback to zeros if Pinecone is not reachable
         return [
             NamespaceInfo(name="playbooks", description="Strategic sales frameworks and messaging", count=0),
@@ -109,7 +113,7 @@ async def ingest_file(request: IngestRequest, admin_user: Profile = Depends(requ
         else:
             raise HTTPException(status_code=400, detail="Only file_path ingestion is currently supported.")
     except Exception as e:
-        print(f"Ingestion error: {e}")
+        logger.error(f"Ingestion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sync-defaults")
@@ -139,7 +143,7 @@ async def sync_defaults(background_tasks: BackgroundTasks, admin_user: Profile =
             try:
                 await knowledge_service.ingest_markdown_file(path, namespace)
             except Exception as e:
-                print(f"Failed to ingest {filename}: {e}")
+                logger.error(f"Failed to ingest {filename}: {e}")
 
     background_tasks.add_task(process_sync)
     return {"status": "sync_started", "files_queued": len(files)}
@@ -176,7 +180,7 @@ async def upload_knowledge_file(
             "path": os.relpath(file_path, os.getcwd())
         }
     except Exception as e:
-        print(f"Upload failed: {e}")
+        logger.error(f"Upload failed: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 class StrategyConfig(BaseModel):

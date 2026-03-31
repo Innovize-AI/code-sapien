@@ -1,4 +1,5 @@
 import json
+import logging
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser
@@ -14,6 +15,8 @@ from workflow.state import AgentState
 from utils.activity_helper import log_activity_and_notify
 
 from prompts.sales_prompts import INTENT_ANALYZER_PROMPT
+
+logger = logging.getLogger(__name__)
 
 class IntentAnalysisResult(BaseModel):
     intent: str = Field(description="The primary intent of the lead (e.g., Interested, Not Interested, Pricing Query, Comparison, Cold)")
@@ -62,7 +65,7 @@ def analyze_email_intent(email_history: List[Dict[str, Any]]) -> Dict[str, Any]:
         result = chain.invoke({"conversation_history": conversation_text})
         return result
     except Exception as e:
-        print(f"Error creating intent analysis: {e}")
+        logger.error(f"Error creating intent analysis: {e}")
         return {
             "intent": "Error",
             "summary": f"Failed to analyze conversation: {e}",
@@ -105,7 +108,7 @@ async def email_history_fetcher_node(state: AgentState):
                         idempotency_key=f"email_interaction:{email_id}:{latest_email.get('subject')}"
                     )
             except Exception as e:
-                print(f"Error fetching emails: {e}")
+                logger.error(f"Error fetching emails: {e}")
 
     return {"email_history": email_history}
 

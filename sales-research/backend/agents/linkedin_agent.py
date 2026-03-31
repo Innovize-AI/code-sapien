@@ -87,7 +87,7 @@ def batch_classify_profiles(profiles: List[Dict]):
         return results_map
 
     except Exception as e:
-        print(f"Error in batch classification: {e}")
+        logger.error(f"Error in batch classification: {e}")
         return {}
 
 def classify_profile(name: str, headline: str):
@@ -119,7 +119,7 @@ def classify_profile(name: str, headline: str):
              return {"is_competitor": False, "is_fit": False, "is_decision_maker": False, "reasoning": "Empty response from LLM"}
 
     except Exception as e:
-        print(f"Error classifying profile {name}: {e}")
+        logger.error(f"Error classifying profile {name}: {e}")
         return {"is_competitor": False, "is_fit": False, "is_decision_maker": False, "reasoning": "Error during classification."}
 
 def get_username_from_url(linkedin_url: str):
@@ -178,7 +178,7 @@ def get_linkedin_profile(state: AgentState):
             except Exception:
                 pass
 
-        print("LinkedIn profile already fetched, skipping duplicate call.")
+        logger.debug("LinkedIn profile already fetched, skipping duplicate call.")
         return state
 
     api_key = os.getenv("RAPID_API_KEY")
@@ -203,7 +203,7 @@ def get_linkedin_profile(state: AgentState):
         
         if isinstance(profile_details, dict) and "message" in profile_details:
              if "exceeded the MONTHLY quota" in profile_details["message"]:
-                print(f"LinkedIn API Rate Limit: {profile_details['message']}")
+                logger.warning(f"LinkedIn API Rate Limit: {profile_details['message']}")
                 return {"user_profile_details": {"error": "Rate limit exceeded"}}
 
         base_data = profile_details.get("data", profile_details) if isinstance(profile_details, dict) else profile_details
@@ -229,7 +229,7 @@ def get_linkedin_profile(state: AgentState):
         }
 
     except Exception as e:
-        print(f"Error fetching LinkedIn profile: {e}")
+        logger.error(f"Error fetching LinkedIn profile: {e}")
         return {"user_profile_details": {"error": str(e)}}
 
 def get_linkedin_posts(state: AgentState):
@@ -262,7 +262,7 @@ def get_linkedin_posts(state: AgentState):
         
         return {"user_profile_details": {"recent_posts": posts_list[:5]}}
     except Exception as e:
-        print(f"Error fetching LinkedIn posts: {e}")
+        logger.error(f"Error fetching LinkedIn posts: {e}")
         return {}
 
 def get_linkedin_engagement(state: AgentState):
@@ -320,7 +320,7 @@ def get_linkedin_engagement(state: AgentState):
                         reactor = reaction.get("reactor", {})
                         if reactor.get("urn") == lead_urn:
                             reaction_type = reaction.get("reaction_type", "LIKE")
-                            print(f"Found engagement for {target_type}: {reaction_type}")
+                            logger.debug(f"Found engagement for {target_type}: {reaction_type}")
                             found_engagements.append({
                                 "type": "reaction",
                                 "target": target_type,
@@ -350,7 +350,7 @@ def get_linkedin_engagement(state: AgentState):
                         })
 
         except Exception as e:
-            print(f"Error checking engagement for {username}: {e}")
+            logger.error(f"Error checking engagement for {username}: {e}")
 
     return {"post_engagements": found_engagements}
 
@@ -377,7 +377,7 @@ def get_company_details(company_identifier: str):
         data = response.json()
         return data.get("data", data)
     except Exception as e:
-        print(f"Error fetching company details: {e}")
+        logger.error(f"Error fetching company details: {e}")
         return None
 
 async def get_linkedin_company_data(state: AgentState):
@@ -423,7 +423,7 @@ async def enrich_company_waterfall(person_url: str = None, company_url: str = No
 
     # 1. Primary: Apollo match by person profile
     if person_url:
-        print(f"DEBUG: CENTRAL WATERFALL: Trialing Apollo for {person_url}")
+        logger.debug(f"CENTRAL WATERFALL: Trialing Apollo for {person_url}")
         apollo_data = await get_apollo_company_data(person_url)
 
     # 2. Check if we need LinkedIn fallback
@@ -431,7 +431,7 @@ async def enrich_company_waterfall(person_url: str = None, company_url: str = No
     core_found = apollo_data.get("employee_count")
     
     if company_url and not core_found:
-        print(f"DEBUG: CENTRAL WATERFALL: Falling back to LinkedIn for {company_url}")
+        logger.debug(f"CENTRAL WATERFALL: Falling back to LinkedIn for {company_url}")
         company_res = get_company_details(company_url)
         if company_res:
             linkedin_data = company_res.get("stats", {})
@@ -541,7 +541,7 @@ def linkedin_profile_analyzer(state: AgentState):
         return {"user_profile_analysis": response.model_dump()}
 
     except Exception as e:
-        print(f"Error in linkedin_profile_analyzer: {e}")
+        logger.error(f"Error in linkedin_profile_analyzer: {e}")
         return {"user_profile_analysis": "Error generating structured analysis."}
 
 async def get_apollo_company_data(linkedin_url: str):
@@ -674,9 +674,9 @@ async def get_apollo_company_data(linkedin_url: str):
                     "person_email": person.get("email"),
                 }
             else:
-                print(f"DEBUG: Apollo enrichment failed ({response.status_code}): {response.text}")
+                logger.debug(f"Apollo enrichment failed ({response.status_code}): {response.text}")
     except Exception as e:
-        print(f"Error calling Apollo API: {e}")
+        logger.error(f"Error calling Apollo API: {e}")
         
     return {}
 
@@ -695,7 +695,7 @@ def analyze_competitor_posts(competitor_urls: list[str]):
                 "data": json.loads(data["user_profile_details"])
             })
         except Exception as e:
-            print(f"Error fetching data for {url}: {e}")
+            logger.error(f"Error fetching data for {url}: {e}")
             all_competitor_data.append({
                 "url": url,
                 "error": str(e)
@@ -736,7 +736,7 @@ def get_post_commenters(post_id: str):
             return payload
         return []
     except Exception as e:
-        print(f"Error fetching comments for post {post_id}: {e}")
+        logger.error(f"Error fetching comments for post {post_id}: {e}")
         return []
 
 def analyze_lead_with_ai(lead: dict, icp_data: dict):
@@ -767,7 +767,7 @@ def analyze_lead_with_ai(lead: dict, icp_data: dict):
         
         return lead
     except Exception as e:
-        print(f"Error analyzing lead with AI: {e}")
+        logger.error(f"Error analyzing lead with AI: {e}")
         lead["fit_score"] = 0
         lead["fit_reasoning"] = "Analysis failed"
         lead["is_qualified"] = False
@@ -795,7 +795,7 @@ def _process_single_post(post, user_name):
     try:
         commenters = get_post_commenters(source_post_url)
     except Exception as e:
-        print(f"Error fetching commenters for post {post_id}: {e}")
+        logger.error(f"Error fetching commenters for post {post_id}: {e}")
         return []
 
     for commenter in commenters:
@@ -841,7 +841,7 @@ def discover_leads_from_competitor(competitor_url: str):
     }
     
     try:
-        print(f"DEBUG: Starting discovery for competitor: {competitor_url}")
+        logger.debug(f"Starting discovery for competitor: {competitor_url}")
         # 1. Fetch recent posts
         response = requests.get(posts_url, headers=headers, params={"username": user_name}, timeout=15)
         posts_data = response.json()
@@ -858,10 +858,10 @@ def discover_leads_from_competitor(competitor_url: str):
                 posts = posts_data["posts"]
         
         if not posts:
-            print(f"DEBUG: No posts found in response for {user_name}. Keys present: {list(posts_data.keys()) if isinstance(posts_data, dict) else 'is list'}")
-            print(f"DEBUG: Response snippet: {str(posts_data)[:200]}")
+            logger.debug(f"No posts found in response for {user_name}. Keys present: {list(posts_data.keys()) if isinstance(posts_data, dict) else 'is list'}")
+            logger.debug(f"Response snippet: {str(posts_data)[:200]}")
 
-        print(f"DEBUG: Found {len(posts)} total posts for {user_name}")
+        logger.debug(f"Found {len(posts)} total posts for {user_name}")
 
         # Filter posts from the last 30 days
         now_ms = int(time.time() * 1000)
@@ -881,7 +881,7 @@ def discover_leads_from_competitor(competitor_url: str):
             else:
                 pass
         
-        print(f"DEBUG: {len(recent_posts)} posts within last 30 days out of {len(posts)}")
+        logger.debug(f"{len(recent_posts)} posts within last 30 days out of {len(posts)}")
         posts = recent_posts if recent_posts else posts[:5] # Fallback to latest 5 if none
 
         # Sort posts by engagement
@@ -906,14 +906,12 @@ def discover_leads_from_competitor(competitor_url: str):
                 if leads:
                     raw_leads_buffer.extend(leads)
             except Exception as exc:
-                print(f"Post processing exception for {post.get('id', 'unknown')}: {exc}")
+                logger.error(f"Post processing exception for {post.get('id', 'unknown')}: {exc}")
         
-        print(f"DEBUG: Found {len(raw_leads_buffer)} interactions for {user_name}")
+        logger.debug(f"Found {len(raw_leads_buffer)} interactions for {user_name}")
         return raw_leads_buffer
     except Exception as e:
-        print(f"CRITICAL Error discovering leads from competitor {competitor_url}: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"CRITICAL Error discovering leads from competitor {competitor_url}: {e}", exc_info=True)
         raise e
 
 
@@ -961,7 +959,7 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
         return results_map
 
     except Exception as e:
-        print(f"Error in async batch classification: {e}")
+        logger.error(f"Error in async batch classification: {e}")
         return {}
 
 async def get_posts_by_keyword(keywords: List[str]):
@@ -972,7 +970,7 @@ async def get_posts_by_keyword(keywords: List[str]):
     linkedin_base_url = os.getenv("LINKEDIN_RAPID_BASE_URL")
     
     if not linkedin_base_url:
-        print("Error: LINKEDIN_RAPID_BASE_URL not set")
+        logger.error("LINKEDIN_RAPID_BASE_URL not set")
         return []
         
     search_url = f"{linkedin_base_url.rstrip('/')}/posts/search"
@@ -984,7 +982,7 @@ async def get_posts_by_keyword(keywords: List[str]):
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def fetch_for_single_keyword(keyword: str):
         try:
-            print(f"DEBUG: Fetching posts for keyword: '{keyword}'")
+            logger.debug(f"Fetching posts for keyword: '{keyword}'")
             # Set a timeout for the API call
             response = await asyncio.to_thread(
                 requests.get,
@@ -995,7 +993,7 @@ async def get_posts_by_keyword(keywords: List[str]):
             )
             
             if response.status_code != 200:
-                print(f"DEBUG: API error for keyword '{keyword}': {response.status_code}")
+                logger.debug(f"API error for keyword '{keyword}': {response.status_code}")
                 # Raise exception to trigger Pub/Sub retry
                 response.raise_for_status()
 
@@ -1040,11 +1038,11 @@ async def get_posts_by_keyword(keywords: List[str]):
                     post["matched_keyword"] = keyword_for_batch
                     all_posts.append(post)
 
-        print(f"DEBUG: Found {len(all_posts)} unique posts across {len(keywords)} keywords")
+        logger.debug(f"Found {len(all_posts)} unique posts across {len(keywords)} keywords")
         return all_posts
 
     except Exception as e:
-        print(f"Error in get_posts_by_keyword: {e}")
+        logger.error(f"Error in get_posts_by_keyword: {e}")
         return []
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
@@ -1055,7 +1053,7 @@ async def discover_leads_from_keywords(keywords: List[str]):
     2. Extracts the AUTHOR of each post as a lead.
     """
     posts = await get_posts_by_keyword(keywords)
-    print(f"DEBUG: Processing {len(posts)} posts for leads extraction...")
+    logger.debug(f"Processing {len(posts)} posts for leads extraction...")
     
     leads = []
     seen_urls = set()
@@ -1112,8 +1110,8 @@ async def discover_leads_from_keywords(keywords: List[str]):
             })
             
         except Exception as e:
-            print(f"Error extracting lead from post: {e}")
+            logger.error(f"Error extracting lead from post: {e}")
             continue
             
-    print(f"DEBUG: Extracted {len(leads)} unique leads from keyword search posts.")
+    logger.debug(f"Extracted {len(leads)} unique leads from keyword search posts.")
     return leads

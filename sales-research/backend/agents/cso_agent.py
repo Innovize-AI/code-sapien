@@ -5,6 +5,9 @@ from services.knowledge_service import KnowledgeService
 from models.structured_output_cso import GlobalCSOBriefing
 import json
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Initialize KnowledgeService
 knowledge_service = KnowledgeService(index_name="glial-index")
@@ -103,5 +106,5 @@ def narrative_arbitrator_node(state: AgentState):
         
         return {"cso_strategic_briefing": response.model_dump() if response else {}}
     except Exception as e:
-        print(f"Error in narrative_arbitrator_node: {e}")
+        logger.error(f"Error in narrative_arbitrator_node: {e}")
         return {"cso_strategic_briefing": {}}

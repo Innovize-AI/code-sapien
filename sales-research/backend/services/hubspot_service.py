@@ -1,4 +1,7 @@
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 import httpx
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
@@ -118,6 +121,6 @@ class HubspotService:
             response = await client.get(endpoint, headers=self.headers, params=params)
             # This is a placeholder as the Events API might differ based on HubSpot tier
             if response.status_code != 200:
-                print(f"Web Visits API Error: {response.text}")
+                logger.info(f"Web Visits API Error: {response.text}")
                 return []
             return response.json().get("results", [])

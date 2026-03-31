@@ -1,4 +1,7 @@
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 import csv
 import sys
@@ -27,25 +30,25 @@ async def main():
         "https://www.linkedin.com/company/apolloio/"   # Apollo.io
     ]
     
-    print(f"--- Starting Lead Generation for Glial ---")
+    logger.info(f"--- Starting Lead Generation for Glial ---")
     
     all_leads = []
     
     # 1. Discover via Keywords
-    print(f"\n[1/2] Searching by keywords: {keywords}")
+    logger.info(f"\n[1/2] Searching by keywords: {keywords}")
     keyword_leads = await discover_leads_from_keywords(keywords)
-    print(f"Found {len(keyword_leads)} potential leads from keyword search.")
+    logger.info(f"Found {len(keyword_leads)} potential leads from keyword search.")
     all_leads.extend(keyword_leads)
     
     # 2. Discover via Competitors
-    print(f"\n[2/2] Searching by competitor interactions: {competitors}")
+    logger.info(f"\n[2/2] Searching by competitor interactions: {competitors}")
     for comp_url in competitors:
         try:
             comp_leads = discover_leads_from_competitor(comp_url)
-            print(f"Found {len(comp_leads)} leads from {comp_url}")
+            logger.info(f"Found {len(comp_leads)} leads from {comp_url}")
             all_leads.extend(comp_leads)
         except Exception as e:
-            print(f"Error searching competitor {comp_url}: {e}")
+            logger.info(f"Error searching competitor {comp_url}: {e}")
 
     # Deduplicate by LinkedIn URL
     unique_leads = {}
@@ -55,7 +58,7 @@ async def main():
             unique_leads[url] = lead
             
     final_leads = list(unique_leads.values())
-    print(f"\n--- Total Unique Leads Found: {len(final_leads)} ---")
+    logger.info(f"\n--- Total Unique Leads Found: {len(final_leads)} ---")
     
     # Write to CSV
     output_file = os.path.join(os.path.dirname(__file__), 'discovered_leads.csv')
@@ -66,9 +69,9 @@ async def main():
             dict_writer = csv.DictWriter(f, fieldnames=keys)
             dict_writer.writeheader()
             dict_writer.writerows(final_leads)
-        print(f"Leads successfully exported to {output_file}")
+        logger.info(f"Leads successfully exported to {output_file}")
     else:
-        print("No leads to export.")
+        logger.info("No leads to export.")
 
 if __name__ == "__main__":
     asyncio.run(main())

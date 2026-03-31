@@ -4,6 +4,9 @@ from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from skills.rag_skills import RAG_SKILLS
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from models.gemini_models import get_gemini_model
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
@@ -22,7 +25,7 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
     1. Hard Filter: Role Match
     2. Soft Filter: Agentic Analysis of Company Fit
     """
-    print(f"Verifying Strict Fit for {product_name}...")
+    logger.info(f"Verifying Strict Fit for {product_name}...")
     
     # 1. Hard Filter: Role Match
     user_details = state.get("user_profile_details", {})
@@ -46,7 +49,7 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
                 break
     
     if not role_match:
-        print(f"Role Mismatch: {job_title} not in {target_roles}")
+        logger.info(f"Role Mismatch: {job_title} not in {target_roles}")
         return PivotFitCheck(is_fit=False, reasoning=f"Lead role '{job_title}' does not match target roles for {product_name}: {target_roles}")
 
     # 2. Agentic Analysis (Soft Filter)
@@ -64,7 +67,7 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
                    "Unknown"
 
     # Fetch product-specific qualification context via RAG
-    print(f"Retrieving Qualification Context for {product_name}...")
+    logger.info(f"Retrieving Qualification Context for {product_name}...")
     qualification_context = knowledge_service.retrieve_context(
         query=f"What is the ideal customer profile for {product_name}? What are the icp qualification criteria, industry fit, and target audience?",
         namespace="playbooks",
@@ -105,7 +108,7 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
         result = await structured_llm.ainvoke(messages)
         return result
     except Exception as e:
-        print(f"Error in verification: {e}")
+        logger.info(f"Error in verification: {e}")
         return PivotFitCheck(is_fit=False, reasoning=f"Error verifying fit: {e}")
 
 def create_strategic_rag_agent():
@@ -174,12 +177,12 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
                 break
     
     if strategic_pivot:
-        print(f"Found Strategic Pivot: {strategic_pivot.name}")
+        logger.info(f"Found Strategic Pivot: {strategic_pivot.name}")
         # Perform Strict Fit Check
         fit_check = await verify_strict_fit(state, strategic_pivot.name, getattr(strategic_pivot, "target_roles", []))
         
         if fit_check.is_fit:
-            print(f"Pivot Fit CONFIRMED: {fit_check.reasoning}")
+            logger.info(f"Pivot Fit CONFIRMED: {fit_check.reasoning}")
             pivot_fit_result = True
             pivot_name = strategic_pivot.name
             
@@ -194,7 +197,7 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
 
             specific_context = ""
             if relevant_files:
-                print(f"Retrieving context from {len(relevant_files)} files: {relevant_files}")
+                logger.info(f"Retrieving context from {len(relevant_files)} files: {relevant_files}")
                 specific_context = knowledge_service.retrieve_from_files(relevant_files, strategic_pivot.name + " " + " ".join(pain_points.keys() if isinstance(pain_points, dict) else []), k=10)
             
             # Fallback to legacy rag_context if no specific files or empty result
@@ -218,7 +221,7 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
             3. Return a briefing specifically supporting a pitch for {strategic_pivot.name}.
             """
         else:
-            print(f"Pivot Fit REJECTED: {fit_check.reasoning}")
+            logger.info(f"Pivot Fit REJECTED: {fit_check.reasoning}")
 
     executor = create_strategic_rag_agent()
     # Fill in the prompt variables via the input or by partially formatting the prompt

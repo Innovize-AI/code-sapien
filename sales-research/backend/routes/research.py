@@ -1,4 +1,7 @@
 import operator
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import Annotated, Any
 
 from typing_extensions import TypedDict
@@ -16,7 +19,7 @@ class ReturnNodeValue:
         self._value = node_secret
 
     def __call__(self, state: State) -> Any:
-        print(f"Adding {self._value} to {state['aggregate']}")
+        logger.info(f"Adding {self._value} to {state['aggregate']}")
         return {"aggregate": [self._value]}
 
 def user_linkedin_analyzer(username):

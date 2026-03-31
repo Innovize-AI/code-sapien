@@ -1,4 +1,7 @@
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from workflow.state import AgentState
@@ -18,11 +21,11 @@ def discovery_router(state: AgentState):
     # If this is a targeted update (email/crm), we skip deep pain point discovery
     # because the company profile likely hasn't changed.
     if trigger in ["email_update", "crm_update"]:
-        print(f"Skipping deep discovery for trigger: {trigger}")
+        logger.info(f"Skipping deep discovery for trigger: {trigger}")
         return "strategic_merger"
     
     if not refresh and state.get("target_pain_points"):
-        print("Skipping discovery/solution mapping - analysis already exists.")
+        logger.info("Skipping discovery/solution mapping - analysis already exists.")
         return "strategic_merger"
         
     return "pain_point_discovery"
@@ -36,10 +39,10 @@ def strategy_router(state: AgentState):
     
     # If there's any history/notes, it's a follow-up
     if email_history or (meeting_notes and meeting_notes.strip()):
-        print("Routing to Follow-up Strategy Agent")
+        logger.info("Routing to Follow-up Strategy Agent")
         return "follow_up_strategy"
     
-    print("Routing to First-touch Outreach Designer")
+    logger.info("Routing to First-touch Outreach Designer")
     return "outreach_designer"
 
 def strategic_merger(state: AgentState):
@@ -47,7 +50,7 @@ def strategic_merger(state: AgentState):
     return state
 
 def collector(state: AgentState):
-    print("WEBSITE COLLECTOR ", state["website"])
+    logger.info("WEBSITE COLLECTOR ", state["website"])
     return {"linkedin_url": state["linkedin_url"], "website": state["website"]}
 
 def research_router(state: AgentState):
@@ -103,7 +106,7 @@ def enrich_website(state: AgentState):
         if match:
             domain = match.group(2)
             url = f"https://{domain}"
-            print(f"Work domain found from email: {domain}")
+            logger.info(f"Work domain found from email: {domain}")
             return {"website": url}
     
     # 2. LinkedIn Enrichment Fallback
@@ -119,7 +122,7 @@ def enrich_website(state: AgentState):
             company_url = profile_res.get("lead_company_linkedin_url") or state.get("lead_company_linkedin_url")
         
         if company_url:
-            print(f"Enriching company info for: {company_url}")
+            logger.info(f"Enriching company info for: {company_url}")
             company_details = get_company_details(company_url)
             if company_details:
                 basic_info = company_details.get("basic_info", {})
@@ -154,7 +157,7 @@ def get_graph():
     if _compiled_graph is not None:
         return _compiled_graph
 
-    print("🚀 Initializing Glial Research Graph (Lazy Loading Agents)...")
+    logger.info("🚀 Initializing Glial Research Graph (Lazy Loading Agents)...")
     
     # Deferred heavy imports
     from agents.linkedin_agent import get_linkedin_profile, get_linkedin_posts, get_linkedin_engagement, get_linkedin_company_data, linkedin_profile_analyzer

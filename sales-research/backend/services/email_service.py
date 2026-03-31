@@ -1,4 +1,7 @@
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from datetime import date, datetime
 from typing import List, Optional, Dict, Any
 from imap_tools import MailBox, AND
@@ -39,7 +42,7 @@ class EmailService:
                     for msg in mailbox.fetch(AND(from_=target_email), limit=limit, reverse=True):
                         history.append(self._parse_msg(msg, "received"))
                 except Exception as e:
-                    print(f"Error fetching received emails: {e}")
+                    logger.info(f"Error fetching received emails: {e}")
 
                 # 2. Fetch emails TO the target (usually in Sent items)
                 # We need to find the sent folder name (Sent, Sent Items, etc.)
@@ -55,10 +58,10 @@ class EmailService:
                     for msg in mailbox.fetch(AND(to=target_email), limit=limit, reverse=True):
                          history.append(self._parse_msg(msg, "sent"))
                 except Exception as e:
-                    print(f"Error fetching sent emails from {sent_folder}: {e}")
+                    logger.info(f"Error fetching sent emails from {sent_folder}: {e}")
 
         except Exception as e:
-            print(f"IMAP Connection Error: {e}")
+            logger.info(f"IMAP Connection Error: {e}")
             return []
 
         # Sort by date

@@ -1,4 +1,7 @@
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 
 # Search for .env in current and parent directories
@@ -41,9 +44,9 @@ if not DB_SCHEMA or DB_SCHEMA == "${db_schema}":
     # Only use staging if explicitly requested
     DB_SCHEMA = "staging" if env == "staging" else "public"
 
-print(f"--- DB INITIALIZATION ---")
-print(f"ENV: {env}")
-print(f"TARGET SCHEMA: {DB_SCHEMA}")
-print(f"SEARCH PATH: {DB_SCHEMA}")
-print(f"--------------------------")
+logger.info(f"--- DB INITIALIZATION ---")
+logger.info(f"ENV: {env}")
+logger.info(f"TARGET SCHEMA: {DB_SCHEMA}")
+logger.info(f"SEARCH PATH: {DB_SCHEMA}")
+logger.info(f"--------------------------")
 

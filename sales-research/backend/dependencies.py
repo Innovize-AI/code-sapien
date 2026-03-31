@@ -42,7 +42,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             await db.commit()
             await db.refresh(profile)
         except Exception as e:
-            print(f"Error creating profile: {e}")
+            logger.info(f"Error creating profile: {e}")
             raise HTTPException(status_code=500, detail="Failed to create user profile")
         
     return profile

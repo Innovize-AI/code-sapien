@@ -42,6 +42,50 @@ async def update_single_competitor_task(competitor_id: str):
             logger.error(f"Error scanning competitor {competitor_id}: {e}")
             raise # Propagate to worker for Pub/Sub retry
 
+async def strategic_seller_discovery_task(seller_url: str, user_id: str = None):
+    """
+    Manually triggered task (e.g. via Slack button) to fetch the audience
+    of a strategic seller to find potential leads without looping indefinitely.
+    """
+    async with SessionLocal() as db:
+        try:
+            logger.info(f"Scanning strategic seller audience: {seller_url}")
+            from agents.linkedin_agent import discover_leads_from_competitor
+            leads = await asyncio.to_thread(discover_leads_from_competitor, seller_url)
+            
+            if leads:
+                # Add metadata to indicate these came from a strategic seller
+                for lead in leads:
+                    lead["competitor"] = f"Strategic Seller: {seller_url}"
+                    if user_id:
+                        lead["created_by_id"] = user_id
+
+                await batch_upsert_identified_profiles(db, leads)
+                await run_classification_and_update(leads)
+                await db.commit()
+                
+                # Log Activity
+                from utils.activity_helper import log_activity_and_notify
+                import hashlib
+                idempotency_key = f"seller_discovery:{hashlib.md5(seller_url.encode()).hexdigest()}"
+                
+                await log_activity_and_notify(
+                    db,
+                    type="comment",
+                    title=f"Discovered {len(leads)} leads from Strategic Seller",
+                    description=f"Identified new commenters on seller's posts ({seller_url}).",
+                    metadata={"url": seller_url, "count": len(leads)},
+                    idempotency_key=idempotency_key
+                )
+                
+                logger.info(f"Saved and classified {len(leads)} leads from strategic seller {seller_url}")
+            else:
+                logger.info(f"No leads found from strategic seller {seller_url}")
+                
+        except Exception as e:
+            logger.error(f"Error scanning strategic seller {seller_url}: {e}")
+            raise
+
 async def update_competitor_leads_task():
     """Wrapper for local dev / batch execution (SEQUENTIAL)."""
     logger.info("Starting competitor leads update task...")

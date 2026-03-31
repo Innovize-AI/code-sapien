@@ -667,6 +667,16 @@ async def upsert_user_settings(db: AsyncSession, user_id: str, settings_data: di
     await db.refresh(db_settings)
     return db_settings
 
+async def delete_user_icp_override(db: AsyncSession, user_id: str):
+    """Clears ONLY the icp_json field from UserSettings to allow fallback to global."""
+    result = await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
+    db_settings = result.scalars().first()
+    if db_settings:
+        db_settings.icp_json = None
+        await db.commit()
+        return True
+    return False
+
 async def get_report_by_email_or_linkedin(db: AsyncSession, email_id: str = None, linkedin_url: str = None):
     if not email_id and not linkedin_url:
         return None

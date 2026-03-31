@@ -29,6 +29,7 @@ PUBSUB_PROJECT_ID = os.getenv("PUBSUB_PROJECT_ID")
 PUBSUB_TOPIC_ID = os.getenv("PUBSUB_TOPIC_ID", "sales-research-discovery")
 LOCAL_PARALLEL = os.getenv("LOCAL_PARALLEL", "false").lower() == "true"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
+HEARTBEAT_DELAY = int(os.getenv("HEARTBEAT_DELAY", "5")) # Default 5s between tasks
 
 publisher = None
 if PUBSUB_PROJECT_ID:
@@ -117,32 +118,40 @@ async def tasks_heartbeat(
                 tasks_to_dispatch.append(("global_task", {"task_name": task.name}, fallback_func, ()))
                 task.last_run_at = now
 
-    # 3. Parallel Dispatch
+    # 3. Sequential Background Dispatch
     async def dispatch_one(t_type, t_payload, f_func, f_args):
         if await publish_task(t_type, t_payload):
             return f"{t_type}_ok"
         elif f_func:
             if LOCAL_PARALLEL:
-                # Trigger as a true async task for local parallelism (ignores sequential queue)
                 asyncio.create_task(f_func(*f_args))
                 return f"{t_type}_local_parallel"
             else:
-                # Default: FastAPI sequential background task queue
                 background_tasks.add_task(f_func, *f_args)
                 return f"{t_type}_local_sync"
         return f"{t_type}_skipped"
 
-    results = []
+    async def run_dispatch_loop(dispatch_list, db_session):
+        results = []
+        for i, t in enumerate(dispatch_list):
+            res = await dispatch_one(*t)
+            results.append(res)
+            if i < len(dispatch_list) - 1:
+                logger.info(f"Background Waiting {HEARTBEAT_DELAY}s before next task dispatch...")
+                await asyncio.sleep(HEARTBEAT_DELAY)
+        logger.info(f"Heartbeat background dispatch complete. Total: {len(results)}")
+
     if tasks_to_dispatch:
         # Commit last_run_at updates BEFORE dispatching to prevent race conditions
         await db.commit()
-        results = await asyncio.gather(*[dispatch_one(*t) for t in tasks_to_dispatch])
+        # Run the sequential dispatch in the background to avoid HTTP timeout
+        background_tasks.add_task(run_dispatch_loop, tasks_to_dispatch, db)
     else:
         await db.commit()
+
     return {
-        "status": "heartbeat_processed", 
-        "total_dispatched": len(results),
-        "results": results
+        "status": "heartbeat_accepted", 
+        "total_to_dispatch": len(tasks_to_dispatch)
     }
 
 @tasks_router.post("/tasks/worker")

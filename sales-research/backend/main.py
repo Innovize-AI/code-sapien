@@ -10,9 +10,9 @@ if os.getenv("LANGCHAIN_API_KEY"):
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
     if not os.getenv("LANGCHAIN_PROJECT"):
         os.environ["LANGCHAIN_PROJECT"] = "sales-research"
-    print(f"🚀 LangSmith Tracing enabled in project: {os.environ['LANGCHAIN_PROJECT']}")
+    logging.info(f"🚀 LangSmith Tracing enabled in project: {os.environ['LANGCHAIN_PROJECT']}")
 else:
-    print("⚠️ LangSmith API Key not found. Tracing disabled.")
+    logging.warning("⚠️ LangSmith API Key not found. Tracing disabled.")
 
 import uvicorn
 # from app.api.routers.chat import chat_router

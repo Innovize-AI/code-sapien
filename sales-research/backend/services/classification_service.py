@@ -16,13 +16,13 @@ class EventStreamManager:
     async def subscribe(self):
         queue = asyncio.Queue()
         self.active_connections.append(queue)
-        print(f"DEBUG: New SSE subscriber. Total: {len(self.active_connections)}")
+        logger.debug(f"New SSE subscriber. Total: {len(self.active_connections)}")
         return queue
 
     async def unsubscribe(self, queue):
         if queue in self.active_connections:
             self.active_connections.remove(queue)
-            print(f"DEBUG: SSE subscriber disconnected. Total: {len(self.active_connections)}")
+            logger.debug(f"SSE subscriber disconnected. Total: {len(self.active_connections)}")
 
     async def broadcast(self, data: dict):
         if not self.active_connections:
@@ -43,7 +43,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
     from utils.url_normalize import normalize_linkedin_url
     
     try:
-        print(f"DEBUG: Background Task Started for {len(raw_leads)} leads")
+        logger.info(f"Background Task Started for {len(raw_leads)} leads")
         
         # 1. Prepare unique profiles for batch classification
         unique_profiles_map = {}
@@ -57,11 +57,11 @@ async def run_classification_and_update(raw_leads: List[dict]):
                     "source_post": lead.get("source_post", "")
                 }
         
-        print(f"DEBUG: Unique profiles to classify: {list(unique_profiles_map.keys())}")
+        logger.debug(f"Unique profiles to classify: {list(unique_profiles_map.keys())}")
         
         unique_profiles_list = list(unique_profiles_map.values())
         if not unique_profiles_list:
-            print("DEBUG: No unique profiles found. Returning.")
+            logger.info("No unique profiles found. Returning.")
             return
 
         # 1.5 Filter out profiles that already exist in the database
@@ -76,12 +76,12 @@ async def run_classification_and_update(raw_leads: List[dict]):
             )
             existing_urls = {r[0] for r in result.all()}
         
-        print(f"DEBUG: Found {len(existing_urls)} profiles with existing classification: {existing_urls}")
+        logger.debug(f"Found {len(existing_urls)} profiles with existing classification: {existing_urls}")
         
         # Keep only profiles that are NOT in existing_urls (using normalized comparison)
         new_profiles_list = [p for p in unique_profiles_list if p["id"] not in existing_urls]
         
-        print(f"DEBUG: Processing {len(new_profiles_list)} new profiles for AI classification: {[p['id'] for p in new_profiles_list]}")
+        logger.info(f"Processing {len(new_profiles_list)} new profiles for AI classification: {[p['id'] for p in new_profiles_list]}")
         
         # B. Handle Existing Profiles: Fetch their data and prepare for broadcast
         existing_profile_data_map = {}
@@ -105,7 +105,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
 
         # If there are NO new profiles but there are existing ones, broadcast them now
         if not new_profiles_list and existing_profile_data_map:
-            print("DEBUG: All discovered profiles already exist in DB. Broadcasting existing data.")
+            logger.info("All discovered profiles already exist in DB. Broadcasting existing data.")
             await event_manager.broadcast({
                 "type": "classification_update",
                 "leads": list(existing_profile_data_map.values())
@@ -113,18 +113,18 @@ async def run_classification_and_update(raw_leads: List[dict]):
             return
         
         if not new_profiles_list:
-            print("DEBUG: No new profiles to classify. Returning.")
+            logger.info("No new profiles to classify. Returning.")
             return
 
         # 2. Batch Classify & Update Iteratively
         batch_size = 100
         for i in range(0, len(new_profiles_list), batch_size):
             batch = new_profiles_list[i : i + batch_size]
-            print(f"DEBUG: Triggering AI for batch {i//batch_size + 1} ({len(batch)} profiles)...")
+            logger.info(f"Triggering AI for batch {i//batch_size + 1} ({len(batch)} profiles)...")
             
             # A. Native Async AI Call
             batch_res = await batch_classify_profiles_async(batch)
-            print(f"DEBUG: AI returned {len(batch_res)} results: {list(batch_res.keys())} | Values: {list(batch_res.values())}")
+            logger.debug(f"AI returned {len(batch_res)} results: {list(batch_res.keys())} | Values: {list(batch_res.values())}")
             
             # B. Identify which leads to update from this batch
             batch_urls = set(item['id'] for item in batch)
@@ -134,15 +134,15 @@ async def run_classification_and_update(raw_leads: List[dict]):
             # Include existing profile data in the first batch broadcast if available
             if i == 0 and existing_profile_data_map:
                 event_leads_batch.extend(existing_profile_data_map.values())
-            print(f"DEBUG: Raw Lead Count: {event_leads_batch}")
+            logger.debug(f"Raw Lead Count: {len(event_leads_batch)}")
             for lead in raw_leads:
                 lead_n_url = normalize_linkedin_url(lead["linkedin_url"])
-                print(f"DEBUG: Checking lead {lead_n_url} against batch_urls...")
+                logger.debug(f"Checking lead {lead_n_url} against batch_urls...")
                 if lead_n_url in batch_urls:
-                    print(f"DEBUG: Found lead {lead_n_url} in batch. Fetching AI result...")
+                    logger.debug(f"Found lead {lead_n_url} in batch. Fetching AI result...")
                     c = batch_res.get(lead_n_url)
                     if c:
-                        print(f"DEBUG: Applying AI result for {lead_n_url}: fit={c.get('is_fit')}")
+                        logger.debug(f"Applying AI result for {lead_n_url}: fit={c.get('is_fit')}")
                         updated_data = {
                             "linkedin_url": lead_n_url,
                             "is_fit": c.get("is_fit"),
@@ -178,12 +178,12 @@ async def run_classification_and_update(raw_leads: List[dict]):
                         icp_data = await get_active_icp(session)
                         await batch_upsert_identified_profiles(session, leads_to_update_batch)
                     
-                    print(f"DEBUG: Batch {i//batch_size + 1} - Updated {len(leads_to_update_batch)} profiles")
+                    logger.info(f"Batch {i//batch_size + 1} - Updated {len(leads_to_update_batch)} profiles")
                     
                     # 2. Individual Enrichment & Notifications
                     for lu in leads_to_update_batch:
                         if lu.get("is_strategic_seller"):
-                            print(f"DEBUG: Skipping notification for Strategic Seller {lu.get('name')}")
+                            logger.info(f"Skipping notification for Strategic Seller {lu.get('name')}")
                             continue
 
                         has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
@@ -194,7 +194,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
                         if is_hot or lu.get("intent") in ["prospect_pain", "pain_point"] or is_qualified:
                             # Apollo Enrichment
                             try:
-                                print(f"DEBUG: Enriching high-priority lead {lu.get('name')} via Apollo...")
+                                logger.info(f"Enriching high-priority lead {lu.get('name')} via Apollo...")
                                 enriched = await enrich_company_waterfall(person_url=lu.get("linkedin_url"))
                                 if enriched:
                                     async with session.begin(): # Sub-transaction for company enrichment
@@ -233,7 +233,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
                                             lu["is_fit"] = new_fit
                                             lu["fit_reasoning"] = new_reasoning
                                         except Exception as re_e:
-                                            print(f"Error re-validating lead {lu.get('name')}: {re_e}")
+                                            logger.error(f"Error re-validating lead {lu.get('name')}: {re_e}")
                                             
                                         await session.execute(
                                             update(IdentifiedProfile)
@@ -241,7 +241,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
                                             .values(**update_vals)
                                         )
                             except Exception as ee:
-                                print(f"Error enriching lead {lu.get('name')}: {ee}")
+                                logger.error(f"Error enriching lead {lu.get('name')}: {ee}")
                                 
                             has_high_intent = lu.get("intent") in ["hand_raiser", "prospect_pain", "interested", "pain_point"]
                             has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
@@ -277,11 +277,9 @@ async def run_classification_and_update(raw_leads: List[dict]):
                     "type": "classification_update",
                     "leads": event_leads_batch
                 })
-                print(f"DEBUG: Broadcasted batch update for {len(event_leads_batch)} leads")
+                logger.info(f"Broadcasted batch update for {len(event_leads_batch)} leads")
             else:
-                 print(f"DEBUG: Batch {i//batch_size + 1} returned no results to update.")
+                 logger.debug(f"Batch {i//batch_size + 1} returned no results to update.")
 
     except Exception as e:
-        print(f"CRITICAL Error in background classification: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"CRITICAL Error in background classification: {e}", exc_info=True)

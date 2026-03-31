@@ -1,4 +1,7 @@
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.crud import create_activity, get_org_settings
 from utils.slack import send_slack_notification
@@ -36,7 +39,7 @@ async def log_activity_and_notify(
     )
 
     if idempotency_key and not activity:
-        print(f"DEBUG: Idempotency conflict for key {idempotency_key}. Skipping Slack notification.")
+        logger.info(f"DEBUG: Idempotency conflict for key {idempotency_key}. Skipping Slack notification.")
         return
 
     # 1.5 Resolve Rep Name
@@ -110,9 +113,9 @@ async def log_activity_and_notify(
 
         # 3. Send Slack Notification
         if settings.slack_webhook_url:
-            print(f"DEBUG: Sending Slack notification for {title}. Blocks: {len(blocks) if blocks else 0}")
+            logger.info(f"DEBUG: Sending Slack notification for {title}. Blocks: {len(blocks) if blocks else 0}")
             if blocks:
-                print(f"DEBUG: Payload: {json.dumps(blocks, indent=2)[:1000]}") # Log first 1000 chars of blocks
+                logger.info(f"DEBUG: Payload: {json.dumps(blocks, indent=2)[:1000]}") # Log first 1000 chars of blocks
             
             slack_text = f"*{title}*\n{description}" if description else f"*{title}*"
             await send_slack_notification(settings.slack_webhook_url, slack_text, blocks=blocks)

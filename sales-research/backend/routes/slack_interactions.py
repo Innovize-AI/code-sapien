@@ -1,4 +1,5 @@
 import json
+import logging
 from fastapi import APIRouter, Request, BackgroundTasks, Form, Depends
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,8 @@ from db.database import get_db
 from db.models import UserSettings
 from services.research_service import run_single_research
 import httpx
+
+logger = logging.getLogger(__name__)
 
 slack_interactions_router = APIRouter(tags=['Slack Interactions'], responses={404: {"description": "Not found"}},)
 
@@ -20,13 +23,13 @@ async def handle_slack_interactions(
     Handles interactions from Slack Block Kit (buttons, etc).
     """
     try:
-        print(f"DEBUG: Received Slack interaction payload: {payload[:200]}...")
+        logger.debug(f"Received Slack interaction payload: {payload[:200]}...")
         data = json.loads(payload)
         user = data.get("user", {}).get("name", "Someone")
         actions = data.get("actions", [])
         response_url = data.get("response_url")
         
-        print(f"DEBUG: Parsed Slack action from {user}: {actions}")
+        logger.debug(f"Parsed Slack action from {user}: {actions}")
 
         if not actions:
             return {"ok": True}
@@ -44,11 +47,11 @@ async def handle_slack_interactions(
                 user_settings = result.scalars().first()
                 if user_settings:
                     internal_user_id = str(user_settings.user_id)
-                    print(f"DEBUG: Resolved Slack User {slack_user_id} to Internal User {internal_user_id}")
+                    logger.debug(f"Resolved Slack User {slack_user_id} to Internal User {internal_user_id}")
                 else:
-                    print(f"DEBUG: No internal user found for Slack User {slack_user_id}")
+                    logger.debug(f"No internal user found for Slack User {slack_user_id}")
             except Exception as e:
-                print(f"Error resolving Slack user: {e}")
+                logger.error(f"Error resolving Slack user: {e}")
 
         if action_id == "analyze_lead" and linkedin_url:
             # Normalize URL for consistent locking
@@ -101,7 +104,7 @@ async def handle_slack_interactions(
         return {"ok": True}
 
     except Exception as e:
-        print(f"Error handling Slack interaction: {e}")
+        logger.error(f"Error handling Slack interaction: {e}")
         return {"ok": False, "error": str(e)}
 
 async def send_slack_response(url: str, text: str, replace_original: bool = False):
@@ -113,8 +116,4 @@ async def send_slack_response(url: str, text: str, replace_original: bool = Fals
                 "replace_original": replace_original
             })
     except Exception as e:
-        print(f"Error sending Slack response: {e}")
-
-    except Exception as e:
-        print(f"Error handling Slack interaction: {e}")
-        return {"ok": False, "error": str(e)}
+        logger.error(f"Error sending Slack response: {e}")

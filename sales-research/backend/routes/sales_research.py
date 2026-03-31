@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from typing import Optional, List
 from fastapi import APIRouter, Query, Depends, Body, BackgroundTasks
@@ -16,6 +17,8 @@ from utils.activity_helper import log_activity_and_notify
 from pydantic import BaseModel
 from dependencies import get_current_user
 from db.models import Profile
+
+logger = logging.getLogger(__name__)
 
 sales_router = APIRouter(tags=['Glial Revenue Intelligence'], responses={404: {"description": "Not found"}},)
 
@@ -216,7 +219,7 @@ async def run_research(
             if not is_high_intent:
                 existing = await get_report_by_email_or_linkedin(db, email_id=email, linkedin_url=linkedin_url)
                 if existing:
-                    print(f"DEBUG: Found existing report for {linkedin_url or email}. skipping research (low intent streaming).")
+                    logger.debug(f"Found existing report for {linkedin_url or email}. skipping research (low intent streaming).")
                     
                     email_fallback = None
                     if not existing.email_id and existing.linkedin_url:
@@ -241,7 +244,7 @@ async def run_research(
         try:
             saved_report = await _persist_results(db, linkedin_url, website, final_state, options)
         except Exception as e:
-            print(f"Failed to save report: {e}")
+            logger.error(f"Failed to save report: {e}")
 
         result_payload = _prepare_state_for_json(final_state)
         if saved_report:

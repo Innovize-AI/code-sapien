@@ -1,3 +1,4 @@
+import logging
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
 from models.gemini_models import get_gemini_model
@@ -10,6 +11,8 @@ import json
 from models.structured_output import OutreachStrategy, CampaignVariant, Solution, StrategicSolutions
 from pydantic import BaseModel, Field
 from typing import List
+
+logger = logging.getLogger(__name__)
 from services.knowledge_service import KnowledgeService
 
 class MultiCampaignResponse(BaseModel):
@@ -115,7 +118,7 @@ def pain_point_node(state: AgentState):
         response = structured_llm.invoke(messages)
         return {"target_pain_points": response.model_dump() if response else {}}
     except Exception as e:
-        print(f"Error in pain_point_node: {e}")
+        logger.error(f"Error in pain_point_node: {e}")
         return {"target_pain_points": {}}
 
 def solution_node(state: AgentState):
@@ -165,7 +168,7 @@ def solution_node(state: AgentState):
         response = structured_llm.invoke(messages)
         return {"strategic_solutions": response.model_dump() if response else {}}
     except Exception as e:
-        print(f"Error in solution_node: {e}")
+        logger.error(f"Error in solution_node: {e}")
         return {"strategic_solutions": {}}
 
 def outreach_node(state: AgentState):
@@ -250,7 +253,7 @@ DO NOT generate a second variant.
         }
 
     except Exception as e:
-        print(f"Error in outreach_node: {e}")
+        logger.error(f"Error in outreach_node: {e}")
         return {"personalized_outreach": [], "campaign_outreach_variants": []}
 
 

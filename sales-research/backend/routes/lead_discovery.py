@@ -5,6 +5,9 @@ from sqlalchemy import select
 from db.models import OrganizationSettings
 from db.database import SessionLocal  # Need a synchronous way or run async
 from tenacity import retry, stop_after_attempt, wait_exponential
+import logging
+
+logger = logging.getLogger(__name__)
 
 # --- Construction logic remains same ---
 
@@ -49,11 +52,11 @@ def find_leads_tavily(input_data: LeadDiscoveryInput, api_key: str = None) -> Li
     if api_key:
         os.environ["TAVILY_API_KEY"] = api_key
     elif not os.environ.get("TAVILY_API_KEY"):
-         print("WARNING: TAVILY_API_KEY not found.")
+         logger.warning("TAVILY_API_KEY not found.")
          return []
 
     query = generate_search_query(input_data)
-    print(f"Executing Search Query: {query}")
+    logger.info(f"Executing Search Query: {query}")
     
     # Deferred heavy import
     from langchain_community.tools.tavily_search import TavilySearchResults
@@ -76,7 +79,7 @@ def find_leads_tavily(input_data: LeadDiscoveryInput, api_key: str = None) -> Li
         return leads
         
     except Exception as e:
-        print(f"Error during Tavily search: {e}")
+        logger.error(f"Error during Tavily search: {e}")
         return []
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
@@ -91,7 +94,7 @@ def find_leads_apollo(input_data: LeadDiscoveryInput, api_key: str = None) -> Li
     final_api_key = api_key or os.environ.get("APOLLO_API_KEY")
     
     if not final_api_key:
-        print("APOLLO_API_KEY not found.")
+        logger.warning("APOLLO_API_KEY not found.")
         return []
 
     url = "https://api.apollo.io/v1/mixed_people/search"
@@ -146,7 +149,7 @@ def find_leads_apollo(input_data: LeadDiscoveryInput, api_key: str = None) -> Li
         return leads
 
     except Exception as e:
-        print(f"Error during Apollo search: {e}")
+        logger.error(f"Error during Apollo search: {e}")
         # Re-raise user-friendly exceptions so they bubble up to the UI
         if "requires a paid plan" in str(e):
             raise e

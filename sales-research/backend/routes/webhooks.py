@@ -1,4 +1,5 @@
 import json
+import logging
 from fastapi import APIRouter, Depends, Body, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db, save_lead_submission, get_db_session
@@ -10,6 +11,8 @@ import asyncio
 from pydantic import BaseModel
 from typing import Optional
 from fastapi import BackgroundTasks
+
+logger = logging.getLogger(__name__)
 
 webhooks_router = APIRouter(tags=['Webhooks'], prefix="/webhooks")
 
@@ -28,7 +31,7 @@ async def run_targeted_research_background(email: str, trigger: str):
     Background task to run the research graph with a specific trigger.
     Consumes the generator to ensure the graph executes fully.
     """
-    print(f"WEBHOOK: Starting targeted research for {email} (Trigger: {trigger})")
+    logger.info(f"WEBHOOK: Starting targeted research for {email} (Trigger: {trigger})")
     
     # We need a user_id context. For webhooks, we might need a system user or 
     # try to find the owner. For now, we'll try to find an owner or use None (system).
@@ -52,10 +55,10 @@ async def run_targeted_research_background(email: str, trigger: str):
         ):
             pass
             
-        print(f"WEBHOOK: Targeted research completed for {email}")
+        logger.info(f"WEBHOOK: Targeted research completed for {email}")
         
     except Exception as e:
-        print(f"WEBHOOK ERROR for {email}: {e}")
+        logger.error(f"WEBHOOK ERROR for {email}: {e}")
 
 @webhooks_router.post("/generic")
 async def generic_webhook(
@@ -282,7 +285,7 @@ async def process_webhook_lead(submission_id, email, linkedin_url, extras, rep_i
             await db.commit()
             
     except Exception as e:
-        print(f"Error processing webhook lead {submission}: {e}")
+        logger.error(f"Error processing webhook lead {email}: {e}")
 
 @webhooks_router.post("/email-received")
 async def email_received_webhook(payload: EmailWebhookPayload, background_tasks: BackgroundTasks):

@@ -2,6 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_history, get_report, get_db, _report_to_dict
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 history_router = APIRouter()
 
@@ -81,7 +84,7 @@ async def read_history(
         total = count_result.scalar()
         
         duration = time.time() - start_time
-        print(f"DEBUG: read_history took {duration:.4f}s")
+        logger.debug(f"read_history took {duration:.4f}s")
         
         history_data = []
         for row in result.all():
@@ -101,10 +104,7 @@ async def read_history(
             
         return {"items": history_data, "total": total}
     except Exception as e:
-        import traceback
-        import logging
-        logging.error(f"Error in read_history: {e}")
-        logging.error(traceback.format_exc())
+        logger.error(f"Error in read_history: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @history_router.get("/history/{report_id}")
@@ -126,5 +126,5 @@ async def read_report_item(report_id: str, db: AsyncSession = Depends(get_db)):
 
     result = _report_to_dict(report, email_fallback=email_fallback)
     duration = time.time() - start_time
-    print(f"DEBUG: read_report_item({report_id}) took {duration:.4f}s")
+    logger.debug(f"read_report_item({report_id}) took {duration:.4f}s")
     return result

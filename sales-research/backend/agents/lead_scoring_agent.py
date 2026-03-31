@@ -147,7 +147,7 @@ async def revalidate_lead_fit_async(lead_data: dict, company_metrics: dict, icp_
         
         # Use provided ICP or fallback to default
         if icp_data:
-             icp_context = f"ICP STRATEGY: {json.dumps(icp_data)}"
+             icp_context = f"ICP STRATEGY: {json.dumps(icp_data)}, series A-D"
         else:
              icp_context = "ICP: B2B SaaS companies, 50-500 employees, series A-D, technology space."
         
@@ -164,12 +164,16 @@ async def revalidate_lead_fit_async(lead_data: dict, company_metrics: dict, icp_
         
         messages = [
             SystemMessage(content="You are an ICP Validation Agent. Your goal is to refine a lead's fit status based on NEWLY confirmed company firmographic data from Apollo/RapidAPI. \n"
-                                  "IMPORTANT: The ICP fields (industry, company_size, revenue, etc.) may be lists of strings. \n"
+                                  "### THE MANDATORY SENIORITY RULE (CRITICAL):\n"
+                                  "A lead is ONLY a fit if they are a **Decision Maker** (Founder, CEO, VP, Director, or Head of Department).\n"
+                                  "**Individual Contributors (ICs) such as SDRs, BDRs, AEs, Analysts, or Senior Specialists without departmental ownership are NOT a fit**, regardless of how well their company matches the ICP.\n"
+                                  "If the 'headline' or 'initial_lead_info' suggests they are an IC, you MUST set `is_fit` to FALSE, even if company metrics match.\n"
+                                  "### FIRMOGRAPHIC MATCHING:\n"
+                                  "The ICP fields (industry, company_size, revenue, etc.) may be lists of strings. \n"
                                   "A match is confirmed if the company's metrics align with ANY of the provided values in those lists. \n"
-                                  "Do not simply discard the 'initial_reasoning' provided in the context. \n"
-                                  "Instead, **MERGE** the discovery insights with the new firmographic facts. \n"
-                                  "A final reasoning should look like: '[Initial discovery context] + [Firmographic confirmation or rejection]'. \n"
-                                  "If the new metrics cause a change in status, explain exactly which metric overrode the initial fit."),
+                                  "### REASONING MERGE:\n"
+                                  "Do not simply discard the 'initial_reasoning' provided. Merge it with new facts.\n"
+                                  "If the lead is disqualified due to seniority, explicitly state: 'Disqualified: Individual Contributor/Non-Decision Maker at a Target Account'."),
             HumanMessage(content=f"RE-VALIDATE THIS LEAD: {json.dumps(context)}")
         ]
         

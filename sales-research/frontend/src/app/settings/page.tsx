@@ -48,8 +48,9 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  saveICP,
-  getICP,
+  savePersonalICP,
+  saveGlobalICP,
+  getPersonalICP,
   getGlobalICP,
   IdealProfileData,
   saveIntegrations,
@@ -204,7 +205,7 @@ export default function SettingsPage() {
           globalSelling,
           competitorsList,
         ] = await Promise.all([
-          getICP(), // Resolved for personal tab
+          getPersonalICP(), // Resolved for personal tab
           getGlobalICP(), // Explicit global for organization tab
           isAdmin ? getIntegrations() : Promise.resolve(null),
           getSellingProfile(),
@@ -328,9 +329,8 @@ export default function SettingsPage() {
         email_config: values.email_config,
         slack_user_id: values.slack_user_id,
       });
-      // Save User ICP Override (Backend handles "if not admin then override" logic for this endpoint?
-      // Actually `saveICP` checks role. If not admin, it saves to user settings. Perfect.)
-      await saveICP({
+      // Save User ICP Override explicitly via the personal endpoint
+      await savePersonalICP({
         industry: values.industry,
         company_size: values.company_size,
         revenue: values.revenue,
@@ -352,8 +352,8 @@ export default function SettingsPage() {
     setSuccess(null);
     setError(null);
     try {
-      // Admin calling saveICP updates Global Settings
-      await saveICP(values);
+      // Admin calling saveGlobalICP explicitly updates Organizational Settings
+      await saveGlobalICP(values);
       setSuccess("Global ICP updated.");
       setTimeout(() => setSuccess(null), 3000);
     } catch (e) {

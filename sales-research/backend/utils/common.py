@@ -1,5 +1,8 @@
 from urllib.parse import urlparse
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 from bs4 import BeautifulSoup
 from langchain_community.tools.tavily_search import TavilySearchResults
 
@@ -24,7 +27,7 @@ def search_web_tavily(query: str):
         results = tavily_tool.invoke({"query": query})
         return results
     except Exception as e:
-        print(f"Error during Tavily search: {e}")
+        logger.info(f"Error during Tavily search: {e}")
         return []
 
 def get_website_content(url: str):
@@ -53,5 +56,5 @@ def get_website_content(url: str):
         
         return text
     except Exception as e:
-        print(f"Error fetching website content: {e}")
+        logger.info(f"Error fetching website content: {e}")
         return f"Error: Could not fetch content from {url}"

@@ -112,6 +112,15 @@ export default function AutopilotPage() {
 
   const handleAddCompetitor = async () => {
     if (!newCompetitorUrl) return;
+    if (competitors.length >= 3) {
+      toast({
+        title: "Limit Reached",
+        description:
+          "Maximum of 3 competitors allowed. Please remove one first.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       await addCompetitor({ linkedin_url: newCompetitorUrl });
       const comps = await getCompetitors();
@@ -157,6 +166,14 @@ export default function AutopilotPage() {
 
   const handleAddKeyword = async () => {
     if (!newKeyword) return;
+    if (keywordRules.length >= 5) {
+      toast({
+        title: "Limit Reached",
+        description: "Maximum of 5 keywords allowed. Please remove one first.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       await addAutopilotRule({ type: "keyword", value: newKeyword });
       setNewKeyword("");
@@ -298,7 +315,9 @@ export default function AutopilotPage() {
               <TabsContent value="linkedin" className="mt-6">
                 <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
                   <CardHeader>
-                    <CardTitle>Keyword Monitoring</CardTitle>
+                    <CardTitle>
+                      Keyword Monitoring ({keywordRules.length}/5)
+                    </CardTitle>
                     <CardDescription>
                       Every day, we'll scan LinkedIn for posts containing these
                       keywords and identify potential leads from the commenters.
@@ -316,9 +335,14 @@ export default function AutopilotPage() {
                           onKeyDown={(e) =>
                             e.key === "Enter" && handleAddKeyword()
                           }
+                          disabled={keywordRules.length >= 5}
                         />
                       </div>
-                      <Button onClick={handleAddKeyword} variant="secondary">
+                      <Button
+                        onClick={handleAddKeyword}
+                        variant="secondary"
+                        disabled={keywordRules.length >= 5}
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         Add
                       </Button>
@@ -390,7 +414,9 @@ export default function AutopilotPage() {
               <TabsContent value="competitors" className="mt-6">
                 <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
                   <CardHeader>
-                    <CardTitle>Competitor Tracking</CardTitle>
+                    <CardTitle>
+                      Competitor Tracking ({competitors.length}/3)
+                    </CardTitle>
                     <CardDescription>
                       We'll monitor these competitor profiles daily for new
                       posts and capture potential leads from the comments.
@@ -408,9 +434,14 @@ export default function AutopilotPage() {
                           onKeyDown={(e) =>
                             e.key === "Enter" && handleAddCompetitor()
                           }
+                          disabled={competitors.length >= 3}
                         />
                       </div>
-                      <Button onClick={handleAddCompetitor} variant="secondary">
+                      <Button
+                        onClick={handleAddCompetitor}
+                        variant="secondary"
+                        disabled={competitors.length >= 3}
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         Add
                       </Button>

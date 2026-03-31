@@ -40,6 +40,8 @@ async def log_activity_and_notify(
 
     if idempotency_key and not activity:
         logger.info(f"DEBUG: Idempotency conflict for key {idempotency_key}. Skipping Slack notification.")
+        # Make sure to close any implicit open transaction before returning
+        await db.commit()
         return
 
     # 1.5 Resolve Rep Name
@@ -119,3 +121,8 @@ async def log_activity_and_notify(
             
             slack_text = f"*{title}*\n{description}" if description else f"*{title}*"
             await send_slack_notification(settings.slack_webhook_url, slack_text, blocks=blocks)
+
+    # SECURE THE TRANSACTION: Clean up any implicitly opened read-transactions
+    # (like from selecting the Profile or UserSettings) to ensure the session 
+    # doesn't leak open locks back to the caller's orchestrator loops.
+    await db.commit()

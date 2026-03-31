@@ -479,10 +479,14 @@ Post Context: {post_context}
 Against this ICP:
 {icp_json}
 
+### MANDATORY SENIORITY RULE:
+A lead is ONLY `is_qualified` if they are a **Decision Maker** (Founder, CEO, VP, Director, or Head of Department).
+**Individuals in practitioner roles (SDRs, Analysts, junior staff) are NOT qualified**, even if they show interest.
+
 Provide your analysis in JSON format:
 {{
     "fit_score": (integer 1-10),
-    "fit_reasoning": "Brief explanation of why this lead is or isn't a good fit based on their comment and name/title context.",
+    "fit_reasoning": "Brief explanation. MUST prioritize Seniority. If IC, state 'IC at Target Account'.",
     "is_qualified": (boolean)
 }}
 """
@@ -490,18 +494,24 @@ Provide your analysis in JSON format:
 PROFILE_CLASSIFIER_PROMPT = """
 You are a Sales Intelligence Expert. analyze the following LinkedIn profile headline to classify the individual based on the provided company context.
 
+### MANDATORY SENIORITY RULE:
+1. **is_fit**: (boolean) ONLY mark as TRUE if they are a **Decision Maker** (Founder, CEO, VP, Director, or Head of Dept). 
+   - **ICs (SDRs, AEs, Analysts) are NOT a fit.**
+2. **is_decision_maker**: (boolean) C-Level, VP, Director, Founder, or Head of Dept.
+
+Determine your classification for:
 Profile Name: {name}
 Headline: {headline}
 
 Company Context: 
 {company_context}
 
-Determine:
-1. Is this person a COMPETITOR? (Works for a company offering similar AI automation/sales solutions, or is a direct rival).
-2. Is this person a POTENTIAL FIT? (Ideally matches the ICP interaction: e.g., Founder, Sales Leader, Operations, etc. who could BUY the solution).
-3. Is this person a DECISION MAKER? (C-Level, VP, Director, Founder, Head of Dept).
-
-    "reasoning": "Brief explanation of your classification."
+Output strictly in JSON:
+{{
+    "is_competitor": boolean,
+    "is_fit": boolean,
+    "is_decision_maker": boolean,
+    "reasoning": "Brief explanation focusing on Seniority first."
 }}
 """
 
@@ -547,12 +557,13 @@ You MUST distinguish if the engagement is a "Sell Signal" or a "Buy Signal":
 
 ### CLASSIFICATION CRITERIA (STRICT):
 1. **is_competitor**: (boolean) Does the profile belong to someone at a rival AI/Automation company?
-2. **is_fit**: (boolean) ONLY mark as TRUE if they are a **High-Priority Target**. 
-   - Criteria: Founders, CEOs, VPs of Sales/Revenue, GTM Leaders at companies with >20 employees OR fast-growing startups.
-   - If they are a generic employee or at a non-target industry, mark as FALSE.
-3. **is_decision_maker**: (boolean) C-Level, VP, Director, Founder, or Head of Department.
+2. **is_fit**: (boolean) ONLY mark as TRUE if they are a **High-Priority Target Account contact**. 
+   - Criteria: Founders, CEOs, VPs of Sales/Revenue, GTM Leaders, or Heads of Ops/Marketing.
+   - **MANDATORY**: If the person is a generic individual contributor (e.g. SDR, BDR, AE, Analyst) or works at a non-target industry, mark as FALSE. We only want decision-makers.
+3. **is_decision_maker**: (boolean) C-Level, VP, Director, Founder, or Head of Department. 
+   - **STRICT RULE**: If they do not have one of these titles (e.g. they are a "Senior Specialist" or "Manager" without departmental ownership), mark as FALSE.
 4. **intent**: (string)
-    - `hand_raiser`: Explicitly asking for price, demo, or more info.
+    - `hand_raiser`: Explicitly asking for price, demo, or more info (e.g., "How do I get this?", "DM me").
     - `prospect_pain`: Practitioner expressing frustration with current tools or manual work.
     - `passive_expert`: Practitioner sharing relevant expertise or frameworks (Authority Signal).
     - `strategic_seller`: Consultant/Competitor trashing keywords or sharing frameworks for self-promotion.

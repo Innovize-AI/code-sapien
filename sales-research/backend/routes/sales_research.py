@@ -182,7 +182,7 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
                  )
                  
                  from services.classification_service import run_classification_and_update
-                 background_tasks.add_task(run_classification_and_update, raw_leads_to_save)
+                 background_tasks.add_task(run_classification_and_update, raw_leads_to_save, user_id=str(current_user.id))
         else:
             leads = find_leads_tavily(input_data, api_key=tavily_key)
         return {"leads": leads}
@@ -231,7 +231,7 @@ async def run_research(
                     yield f"data: {json.dumps({'status': 'Done', 'result': _report_to_dict(existing, email_fallback=email_fallback)})}\n\n"
                     return
 
-            async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email):
+            async for node_name, state_update, current_state in _run_research_gen(linkedin_url, website, options, email, user_id=str(current_user.id)):
                 final_state = current_state
                 message = NODE_STATUS_MAPPING.get(node_name, f"Processing {node_name}...")
                 yield f"data: {json.dumps({'status': message})}\n\n"
@@ -274,7 +274,8 @@ async def run_bulk_research(
                     lead.url, 
                     lead.website, 
                     input_data.options, 
-                    progress_callback=progress_callback
+                    progress_callback=progress_callback,
+                    user_id=str(current_user.id)
                 )
             )
         

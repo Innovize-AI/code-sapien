@@ -39,7 +39,7 @@ class EventStreamManager:
 
 event_manager = EventStreamManager()
 
-async def run_classification_and_update(raw_leads: List[dict]):
+async def run_classification_and_update(raw_leads: List[dict], user_id: str | None = None):
     """
     Background task to classify leads and update DB.
     """
@@ -177,7 +177,7 @@ async def run_classification_and_update(raw_leads: List[dict]):
                 # 1. Batch Upsert Profiles (Clean isolated session)
                 async with SessionLocal() as session:
                     async with session.begin():
-                        icp_data = await get_active_icp(session)
+                        icp_data = await get_active_icp(session, user_id=user_id)
                         await batch_upsert_identified_profiles(session, leads_to_update_batch)
                 
                 logger.info(f"Batch {i//batch_size + 1} - Updated {len(leads_to_update_batch)} profiles")

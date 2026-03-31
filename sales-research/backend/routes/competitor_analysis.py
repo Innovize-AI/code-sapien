@@ -10,7 +10,9 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db, save_competitor_analysis, upsert_identified_profile, get_identified_profiles, batch_upsert_identified_profiles, count_identified_profiles
 from db.database import SessionLocal
+from db.models import Profile
 from utils.activity_helper import log_activity_and_notify
+from dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +272,8 @@ async def sse_classification(request: Request):
 async def discover_leads(
     input_data: CompetitorInput, 
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     """
     Discover leads from competitor posts.
@@ -343,7 +346,7 @@ async def discover_leads(
             
         # 2. Trigger Background Classification
         from services.classification_service import run_classification_and_update
-        background_tasks.add_task(run_classification_and_update, raw_leads_to_save)
+        background_tasks.add_task(run_classification_and_update, raw_leads_to_save, user_id=str(current_user.id))
         
         logger.debug(f"Returning {len(all_leads)} leads immediately to frontend.")
         return {"leads": all_leads}

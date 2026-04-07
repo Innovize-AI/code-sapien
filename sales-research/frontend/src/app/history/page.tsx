@@ -38,6 +38,9 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
 } from "lucide-react";
 import { useBulkAnalysis } from "@/context/bulk-analysis-context";
 import { useAuth } from "@/context/auth-context";
@@ -58,6 +61,7 @@ interface HistoryItem {
   isTemporary?: boolean;
   result?: any;
   currentStep?: string;
+  email_verification_status?: string;
 }
 
 const ProfileAvatar = ({
@@ -103,6 +107,46 @@ export default function HistoryPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const renderEmailVerificationBadge = (status?: string) => {
+    if (!status) return null;
+    const s = status.toLowerCase();
+    switch (s) {
+      case "verified":
+      case "ok":
+      case "valid":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1"
+          >
+            <ShieldCheck className="w-2.5 h-2.5" />
+            Verified
+          </Badge>
+        );
+      case "unverified":
+      case "invalid":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-red-50 text-red-700 border-red-200 flex items-center gap-1"
+          >
+            <ShieldAlert className="w-2.5 h-2.5" />
+            Unverified
+          </Badge>
+        );
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-gray-50 text-gray-600 border-gray-200 flex items-center gap-1"
+          >
+            <ShieldQuestion className="w-2.5 h-2.5" />
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </Badge>
+        );
+    }
+  };
 
   const toggleSort = (column: string) => {
     if (sortBy === column) {
@@ -301,11 +345,14 @@ export default function HistoryPage() {
                               src={item.profile_picture_url}
                               fallbackName={item.fullname}
                             />
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-bold text-sm truncate">
-                                {item.fullname || "Anonymous"}
-                              </span>
-                              <div className="flex items-center gap-2 mt-0.5">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm">
+                                  {item.fullname || "Anonymous"}
+                                </span>
+                                {renderEmailVerificationBadge(item.email_verification_status)}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                 <a
                                   href={item.linkedin_url}
                                   target="_blank"
@@ -313,7 +360,6 @@ export default function HistoryPage() {
                                   className="text-[10px] text-blue-600 hover:underline flex items-center gap-1"
                                 >
                                   LinkedIn{" "}
-                                  <ExternalLink className="h-2.5 w-2.5" />
                                 </a>
                                 {item.website && (
                                   <a
@@ -324,6 +370,21 @@ export default function HistoryPage() {
                                   >
                                     Website <Globe className="h-2.5 w-2.5" />
                                   </a>
+                                )}
+                                {item.email_verification_status && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-[9px] h-4 px-1 flex items-center gap-0.5 border-none ${
+                                      item.email_verification_status === 'verified' ? 'text-emerald-600 bg-emerald-50' : 
+                                      item.email_verification_status === 'invalid' ? 'text-rose-600 bg-rose-50' : 
+                                      'text-amber-600 bg-amber-50'
+                                    }`}
+                                  >
+                                    {item.email_verification_status === 'verified' && <ShieldCheck className="h-2.5 w-2.5" />}
+                                    {item.email_verification_status === 'invalid' && <ShieldAlert className="h-2.5 w-2.5" />}
+                                    {['catchall', 'unknown', 'disposable'].includes(item.email_verification_status) && <ShieldQuestion className="h-2.5 w-2.5" />}
+                                    {item.email_verification_status.charAt(0).toUpperCase() + item.email_verification_status.slice(1)}
+                                  </Badge>
                                 )}
                               </div>
                             </div>

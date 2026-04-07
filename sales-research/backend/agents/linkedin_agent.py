@@ -385,11 +385,14 @@ async def get_linkedin_company_data(state: AgentState):
     lead_url = state.get("linkedin_url") or state.get("user_linkedin_url")
     company_url = state.get("lead_company_linkedin_url")
     
+    million_verifier = state.get("million_verifier", False)
+
     # Use the centralized waterfall helper
     enriched_data = await enrich_company_waterfall(
         person_url=lead_url, 
         company_url=company_url,
-        existing_stats=state.get("company_stats")
+        existing_stats=state.get("company_stats"),
+        million_verifier_enabled=million_verifier
     )
     
     if not enriched_data:
@@ -410,7 +413,12 @@ async def get_linkedin_company_data(state: AgentState):
 
     }
 
-async def enrich_company_waterfall(person_url: str = None, company_url: str = None, existing_stats: dict = None):
+async def enrich_company_waterfall(
+    person_url: str = None, 
+    company_url: str = None, 
+    existing_stats: dict = None,
+    million_verifier_enabled: bool = False
+):
     """
     Centralized enrichment coordinator:
     1. Apollo Match (via person_url)
@@ -424,7 +432,10 @@ async def enrich_company_waterfall(person_url: str = None, company_url: str = No
     # 1. Primary: Apollo match by person profile
     if person_url:
         logger.debug(f"CENTRAL WATERFALL: Trialing Apollo for {person_url}")
-        apollo_data = await get_apollo_company_data(person_url)
+        apollo_data = await get_apollo_company_data(
+            person_url,
+            million_verifier_enabled=million_verifier_enabled
+        )
 
     # 2. Check if we need LinkedIn fallback
     # Skip if Apollo was successful AND provided core stats
@@ -492,6 +503,7 @@ async def enrich_company_waterfall(person_url: str = None, company_url: str = No
         "hiring": hiring[:5],
         "website": stats.get("website"),
         "person_email": apollo_data.get("person_email"),
+        "email_verification_status": apollo_data.get("email_verification_status"),
         "linkedin_url": apollo_data.get("company_linkedin_url"),
         "domain": apollo_data.get("domain") or (stats.get("website").replace("http://", "").replace("https://", "").split("/")[0] if stats.get("website") else None),
 
@@ -544,7 +556,10 @@ def linkedin_profile_analyzer(state: AgentState):
         logger.error(f"Error in linkedin_profile_analyzer: {e}")
         return {"user_profile_analysis": "Error generating structured analysis."}
 
-async def get_apollo_company_data(linkedin_url: str):
+async def get_apollo_company_data(
+    linkedin_url: str,
+    million_verifier_enabled: bool = False
+):
     """
     Enrichment using Apollo People Match API.
     Extracts company stats, technologies, funding events,
@@ -620,7 +635,7 @@ async def get_apollo_company_data(linkedin_url: str):
                     "24_month": org.get("organization_headcount_twenty_four_month_growth"),
                 }
 
-                return {
+                result = {
                     # Core stats
                     "revenue_estimate": rev_str,
                     "employee_count": org.get("estimated_num_employees") or org.get("num_employees"),
@@ -651,6 +666,19 @@ async def get_apollo_company_data(linkedin_url: str):
                     # Lead person_email + context
                     "person_email": person.get("email"),
                 }
+
+                # --- Million Verifier Integration ---
+                if result.get("person_email") and million_verifier_enabled:
+                    from utils.email_verifier import verify_email
+                    api_key = os.getenv("MILLION_VERIFIER_API_KEY")
+                    logger.info(f"MILLION VERIFIER: Verifying email {result['person_email']}...")
+                    verification_status = await verify_email(result["person_email"], api_key)
+                    print(f"Verification Status: {verification_status}")
+                    result["email_verification_status"] = verification_status
+                else:
+                    result["email_verification_status"] = None
+
+                return result
             return {}
     except Exception as e:
         logger.error(f"Error calling Apollo API: {e}")

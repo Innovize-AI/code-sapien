@@ -122,6 +122,7 @@ class OrganizationSettings(Base):
     # Integration Keys
     tavily_api_key = Column(String, nullable=True)
     apollo_api_key = Column(String, nullable=True)
+    million_verifier_api_key = Column(String, nullable=True)
 
     # Lead Discovery Autopilot Configs
     discovery_keywords = Column(Text, nullable=True)    # JSON list of keywords
@@ -201,6 +202,7 @@ class IdentifiedProfile(Base):
     normalized_linkedin_url = Column(Text, nullable=True, index=True)
     website = Column(Text, nullable=True) 
     email = Column(String, nullable=True)
+    email_verification_status = Column(String, nullable=True)
     created_by_id = Column(UUID(as_uuid=True), nullable=True)
     
     # Classification

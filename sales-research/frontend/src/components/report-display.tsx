@@ -14,6 +14,7 @@ import {
   Calendar,
   ShieldCheck,
   ShieldAlert,
+  ShieldQuestion,
   ExternalLink,
   ChevronRight,
   LayoutDashboard,
@@ -74,6 +75,8 @@ import { ensureProtocol } from "@/lib/utils";
 interface ReportDisplayProps {
   data: {
     fullname?: string;
+    email?: string;
+    email_verification_status?: string;
     profile_picture_url?: string;
     linkedin_url?: string;
     website?: string;
@@ -1752,7 +1755,32 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                     <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all" />
                   </a>
                 )}
-                {data.email_id && (
+                {data.email && (
+                  <div className="flex items-center gap-2 text-zinc-400 group">
+                    <div className="p-2 rounded-lg bg-zinc-800 group-hover:bg-primary/20 group-hover:text-primary transition-all">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold tracking-tight text-white/90">
+                        {data.email}
+                      </span>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-[9px] h-4 px-1.5 flex items-center gap-1 border-none mt-0.5 w-fit ${
+                          data.email_verification_status === 'verified' ? 'text-emerald-400 bg-emerald-500/10' : 
+                          data.email_verification_status === 'invalid' ? 'text-rose-400 bg-rose-500/10' : 
+                          'text-amber-400 bg-amber-500/10'
+                        }`}
+                      >
+                        {data.email_verification_status === 'verified' && <ShieldCheck className="h-2.5 w-2.5" />}
+                        {data.email_verification_status === 'invalid' && <ShieldAlert className="h-2.5 w-2.5" />}
+                        {['catchall', 'unknown', 'disposable'].includes(data.email_verification_status || '') && <ShieldQuestion className="h-2.5 w-2.5" />}
+                        <span className="uppercase tracking-widest">{data.email_verification_status || 'unknown'}</span>
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+                {data.email_id && !data.email && (
                   <a
                     href={`mailto:${data.email_id}`}
                     className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group"

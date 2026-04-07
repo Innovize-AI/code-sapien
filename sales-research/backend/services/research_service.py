@@ -79,7 +79,9 @@ async def _get_organization_settings(user_id: str = None) -> dict:
             "selling_profile": selling_profile,
             "user_linkedin_url": user_linkedin,
             "company_linkedin_url": company_linkedin,
-            "email_config": email_config
+            "email_config": email_config,
+            "million_verifier_api_key": global_settings.million_verifier_api_key if global_settings else None,
+            "integrations_config": global_settings.integrations_config if global_settings else None
         }
 
 def _safe_serialize(val):
@@ -222,6 +224,31 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
                 update_values["website"] = saved_report.website
             if saved_report.company_id:
                 update_values["company_id"] = saved_report.company_id
+            
+            # Manual Research Sync: Always update email and verification if found in the graph
+            email_id = final_state.get("email_id")
+            email_status = final_state.get("email_verification_status")
+            
+            if email_id:
+                update_values["email"] = email_id
+            if email_status:
+                update_values["email_verification_status"] = email_status
+            
+            # Attribute the lead if not already attributed
+            if user_id:
+                try:
+                    from sqlalchemy import and_, or_
+                    # Only update if current created_by_id is null
+                    await db.execute(
+                        update(IdentifiedProfile)
+                        .where(and_(
+                            IdentifiedProfile.linkedin_url == saved_report.linkedin_url,
+                            or_(IdentifiedProfile.created_by_id == None, IdentifiedProfile.created_by_id == user_id)
+                        ))
+                        .values(created_by_id=uuid.UUID(user_id) if isinstance(user_id, str) else user_id)
+                    )
+                except Exception as e:
+                    logger.error(f"Error attributing profile to user {user_id}: {e}")
                 
             if update_values:
                 await db.execute(
@@ -297,6 +324,11 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     thread = {"configurable": {"thread_id": thread_id}}
     
     org_settings = await _get_organization_settings(user_id=user_id)
+    
+    # Inject Million Verifier API Key into environment from DB
+    if org_settings.get("million_verifier_api_key"):
+        os.environ["MILLION_VERIFIER_API_KEY"] = org_settings["million_verifier_api_key"]
+        
     ideal_profile = org_settings["icp"]
 
     if options is None:
@@ -412,6 +444,13 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
             ]
         )
 
+    million_verifier_enabled = False
+    try:
+        int_config = json.loads(org_settings.get("integrations_config") or "{}")
+        million_verifier_enabled = int_config.get("million_verifier", False)
+    except:
+        million_verifier_enabled = False
+
     initial_state = {
         "email_id": email,
         "linkedin_url": linkedin_url or existing_state.get("linkedin_url"),
@@ -424,6 +463,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "lead_company_linkedin_url": existing_state.get("lead_company_linkedin_url", ""),
         "input_lead_data": options,
         "extra_research_context": options.extra_metadata if options else existing_state.get("extra_metadata"),
+        "million_verifier_enabled": million_verifier_enabled,
         
         "user_profile_details": existing_state.get("user_profile_details", {}),
         "scraped_website_content": existing_state.get("scraped_website_content", ""),

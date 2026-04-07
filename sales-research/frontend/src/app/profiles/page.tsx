@@ -35,6 +35,9 @@ import {
   ArrowDown,
   Zap,
   TrendingUp,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
 } from "lucide-react";
 import {
   Tooltip,
@@ -99,6 +102,47 @@ export default function ProfilesPage() {
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
+
+  const renderEmailVerificationBadge = (status?: string) => {
+    if (!status) return null;
+
+    const s = status.toLowerCase();
+    switch (s) {
+      case "verified":
+      case "ok":
+      case "valid":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-5 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1"
+          >
+            <ShieldCheck className="w-2.5 h-2.5" />
+            Verified
+          </Badge>
+        );
+      case "unverified":
+      case "invalid":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-5 px-1.5 bg-red-50 text-red-700 border-red-200 flex items-center gap-1"
+          >
+            <ShieldAlert className="w-2.5 h-2.5" />
+            Unverified
+          </Badge>
+        );
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-5 px-1.5 bg-gray-50 text-gray-600 border-gray-200 flex items-center gap-1"
+          >
+            <ShieldQuestion className="w-2.5 h-2.5" />
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </Badge>
+        );
+    }
+  };
 
   // Bulk Analysis Context
   const {
@@ -453,6 +497,12 @@ export default function ProfilesPage() {
                           <ExternalLink className="w-2 h-2" />
                         </a>
                       )}
+                      {profile.email && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-muted-foreground">{profile.email}</span>
+                          {renderEmailVerificationBadge(profile.email_verification_status)}
+                        </div>
+                      )}
                     </div>
                     {profile.headline && (
                       <p className="text-xs text-muted-foreground mt-1 text-ellipsis overflow-hidden line-clamp-2">
@@ -670,8 +720,8 @@ export default function ProfilesPage() {
                           className="w-80 p-0 shadow-xl border-primary/20 overflow-hidden"
                         >
                           <div className="p-3 bg-muted/30 border-b border-primary/10 flex items-center justify-between">
-                            <span className="font-bold text-xs">
-                              All Touchpoints
+                            <span className="font-bold text-xs uppercase tracking-tight">
+                              All Discoveries
                             </span>
                             <Badge variant="outline" className="text-[10px]">
                               {getTouchpointStats(profile).totalCount} Total
@@ -994,9 +1044,12 @@ export default function ProfilesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col max-w-[300px]">
-                      <span className="font-bold truncate">
-                        {profile.name || "Anonymous"}
-                      </span>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold truncate">
+                          {profile.name || "Anonymous"}
+                        </span>
+                        {renderEmailVerificationBadge(profile.email_verification_status)}
+                      </div>
                       <div className="flex flex-wrap items-center gap-2 mt-0.5">
                         <a
                           href={profile.linkedin_url}
@@ -1015,6 +1068,12 @@ export default function ProfilesPage() {
                           >
                             Website <Globe className="w-2.5 h-2.5" />
                           </a>
+                        )}
+                        {profile.email && (
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            {profile.email}
+                            {renderEmailVerificationBadge(profile.email_verification_status)}
+                          </span>
                         )}
                       </div>
                       {profile.headline && (
@@ -1185,10 +1244,7 @@ export default function ProfilesPage() {
                                 <span className="font-bold text-xs uppercase tracking-tight">
                                   All Discoveries
                                 </span>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] bg-white"
-                                >
+                                <Badge variant="outline" className="text-[10px] bg-white">
                                   {getTouchpointStats(profile).totalCount} Total
                                 </Badge>
                               </div>

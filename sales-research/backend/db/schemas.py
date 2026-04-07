@@ -132,6 +132,9 @@ class IntegrationSettings(BaseModel):
     hubspot_access_token: Optional[str] = None
     hubspot_sync_enabled: bool = False
     
+    million_verifier_api_key: Optional[str] = None
+    million_verifier: bool = False
+    
     # Discovery Configs
     discovery_keywords: Optional[str] = None
     apollo_search_config: Optional[str] = None
@@ -151,9 +154,9 @@ class OrganizationSettingsBase(BaseModel):
     
     hubspot_access_token: Optional[str] = None
     hubspot_sync_enabled: Optional[bool] = False
-
-    crm_config: Optional[str] = None
+    million_verifier_api_key: Optional[str] = None
     integrations_config: Optional[str] = None
+    crm_config: Optional[str] = None
     onboarding_complete: Optional[int] = 0
     
     discovery_keywords: Optional[str] = None
@@ -194,6 +197,7 @@ class IdentifiedProfileBase(BaseModel):
     linkedin_url: str
     website: Optional[str] = None
     email: Optional[str] = None
+    email_verification_status: Optional[str] = None
     
     # Classification
     is_fit: bool = False

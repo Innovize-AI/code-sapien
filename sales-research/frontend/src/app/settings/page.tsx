@@ -111,6 +111,10 @@ const keysFormSchema = z.object({
     .optional()
     .or(z.literal("")),
   slack_user_id: z.string().optional(),
+  million_verifier_api_key: z.string().optional(),
+  million_verifier_enabled: z.boolean().optional(),
+  hubspot_access_token: z.string().optional(),
+  hubspot_sync_enabled: z.boolean().optional(),
 });
 
 const sellingProfileSchema = z.object({
@@ -248,9 +252,9 @@ export default function SettingsPage() {
               ? resolvedIcp.job_title
               : resolvedIcp.job_title
                 ? (resolvedIcp.job_title as string)
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
                 : [],
             value_proposition: resolvedIcp.value_proposition || "",
           };
@@ -273,9 +277,9 @@ export default function SettingsPage() {
               ? globalIcp.job_title
               : globalIcp.job_title
                 ? (globalIcp.job_title as string)
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
                 : [],
             value_proposition: globalIcp.value_proposition || "",
           };
@@ -292,6 +296,10 @@ export default function SettingsPage() {
             email_config: globalKeys.email_config || "",
             slack_webhook_url: globalKeys.slack_webhook_url || "",
             slack_user_id: globalKeys.slack_user_id || "",
+            million_verifier_api_key: globalKeys.million_verifier_api_key || "",
+            million_verifier_enabled: !!globalKeys.million_verifier_enabled,
+            hubspot_access_token: globalKeys.hubspot_access_token || "",
+            hubspot_sync_enabled: !!globalKeys.hubspot_sync_enabled,
           };
           globalKeysForm.reset(sanitizedKeys);
         }
@@ -1093,7 +1101,7 @@ export default function SettingsPage() {
           {/* Global Keys */}
           <Card>
             <CardHeader>
-              <CardTitle>API Integrations</CardTitle>
+              <CardTitle>Core API Keys</CardTitle>
               <CardDescription>
                 Organization-wide keys for data providers.
               </CardDescription>
@@ -1111,6 +1119,29 @@ export default function SettingsPage() {
                       <FormItem>
                         <div className="flex items-center justify-between">
                           <FormLabel>Tavily API Key</FormLabel>
+                          {!isAdmin && (
+                            <Badge variant="outline" className="text-xs h-5">
+                              <Lock className="w-2 h-2 mr-1" /> Admin Only
+                            </Badge>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            {...field}
+                            disabled={!isAdmin}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={globalKeysForm.control}
+                    name="apollo_api_key"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Apollo API Key</FormLabel>
                           {!isAdmin && (
                             <Badge variant="outline" className="text-xs h-5">
                               <Lock className="w-2 h-2 mr-1" /> Admin Only

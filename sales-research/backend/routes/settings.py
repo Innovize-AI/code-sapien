@@ -182,13 +182,20 @@ async def get_integrations(
     db: AsyncSession = Depends(get_db),
     admin_user: Profile = Depends(require_admin)
 ):
-    # ... (existing admin logic)
     result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
+    settings = result.scalar_one_or_none()
     
     if not settings:
         return IntegrationSettings()
     
+    # Parse integrations_config JSON
+    int_config = {}
+    if settings.integrations_config:
+        try:
+            int_config = json.loads(settings.integrations_config)
+        except:
+            int_config = {}
+
     return IntegrationSettings(
         tavily_api_key=settings.tavily_api_key,
         apollo_api_key=settings.apollo_api_key,
@@ -203,6 +210,8 @@ async def get_integrations(
         apollo_search_config=settings.apollo_search_config,
         hubspot_access_token=settings.hubspot_access_token,
         hubspot_sync_enabled=settings.hubspot_sync_enabled,
+        million_verifier_api_key=settings.million_verifier_api_key,
+        million_verifier=int_config.get("million_verifier", False),
     )
 
 
@@ -213,7 +222,7 @@ async def save_integrations(
     admin_user: Profile = Depends(require_admin)
 ):
     result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
+    settings = result.scalar_one_or_none()
     
     if settings:
         settings.tavily_api_key = data.tavily_api_key
@@ -229,12 +238,24 @@ async def save_integrations(
         settings.apollo_search_config = data.apollo_search_config
         settings.hubspot_access_token = data.hubspot_access_token
         settings.hubspot_sync_enabled = data.hubspot_sync_enabled
+        settings.million_verifier_api_key = data.million_verifier_api_key
+        
+        # Update JSON config for million_verifier
+        try:
+            int_config = json.loads(settings.integrations_config or "{}")
+        except:
+            int_config = {}
+        
+        # Pop the legacy key if it exists
+        int_config.pop("million_verifier_enabled", None)
+        int_config["million_verifier"] = data.million_verifier
+        settings.integrations_config = json.dumps(int_config)
     else:
         settings = OrganizationSettings(
             tavily_api_key=data.tavily_api_key, 
             apollo_api_key=data.apollo_api_key,
             email_config=data.email_config,
-            integrations_config=data.integrations_config,
+            integrations_config=json.dumps({"million_verifier": data.million_verifier}),
             kit_api_key=data.kit_api_key,
             kit_api_secret=data.kit_api_secret,
             user_linkedin_url=data.user_linkedin_url,
@@ -244,6 +265,7 @@ async def save_integrations(
             apollo_search_config=data.apollo_search_config,
             hubspot_access_token=data.hubspot_access_token,
             hubspot_sync_enabled=data.hubspot_sync_enabled,
+            million_verifier_api_key=data.million_verifier_api_key,
         )
 
         db.add(settings)

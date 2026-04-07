@@ -341,6 +341,8 @@ export interface IntegrationSettings {
     apollo_search_config?: string;
     hubspot_access_token?: string;
     hubspot_sync_enabled?: boolean;
+    million_verifier_api_key?: string;
+    million_verifier_enabled?: boolean;
 }
 
 
@@ -501,6 +503,8 @@ export interface IdentifiedProfile {
     headline?: string;
     linkedin_url: string;
     website?: string;
+    email?: string;
+    email_verification_status?: string;
     company_id?: string;
 
     // Classification

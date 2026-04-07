@@ -96,15 +96,22 @@ async def check_existing_reports(
             
         key = linkedin_url or email
         if found_report and key:
-             # Fallback email from IdentifiedProfile if missing in report
-             email_fallback = None
-             if not found_report.email_id and found_report.linkedin_url:
-                 from db.models import IdentifiedProfile
-                 stmt_prof = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == found_report.linkedin_url)
-                 res_prof = await db.execute(stmt_prof)
-                 email_fallback = res_prof.scalar_one_or_none()
+            # Fallback email from IdentifiedProfile if missing in report
+            email_fallback = None
+            verification_status = None
+            if found_report.linkedin_url:
+                from db.models import IdentifiedProfile
+                stmt_prof = select(IdentifiedProfile.email, IdentifiedProfile.email_verification_status).where(IdentifiedProfile.linkedin_url == found_report.linkedin_url)
+                res_prof = await db.execute(stmt_prof)
+                profile_data = res_prof.first()
+                if profile_data:
+                    email_fallback = profile_data[0]
+                    verification_status = profile_data[1]
+                    
+            # Attach transiently for _report_to_dict
+            setattr(found_report, "email_verification_status", verification_status)
 
-             results[key] = {
+            results[key] = {
                 "exists": True,
                 "report_id": str(found_report.id),
                 "data": _report_to_dict(found_report, email_fallback=email_fallback)

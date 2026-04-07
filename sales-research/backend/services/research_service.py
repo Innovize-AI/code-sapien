@@ -447,7 +447,12 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     million_verifier_enabled = False
     try:
         int_config = json.loads(org_settings.get("integrations_config") or "{}")
-        million_verifier_enabled = int_config.get("million_verifier", False)
+        # Support both flat and nested structure during transition
+        mv_config = int_config.get("million_verifier", False)
+        if isinstance(mv_config, dict):
+            million_verifier_enabled = mv_config.get("enabled", False)
+        else:
+            million_verifier_enabled = bool(mv_config)
     except:
         million_verifier_enabled = False
 

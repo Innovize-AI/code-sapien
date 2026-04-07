@@ -385,14 +385,14 @@ async def get_linkedin_company_data(state: AgentState):
     lead_url = state.get("linkedin_url") or state.get("user_linkedin_url")
     company_url = state.get("lead_company_linkedin_url")
     
-    million_verifier = state.get("million_verifier", False)
+    million_verifier_enabled = state.get("million_verifier_enabled", False)
 
     # Use the centralized waterfall helper
     enriched_data = await enrich_company_waterfall(
         person_url=lead_url, 
         company_url=company_url,
         existing_stats=state.get("company_stats"),
-        million_verifier_enabled=million_verifier
+        million_verifier_enabled=million_verifier_enabled
     )
     
     if not enriched_data:

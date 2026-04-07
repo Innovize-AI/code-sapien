@@ -207,8 +207,14 @@ export default function IntegrationsPage() {
       const updated = {
         ...settings,
         integrations_config: JSON.stringify(newConfigs),
-        million_verifier_enabled: id === "million_verifier" ? newConfigs[id].enabled : settings.million_verifier_enabled,
-        hubspot_sync_enabled: id === "hubspot" ? newConfigs[id].enabled : settings.hubspot_sync_enabled,
+        million_verifier_enabled:
+          id === "million_verifier"
+            ? newConfigs[id].enabled
+            : settings.million_verifier_enabled,
+        hubspot_sync_enabled:
+          id === "hubspot"
+            ? newConfigs[id].enabled
+            : settings.hubspot_sync_enabled,
       };
       await saveIntegrations(updated);
       setSettings(updated);
@@ -624,7 +630,9 @@ export default function IntegrationsPage() {
                               type="password"
                               placeholder="mv-..."
                               className="text-xs h-9 bg-background/50 hover:bg-background border-border/40 focus:border-primary/30 focus:ring-primary/5 transition-all duration-200"
-                              defaultValue={settings?.million_verifier_api_key || ""}
+                              defaultValue={
+                                settings?.million_verifier_api_key || ""
+                              }
                               onBlur={(e) => {
                                 if (settings) {
                                   const updated = {
@@ -636,14 +644,16 @@ export default function IntegrationsPage() {
                                     setSettings(updated);
                                     toast({
                                       title: "Configuration Updated",
-                                      description: "Million Verifier API key saved.",
+                                      description:
+                                        "Million Verifier API key saved.",
                                     });
                                   });
                                 }
                               }}
                             />
                             <p className="text-[10px] text-muted-foreground leading-tight">
-                              Your Million Verifier API Key for email validation.
+                              Your Million Verifier API Key for email
+                              validation.
                             </p>
                           </div>
                         </div>

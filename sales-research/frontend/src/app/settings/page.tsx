@@ -252,9 +252,9 @@ export default function SettingsPage() {
               ? resolvedIcp.job_title
               : resolvedIcp.job_title
                 ? (resolvedIcp.job_title as string)
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean)
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
                 : [],
             value_proposition: resolvedIcp.value_proposition || "",
           };
@@ -277,9 +277,9 @@ export default function SettingsPage() {
               ? globalIcp.job_title
               : globalIcp.job_title
                 ? (globalIcp.job_title as string)
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean)
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
                 : [],
             value_proposition: globalIcp.value_proposition || "",
           };

@@ -60,7 +60,12 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                 # Extract Million Verifier toggle from JSON config
                 try:
                     int_config = json.loads(settings.integrations_config or "{}")
-                    million_verifier_enabled = int_config.get("million_verifier", False)
+                    # Support both flat and nested structure
+                    mv_config = int_config.get("million_verifier", False)
+                    if isinstance(mv_config, dict):
+                        million_verifier_enabled = mv_config.get("enabled", False)
+                    else:
+                        million_verifier_enabled = bool(mv_config)
                 except:
                     million_verifier_enabled = False
                 if settings.million_verifier_api_key:

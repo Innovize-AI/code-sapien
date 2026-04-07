@@ -196,6 +196,13 @@ async def get_integrations(
         except:
             int_config = {}
 
+    # Parse million_verifier from config safely (handle both bool and {"enabled": bool})
+    mv_config = int_config.get("million_verifier", False)
+    if isinstance(mv_config, dict):
+        mv_enabled = mv_config.get("enabled", False)
+    else:
+        mv_enabled = bool(mv_config)
+
     return IntegrationSettings(
         tavily_api_key=settings.tavily_api_key,
         apollo_api_key=settings.apollo_api_key,
@@ -211,7 +218,7 @@ async def get_integrations(
         hubspot_access_token=settings.hubspot_access_token,
         hubspot_sync_enabled=settings.hubspot_sync_enabled,
         million_verifier_api_key=settings.million_verifier_api_key,
-        million_verifier=int_config.get("million_verifier", False),
+        million_verifier_enabled=mv_enabled,
     )
 
 
@@ -246,16 +253,17 @@ async def save_integrations(
         except:
             int_config = {}
         
-        # Pop the legacy key if it exists
+        # Pop legacy key if it exists
         int_config.pop("million_verifier_enabled", None)
-        int_config["million_verifier"] = data.million_verifier
+        # Store as dictionary for backward compatibility with nested frontend logic
+        int_config["million_verifier"] = {"enabled": data.million_verifier_enabled}
         settings.integrations_config = json.dumps(int_config)
     else:
         settings = OrganizationSettings(
             tavily_api_key=data.tavily_api_key, 
             apollo_api_key=data.apollo_api_key,
             email_config=data.email_config,
-            integrations_config=json.dumps({"million_verifier": data.million_verifier}),
+            integrations_config=json.dumps({"million_verifier": {"enabled": data.million_verifier_enabled}}),
             kit_api_key=data.kit_api_key,
             kit_api_secret=data.kit_api_secret,
             user_linkedin_url=data.user_linkedin_url,

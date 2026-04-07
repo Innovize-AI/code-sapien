@@ -133,7 +133,7 @@ class IntegrationSettings(BaseModel):
     hubspot_sync_enabled: bool = False
     
     million_verifier_api_key: Optional[str] = None
-    million_verifier: bool = False
+    million_verifier_enabled: bool = False
     
     # Discovery Configs
     discovery_keywords: Optional[str] = None

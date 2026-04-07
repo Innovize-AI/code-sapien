@@ -44,10 +44,29 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
     Background task to classify leads and update DB.
     """
     from utils.url_normalize import normalize_linkedin_url
+    import os
+    from db.models import OrganizationSettings
     
     try:
         logger.info(f"Background Task Started for {len(raw_leads)} leads")
-        
+
+        # 0. Fetch Million Verifier Settings
+        million_verifier_enabled = False
+        async with SessionLocal() as session:
+            stmt = select(OrganizationSettings).limit(1)
+            result = await session.execute(stmt)
+            settings = result.scalar_one_or_none()
+            if settings:
+                # Extract Million Verifier toggle from JSON config
+                try:
+                    int_config = json.loads(settings.integrations_config or "{}")
+                    million_verifier_enabled = int_config.get("million_verifier", False)
+                except:
+                    million_verifier_enabled = False
+                if settings.million_verifier_api_key:
+                    os.environ["MILLION_VERIFIER_API_KEY"] = settings.million_verifier_api_key
+                    logger.debug("Million Verifier API Key injected from DB")
+
         # 1. Prepare unique profiles for batch classification
         unique_profiles_map = {}
         for lead in raw_leads:
@@ -189,7 +208,7 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                         continue
 
                     # Define High Intent and Friction (Decision maker filter applied later)
-                    has_high_intent = lu.get("intent") in ["prospect_pain", "pain_point"]
+                    has_high_intent = lu.get("intent") in ["prospect_pain", "pain_point", "demo_interest"]
                     has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
                     
                     # Logic for determining if we should even bother enriching/notifying (Apollo Costs)
@@ -200,7 +219,10 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                         # Apollo Enrichment (External Network Call - No Session Open)
                         try:
                             logger.info(f"Enriching priority lead {lu.get('name')} via Apollo...")
-                            enriched = await enrich_company_waterfall(person_url=lu.get("linkedin_url"))
+                            enriched = await enrich_company_waterfall(
+                                person_url=lu.get("linkedin_url"),
+                                million_verifier_enabled=million_verifier_enabled
+                            )
                             if enriched:
                                 # 3. Save Enrichment (Clean isolated sub-session)
                                 async with SessionLocal() as session:
@@ -208,14 +230,33 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                                         # Create a mutable copy for upsert_company and extract person_email
                                         company_data_for_upsert = enriched.copy()
                                         person_email = company_data_for_upsert.pop("person_email", None)
+                                        email_status = company_data_for_upsert.pop("email_verification_status", None)
                                         
                                         # Enrich the lead with personal email if found
                                         if person_email:
                                             lu["email"] = person_email
                                         
+                                        if email_status:
+                                            lu["email_verification_status"] = email_status
+                                        
+                                        # PERSIST to IdentifiedProfile
+                                        profile_stmt = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url == lu.get("linkedin_url"))
+                                        profile_res = await session.execute(profile_stmt)
+                                        db_profile = profile_res.scalar_one_or_none()
+                                        
+                                        if db_profile:
+                                            if person_email:
+                                                db_profile.email = person_email
+                                            if email_status:
+                                                db_profile.email_verification_status = email_status
+                                            logger.info(f"Updated profile {db_profile.name} with email: {person_email} (Status: {email_status})")
+
+                                        # Re-define update_vals for company upsert
                                         update_vals = {}
                                         if person_email:
                                             update_vals["email"] = person_email
+                                        if email_status:
+                                            update_vals["email_verification_status"] = email_status
 
                                         # Guard: Only upsert company if we have a valid identifier (LinkedIn URL or Domain)
                                         if enriched.get("linkedin_url") or enriched.get("domain"):

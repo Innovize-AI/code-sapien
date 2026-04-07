@@ -3,11 +3,13 @@ import logging
 from fastapi import APIRouter, Request, BackgroundTasks, Form, Depends
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
+import datetime
 from sqlalchemy import select
 from db.database import get_db
-from db.models import UserSettings
+from db.models import UserSettings, Activity
+from utils.url_normalize import normalize_linkedin_url
 from services.research_service import run_single_research
-import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +57,9 @@ async def handle_slack_interactions(
 
         if action_id == "analyze_lead" and linkedin_url:
             # Normalize URL for consistent locking
-            from utils.url_normalize import normalize_linkedin_url
             norm_url = normalize_linkedin_url(linkedin_url)
             
             # Check for existing lock to provide immediate feedback
-            from db.models import Activity
-            from sqlalchemy import select
-            import datetime
-            
             lock_key = f"research_lock_{norm_url}"
             lock_check = await db.execute(select(Activity).where(Activity.idempotency_key == lock_key))
             existing_lock = lock_check.scalars().first()

@@ -132,7 +132,7 @@ class KnowledgeService:
         # 1. Auto-classify if metadata/namespace is missing or enrichment needed
         if namespace is None or metadata is None:
             doc_meta = await document_classifier.classify_document(content, os.path.basename(file_path))
-            logger.info("doc_meta", doc_meta)
+            logger.info(f"doc_meta: {doc_meta}")
             if namespace is None:
                 namespace = doc_meta.suggested_namespace
             if metadata is None:

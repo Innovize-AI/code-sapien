@@ -59,47 +59,57 @@ async def upsert_company(
     normalized_linkedin_url = normalize_linkedin_url(linkedin_url) if linkedin_url else None
     normalized_domain = domain.lower().strip() if domain else None
 
-    # Prepare data for upsert
-    insert_data = {
+    # Try to find existing company by LinkedIn URL first
+    company = None
+    if normalized_linkedin_url:
+        result = await db.execute(select(Company).where(Company.linkedin_url == normalized_linkedin_url))
+        company = result.scalar_one_or_none()
+    
+    # If not found, try by domain
+    if not company and normalized_domain:
+        result = await db.execute(select(Company).where(Company.domain == normalized_domain))
+        company = result.scalar_one_or_none()
+
+    # Prepare data for update/create
+    relevant_data = {
         **company_data,
-        "linkedin_url": normalized_linkedin_url,
-        "domain": normalized_domain,
         "updated_at": datetime.datetime.now(datetime.timezone.utc)
     }
     
+    # Ensure ID and created_at are never overwritten
+    relevant_data.pop("id", None)
+    relevant_data.pop("created_at", None)
+    
+    # Explicitly set normalized values if they were provided
+    if normalized_linkedin_url:
+        relevant_data["linkedin_url"] = normalized_linkedin_url
+    if normalized_domain:
+        relevant_data["domain"] = normalized_domain
+
     # EXPLICIT GUARD: Never save prospect email to company table
-    insert_data.pop("email", None)
-    insert_data.pop("person_email", None)
+    relevant_data.pop("email", None)
+    relevant_data.pop("person_email", None)
+
+    # Handle dictionary/list fields for Text columns (JSON storage)
+    for key, value in relevant_data.items():
+        if isinstance(value, (dict, list)):
+            relevant_data[key] = json.dumps(value)
 
     # Filter to only valid columns
     valid_columns = Company.__table__.columns.keys()
-    insert_data = {k: v for k, v in insert_data.items() if k in valid_columns}
-    
-    # Build conflict target
-    if normalized_linkedin_url:
-        conflict_target = [Company.linkedin_url]
-    elif normalized_domain:
-        conflict_target = [Company.domain]
+    final_data = {k: v for k, v in relevant_data.items() if k in valid_columns}
+
+    if company:
+        # Update existing
+        for key, value in final_data.items():
+            setattr(company, key, value)
     else:
-        raise ValueError("Cannot upsert company without a unique identifier (linkedin_url or domain).")
-
-    # Handle dictionary/list fields for Text columns (JSON storage)
-    for key, value in insert_data.items():
-        if isinstance(value, (dict, list)):
-            insert_data[key] = json.dumps(value)
-
-    # Remove fields that should not be updated on conflict
-    update_data = {k: v for k, v in insert_data.items() if k not in ['id', 'created_at', 'linkedin_url', 'domain']}
-
-    stmt = insert(Company).values(**insert_data)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=conflict_target,
-        set_=update_data
-    ).returning(Company)
-
-    result = await db.execute(stmt)
-    company = result.scalar_one()
-    # Let the caller handle commitment/refreshing for better transaction control
+        # Create new
+        company = Company(**final_data)
+        db.add(company)
+    
+    # We execute flush to get the ID back if newly created, but let caller commit
+    await db.flush()
     return company
 
 def _safe_deserialize(val):
@@ -159,6 +169,7 @@ def _report_to_dict(report, email_fallback=None):
         "id": str(report.id),
         "linkedin_url": report.linkedin_url,
         "email_id": report.email_id or email_fallback,
+        "email_verification_status": getattr(report, "email_verification_status", None),
         "website": report.website,
         "sales_research_report": _safe_deserialize(report.sales_research_report),
         "lead_score_analysis": _safe_deserialize(report.lead_score_analysis),
@@ -273,6 +284,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "intent": l.get("intent"),
                 "sentiment": l.get("sentiment"),
                 "email": l.get("email"),
+                "email_verification_status": l.get("email_verification_status"),
                 "company_id": l.get("company_id"),
                 "profile_metadata": l.get("profile_metadata") or {},
                 "interactions": []
@@ -394,6 +406,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "intent": data.get("intent") or p.intent,
                 "sentiment": data.get("sentiment") or p.sentiment,
                 "email": data.get("email") or p.email,
+                "email_verification_status": data.get("email_verification_status") or p.email_verification_status,
                 "comment_history": json.dumps(db_comments),
                 "source_posts": json.dumps(db_sources),
                 "interaction_history": json.dumps(db_history),
@@ -455,6 +468,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "intent": data.get("intent"),
                 "sentiment": data.get("sentiment"),
                 "email": data.get("email"),
+                "email_verification_status": data.get("email_verification_status"),
                 "comment_history": json.dumps(legacy_comments),
                 "source_posts": json.dumps(legacy_sources),
                 "interaction_history": json.dumps(new_history),
@@ -472,7 +486,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             IdentifiedProfile.__table__,
             upsert_rows,
             conflict_cols=["linkedin_url"],
-            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "profile_metadata", "normalized_linkedin_url"],
+            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "email_verification_status", "profile_metadata", "normalized_linkedin_url"],
             chunk_size=100
         )
         logger.info(f"DEBUG: Batch upsert executed. Results count: {len(results)}")
@@ -537,6 +551,9 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict, compan
         
         if profile_data.get("email"):
             db_profile.email = profile_data["email"]
+        
+        if profile_data.get("email_verification_status"):
+            db_profile.email_verification_status = profile_data["email_verification_status"]
 
         if profile_data.get("profile_metadata"):
             md = profile_data["profile_metadata"]
@@ -557,6 +574,7 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict, compan
             linkedin_url=normalize_linkedin_url(profile_data["linkedin_url"]),
             name=profile_data.get("name"),
             email=profile_data.get("email"),
+            email_verification_status=profile_data.get("email_verification_status"),
             profile_metadata=json.dumps(profile_data.get("profile_metadata")) if isinstance(profile_data.get("profile_metadata"), dict) else profile_data.get("profile_metadata"),
             comment_history=json.dumps([new_comment]) if new_comment else "[]",
             source_posts=json.dumps(new_sources),
@@ -641,7 +659,8 @@ async def save_report(db: AsyncSession, report_data: ResearchReportCreate, user_
         data['normalized_linkedin_url'] = normalize_linkedin_url(data['linkedin_url'])
     db_report = ResearchReport(**data)
     if user_id:
-        db_report.created_by_id = user_id
+        import uuid
+        db_report.created_by_id = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
     db.add(db_report)
     await db.commit()
     await db.refresh(db_report)

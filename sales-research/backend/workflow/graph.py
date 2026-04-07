@@ -50,8 +50,8 @@ def strategic_merger(state: AgentState):
     return state
 
 def collector(state: AgentState):
-    logger.info("WEBSITE COLLECTOR ", state["website"])
-    return {"linkedin_url": state["linkedin_url"], "website": state["website"]}
+    logger.info(f"WEBSITE COLLECTOR: {state.get('website')}")
+    return {"linkedin_url": state.get("linkedin_url"), "website": state.get("website")}
 
 def research_router(state: AgentState):
     """

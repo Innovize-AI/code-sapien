@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Loader2,
   Slack,
+  UserCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -109,6 +110,15 @@ const INTEGRATIONS: IntegrationMetadata[] = [
     icon: Slack,
     webhookPath: "/slack/interactions",
     docsUrl: "https://api.slack.com/messaging/webhooks",
+    category: "Other",
+  },
+  {
+    id: "million_verifier",
+    name: "Million Verifier",
+    description: "Verify lead email addresses automatically.",
+    icon: UserCheck,
+    webhookPath: "",
+    docsUrl: "https://www.millionverifier.com/api-docs/",
     category: "Other",
   },
 ];
@@ -197,8 +207,11 @@ export default function IntegrationsPage() {
       const updated = {
         ...settings,
         integrations_config: JSON.stringify(newConfigs),
+        million_verifier_enabled: id === "million_verifier" ? newConfigs[id].enabled : settings.million_verifier_enabled,
+        hubspot_sync_enabled: id === "hubspot" ? newConfigs[id].enabled : settings.hubspot_sync_enabled,
       };
       await saveIntegrations(updated);
+      setSettings(updated);
       toast({
         title: "Success",
         description: `${INTEGRATIONS.find((i) => i.id === id)?.name} integration updated.`,
@@ -590,6 +603,48 @@ export default function IntegrationsPage() {
                                 <Copy className="h-4 w-4" />
                               </Button>
                             </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {app.id === "million_verifier" && isEnabled && (
+                    <div className="pt-6 border-t space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                      <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+                        <Label className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground transition-all duration-300 group-hover:text-primary/70">
+                          Million Verifier Configuration
+                        </Label>
+                        <div className="space-y-3 pt-1">
+                          <div className="space-y-2">
+                            <Label className="text-[11px] font-semibold text-foreground/80">
+                              API Key
+                            </Label>
+                            <Input
+                              type="password"
+                              placeholder="mv-..."
+                              className="text-xs h-9 bg-background/50 hover:bg-background border-border/40 focus:border-primary/30 focus:ring-primary/5 transition-all duration-200"
+                              defaultValue={settings?.million_verifier_api_key || ""}
+                              onBlur={(e) => {
+                                if (settings) {
+                                  const updated = {
+                                    ...settings,
+                                    million_verifier_api_key: e.target.value,
+                                    million_verifier_enabled: true,
+                                  };
+                                  saveIntegrations(updated).then(() => {
+                                    setSettings(updated);
+                                    toast({
+                                      title: "Configuration Updated",
+                                      description: "Million Verifier API key saved.",
+                                    });
+                                  });
+                                }
+                              }}
+                            />
+                            <p className="text-[10px] text-muted-foreground leading-tight">
+                              Your Million Verifier API Key for email validation.
+                            </p>
                           </div>
                         </div>
                       </div>

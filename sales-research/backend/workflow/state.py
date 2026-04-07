@@ -92,6 +92,10 @@ class AgentState(TypedDict):
     profile_picture_url: Optional[str]
     lead_li_urn: Optional[str]
     extra_research_context: Optional[dict]
+    email_verification_status: Annotated[Optional[str], reduce_last]
+    
+    # Million Verifier Config (Passed from settings)
+    million_verifier_enabled: bool
     
     # LinkedIn Subgraph Data
     post_engagements: List[dict]

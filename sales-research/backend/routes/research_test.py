@@ -68,17 +68,17 @@ class AgentState(TypedDict):
     # companyProfile: 
 
 def collector(state:AgentState):
-    logger.info("WEBSITE COLLECTOR ", state["website"])
-    return {"linkedin_url":state["linkedin_url"], "website":state["website"]}
+    logger.info(f"WEBSITE COLLECTOR: {state.get('website')}")
+    return {"linkedin_url":state.get("linkedin_url"), "website":state.get("website")}
 
 #scrape webpages node
 def scrape_webpages(state:AgentState) -> str:
     """Use requests and bs4 to scrape the provided web pages for detailed information."""
-    logger.info("website " , state["website"])
-    loader = WebBaseLoader(state["website"])
+    logger.info(f"website: {state.get('website')}")
+    loader = WebBaseLoader(state.get("website") or "")
 
     docs = loader.load()
-    logger.info("docs", docs)
+    logger.info(f"docs: {docs}")
     scraped_content= "\n\n".join(
         [
             f'{doc.page_content}'

@@ -20,51 +20,60 @@ async def simulate_kelsey_workflow():
         profiles = result.scalars().all()
         
         if not profiles:
-            print("❌ No profiles found matching the pattern. Please run a discovery first or update the pattern.")
-            return
+            print("⚠️ No existing profiles found. Injecting mock Kelsey lead for simulation.")
+            target_url = "https://www.linkedin.com/in/kelsey-witt-2908a489/"
+            raw_leads = [{
+                "linkedin_url": target_url,
+                "name": "Kelsey Witt",
+                "headline": "Director of Project Management at Smartsheet",
+                "comment": "Searching for a new AI partner for project management automation. We need a demo ASAP and want to discuss pricing for a team of 50. This is a high priority for our Q3 planning.",
+                "source_post": "Solving Project Complexity with AI",
+                "source_post_url": "https://www.linkedin.com/posts/innovize-ai_project-mgmt",
+                "competitor": "Smartsheet"
+            }]
+        else:
+            p = profiles[0] # Take the first match
+            target_url = p.linkedin_url
+            print(f"  Found Profile: {p.name} ({target_url})")
 
-        p = profiles[0] # Take the first match
-        target_url = p.linkedin_url
-        print(f"  Found Profile: {p.name} ({target_url})")
-
-        # Reconstruct raw leads from interaction history or comment history
-        try:
-            # Try to get the latest comment and source post
-            history = json.loads(p.interaction_history or "[]")
-            raw_leads = []
-            if history:
-                for comp in history:
-                    for post in comp.get("posts", []):
-                        for comment in post.get("comments", []):
-                            raw_leads.append({
-                                "linkedin_url": target_url,
-                                "name": p.name,
-                                "headline": p.headline,
-                                "comment": comment,
-                                "source_post": post.get("title"),
-                                "source_post_url": post.get("url"),
-                                "competitor": comp.get("competitor")
-                            })
-            
-            # Fallback to legacy fields if history is empty
-            if not raw_leads:
-                comments = json.loads(p.comment_history or "[]")
-                sources = json.loads(p.source_posts or "[]")
-                latest_comment = comments[0] if comments else "No comment found"
-                latest_source = sources[0] if sources else {"title": "Unknown", "url": None, "competitor": "Unknown"}
+            # Reconstruct raw leads from interaction history or comment history
+            try:
+                # Try to get the latest comment and source post
+                history = json.loads(p.interaction_history or "[]")
+                raw_leads = []
+                if history:
+                    for comp in history:
+                        for post in comp.get("posts", []):
+                            for comment in post.get("comments", []):
+                                raw_leads.append({
+                                    "linkedin_url": target_url,
+                                    "name": p.name,
+                                    "headline": p.headline,
+                                    "comment": comment,
+                                    "source_post": post.get("title"),
+                                    "source_post_url": post.get("url"),
+                                    "competitor": comp.get("competitor")
+                                })
                 
-                raw_leads.append({
-                    "linkedin_url": target_url,
-                    "name": p.name,
-                    "headline": p.headline,
-                    "comment": latest_comment,
-                    "source_post": latest_source.get("title"),
-                    "source_post_url": latest_source.get("url"),
-                    "competitor": latest_source.get("competitor")
-                })
-        except Exception as e:
-            print(f"  ⚠️ Error parsing existing data: {e}")
-            return
+                # Fallback to legacy fields if history is empty
+                if not raw_leads:
+                    comments = json.loads(p.comment_history or "[]")
+                    sources = json.loads(p.source_posts or "[]")
+                    latest_comment = comments[0] if comments else "No comment found"
+                    latest_source = sources[0] if sources else {"title": "Unknown", "url": None, "competitor": "Unknown"}
+                    
+                    raw_leads.append({
+                        "linkedin_url": target_url,
+                        "name": p.name,
+                        "headline": p.headline,
+                        "comment": latest_comment,
+                        "source_post": latest_source.get("title"),
+                        "source_post_url": latest_source.get("url"),
+                        "competitor": latest_source.get("competitor")
+                    })
+            except Exception as e:
+                print(f"  ⚠️ Error parsing existing data: {e}")
+                return
 
         print(f"  Extracted {len(raw_leads)} interaction(s) for simulation.")
 
@@ -108,7 +117,9 @@ async def simulate_kelsey_workflow():
 
     print("\n✅ Simulation cycle finished!")
     async with SessionLocal() as check_db:
-        final_stmt = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url == target_url)
+        from db.crud import normalize_linkedin_url
+        norm_url = normalize_linkedin_url(target_url)
+        final_stmt = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url == norm_url)
         final_res = await check_db.execute(final_stmt)
         final_p = final_res.scalar_one_or_none()
         if final_p:

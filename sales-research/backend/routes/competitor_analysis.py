@@ -116,21 +116,26 @@ async def get_profiles(
         logger.debug(f"get_profiles Fetch rows: {fetch_end - db_end:.4f}s")
         
         for profile, rep_name, report_id, company in rows:
-            p_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns}
+            # Start with metadata, then overwrite with explicit columns
+            try:
+                p_dict = json.loads(profile.profile_metadata or "{}") if isinstance(profile.profile_metadata, str) else (profile.profile_metadata or {})
+                if not isinstance(p_dict, dict): p_dict = {}
+            except Exception as e:
+                logger.error(f"Error parsing profile_metadata for {profile.id}: {e}")
+                p_dict = {}
+                
+            # Overwrite with columns (The Truth)
+            columns_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns}
+            for k, v in columns_dict.items():
+                if v is not None or k not in p_dict:
+                    p_dict[k] = v
+                    
             # Convert UUIDs to strings for JSON
             for k, v in p_dict.items():
                 if hasattr(v, 'hex'): p_dict[k] = str(v)
             
             p_dict["rep_name"] = rep_name or "System"
             p_dict["latest_report_id"] = str(report_id) if report_id else None
-            
-            # Unpack profile_metadata into p_dict
-            try:
-                meta = json.loads(profile.profile_metadata or "{}") if isinstance(profile.profile_metadata, str) else (profile.profile_metadata or {})
-                if isinstance(meta, dict):
-                    p_dict.update(meta)
-            except Exception as e:
-                logger.error(f"Error parsing profile_metadata for {profile.id}: {e}")
             
             # Include Company data
             if company:

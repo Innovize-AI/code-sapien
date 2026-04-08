@@ -19,48 +19,22 @@ class PivotFitCheck(BaseModel):
     is_fit: bool = Field(description="True if the company is a strong fit for the strategic pivot product.")
     reasoning: str = Field(description="Explanation of why it fits or does not fit based on industry, size, and role.")
 
-async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_roles: List[str]) -> PivotFitCheck:
+async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_roles: List[str], target_industries: List[str]) -> PivotFitCheck:
     """
     Verifies if the lead is a strict fit for the strategic pivot.
-    1. Hard Filter: Role Match
-    2. Soft Filter: Agentic Analysis of Company Fit
+    Utilizes semantic matching for roles and industry qualification.
     """
     logger.info(f"Verifying Strict Fit for {product_name}...")
     
-    # 1. Hard Filter: Role Match
     user_details = state.get("user_profile_details", {})
+    headline = user_details.get("basic_info", {}).get("headline", "")
     
-    # need to adjust this
-    job_title = user_details.get("basic_info", {}).get("headline", "")
-    ideal_job_titles= state.get("ideal_profile", {}).job_title or ""
-    # Handle the case where job_title is a list from the ICP
-    if isinstance(ideal_job_titles, list):
-        ideal_job_titles_str = " ".join(str(j) for j in ideal_job_titles)
-    
-    job_title_lower = str(job_title).lower()
-    
-    role_match = False
-    if not ideal_job_titles:
-        role_match = True # No specific roles defined, assume fit
-    else:
-        for role in ideal_job_titles:
-            if role.lower() in ideal_job_titles_str.lower():
-                role_match = True
-                break
-    
-    if not role_match:
-        logger.info(f"Role Mismatch: {job_title} not in {target_roles}")
-        return PivotFitCheck(is_fit=False, reasoning=f"Lead role '{job_title}' does not match target roles for {product_name}: {target_roles}")
-
-    # 2. Agentic Analysis (Soft Filter)
     website_analysis = state.get("website_analysis", {})
     industry = website_analysis.get("industry", "Unknown")
     company_desc = website_analysis.get("summary", "Unknown")
     
-    # robustly fetch company size from various state fields
     extracted_data = state.get("lead_extracted_data", {})
     company_stats = state.get("company_stats", {})
-    
     company_size = extracted_data.get("company_size") or \
                    company_stats.get("employee_count") or \
                    company_stats.get("staff_count") or \
@@ -69,40 +43,40 @@ async def verify_strict_fit(state: Dict[str, Any], product_name: str, target_rol
     # Fetch product-specific qualification context via RAG
     logger.info(f"Retrieving Qualification Context for {product_name}...")
     qualification_context = knowledge_service.retrieve_context(
-        query=f"What is the ideal customer profile for {product_name}? What are the icp qualification criteria, industry fit, and target audience?",
+        query=f"{product_name} ICP qualification criteria, target industries, and ideal roles",
         namespace="playbooks",
-        k=2
+        k=3
     )
-    
-    if not qualification_context.strip():
-        # Fallback search if playbooks namespace is empty/not specific
-        qualification_context = knowledge_service.retrieve_context(
-            query=f"{product_name} target audience and industries",
-            namespace="solutions",
-            k=1
-        )
 
     prompt = f"""
-    Analyze if this company is a good fit for the product '{product_name}'.
+    Analyze if this prospect is a high-potential fit for '{product_name}'.
     
     ### PRODUCT QUALIFICATION CONTEXT (INTERNAL):
     {qualification_context if qualification_context.strip() else f"Standard qualification for {product_name}."}
     
-    ### PROSPECT COMPANY PROFILE:
-    - Industry: {industry}
-    - Description: {company_desc}
-    - Size: {company_size}
+    ### TARGET CRITERIA:
+    - Target Roles: {target_roles}
+    - Target Industries: {target_industries}
     
-    Target Roles: {target_roles} (Role matched: {job_title})
+    ### PROSPECT PROFILE:
+    - Current Role/Headline: {headline}
+    - Company Industry: {industry}
+    - Company Size: {company_size}
+    - Company Description: {company_desc}
     
-    Is this a high-potential fit? Return boolean and clear reasoning based on the qualification context above.
+    ### YOUR TASK (SEMANTIC ANALYSIS):
+    1. **Role Match**: Does the prospect's headline semantically align with the target roles? (e.g., 'VP Sales' matches 'VP of Sales'). Use your intelligence to map seniority and departments.
+    2. **Industry Match**: Does the company's industry or description align with the target industries or the qualification context? 
+    3. **Final Verdict**: Approve only if there is a clear strategic fit.
+    
+    Return 'is_fit' as true only if BOTH role (semantically) and industry/company profile align.
     """
     
     try:
         model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(PivotFitCheck)
         messages = [
-            SystemMessage(content="You are a strict qualification agent. You only approve leads that are a clear fit."),
+            SystemMessage(content="You are a strict qualification agent. You specialize in semantic role and industry mapping."),
             HumanMessage(content=prompt)
         ]
         result = await structured_llm.ainvoke(messages)
@@ -145,97 +119,98 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
     LangGraph node that performs agentic RAG to find the best solutions.
     """
     pain_points = state.get("target_pain_points", {})
-    industry = state.get("website_analysis", {}).get("industry", "Unknown")
+    website_analysis = state.get("website_analysis", {})
+    industry = website_analysis.get("industry", "Unknown")
+    company_desc = website_analysis.get("summary", "Unknown")
     selling_profile = state.get("selling_company_profile")
     
     selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
-    selling_products_list = "\n".join([f"- {p.name}: {getattr(p, 'description', '')}" for p in selling_profile.products]) if selling_profile else "Glial, IDP, Agentic KB"
+    
+    # --- RAG Discovery Phase 1: General Industry Opportunities ---
+    logger.info(f"Performing General Industry Opportunity Discovery for {industry}...")
+    general_industry_context = knowledge_service.retrieve_context(
+        query=f"Case studies and solutions for {industry} industry focusing on {json.dumps(pain_points)}",
+        namespace="case-studies", # Search specifically in case studies first
+        k=3
+    )
+    
+    # --- RAG Discovery Phase 2: Explicit Product Qualification ---
+    qualified_products = []
+    combined_specific_context = ""
+    pivot_fit_names = []
+    
+    if selling_profile and selling_profile.products:
+        for product in selling_profile.products:
+            # Check if product is a strategic pivot
+            is_pivot = getattr(product, "is_strategic_pivot", False)
+            
+            if is_pivot:
+                # Perform Smart Fit Check (Semantic)
+                fit_check = await verify_strict_fit(
+                    state, 
+                    product.name, 
+                    getattr(product, "target_roles", []), 
+                    getattr(product, "target_industries", [])
+                )
+                
+                if fit_check.is_fit:
+                    logger.info(f"Confirmed Fit for Pivot: {product.name}. Reason: {fit_check.reasoning}")
+                    qualified_products.append(product)
+                    pivot_fit_names.append(product.name)
+                    
+                    # Retrieve product-specific content
+                    relevant_files = getattr(product, "attached_playbooks", []) + getattr(product, "attached_case_studies", [])
+                    if not relevant_files:
+                        relevant_files = getattr(product, "relevant_files", [])
+                    
+                    if relevant_files:
+                        specific_context = knowledge_service.retrieve_from_files(
+                            relevant_files, 
+                            f"{product.name} implementation and ROI for {industry}", 
+                            k=4
+                        )
+                        combined_specific_context += f"\n\n### CONTEXT FOR {product.name}:\n{specific_context}"
+                else:
+                    logger.info(f"Rejected Pivot: {product.name}. Reason: {fit_check.reasoning}")
+            else:
+                # Non-pivot products are added to the general pool for the agent to consider
+                qualified_products.append(product)
 
+    # Re-build filtered product list for the agent
+    filtered_products_list = "\n".join([f"- {p.name}: {p.description}" for p in qualified_products])
+    
+    # Final Refined Research Goal
     research_goal = f"""
     Find the best {selling_company_name} solutions for a prospect in the {industry} industry.
-    Identified Pain Points: {json.dumps(pain_points)}
+    Identified Prospect Pain Points: {json.dumps(pain_points)}
     
-    Your goal is to return a 'Strategic Solution Briefing' that includes:
-    1. The core product to lead with.
-    2. Specific playbook snippets or case studies you found.
-    3. Verified feasibility and ROI metrics.
+    === QUALIFIED INTERNAL ASSETS (USE THESE FIRST) ===
+    {combined_specific_context if combined_specific_context else "No project-specific playbooks attached."}
+    
+    === INDUSTRY-SPECIFIC PROVEN SOLUTIONS (CASE STUDIES) ===
+    {general_industry_context if general_industry_context.strip() else "No direct industry case studies found."}
+    ===================================================
+    
+    Your mission:
+    1. Synthesize the 'Qualified Internal Assets' with the 'Industry-Specific Case Studies'.
+    2. Select the absolute best product(s) from the pool below to lead with.
+    3. Return a definitive 'Strategic Solution Briefing' including ROI markers and proof points.
+    
+    AVAILABLE PRODUCT POOL:
+    {filtered_products_list}
     """
     
     executor = create_strategic_rag_agent()
-    # Fill in the prompt variables via the input or by partially formatting the prompt
-    # Since prompt is inside create_strategic_rag_agent, I'll update that helper.
-    
-    pivot_fit_result = False
-    pivot_name = ""
-    
-    # --- Check for Strategic Pivot ---
-    strategic_pivot = None
-    if selling_profile:
-        for p in selling_profile.products:
-            if getattr(p, "is_strategic_pivot", False):
-                strategic_pivot = p
-                break
-    
-    if strategic_pivot:
-        logger.info(f"Found Strategic Pivot: {strategic_pivot.name}")
-        # Perform Strict Fit Check
-        fit_check = await verify_strict_fit(state, strategic_pivot.name, getattr(strategic_pivot, "target_roles", []))
-        
-        if fit_check.is_fit:
-            logger.info(f"Pivot Fit CONFIRMED: {fit_check.reasoning}")
-            pivot_fit_result = True
-            pivot_name = strategic_pivot.name
-            
-            # Retrieve specific context from relevant files
-            attached_playbooks = getattr(strategic_pivot, "attached_playbooks", [])
-            attached_case_studies = getattr(strategic_pivot, "attached_case_studies", [])
-            relevant_files = attached_playbooks + attached_case_studies
-            
-            # Fallback to legacy relevant_files if new ones are empty (migration safety)
-            if not relevant_files:
-                relevant_files = getattr(strategic_pivot, "relevant_files", [])
-
-            specific_context = ""
-            if relevant_files:
-                logger.info(f"Retrieving context from {len(relevant_files)} files: {relevant_files}")
-                specific_context = knowledge_service.retrieve_from_files(relevant_files, strategic_pivot.name + " " + " ".join(pain_points.keys() if isinstance(pain_points, dict) else []), k=10)
-            
-            # Fallback to legacy rag_context if no specific files or empty result
-            if not specific_context and getattr(strategic_pivot, "rag_context", None):
-                 specific_context = f"Legacy Context Reference: {strategic_pivot.rag_context}"
-
-            # Update Research Goal to focus on Pivot
-            research_goal = f"""
-            PRIMARY OBJECTIVE: Find evidence to pitch '{strategic_pivot.name}' to this prospect.
-            
-            Context: {strategic_pivot.description}
-            Identified Pain Points: {json.dumps(pain_points)}
-            
-            === VERIFIED INTERNAL KNOWLEDGE (MUST USE) ===
-            {specific_context}
-            ==============================================
-            
-            Task:
-            1. Synthesize the 'Verified Internal Knowledge' above to create a compelling case.
-            2. Find specific case studies or ROI metrics for {strategic_pivot.name} within this context.
-            3. Return a briefing specifically supporting a pitch for {strategic_pivot.name}.
-            """
-        else:
-            logger.info(f"Pivot Fit REJECTED: {fit_check.reasoning}")
-
-    executor = create_strategic_rag_agent()
-    # Fill in the prompt variables via the input or by partially formatting the prompt
-    # Since prompt is inside create_strategic_rag_agent, I'll update that helper.
     
     result = await executor.ainvoke({
         "input": research_goal, 
         "chat_history": [],
         "selling_company_name": selling_company_name,
-        "selling_products_list": selling_products_list
+        "selling_products_list": filtered_products_list
     })
     
     return {
         "strategic_rag_briefing": result["output"],
-        "is_strategic_pivot_fit": pivot_fit_result,
-        "pivot_product_name": pivot_name
+        "is_strategic_pivot_fit": len(pivot_fit_names) > 0,
+        "pivot_product_name": ", ".join(pivot_fit_names) if pivot_fit_names else ""
     }

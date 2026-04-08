@@ -105,6 +105,7 @@ class ProductConfig(BaseModel):
     description: str = Field(description="Short description for the AI")
     is_strategic_pivot: bool = Field(default=False, description="Is this the 'Hero Product' to pivot to?")
     target_roles: List[str] = Field(default_factory=list, description="Job titles that qualify for this pivot (e.g. 'Founder')")
+    target_industries: List[str] = Field(default_factory=list, description="Industries that qualify for this pivot (e.g. 'Logistics')")
     attached_playbooks: List[str] = Field(default_factory=list, description="Playbooks specifically linked to this product")
     attached_case_studies: List[str] = Field(default_factory=list, description="Case studies showcasing this product")
     relevant_files: List[str] = Field(default_factory=list, description="[DEPRECATED] Combined list of relevant files")

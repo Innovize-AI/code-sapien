@@ -200,23 +200,43 @@ def outreach_node(state: AgentState):
     is_pivot_fit = state.get("is_strategic_pivot_fit", False)
     pivot_name = state.get("pivot_product_name", "")
     
+    rag_briefing = state.get("strategic_rag_briefing", "No RAG context available.")
+
+    # Style & RAG Instruction
+    style_and_rag_instruction = f"""
+### STYLE GUIDE (CRITICAL):
+- **Reading Level**: Write at a **7th-grade reading level**. Use simple words, short sentences, and clear ideas.
+- **Punctuation**: Never use em dashes (—). Use simpler sentence structures.
+- **Avoid AI Cliches**: Never use phrases like "most companies," "in today's landscape," "leveraging AI," "AI-powered," or "streamlining operations."
+- **Be Human & Specific**: Write like a Senior Strategic Consultant who has done their homework. Use the specific proof points and ROI markers provided in the RAG briefing.
+- **Directness**: Get straight to the value. No fluff.
+
+### STRATEGIC RAG BRIEFING (GROUND TRUTH):
+{rag_briefing}
+"""
+
     if is_pivot_fit:
         prompt += f"""
+{style_and_rag_instruction}
 
 TASK MODIFICATION: You MUST generate EXACTLY TWO distinct campaign variants:
-Variant 1: "Best Fit - [Product Name]" -> The standard approach based on strongest pain points.
-Variant 2: "Strategic Pivot - {pivot_name}" -> A campaign specifically pitching '{pivot_name}' as the solution, using the RAG context provided.
+Variant 1: "Best Fit - [Product Name]" -> The standard approach based on strongest pain points. Use the RAG briefing to ground the value prop.
+Variant 2: "Strategic Pivot - {pivot_name}" -> A high-authority campaign specifically pitching '{pivot_name}'. Use the RAG evidence/playbooks as the primary hook.
 """
     else:
-        prompt += """
+        prompt += f"""
+{style_and_rag_instruction}
 
 TASK MODIFICATION: You MUST generate EXACTLY ONE campaign variant:
-Variant 1: "Best Fit - [Product Name]" -> The standard approach based on strongest pain points.
+Variant 1: "Best Fit - [Product Name]" -> The standard approach. Use the RAG briefing to ground the value prop.
 DO NOT generate a second variant.
 """
 
     messages = [
-        SystemMessage(content="### ROLE: You are a world-class direct response copywriter and cold email strategist."),
+        SystemMessage(content="""You are a world-class Direct Response Copywriter and Strategic Sales Consultant. 
+        Your mission is to craft outreach that is authentic, evidence-based, and completely free of generic AI terminology.
+        You rely strictly on the provided 'Strategic RAG Briefing' to ground your claims.
+        """),
         HumanMessage(content=prompt)
     ]
     

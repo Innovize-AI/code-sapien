@@ -2,6 +2,7 @@ import os
 import re
 import logging
 import asyncio
+import json
 from typing import List, Optional
 from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
@@ -9,6 +10,8 @@ from pinecone import Pinecone
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from services.document_classifier import document_classifier
+from models.gemini_models import get_gemini_model
+from langchain_core.messages import SystemMessage, HumanMessage
 
 logger = logging.getLogger(__name__)
 
@@ -165,19 +168,112 @@ class KnowledgeService:
         logger.info(f"Ingested {len(splits)} chunks from {file_path} into namespace '{namespace}' with metadata: {metadata}")
         return {"chunks": len(splits), "namespace": namespace, "metadata": metadata}
 
-    def retrieve_context(self, query: str, namespace: str, k: int = 3) -> str:
+    def rerank_documents(self, query: str, documents: List[Document], top_n: int = 4) -> List[Document]:
         """
-        Retrieves the top k chunks from a specific namespace and formats them as a string.
+        Reranks a list of documents using Pinecone's BGE-reranker-v2-m3 or Gemini fallback.
+        """
+        if not documents:
+            return []
+
+        try:
+            # 1. Attempt Pinecone Native Rerank
+            logger.info(f"Reranking {len(documents)} docs using bge-reranker-v2-m3...")
+            rerank_results = self.pc.inference.rerank(
+                model="bge-reranker-v2-m3",
+                query=query,
+                documents=[doc.page_content for doc in documents],
+                top_n=top_n,
+                return_documents=True
+            )
+            
+            # Map results back to Documents with metadata preserved
+            final_docs = []
+            for result in rerank_results.data:
+                # Find the original document index to preserve metadata
+                original_doc = next((d for d in documents if d.page_content == result.document.text), None)
+                if original_doc:
+                    # Update score with reranker confidence
+                    original_doc.metadata["relevance_score"] = result.score
+                    final_docs.append(original_doc)
+            
+            return final_docs
+
+        except Exception as e:
+            logger.warning(f"Pinecone Rerank failed, falling back to LLM reranker: {e}")
+            return self._rerank_by_llm(query, documents, top_n)
+
+    def _rerank_by_llm(self, query: str, documents: List[Document], top_n: int = 4) -> List[Document]:
+        """
+        Fallback Listwise Reranker using Gemini 3 Flash.
+        """
+        logger.info(f"Executing Listwise Rerank for {len(documents)} docs via Gemini...")
+        
+        doc_list_text = "\n".join([f"ID: {i} | Content: {doc.page_content[:500]}..." for i, doc in enumerate(documents)])
+        
+        prompt = f"""
+        Rate the RELEVANCE of the following knowledge chunks to the query: '{query}'
+        
+        CHUNKS:
+        {doc_list_text}
+        
+        TASK:
+        1. Identify the top {top_n} most helpful chunks for answering the query.
+        2. Return ONLY a JSON list of the IDs in order of relevance. 
+        Example: [3, 0, 1]
+        """
+        
+        try:
+            # Use local loop for async call since this is a sync method in a class
+            model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
+            messages = [
+                SystemMessage(content="You are a high-fidelity relevance reranker. You only care about actual utility for the user's research goal."),
+                HumanMessage(content=prompt)
+            ]
+            response = model.invoke(messages)
+            
+            # Extract IDs from response
+            res_text = response.content.strip()
+            # Handle potential markdown formatting
+            res_text = res_text.replace("```json", "").replace("```", "").strip()
+            ids = json.loads(res_text)
+            
+            final_docs = []
+            for idx in ids:
+                if 0 <= idx < len(documents):
+                    doc = documents[idx]
+                    doc.metadata["relevance_score"] = 0.9 # Hardcoded high value for LLM-selected chunks
+                    final_docs.append(doc)
+            
+            return final_docs[:top_n]
+        except Exception as e:
+            logger.error(f"Fallback Reranker failed: {e}")
+            return documents[:top_n] # Absolute fallback to similarity order
+
+    def retrieve_context(self, query: str, namespace: str, k: int = 10, top_n: int = 4, score_threshold: float = 0.5) -> str:
+        """
+        Retrieves the top k chunks via similarity, then reranks to top_n using cross-encoders.
         """
         vectorstore = self._get_vectorstore(namespace)
-        docs = vectorstore.similarity_search(query, k=k)
+        # 1. Recall (Broad)
+        docs_with_scores = vectorstore.similarity_search_with_score(query, k=k)
+        initial_docs = [d for d, s in docs_with_scores if s >= score_threshold]
+        
+        if not initial_docs:
+            return f"No initially similar knowledge found in the '{namespace}' namespace."
+
+        # 2. Precision (Rerank)
+        reranked_docs = self.rerank_documents(query, initial_docs, top_n=top_n)
 
         context_parts = []
-        for doc in docs:
+        for doc in reranked_docs:
+            score = doc.metadata.get("relevance_score", 0.0)
             source = doc.metadata.get("source", "Unknown")
             header = doc.metadata.get("Header 1") or doc.metadata.get("Header 2") or ""
-            context_parts.append(f"--- [Source: {source} | {header}] ---\n{doc.page_content}")
+            context_parts.append(f"--- [Source: {source} | {header} | Relevance: {score:.4f}] ---\n{doc.page_content}")
 
+        if not context_parts:
+            return f"No relevant internal knowledge found after reranking in the '{namespace}' namespace."
+            
         return "\n\n".join(context_parts)
 
     def get_index_stats(self) -> dict:
@@ -187,39 +283,57 @@ class KnowledgeService:
         stats = self.index.describe_index_stats()
         return stats.to_dict()
 
-    def search_all_namespaces(self, query: str, namespaces: List[str], k: int = 2) -> str:
+    def search_all_namespaces(self, query: str, namespaces: List[str], k: int = 2, score_threshold: float = 0.7) -> str:
         """
-        Searches across multiple namespaces and aggregates the context.
+        Searches across multiple namespaces and aggregates chunks passing the threshold.
         """
         aggregated_context = []
         for ns in namespaces:
-            context = self.retrieve_context(query, ns, k=k)
-            if context.strip():
+            context = self.retrieve_context(query, ns, k=k, score_threshold=score_threshold)
+            if "No relevant internal knowledge found" not in context:
                 aggregated_context.append(f"=== KNOWLEDGE TYPE: {ns.upper()} ===\n{context}")
 
+        if not aggregated_context:
+            return "No relevant internal knowledge found across the requested namespaces."
+            
         return "\n\n".join(aggregated_context)
 
-    def retrieve_from_files(self, filenames: List[str], query: str, k: int = 5) -> str:
+    def retrieve_from_files(self, filenames: List[str], query: str, k: int = 15, top_n: int = 5, score_threshold: float = 0.3) -> str:
         """
-        Retrieves context specifically from a list of files across all namespaces.
+        Retrieves context specifically from a list of files across all namespaces, applying semantic reranking.
         """
         namespaces = ["playbooks", "case-studies", "solutions"]
-        aggregated_context = []
+        all_candidate_docs = []
 
+        # 1. Recall from all relevant namespaces with a broad filter
         for ns in namespaces:
             try:
                 vectorstore = self._get_vectorstore(ns)
                 filter_dict = {"source": {"$in": filenames}}
-                docs = vectorstore.similarity_search(query, k=k, filter=filter_dict)
-
-                if docs:
-                    aggregated_context.append(f"=== MATCHES IN {ns.upper()} ===")
-                    for doc in docs:
-                        source = doc.metadata.get("source", "Unknown")
-                        header = doc.metadata.get("Header 1") or doc.metadata.get("Header 2") or ""
-                        aggregated_context.append(f"--- [Source: {source} | {header}] ---\n{doc.page_content}")
+                # Broad similarity search
+                docs_with_scores = vectorstore.similarity_search_with_score(query, k=k, filter=filter_dict)
+                for doc, score in docs_with_scores:
+                    if score >= score_threshold:
+                        doc.metadata["initial_score"] = score
+                        doc.metadata["namespace"] = ns
+                        all_candidate_docs.append(doc)
             except Exception as e:
                 logger.warning(f"Error searching namespace {ns} with filter: {e}")
                 continue
 
-        return "\n\n".join(aggregated_context)
+        if not all_candidate_docs:
+            return f"No contextually similar knowledge found in the specified files ({filenames})."
+
+        # 2. Precision: Cross-Encoder Rerank
+        reranked_docs = self.rerank_documents(query, all_candidate_docs, top_n=top_n)
+
+        # 3. Format result
+        formatted_parts = []
+        for doc in reranked_docs:
+            source = doc.metadata.get("source", "Unknown")
+            ns = doc.metadata.get("namespace", "Unknown")
+            header = doc.metadata.get("Header 1") or doc.metadata.get("Header 2") or ""
+            rel_score = doc.metadata.get("relevance_score", 0.0)
+            formatted_parts.append(f"--- [Source: {source} | Type: {ns.upper()} | {header} | Relevance: {rel_score:.4f}] ---\n{doc.page_content}")
+
+        return "\n\n".join(formatted_parts)

@@ -17,7 +17,7 @@ def search_intelligence_base(query: str, namespace: str) -> str:
     - 'case-studies': ROI proofs and success stories.
     Use this when you need specific, validated evidence.
     """
-    return knowledge_service.retrieve_context(query, namespace, k=3)
+    return knowledge_service.retrieve_context(query, namespace, k=5, top_n=3)
 
 @tool
 def verify_solution_feasibility(product_name: str, industry: str, use_case: str, product_context: str) -> str:
@@ -35,7 +35,7 @@ def get_roi_proof_points(product_name: str, pain_point: str) -> str:
     Use this to ground outreach in hard numbers.
     """
     query = f"ROI impact for {product_name} solving {pain_point}"
-    return knowledge_service.retrieve_context(query, "case-studies", k=2)
+    return knowledge_service.retrieve_context(query, "case-studies", k=5, top_n=3)
 
 # Export the skills
 RAG_SKILLS = [search_intelligence_base, verify_solution_feasibility, get_roi_proof_points]

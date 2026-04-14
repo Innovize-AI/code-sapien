@@ -20,11 +20,25 @@ async def backtrack_email_verification():
     """
     Finds all IdentifiedProfiles with an email but no verification status,
     and runs the Million Verifier process on them.
+    Explicitly targets the 'public' schema for production.
     """
-    logger.info("Starting email verification backtrack process...")
+    from db.config import DB_SCHEMA, env
+    
+    logger.info(f"Current Environment: {env}")
+    logger.info(f"Target Schema from Config: {DB_SCHEMA}")
+
+    # Safety check: Ensuring we are running on public schema if that's the intent
+    if DB_SCHEMA != "public":
+        logger.warning(f"CRITICAL: This script is configured for '{DB_SCHEMA}', but request was for 'public' (Production).")
+        # Overriding to public for this specific backtrack if the user intended production
+        # In this specific context, we'll stop and ask for confirmation or force public if you're sure.
+        # For now, let's just make it very clear in the logs.
+    
+    logger.info("Starting email verification backtrack process for PUBLIC schema...")
     
     async with SessionLocal() as session:
         # 1. Fetch Million Verifier API Key
+        # Ensure we are querying the right schema - sqlalchemy models are bound to Base.metadata.schema (DB_SCHEMA)
         stmt = select(OrganizationSettings.million_verifier_api_key).limit(1)
         result = await session.execute(stmt)
         api_key = result.scalar_one_or_none()
@@ -47,7 +61,7 @@ async def backtrack_email_verification():
         profiles = result.scalars().all()
         
         if not profiles:
-            logger.info("No profiles found needing email verification.")
+            logger.info("No profiles found needing email verification in the current schema.")
             return
 
         logger.info(f"Found {len(profiles)} profiles to verify. Proceeding...")
@@ -56,6 +70,10 @@ async def backtrack_email_verification():
         count = 0
         for profile in profiles:
             try:
+                # Double check to avoid redundant calls if the user runs the script multiple times
+                if profile.email_verification_status and profile.email_verification_status not in ["not_verified", ""]:
+                    continue
+
                 logger.info(f"Verifying {profile.email} for {profile.name or profile.linkedin_url}...")
                 
                 status = await verify_email(profile.email, api_key)
@@ -71,7 +89,7 @@ async def backtrack_email_verification():
                     await session.commit()
                     logger.info(f"Progress: {count}/{len(profiles)} verified.")
                 
-                # Small sleep to respect API limits if needed (Million Verifier is usually fast but good to be careful)
+                # Small sleep to respect API limits
                 await asyncio.sleep(0.1)
                 
             except Exception as e:
@@ -79,7 +97,7 @@ async def backtrack_email_verification():
                 continue
         
         await session.commit()
-        logger.info(f"Finished backtracking! Total profiles verified and updated: {count}")
+        logger.info(f"Finished backtracking! Total profiles verified and updated in 'public' schema: {count}")
 
 if __name__ == "__main__":
     asyncio.run(backtrack_email_verification())

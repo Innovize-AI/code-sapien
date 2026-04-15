@@ -338,6 +338,9 @@ You MUST categorize the prospect into ONE of these 6 Strategic Angles and use th
     - **CSO OBJECTION PREEMPTION**: 
     - Check the `CSO_STRATEGIC_BRIEFING` -> `unified_command` -> `objection_preemption`.
     - You MUST subtlety weave at least one of these potential objections into your message to "disarm" the prospect before they can even think it. (e.g., "You might think this is just another wrapper...").
+    - **CORE STRATEGY**: You MUST align your pitch with the `CSO_STRATEGIC_BRIEFING` -> `unified_command` -> `product_selection_reasoning`. 
+        - If the CSO identifies a **Strategic Pivot**, your message MUST center on that specific product's unique value.
+        - If the CSO recommends **Solution Based Pitching**, your message MUST focus on mapping the broader solutions to the prospect's pain points.
     - **Use the `CSO_STRATEGIC_BRIEFING` -> `unified_command` -> `strategic_proof_points` to validate your claims.**
 
     ### PROSPECT DATA:

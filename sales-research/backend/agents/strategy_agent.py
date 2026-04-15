@@ -175,7 +175,8 @@ def outreach_node(state: AgentState):
     """Crafts the personalized "hook" and outbound message using structured output."""
     user_analysis_dict = state.get("user_profile_analysis", {})
     user_analysis = format_profile_analysis(user_analysis_dict)
-    solutions = state.get("strategic_solutions", "")
+    solutions = state.get("strategic_solutions", {})
+    solutions_str = json.dumps(solutions) if isinstance(solutions, dict) else str(solutions)
     engagements = state.get("post_engagements", [])
     lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
     
@@ -186,7 +187,7 @@ def outreach_node(state: AgentState):
         user_analysis=user_analysis,
         lead_segment=lead_segment,
         engagements=json.dumps(engagements),
-        solutions=solutions,
+        solutions=solutions_str,
         journey_context=json.dumps(journey_analysis),
         cso_context=json.dumps(cso_briefing)
     )
@@ -215,20 +216,28 @@ def outreach_node(state: AgentState):
 {rag_briefing}
 """
 
+    solution_based_instruction = f"""
+### SOLUTION BASED PITCH GROUND TRUTH:
+Use the following validated solutions from the Strategy Node as your ONLY source for the Solution Based Pitch. Do NOT invent new solutions.
+{solutions_str}
+"""
+
     if is_pivot_fit:
         prompt += f"""
 {style_and_rag_instruction}
+{solution_based_instruction}
 
 TASK MODIFICATION: You MUST generate EXACTLY TWO distinct campaign variants:
-Variant 1: "Best Fit - [Product Name]" -> The standard approach based on strongest pain points. Use the RAG briefing to ground the value prop.
-Variant 2: "Strategic Pivot - {pivot_name}" -> A high-authority campaign specifically pitching '{pivot_name}'. Use the RAG evidence/playbooks as the primary hook.
+Variant 1: "Strategic Pivot - {pivot_name}" -> A high-authority campaign specifically pitching '{pivot_name}'. Use the RAG evidence and playbooks as the primary hook.
+Variant 2: "Solution Based Pitch" -> Use ONLY the `SOLUTION BASED PITCH GROUND TRUTH` above. Map those specific solutions to the prospect's pain points. Do NOT spotlight a single product. Focus on transformation outcomes.
 """
     else:
         prompt += f"""
 {style_and_rag_instruction}
+{solution_based_instruction}
 
 TASK MODIFICATION: You MUST generate EXACTLY ONE campaign variant:
-Variant 1: "Best Fit - [Product Name]" -> The standard approach. Use the RAG briefing to ground the value prop.
+Variant 1: "Solution Based Pitch" -> Use ONLY the `SOLUTION BASED PITCH GROUND TRUTH` above. Map those specific solutions to the prospect's pain points. Do NOT spotlight a single product. Focus on transformation outcomes.
 DO NOT generate a second variant.
 """
 

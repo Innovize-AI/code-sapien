@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, cast, DATE, desc, or_
+from sqlalchemy import select, func, cast, DATE, desc, or_, text, true
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, timedelta
 
@@ -108,13 +108,22 @@ async def get_dashboard_analytics(db: AsyncSession = Depends(get_db)):
     # We use jsonb_array_elements to flatten source_posts
     # source_posts is a JSON string of list of dicts: [{"competitor": "...", ...}]
     
-    # Extract all unique (profile_id, competitor) pairs
-    # Note: We cast IdentifedProfile.source_posts (which is Text) to JSONB
-    posts_lateral = func.jsonb_array_elements(cast(func.coalesce(IdentifiedProfile.source_posts, '[]'), JSONB)).alias("post")
-    comp_select = select(posts_lateral.column_list[0]["competitor"].astext.label("competitor_name"), func.count(IdentifiedProfile.id.distinct())) \
-        .group_by(text("competitor_name")) \
+
+    # Unnest source_posts JSONB array into rows, then extract the "competitor" key
+    posts_func = func.jsonb_array_elements(
+        cast(func.coalesce(IdentifiedProfile.source_posts, '[]'), JSONB)
+    ).table_valued("value").lateral("post")
+
+    comp_select = (
+        select(
+            cast(posts_func.c.value, JSONB)["competitor"].astext.label("competitor_name"),
+            func.count(IdentifiedProfile.id.distinct())
+        )
+        .join(posts_func, true())
+        .group_by(text("competitor_name"))
         .order_by(desc(func.count(IdentifiedProfile.id.distinct())))
-    
+    )
+
     comp_result = await db.execute(comp_select)
     
     competitor_breakdown = []

@@ -326,6 +326,33 @@ export const fetchDashboardStats = async (): Promise<DashboardStats | null> => {
         return null;
     }
 };
+
+export interface AnalyticsDataPoint {
+    date: string;
+    count: number;
+}
+
+export interface BreakdownItem {
+    name: string;
+    count: number;
+}
+
+export interface DashboardAnalytics {
+    daily_trends: AnalyticsDataPoint[];
+    lead_quality: Record<string, number>;
+    competitor_breakdown: BreakdownItem[];
+    keyword_breakdown: BreakdownItem[];
+}
+
+export const fetchDashboardAnalytics = async (): Promise<DashboardAnalytics | null> => {
+    try {
+        const response = await axios.get(`${API_URL}/api/dashboard/analytics`);
+        return response.data;
+    } catch (e) {
+        console.error("Failed to fetch dashboard analytics", e);
+        return null;
+    }
+};
 export interface IntegrationSettings {
     tavily_api_key?: string;
     apollo_api_key?: string;

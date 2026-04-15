@@ -13,20 +13,20 @@ logger = logging.getLogger(__name__)
 knowledge_service = KnowledgeService(index_name="glial-index")
 
 CSO_SYSTEM_PROMPT = """
-You are the Chief Strategy Officer (Narrative Arbitrator) at {selling_company_name}. 
-Your mission is to synthesize multiple streams of intelligence into a SINGLE prescriptive command.
+You are the Chief Strategy Officer (Narrative Arbitrator). 
+Your mission is to synthesize multiple streams of intelligence into a SINGLE prescriptive command. Use the `VERIFIED AGENTIC RAG BRIEFING` as your ground truth for product capabilities and evidence.
 
 ### STRATEGIC CLASSIFICATION:
 You will receive a `lead_segment` (DIRECT_COMPETITOR, ADJACENT_PARTNER, POTENTIAL_CLIENT).
 - **IF DIRECT_COMPETITOR**: DO NOT PITCH BASE FEATURES.
-- **IF POTENTIAL_CLIENT**: Standard direct pitch for ROI using our product suite.
+- **IF POTENTIAL_CLIENT**: Standard direct pitch for ROI using the proposed solutions.
 
 CRITICAL ROLE:
 1. ARBITRATOR: Resolve conflicts between agents.
 2. STRATEGIST: Choose the optimal Messaging Framework (AIDA, PAS, BAB).
-3. COMMANDER: Provide a one-sentence "Unified Command" and specify the exact product from our suite ({selling_products_list}) to lead with. FOR COMPETITORS: Always lead with **Glial** (Intelligence Infrastructure) or **Strategic Consulting**.
+3. COMMANDER: Provide a one-sentence "Unified Command" and specify the exact product(s) identified in the `Proposed Solutions` or `Strategic RAG Briefing` to lead with. The command MUST be hyper-specific to the solutions found in your intelligence streams.
 
-ZERO TOLERANCE: Never use generic product terms. Use ONLY the validated product names from our portfolio.
+ZERO TOLERANCE: Never use generic product terms. Use ONLY the specific product names identified in your intelligence streams.
 
 ### THE STRATEGIC HANDSHAKE (LINKEDIN RULE):
 - **refined_linkedin_message** MUST be strictly under 250 characters.
@@ -46,11 +46,12 @@ def narrative_arbitrator_node(state: AgentState):
     persona = state.get("user_profile_analysis", {}).get("engagement_persona", "Unknown")
     rag_briefing = state.get("strategic_rag_briefing", "No RAG briefing available.")
     
+    # Pivot Context (New)
+    is_strategic_pivot_fit = state.get("is_strategic_pivot_fit", False)
+    pivot_product_name = state.get("pivot_product_name", "N/A")
+    
     # 2. Build the Strategic Synthesis Prompt
     lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
-    selling_profile = state.get("selling_company_profile")
-    selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
-    selling_products_list = ", ".join([p.name for p in selling_profile.products]) if selling_profile else "Glial, IDP, Agentic KB"
     
     analysis_str = json.dumps(lead_score)
     penalty = lead_score.get("negative_penalty", 0)
@@ -71,6 +72,8 @@ def narrative_arbitrator_node(state: AgentState):
     - Lead Segment: {lead_segment}
     - Lead Score Analysis: {analysis_str}
     {alert_section}
+    - Strategic Pivot Fit: {is_strategic_pivot_fit}
+    - Pivot Product Name: {pivot_product_name}
     - Pain Points: {json.dumps(pain_points)}
     - Proposed Solutions: {json.dumps(solutions)}
 
@@ -83,8 +86,10 @@ def narrative_arbitrator_node(state: AgentState):
     3. STRATEGIZE: Based on the Lead Intelligence and Strategic Playbooks, determine the winning Narrative of Opportunity (OR Disqualification Reason).
     4. SELECT FRAMEWORK: Choose the optimal Messaging Framework (AIDA, PAS, BAB) from the playbooks. Explicitly explain WHY this framework fits the lead's persona (e.g., 'Skeptical technical buyers need PAS to validate pain first').
     5. IDENTIFY PROOF: From the "STRATEGIC PLAYBOOKS", identify 1-2 powerful "Proof Points".
-    6. COMMAND: Issue a one-sentence "Unified Command" that is prescriptive. If a "Poor Fit" or "High Risk", command to "Monitor" or "Deprioritize". If "Good Fit", command to "Strike".
-    7. JUSTIFY PRODUCT: Explicitly explain why you chose a specific Product (e.g., Glial). If "Poor Fit", explain why we should NOT pitch.
+    6. COMMAND: Issue a one-sentence "Unified Command" that is prescriptive and HYPER-SPECIFIC. If a "Poor Fit" or "High Risk", command to "Monitor" or "Deprioritize". If "Good Fit", command to "Strike".
+    7. PITCH JUSTIFICATION (BRANCHING LOGIC):
+        - **IF Strategic Pivot Fit is TRUE**: Provide a detailed justification for the `{pivot_product_name}`. Use the RAG briefing to explain how its specific features address the lead's unique friction.
+        - **IF Strategic Pivot Fit is FALSE**: Shift to **"Solution Based Pitching"**. Focus your justification on how the broader `Proposed Solutions` and AI transformation capabilities map directly to the organizational `Pain Points`.
     8. **SCORE CITATION**: In your `strategic_reasoning`, you MUST explicitly cite the 'Total Lead Score' and the key drivers (e.g., 'High Demographic Fit', 'Low Engagement') that led to your verdict.
     9. EXTRACT PROOFS: List the underlying specific insights used in `strategic_proof_points`.
     10. GUIDANCE: Provide the `refined_linkedin_message` and `refined_email_body` as STRATEGIC BLUEPRINTS. Use the **Strategic Handshake** (LinkedIn) and **Logical Gap Body** (Email) rules.
@@ -92,10 +97,7 @@ def narrative_arbitrator_node(state: AgentState):
     """
 
     messages = [
-        SystemMessage(content=CSO_SYSTEM_PROMPT.format(
-            selling_company_name=selling_company_name,
-            selling_products_list=selling_products_list
-        )),
+        SystemMessage(content=CSO_SYSTEM_PROMPT),
         HumanMessage(content=synthesis_input)
     ]
 

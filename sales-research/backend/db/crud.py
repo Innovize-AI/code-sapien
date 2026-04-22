@@ -274,6 +274,15 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
         url = normalize_linkedin_url(url)
         
         if url not in batch_map:
+            # Derive lead_source from competitor field
+            competitor = l.get("competitor", "")
+            if competitor == "Apollo":
+                lead_source = "apollo"
+            elif competitor and (competitor == "Keyword Search" or competitor == "Keyword" or competitor.startswith("Keyword:")):
+                lead_source = "keyword"
+            else:
+                lead_source = "competitor"
+
             batch_map[url] = {
                 "name": l.get("name"),
                 "headline": l.get("headline"),
@@ -286,7 +295,9 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "email": l.get("email"),
                 "email_verification_status": l.get("email_verification_status"),
                 "company_id": l.get("company_id"),
+                "website": l.get("website"), # Explicitly track website
                 "profile_metadata": l.get("profile_metadata") or {},
+                "lead_source": lead_source,
                 "interactions": []
             }
         elif l.get("headline") and not batch_map[url].get("headline"):
@@ -322,7 +333,112 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             "normalized_linkedin_url": normalize_linkedin_url(l.get("linkedin_url"))
         })
 
-    # 2. Fetch all existing profiles in one query
+    # 2. RESOLUTION PHASE: Resolve Apollo placeholders and Auto-Link Companies
+    # 2a. Apollo Placeholder Resolution
+    apollo_id_map = {} # ID -> Real URL
+    for url, data in batch_map.items():
+        pm = data.get("profile_metadata") or {}
+        a_id = pm.get("apollo_id")
+        if a_id and not url.startswith("apollo_id:"):
+            apollo_id_map[a_id] = url
+
+    if apollo_id_map:
+        # 1. Find existing placeholder profiles
+        placeholder_query = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url.startswith("apollo_id:"))
+        placeholder_res = await db.execute(placeholder_query)
+        placeholders = placeholder_res.scalars().all()
+        
+        # 2. Pre-fetch existing "Real" profiles to check for conflicts
+        real_urls = list(apollo_id_map.values())
+        norm_real_urls = [normalize_linkedin_url(u) for u in real_urls]
+        existing_real_query = select(IdentifiedProfile).where(IdentifiedProfile.normalized_linkedin_url.in_(norm_real_urls))
+        existing_real_res = await db.execute(existing_real_query)
+        # Map: normalized_url -> profile_object
+        existing_real_map = {p.normalized_linkedin_url: p for p in existing_real_res.scalars().all()}
+
+        for p in placeholders:
+            try:
+                # profile_metadata is a JSON string in a Text column
+                pm_raw = p.profile_metadata
+                p_pm = json.loads(pm_raw) if isinstance(pm_raw, str) and pm_raw.strip() else (pm_raw or {})
+                pid = p_pm.get("apollo_id")
+                
+                if pid in apollo_id_map:
+                    real_url = apollo_id_map[pid]
+                    norm_url = normalize_linkedin_url(real_url)
+                    
+                    if norm_url in existing_real_map:
+                        # CONFLICT: Real URL already exists as a full profile
+                        # MERGE: Add apollo_id to the existing full profile and delete placeholder
+                        target_p = existing_real_map[norm_url]
+                        target_pm_raw = target_p.profile_metadata
+                        target_pm = json.loads(target_pm_raw) if isinstance(target_pm_raw, str) and target_pm_raw.strip() else (target_pm_raw or {})
+                        
+                        target_pm["apollo_id"] = pid
+                        target_p.profile_metadata = json.dumps(target_pm)
+                        
+                        await db.delete(p)
+                        logger.info(f"MERGED Apollo placeholder {pid} into existing profile {norm_url}")
+                    else:
+                        # RESOLVE: Placeholder becomes the new real record
+                        p.linkedin_url = real_url
+                        p.normalized_linkedin_url = norm_url
+                        
+                        # Ensure apollo_id is in metadata after resolution
+                        p_pm["apollo_id"] = pid
+                        p.profile_metadata = json.dumps(p_pm)
+                        
+                        # Cache this as "existing" to avoid double-processing if another placeholder matches
+                        existing_real_map[norm_url] = p
+                        logger.info(f"RESOLVED Apollo placeholder: {pid} -> {real_url}")
+            except Exception as e:
+                logger.error(f"Error resolving placeholder for {p.linkedin_url}: {e}")
+
+    # 2b. Company Auto-Linking
+    domains_to_lookup = set()
+    url_to_domain = {}
+    for url, data in batch_map.items():
+        if data.get("company_id"): continue
+        
+        # Check metadata or website field
+        pm = data.get("profile_metadata") or {}
+        website = pm.get("website") or data.get("website")
+        if website:
+            # Actually use a simple domain extractor
+            domain = website.split("//")[-1].split("/")[0].replace("www.", "").lower().strip()
+            if domain and "." in domain:
+                domains_to_lookup.add(domain)
+                url_to_domain[url] = domain
+
+    if domains_to_lookup:
+        comp_query = select(Company).where(Company.domain.in_(list(domains_to_lookup)))
+        comp_res = await db.execute(comp_query)
+        existing_companies = {c.domain: c for c in comp_res.scalars().all()}
+        
+        for url, domain in url_to_domain.items():
+            if domain in existing_companies:
+                batch_map[url]["company_id"] = existing_companies[domain].id
+            else:
+                # Optional: Create skeleton company if name is available?
+                # For now, we only link existing or let classification handle creation.
+                # Actually, let's create it if we have a name!
+                comp_name = batch_map[url].get("profile_metadata", {}).get("company_name")
+                if comp_name:
+                    try:
+                        new_comp = Company(
+                            name=comp_name,
+                            domain=domain,
+                            website=f"https://{domain}"
+                        )
+                        db.add(new_comp)
+                        await db.flush() # Get ID
+                        batch_map[url]["company_id"] = new_comp.id
+                        existing_companies[domain] = new_comp # Cache for this batch
+                        logger.info(f"Created skeleton Company for {comp_name} ({domain})")
+                    except Exception as e:
+                        logger.error(f"Failed to create skeleton company {comp_name}: {e}")
+
+    # 3. Fetch all existing profiles in one query (including newly resolved ones)
     urls = [normalize_linkedin_url(u) for u in batch_map.keys()]
     query = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url.in_(urls))
     result = await db.execute(query)
@@ -407,6 +523,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "sentiment": data.get("sentiment") or p.sentiment,
                 "email": data.get("email") or p.email,
                 "email_verification_status": data.get("email_verification_status") or p.email_verification_status,
+                "lead_source": p.lead_source or data.get("lead_source"),  # never overwrite existing source
                 "comment_history": json.dumps(db_comments),
                 "source_posts": json.dumps(db_sources),
                 "interaction_history": json.dumps(db_history),
@@ -469,6 +586,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "sentiment": data.get("sentiment"),
                 "email": data.get("email"),
                 "email_verification_status": data.get("email_verification_status"),
+                "lead_source": data.get("lead_source"),
                 "comment_history": json.dumps(legacy_comments),
                 "source_posts": json.dumps(legacy_sources),
                 "interaction_history": json.dumps(new_history),
@@ -486,7 +604,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             IdentifiedProfile.__table__,
             upsert_rows,
             conflict_cols=["linkedin_url"],
-            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "email_verification_status", "profile_metadata", "normalized_linkedin_url"],
+            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "lead_source", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "email_verification_status", "profile_metadata", "normalized_linkedin_url"],
             chunk_size=100
         )
         logger.info(f"DEBUG: Batch upsert executed. Results count: {len(results)}")

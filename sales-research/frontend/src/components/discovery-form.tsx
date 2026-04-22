@@ -11,6 +11,12 @@ import {
   CheckSquare,
   Square,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Sliders,
+  Lock,
+  Unlock,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,13 +39,24 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { normalizeUrl } from "@/lib/utils";
+import { MultiSelect } from "@/components/ui/multi-select";
+import {
+  JOB_TITLE_OPTIONS,
+  LINKEDIN_INDUSTRIES,
+  COMPANY_SIZE_OPTIONS,
+  APOLLO_SENIORITY_OPTIONS,
+  APOLLO_EMAIL_STATUS_OPTIONS,
+  APOLLO_INDUSTRIES,
+} from "@/lib/constants";
 import {
   discoverLeads,
+  enrichLeads,
   checkExistingReports,
   discoverCompetitorLeads,
   getCompetitors,
   Competitor,
   API_URL,
+  LeadDiscoveryInput,
 } from "@/lib/api";
 import {
   Card,
@@ -52,11 +69,30 @@ import { LeadStatus } from "@/components/bulk-analysis-modal";
 
 const findFormSchema = z
   .object({
-    industry: z.string().optional(),
-    job_title: z.string().optional(),
+    industry: z.union([z.string(), z.array(z.string())]).optional(),
+    job_title: z.union([z.string(), z.array(z.string())]).optional(),
+    include_similar_titles: z.boolean().optional(),
     location: z.string().optional(),
     provider: z.enum(["tavily", "apollo", "competitor", "linkedin_keyword"]),
     keywords: z.string().optional(),
+    person_seniorities: z.array(z.string()).optional(),
+    contact_email_status: z.array(z.string()).optional(),
+    organization_ids: z.string().optional(),
+    organization_locations: z.string().optional(),
+    company_size: z.array(z.string()).optional(),
+    revenue_min: z.string().optional(),
+    revenue_max: z.string().optional(),
+    technologies: z.string().optional(),
+    technologies_all: z.string().optional(),
+    technologies_exclude: z.string().optional(),
+    job_postings: z.string().optional(),
+    organization_job_locations: z.string().optional(),
+    organization_num_jobs_min: z.string().optional(),
+    organization_num_jobs_max: z.string().optional(),
+    organization_job_posted_at_min: z.string().optional(),
+    organization_job_posted_at_max: z.string().optional(),
+    organization_domains: z.string().optional(),
+    q_keywords: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.provider === "linkedin_keyword") {
@@ -68,29 +104,44 @@ const findFormSchema = z
         });
       }
     } else if (data.provider !== "competitor") {
-      if (!data.industry || data.industry.trim().length < 2) {
+      const industry = Array.isArray(data.industry) ? data.industry : [data.industry];
+      const jobTitle = Array.isArray(data.job_title) ? data.job_title : [data.job_title];
+      
+      if (!industry.length || !industry[0]?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Industry is required",
           path: ["industry"],
         });
       }
-      if (!data.job_title || data.job_title.trim().length < 2) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Job title is required",
-          path: ["job_title"],
-        });
-      }
     }
   });
 
 type FindFormValues = {
-  industry?: string;
-  job_title?: string;
+  industry?: string | string[];
+  job_title?: string | string[];
+  include_similar_titles?: boolean;
   location?: string;
   provider: "tavily" | "apollo" | "competitor" | "linkedin_keyword";
   keywords?: string;
+  person_seniorities?: string[];
+  contact_email_status?: string[];
+  organization_ids?: string;
+  organization_locations?: string;
+  company_size?: string[];
+  revenue_min?: string;
+  revenue_max?: string;
+  technologies?: string;
+  technologies_all?: string;
+  technologies_exclude?: string;
+  job_postings?: string;
+  organization_job_locations?: string;
+  organization_num_jobs_min?: string;
+  organization_num_jobs_max?: string;
+  organization_job_posted_at_min?: string;
+  organization_job_posted_at_max?: string;
+  organization_domains?: string;
+  q_keywords?: string;
 };
 
 export function DiscoveryForm({
@@ -107,12 +158,14 @@ export function DiscoveryForm({
 }) {
   const [keywordInput, setKeywordInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [results, setResults] = useState<
     {
       url: string;
       website: string;
       name?: string;
       comment?: string;
+      is_enriched?: boolean;
       metadata?: any;
       fit_score?: number;
       fit_reasoning?: string;
@@ -140,22 +193,25 @@ export function DiscoveryForm({
         const data = JSON.parse(event.data);
         if (data.type === "classification_update" && data.leads) {
           setResults((prevResults) => {
-            // Create a map for faster lookup
+            // Create a map for faster lookup (using normalized URLs)
             const updatesMap = new Map<string, any>(
-              data.leads.map((l: any) => [l.linkedin_url, l]),
+              data.leads.map((l: any) => [normalizeUrl(l.linkedin_url), l]),
             );
 
             return prevResults.map((lead) => {
-              const update = updatesMap.get(lead.url);
+              const leadNorm = normalizeUrl(lead.url);
+              const update = updatesMap.get(leadNorm);
               if (update) {
                 return {
                   ...lead,
+                  name: lead.name || update.name, // Update name if missing
                   metadata: {
                     ...lead.metadata,
                     is_fit: update.is_fit,
                     is_competitor: update.is_competitor,
                     is_decision_maker: update.is_decision_maker,
                     fit_reasoning: update.fit_reasoning,
+                    apollo_id: update.apollo_id || lead.metadata?.apollo_id
                   },
                 };
               }
@@ -185,15 +241,64 @@ export function DiscoveryForm({
     };
     load();
   }, []);
+  
+  const handleEnrich = async (personIds: string[]) => {
+    if (isLoading || personIds.length === 0) return [];
+    
+    setIsLoading(true);
+    try {
+      const data = await enrichLeads(personIds);
+      if (data.leads) {
+        setResults(prev => prev.map(lead => {
+          const enriched = data.leads.find((l: any) => l.metadata?.apollo_id === lead.metadata?.apollo_id);
+          if (enriched) {
+            return {
+              ...lead,
+              ...enriched,
+              is_enriched: true
+            };
+          }
+          return lead;
+        }));
+        return data.leads as any[];
+      }
+      return [];
+    } catch (err) {
+      console.error("Enrichment failed:", err);
+      setError("Failed to enrich leads.");
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const findForm = useForm<FindFormValues>({
     resolver: zodResolver(findFormSchema),
     defaultValues: {
-      industry: "",
-      job_title: "",
+      industry: [],
+      job_title: [],
+      include_similar_titles: true,
       location: "",
       provider: "tavily",
       keywords: "",
+      person_seniorities: [],
+      contact_email_status: [],
+      organization_ids: "",
+      organization_locations: "",
+      company_size: [],
+      revenue_min: "",
+      revenue_max: "",
+      technologies: "",
+      technologies_all: "",
+      technologies_exclude: "",
+      job_postings: "",
+      organization_job_locations: "",
+      organization_num_jobs_min: "",
+      organization_num_jobs_max: "",
+      organization_job_posted_at_min: "",
+      organization_job_posted_at_max: "",
+      organization_domains: "",
+      q_keywords: "",
     },
   });
 
@@ -296,8 +401,8 @@ export function DiscoveryForm({
       } else if (values.provider === "linkedin_keyword") {
         // Pass dummy values for required fields
         const payload = {
-          industry: values.industry || "Keyword Search",
-          job_title: values.job_title || "Any",
+          industry: Array.isArray(values.industry) ? values.industry.join(", ") : values.industry || "Keyword Search",
+          job_title: Array.isArray(values.job_title) ? values.job_title.join(", ") : values.job_title || "Any",
           location: values.location,
           provider: values.provider,
           keywords: values.keywords
@@ -343,7 +448,70 @@ export function DiscoveryForm({
           setError(data.error);
         }
       } else {
-        const data = await discoverLeads(values as any);
+        const jobTitles = Array.isArray(values.job_title) ? values.job_title : [values.job_title || ""];
+        const industries = Array.isArray(values.industry) ? values.industry : [values.industry || ""];
+        
+        // Robust construction: only send fields the backend expects
+        const payload: LeadDiscoveryInput = {
+          provider: values.provider,
+          location: values.location || undefined,
+          job_title: values.provider === 'tavily' ? jobTitles.join(" OR ") : jobTitles[0],
+          industry: values.provider === 'tavily' ? industries.join(" OR ") : industries[0],
+          company_size: values.company_size
+        };
+
+        if (values.provider === 'apollo') {
+          payload.person_titles = jobTitles;
+          payload.industry = industries[0];
+          payload.include_similar_titles = values.include_similar_titles;
+          payload.person_seniorities = values.person_seniorities;
+          payload.contact_email_status = values.contact_email_status;
+          payload.organization_num_employees_ranges = values.company_size;
+          payload.revenue_min = values.revenue_min ? parseInt(values.revenue_min) : undefined;
+          payload.revenue_max = values.revenue_max ? parseInt(values.revenue_max) : undefined;
+
+          if (values.organization_ids) {
+            payload.organization_ids = values.organization_ids.split(",").map(id => id.trim()).filter(id => id);
+          }
+          if (values.organization_locations) {
+            payload.organization_locations = values.organization_locations.split(",").map(l => l.trim()).filter(l => l);
+          }
+          if (values.technologies) {
+            payload.currently_using_any_of_technology_uids = values.technologies.split(",").map(t => t.trim()).filter(t => t);
+          }
+          if (values.technologies_all) {
+            payload.currently_using_all_of_technology_uids = values.technologies_all.split(",").map(t => t.trim()).filter(t => t);
+          }
+          if (values.technologies_exclude) {
+            payload.currently_not_using_any_of_technology_uids = values.technologies_exclude.split(",").map(t => t.trim()).filter(t => t);
+          }
+          if (values.job_postings) {
+            payload.q_organization_job_titles = values.job_postings.split(",").map(j => j.trim()).filter(j => j);
+          }
+          if (values.organization_job_locations) {
+            payload.organization_job_locations = values.organization_job_locations.split(",").map(l => l.trim()).filter(l => l);
+          }
+          if (values.organization_num_jobs_min) {
+            payload.organization_num_jobs_range_min = parseInt(values.organization_num_jobs_min);
+          }
+          if (values.organization_num_jobs_max) {
+            payload.organization_num_jobs_range_max = parseInt(values.organization_num_jobs_max);
+          }
+          if (values.organization_job_posted_at_min) {
+            payload.organization_job_posted_at_range_min = values.organization_job_posted_at_min;
+          }
+          if (values.organization_job_posted_at_max) {
+            payload.organization_job_posted_at_range_max = values.organization_job_posted_at_max;
+          }
+          if (values.organization_domains) {
+            payload.organization_domains = values.organization_domains.split(",").map(d => d.trim()).filter(d => d);
+          }
+          if (values.q_keywords) {
+            payload.q_keywords = values.q_keywords;
+          }
+        }
+
+        const data = await discoverLeads(payload);
         if (data.leads) {
           setResults(data.leads);
           const checkLeads = data.leads.map(
@@ -429,7 +597,13 @@ export function DiscoveryForm({
                       <FormItem>
                         <FormLabel>Industry</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. FinTech" {...field} />
+                          <MultiSelect
+                            options={findForm.watch("provider") === "apollo" ? APOLLO_INDUSTRIES : LINKEDIN_INDUSTRIES}
+                            value={Array.isArray(field.value) ? field.value : []}
+                            onChange={field.onChange}
+                            placeholder="Select industries..."
+                            allowCustom
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -442,18 +616,43 @@ export function DiscoveryForm({
                       <FormItem>
                         <FormLabel>Job Title</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. CTO" {...field} />
+                          <MultiSelect
+                            options={JOB_TITLE_OPTIONS}
+                            value={Array.isArray(field.value) ? field.value : []}
+                            onChange={field.onChange}
+                            placeholder="Select job titles..."
+                            allowCustom
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  {findForm.watch("provider") === "apollo" && (
+                    <FormField
+                      control={findForm.control}
+                      name="include_similar_titles"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2 -mt-1">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value ?? true}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="!mt-0 text-xs font-normal text-muted-foreground cursor-pointer">
+                            Include similar / fuzzy-matched titles
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={findForm.control}
                     name="location"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Location (Optional)</FormLabel>
+                        <FormLabel>{findForm.watch("provider") === "apollo" ? "Person Location" : "Location (Optional)"}</FormLabel>
                         <FormControl>
                           <Input placeholder="e.g. San Francisco" {...field} />
                         </FormControl>
@@ -461,6 +660,290 @@ export function DiscoveryForm({
                       </FormItem>
                     )}
                   />
+
+                  {/* Apollo Advanced Filters */}
+                  {findForm.watch("provider") === "apollo" && (
+                    <div className="space-y-4 pt-2 border-t mt-4">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full flex items-center justify-between text-muted-foreground hover:text-primary transition-colors h-8"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                      >
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
+                          <Sliders className="w-3 h-3" />
+                          Advanced Reach Filters
+                        </div>
+                        {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+
+                      {showAdvanced && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                          <FormField
+                            control={findForm.control}
+                            name="q_keywords"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Lead Keywords / Bio</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. AI enthusiast, Series A founder, sustainability" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Search for keywords in person bio, interests, or profile.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={findForm.control}
+                              name="person_seniorities"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Seniority</FormLabel>
+                                  <FormControl>
+                                    <MultiSelect
+                                      options={APOLLO_SENIORITY_OPTIONS}
+                                      value={field.value || []}
+                                      onChange={field.onChange}
+                                      placeholder="Any seniority"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={findForm.control}
+                              name="contact_email_status"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email Status</FormLabel>
+                                  <FormControl>
+                                    <MultiSelect
+                                      options={APOLLO_EMAIL_STATUS_OPTIONS}
+                                      value={field.value || []}
+                                      onChange={field.onChange}
+                                      placeholder="e.g. Verified"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={findForm.control}
+                            name="company_size"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Headcount</FormLabel>
+                                <FormControl>
+                                  <MultiSelect
+                                    options={COMPANY_SIZE_OPTIONS}
+                                    value={field.value || []}
+                                    onChange={field.onChange}
+                                    placeholder="Any size"
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={findForm.control}
+                              name="revenue_min"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Revenue Min ($)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Min" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={findForm.control}
+                              name="revenue_max"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Revenue Max ($)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Max" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={findForm.control}
+                            name="organization_locations"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Company HQ Location</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. New York, United States (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Filter by company headquarters.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="technologies"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Uses Any Technology</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. salesforce, aws (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Company uses at least one of these.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="technologies_all"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Uses All Technologies</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. hubspot, stripe (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Company must use every one of these.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="technologies_exclude"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Exclude Technologies</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. competitor_tool (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Exclude companies using any of these.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="job_postings"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Hiring For (Job Title Keywords)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. Sales, Python (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Search active job posting titles.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="organization_job_locations"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Hiring In (Locations)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. Austin, Remote (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Companies actively hiring in these locations.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={findForm.control}
+                              name="organization_num_jobs_min"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Active Jobs Min</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Min" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={findForm.control}
+                              name="organization_num_jobs_max"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Active Jobs Max</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Max" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={findForm.control}
+                              name="organization_job_posted_at_min"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Job Posted After</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={findForm.control}
+                              name="organization_job_posted_at_max"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Job Posted Before</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={findForm.control}
+                            name="organization_domains"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Target Domains</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="google.com, apple.com" {...field} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="organization_ids"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Apollo Company IDs</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="5f3e4b2a..., 6a1c9d3f... (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Target specific companies by their Apollo ID.</p>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -675,20 +1158,66 @@ export function DiscoveryForm({
                     Re-run All
                   </label>
                 </div>
+                {selectedUrls.length > 0 && results.some(r => selectedUrls.includes(r.url) && r.is_enriched === false) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    onClick={() => {
+                      const idsToEnrich = results
+                        .filter(r => selectedUrls.includes(r.url) && r.is_enriched === false)
+                        .map(r => r.metadata?.apollo_id)
+                        .filter(Boolean);
+                      handleEnrich(idsToEnrich);
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    Enrich Selected
+                  </Button>
+                )}
                 <Button
                   size="sm"
-                  onClick={() => {
+                  disabled={isLoading}
+                  onClick={async () => {
                     if (onBulkSelect) {
+                      const currentSelectedUrls = [...selectedUrls];
                       const selectedLeads = results.filter((r) =>
-                        selectedUrls.includes(r.url),
+                        currentSelectedUrls.includes(r.url),
                       );
-                      onBulkSelect(selectedLeads, { refresh: refreshAll });
+                      
+                      const unenrichedIds = selectedLeads
+                        .filter(r => r.is_enriched === false)
+                        .map(r => r.metadata?.apollo_id)
+                        .filter(Boolean);
+
+                      if (unenrichedIds.length > 0) {
+                        // Automatically enrich before analysis
+                        const enrichedResults = await handleEnrich(unenrichedIds);
+                        
+                        // Combine already enriched leads with newly enriched ones
+                        const alreadyEnrichedLeads = selectedLeads.filter(r => r.is_enriched !== false);
+                        const validNewLeads = enrichedResults.filter((l: any) => l.url && !l.url.startsWith('apollo_id:'));
+                        
+                        const allValidLeads = [...alreadyEnrichedLeads, ...validNewLeads];
+                        
+                        if (allValidLeads.length > 0) {
+                          onBulkSelect(allValidLeads, { refresh: refreshAll });
+                        }
+                      } else {
+                        onBulkSelect(selectedLeads, { refresh: refreshAll });
+                      }
+                      
                       setSelectedUrls([]); // Clear selection to allow new additions immediately
                       setRefreshAll(false);
                     }
                   }}
                 >
-                  Analyze Selected ({selectedUrls.length})
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    `Analyze Selected (${selectedUrls.length})`
+                  )}
                 </Button>
               </div>
             )}
@@ -697,8 +1226,9 @@ export function DiscoveryForm({
         {results.length > 0 ? (
           <div className="grid gap-3">
             {results.map((lead, i) => {
+              const leadNorm = normalizeUrl(lead.url);
               const status = leadsStatus?.find(
-                (s) => s.url === lead.url,
+                (s) => normalizeUrl(s.url) === leadNorm,
               )?.status;
               return (
                 <Card
@@ -714,15 +1244,32 @@ export function DiscoveryForm({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <a
-                            href={lead.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium truncate text-sm hover:underline hover:text-primary transition-colors"
-                          >
-                            {lead.name || lead.url}
-                          </a>
+                          {lead.is_enriched === false ? (
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              <span className="text-sm font-medium text-muted-foreground truncate italic">
+                                {lead.name || "Unenriched Lead"}
+                              </span>
+                            </div>
+                          ) : (
+                            <a
+                              href={lead.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium truncate text-sm hover:underline hover:text-primary transition-colors"
+                            >
+                              {lead.name || lead.url}
+                            </a>
+                          )}
                           <div className="flex flex-wrap gap-1.5 ml-2">
+                            {lead.is_enriched === false && (
+                              <Badge 
+                                variant="outline" 
+                                className="text-[8px] h-3.5 px-1 py-0 uppercase tracking-tighter font-bold bg-amber-50 text-amber-700 border-amber-200"
+                              >
+                                Apollo Locked
+                              </Badge>
+                            )}
                             {status === "analyzing" && (
                               <Badge
                                 variant="secondary"
@@ -785,14 +1332,26 @@ export function DiscoveryForm({
                           </div>
                         </div>
 
-                        {status === "completed" && onSelect && (
+                        {lead.is_enriched === false ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[10px] px-2 ml-2 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors shrink-0 gap-1.5"
+                            onClick={() => handleEnrich([lead.metadata?.apollo_id].filter(Boolean) as string[])}
+                            disabled={isLoading}
+                          >
+                            <Zap className="w-3 h-3 text-amber-500" />
+                            Unlock Profile
+                          </Button>
+                        ) : status === "completed" && onSelect && (
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-7 text-xs px-2 ml-2 hover:bg-primary/5 hover:text-primary transition-colors shrink-0"
                             onClick={() => {
+                              const leadNorm = normalizeUrl(lead.url);
                               const leadResult = leadsStatus?.find(
-                                (s) => s.url === lead.url,
+                                (s) => normalizeUrl(s.url) === leadNorm,
                               );
                               if (leadResult && leadResult.result) {
                                 onSelect({
@@ -808,8 +1367,29 @@ export function DiscoveryForm({
                         )}
                       </div>
 
-                      <div className="text-xs text-muted-foreground truncate mt-0.5">
-                        {lead.website}
+                      <div className="text-xs font-semibold text-primary truncate mt-0.5">
+                        {lead.comment}
+                      </div>
+
+                      <div className="text-[10px] text-muted-foreground truncate mt-0.5 flex items-center gap-2">
+                        <span>{lead.website}</span>
+                        {lead.metadata?.email_status && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-[8px] h-3.5 px-1 py-0 uppercase tracking-tighter font-bold ${
+                              lead.metadata.email_status === 'verified' ? 'bg-green-50 text-green-700 border-green-200' : 
+                              lead.metadata.email_status === 'extrapolated' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              'bg-gray-50 text-gray-500 border-gray-200'
+                            }`}
+                          >
+                            {lead.metadata.email_status}
+                          </Badge>
+                        )}
+                        {lead.metadata?.seniority && (
+                          <span className="text-[9px] text-muted-foreground bg-muted/30 px-1 rounded border border-muted/50">
+                            {lead.metadata.seniority}
+                          </span>
+                        )}
                       </div>
 
                       {lead.metadata?.fit_reasoning && (

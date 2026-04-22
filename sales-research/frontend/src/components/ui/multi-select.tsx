@@ -11,8 +11,13 @@ import {
 } from "@/components/ui/form"
 import { cn } from "@/lib/utils"
 
+export interface MultiSelectOption {
+    label: string
+    value: string
+}
+
 export interface MultiSelectProps {
-    options: string[]
+    options: (string | MultiSelectOption)[]
     value: string | string[]
     onChange: (value: string[]) => void
     placeholder?: string
@@ -20,6 +25,7 @@ export interface MultiSelectProps {
     allowCustom?: boolean
     disabled?: boolean
     hideSearch?: boolean
+    className?: string
 }
 
 export function MultiSelect({
@@ -31,34 +37,63 @@ export function MultiSelect({
     allowCustom = false,
     disabled = false,
     hideSearch = false,
+    className,
 }: MultiSelectProps) {
     const [open, setOpen] = React.useState(false)
     const [search, setSearch] = React.useState("")
 
-    const uniqueOptions = React.useMemo(() => Array.from(new Set(options)), [options])
+    const getOptionLabel = (option: string | MultiSelectOption) => 
+        typeof option === "string" ? option : option.label
 
-    const selected = React.useMemo(() => {
+    const getOptionValue = (option: string | MultiSelectOption) => 
+        typeof option === "string" ? option : option.value
+
+    const uniqueOptions = React.useMemo(() => {
+        const seen = new Set()
+        return options.filter(option => {
+            const val = getOptionValue(option)
+            if (seen.has(val)) return false
+            seen.add(val)
+            return true
+        })
+    }, [options])
+
+    const selectedValues = React.useMemo(() => {
         if (!value) return []
         if (Array.isArray(value)) return value
         return value.split(",").map(s => s.trim()).filter(Boolean)
     }, [value])
 
-    const filteredOptions = uniqueOptions.filter(option =>
-        (hideSearch || option.toLowerCase().includes(search.toLowerCase())) && !selected.includes(option)
-    )
+    const filteredOptions = uniqueOptions.filter(option => {
+        const optionLabel = getOptionLabel(option)
+        const optionValue = getOptionValue(option)
+        const matchesSearch = hideSearch || optionLabel.toLowerCase().includes(search.toLowerCase())
+        const isNotSelected = !selectedValues.includes(optionValue)
+        return matchesSearch && isNotSelected
+    })
 
-    const handleUnselect = (item: string) => {
+    const handleUnselect = (val: string) => {
         if (disabled) return
-        onChange(selected.filter((i) => i !== item))
+        onChange(selectedValues.filter((v) => v !== val))
     }
 
-    const handleSelect = (item: string) => {
+    const handleSelect = (val: string) => {
         if (disabled) return
-        if (!selected.includes(item)) {
-            onChange([...selected, item])
+        if (!selectedValues.includes(val)) {
+            onChange([...selectedValues, val])
         }
         setSearch("")
     }
+
+    const optionsMap = React.useMemo(() => {
+        const map = new Map<string, string>()
+        options.forEach(option => {
+            map.set(getOptionValue(option), getOptionLabel(option))
+        })
+        return map
+    }, [options, getOptionValue, getOptionLabel])
+
+    const getItemLabel = (val: string) => optionsMap.get(val) || val
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (disabled) return
@@ -67,13 +102,13 @@ export function MultiSelect({
             e.stopPropagation()
             handleSelect(search.trim())
         }
-        if (e.key === "Backspace" && !search && selected.length > 0) {
-            handleUnselect(selected[selected.length - 1])
+        if (e.key === "Backspace" && !search && selectedValues.length > 0) {
+            handleUnselect(selectedValues[selectedValues.length - 1])
         }
     }
 
     return (
-        <div className="space-y-2">
+        <div className={cn("space-y-2", className)}>
             {label && <FormLabel>{label}</FormLabel>}
             <div className="relative">
                 <div
@@ -84,31 +119,31 @@ export function MultiSelect({
                     )}
                     onClick={() => !disabled && setOpen(!open)}
                 >
-                    {selected.length > 0 ? (
-                        selected.map((item) => (
+                    {selectedValues.length > 0 ? (
+                        selectedValues.map((val) => (
                             <Badge
-                                key={item}
+                                key={val}
                                 variant="secondary"
                                 className={cn(
                                     "bg-primary/10 text-primary border-primary/20 transition-colors py-0.5 pl-2 pr-1 gap-1",
                                     !disabled && "hover:bg-primary/20"
                                 )}
                             >
-                                {item}
+                                {getItemLabel(val)}
                                 {!disabled && (
                                     <button
                                         type="button"
                                         className="rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-primary/30 p-0.5"
                                         onKeyDown={(e) => {
                                             if (e.key === "Enter") {
-                                                handleUnselect(item)
+                                                handleUnselect(val)
                                             }
                                         }}
                                         onMouseDown={(e) => {
                                             e.preventDefault()
                                             e.stopPropagation()
                                         }}
-                                        onClick={() => handleUnselect(item)}
+                                        onClick={() => handleUnselect(val)}
                                     >
                                         <X className="h-3 w-3" />
                                     </button>
@@ -144,7 +179,7 @@ export function MultiSelect({
                                 </div>
                             )}
                             <div className="max-h-[300px] overflow-y-auto p-1 custom-scrollbar">
-                                {allowCustom && !hideSearch && search.trim() && !options.some(o => o.toLowerCase() === search.toLowerCase()) && (
+                                {allowCustom && !hideSearch && search.trim() && !options.some(o => getOptionLabel(o).toLowerCase() === search.toLowerCase()) && (
                                     <div
                                         className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
                                         onClick={(e) => {
@@ -161,35 +196,39 @@ export function MultiSelect({
                                 {filteredOptions.length === 0 && (!allowCustom || !search.trim()) ? (
                                     <p className="py-6 text-center text-sm text-muted-foreground">No results found.</p>
                                 ) : (
-                                    filteredOptions.map((option) => (
-                                        <div
-                                            key={option}
-                                            className={cn(
-                                                "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-primary/10 hover:text-primary transition-colors",
-                                            )}
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleSelect(option)
-                                            }}
-                                        >
-                                            <Check className={cn("mr-2 h-4 w-4 opacity-0")} />
-                                            {option}
-                                        </div>
-                                    ))
+                                    filteredOptions.map((option) => {
+                                        const label = getOptionLabel(option)
+                                        const val = getOptionValue(option)
+                                        return (
+                                            <div
+                                                key={val}
+                                                className={cn(
+                                                    "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-primary/10 hover:text-primary transition-colors",
+                                                )}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleSelect(val)
+                                                }}
+                                            >
+                                                <Check className={cn("mr-2 h-4 w-4 opacity-0")} />
+                                                {label}
+                                            </div>
+                                        )
+                                    })
                                 )}
-                                {selected.length > 0 && (
+                                {selectedValues.length > 0 && (
                                     <>
                                         <div className="h-px bg-border my-1" />
                                         <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                                             Selected
                                         </div>
-                                        {selected.map((item) => (
+                                        {selectedValues.map((val) => (
                                             <div
-                                                key={`sel-${item}`}
+                                                key={`sel-${val}`}
                                                 className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-2 text-sm outline-none bg-primary/5 text-primary/80"
                                             >
                                                 <Check className="mr-2 h-4 w-4 opacity-100" />
-                                                {item}
+                                                {getItemLabel(val)}
                                             </div>
                                         ))}
                                     </>

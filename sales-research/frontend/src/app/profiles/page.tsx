@@ -9,7 +9,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { getIdentifiedProfiles, IdentifiedProfile, API_URL } from "@/lib/api";
+import { getIdentifiedProfiles, IdentifiedProfile, API_URL, enrichLeads } from "@/lib/api";
 import {
   Loader2,
   ExternalLink,
@@ -90,8 +90,28 @@ export default function ProfilesPage() {
   const [profiles, setProfiles] = useState<IdentifiedProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [enrichingIds, setEnrichingIds] = useState<Set<string>>(new Set());
+  const handleEnrich = async (personIds: string[]) => {
+    try {
+      setEnrichingIds(prev => new Set([...prev, ...personIds]));
+      await enrichLeads(personIds);
+      // Success - the backend will push updates via SSE when done
+    } catch (err) {
+      console.error("Enrichment failed", err);
+      setError("Failed to enrich profile");
+    } finally {
+      setEnrichingIds(prev => {
+        const next = new Set(prev);
+        personIds.forEach(id => next.delete(id));
+        return next;
+      });
+    }
+  };
+
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>({ all: 0, apollo: 0, keyword: 0, competitor: 0 });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -165,12 +185,22 @@ export default function ProfilesPage() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
+  const getDateRange = () => {
+    const now = new Date();
+    if (dateFilter === "today") return [`${now.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`] as [string, string];
+    if (dateFilter === "yesterday") { const y = new Date(now); y.setDate(y.getDate() - 1); return [`${y.toISOString().split('T')[0]}T00:00:00Z`, `${y.toISOString().split('T')[0]}T23:59:59Z`] as [string, string]; }
+    if (dateFilter === "last_week") { const w = new Date(now); w.setDate(w.getDate() - 7); return [`${w.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`] as [string, string]; }
+    if (dateFilter === "last_month") { const m = new Date(now); m.setDate(m.getDate() - 30); return [`${m.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`] as [string, string]; }
+    return [undefined, undefined] as [undefined, undefined];
+  };
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       async function loadProfiles() {
         setIsLoading(true);
         try {
           const skip = page * PAGE_SIZE;
+          const [date_start, date_end] = getDateRange();
           const data = await getIdentifiedProfiles(
             skip,
             PAGE_SIZE,
@@ -178,28 +208,13 @@ export default function ProfilesPage() {
             statusFilter.length > 0 ? statusFilter : "all",
             sortBy,
             sortOrder,
-            ...(() => {
-              const now = new Date();
-              if (dateFilter === "today") {
-                return [`${now.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`];
-              }
-              if (dateFilter === "yesterday") {
-                const y = new Date(now); y.setDate(y.getDate() - 1);
-                return [`${y.toISOString().split('T')[0]}T00:00:00Z`, `${y.toISOString().split('T')[0]}T23:59:59Z`];
-              }
-              if (dateFilter === "last_week") {
-                const w = new Date(now); w.setDate(w.getDate() - 7);
-                return [`${w.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`];
-              }
-              if (dateFilter === "last_month") {
-                const m = new Date(now); m.setDate(m.getDate() - 30);
-                return [`${m.toISOString().split('T')[0]}T00:00:00Z`, `${now.toISOString().split('T')[0]}T23:59:59Z`];
-              }
-              return [undefined, undefined];
-            })()
+            date_start,
+            date_end,
+            activeTab,
           );
           setProfiles(data.profiles || []);
           setTotal(data.total || 0);
+          if (data.tab_counts) setTabCounts(data.tab_counts);
         } catch (err) {
           setError("Failed to load identified profiles");
           console.error(err);
@@ -208,10 +223,10 @@ export default function ProfilesPage() {
         }
       }
       loadProfiles();
-    }, 500); // Debounce search
+    }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [page, searchQuery, statusFilter, sortBy, sortOrder, dateFilter]);
+  }, [page, searchQuery, statusFilter, sortBy, sortOrder, dateFilter, activeTab]);
 
   // Click outside for status filter
   useEffect(() => {
@@ -238,20 +253,26 @@ export default function ProfilesPage() {
         const data = JSON.parse(event.data);
         if (data.type === "classification_update" && data.leads) {
           setProfiles((prevProfiles) => {
-            // Create a map for faster lookup
-            const updatesMap = new Map<string, any>(
-              data.leads.map((l: any) => [l.linkedin_url, l]),
-            );
-
             return prevProfiles.map((profile) => {
-              const update = updatesMap.get(profile.linkedin_url);
+              // Find matching update: by id, old_url, or current url
+              const update = data.leads.find(
+                (l: any) =>
+                  (l.id && l.id === profile.id) ||
+                  (l.old_linkedin_url &&
+                    l.old_linkedin_url === profile.linkedin_url) ||
+                  l.linkedin_url === profile.linkedin_url,
+              );
+
               if (update) {
                 return {
                   ...profile,
-                  is_fit: update.is_fit,
-                  is_competitor: update.is_competitor,
-                  is_decision_maker: update.is_decision_maker,
-                  fit_reasoning: update.fit_reasoning,
+                  name: update.name || profile.name,
+                  headline: update.headline || profile.headline,
+                  linkedin_url: update.linkedin_url || profile.linkedin_url,
+                  is_fit: update.is_fit !== undefined ? update.is_fit : profile.is_fit,
+                  is_competitor: update.is_competitor !== undefined ? update.is_competitor : profile.is_competitor,
+                  is_decision_maker: update.is_decision_maker !== undefined ? update.is_decision_maker : profile.is_decision_maker,
+                  fit_reasoning: update.fit_reasoning || profile.fit_reasoning,
                 };
               }
               return profile;
@@ -283,34 +304,8 @@ export default function ProfilesPage() {
     setSelectedIds(newSelected);
   };
 
-  const isKeywordLead = (profile: IdentifiedProfile) => {
-    try {
-      const history = JSON.parse(profile.interaction_history || "[]");
-      return history.some(
-        (h: any) =>
-          h.competitor === "Keyword Search" ||
-          h.competitor === "Keyword" ||
-          (h.competitor && h.competitor.startsWith("Keyword:")),
-      );
-    } catch (e) {
-      return false;
-    }
-  };
-
-  const keywordProfiles = profiles.filter((p: IdentifiedProfile) =>
-    isKeywordLead(p),
-  );
-  const competitorProfiles = profiles.filter(
-    (p: IdentifiedProfile) => !isKeywordLead(p),
-  );
-
-  const getActiveConfig = () => {
-    if (activeTab === "keyword")
-      return { list: keywordProfiles, total: keywordProfiles.length };
-    if (activeTab === "competitor")
-      return { list: competitorProfiles, total: competitorProfiles.length };
-    return { list: profiles, total: profiles.length };
-  };
+  // Profiles are server-filtered by activeTab — use directly
+  const getActiveConfig = () => ({ list: profiles, total });
 
   const getTouchpointStats = (profile: IdentifiedProfile) => {
     let keywordCount = 0;
@@ -1027,10 +1022,14 @@ export default function ProfilesPage() {
                   : profile.latest_report_id;
 
               let interactionHistory: any[] = [];
+              let profileMeta: any = {};
               try {
                 interactionHistory = JSON.parse(
                   profile.interaction_history || "[]",
                 );
+              } catch (e) { }
+              try {
+                profileMeta = JSON.parse(profile.profile_metadata || "{}");
               } catch (e) { }
 
               return (
@@ -1039,7 +1038,7 @@ export default function ProfilesPage() {
                     <Checkbox
                       checked={selectedIds.has(profile.id)}
                       onCheckedChange={() => toggleSelection(profile.id)}
-                      disabled={status === "analyzing" || status === "pending"}
+                      disabled={status === "analyzing" || status === "pending" || profile.linkedin_url.startsWith("apollo_id:")}
                     />
                   </TableCell>
                   <TableCell>
@@ -1094,13 +1093,13 @@ export default function ProfilesPage() {
                       }}
                     >
                       <span className="text-xs font-semibold truncate max-w-[150px] group-hover/company:text-primary group-hover/company:underline">
-                        {profile.company?.name || "—"}
+                        {profile.company?.name || profile.profile_metadata?.company_name || "—"}
                       </span>
-                      {profile.company?.website && (
+                      {profile.company?.website || profile.website ? (
                         <span className="text-[9px] text-muted-foreground truncate max-w-[150px] opacity-70">
-                          {profile.company.website.replace(/^https?:\/\//, "")}
+                          {(profile.company?.website || profile.website || "").replace(/^https?:\/\//, "")}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -1110,12 +1109,12 @@ export default function ProfilesPage() {
                     >
                       {(() => {
                         try {
-                          const inds = JSON.parse(
-                            profile.company?.industries || "[]",
-                          );
+                          const inds = profile.company?.industries 
+                            ? JSON.parse(profile.company.industries)
+                            : (profile.profile_metadata?.company_industries || []);
                           return Array.isArray(inds) ? inds[0] : inds || "—";
                         } catch (e) {
-                          return profile.company?.industries || "—";
+                          return "—";
                         }
                       })()}
                     </Badge>
@@ -1311,6 +1310,27 @@ export default function ProfilesPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {profile.linkedin_url.startsWith("apollo_id:") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-[10px] px-2 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors shrink-0 gap-1.5"
+                          onClick={() => {
+                            if (profileMeta.apollo_id) {
+                              handleEnrich([profileMeta.apollo_id]);
+                            }
+                          }}
+                          disabled={isLoading || (profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id))}
+                        >
+                          {(profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id)) ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Zap className="w-3 h-3 text-amber-500" />
+                          )}
+                          Enrich
+                        </Button>
+                      )}
                       {status === "analyzing" && (
                         <Badge
                           variant="secondary"
@@ -1322,6 +1342,7 @@ export default function ProfilesPage() {
                       )}
                       {reportId && (
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
                           className="h-7 px-2 text-primary hover:text-primary hover:bg-primary/10"
@@ -1334,8 +1355,9 @@ export default function ProfilesPage() {
                           Report
                         </Button>
                       )}
-                      {!status && !reportId && (
+                      {!status && !reportId && !profile.linkedin_url.startsWith("apollo_id:") && (
                         <Button
+                          type="button"
                           variant="outline"
                           size="sm"
                           className="h-7 px-2"
@@ -1406,7 +1428,17 @@ export default function ProfilesPage() {
             )}
 
             {totalPages > 1 && (
-              <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border">
+              <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage(0)}
+                  disabled={page === 0 || isLoading}
+                  title="First page"
+                >
+                  <ChevronLeft className="w-3 h-3" /><ChevronLeft className="w-3 h-3 -ml-2" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1416,19 +1448,27 @@ export default function ProfilesPage() {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <span className="text-[10px] font-bold px-2 uppercase tracking-tighter">
-                  Page {page + 1} of {totalPages}
+                <span className="text-[10px] font-bold px-2 tabular-nums">
+                  {page + 1} / {totalPages}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-8 w-8 p-0"
-                  onClick={() =>
-                    setPage((p) => Math.min(totalPages - 1, p + 1))
-                  }
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1 || isLoading}
                 >
                   <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage(totalPages - 1)}
+                  disabled={page >= totalPages - 1 || isLoading}
+                  title="Last page"
+                >
+                  <ChevronRight className="w-3 h-3" /><ChevronRight className="w-3 h-3 -ml-2" />
                 </Button>
               </div>
             )}
@@ -1645,32 +1685,50 @@ export default function ProfilesPage() {
             <Tabs
               defaultValue="all"
               value={activeTab}
-              onValueChange={setActiveTab}
+              onValueChange={(v) => { setActiveTab(v); setPage(0); setSelectedIds(new Set()); }}
               className="w-full"
             >
-              <TabsList className="mb-4">
-                <TabsTrigger value="all">All ({profiles.length})</TabsTrigger>
-                <TabsTrigger value="keyword">
-                  Keywords ({keywordProfiles.length})
+              <TabsList className="bg-muted/50 border shadow-sm">
+                <TabsTrigger value="all" className="gap-2">
+                  <List className="w-4 h-4" />
+                  All Leads
+                  <Badge variant="secondary" className="ml-1 px-1 py-0 h-4 min-w-4 text-[10px]">
+                    {tabCounts.all ?? 0}
+                  </Badge>
                 </TabsTrigger>
-                <TabsTrigger value="competitor">
-                  Competitors ({competitorProfiles.length})
+                <TabsTrigger value="apollo" className="gap-2 group">
+                  <Zap className="w-4 h-4 text-primary group-data-[state=active]:fill-primary/20" />
+                  Apollo
+                  <Badge variant="secondary" className="ml-1 px-1 py-0 h-4 min-w-4 text-[10px]">
+                    {tabCounts.apollo ?? 0}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="competitor" className="gap-2">
+                  <Globe className="w-4 h-4" />
+                  Competitor Posts
+                  <Badge variant="secondary" className="ml-1 px-1 py-0 h-4 min-w-4 text-[10px]">
+                    {tabCounts.competitor ?? 0}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="keyword" className="gap-2">
+                  <Search className="w-4 h-4" />
+                  Keyword Search
+                  <Badge variant="secondary" className="ml-1 px-1 py-0 h-4 min-w-4 text-[10px]">
+                    {tabCounts.keyword ?? 0}
+                  </Badge>
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="all">
-                {viewMode === "grid"
-                  ? renderProfileGrid(profiles)
-                  : renderProfileList(profiles)}
+                {viewMode === "grid" ? renderProfileGrid(profiles) : renderProfileList(profiles)}
               </TabsContent>
-              <TabsContent value="keyword">
-                {viewMode === "grid"
-                  ? renderProfileGrid(keywordProfiles)
-                  : renderProfileList(keywordProfiles)}
+              <TabsContent value="apollo">
+                {viewMode === "grid" ? renderProfileGrid(profiles) : renderProfileList(profiles)}
               </TabsContent>
               <TabsContent value="competitor">
-                {viewMode === "grid"
-                  ? renderProfileGrid(competitorProfiles)
-                  : renderProfileList(competitorProfiles)}
+                {viewMode === "grid" ? renderProfileGrid(profiles) : renderProfileList(profiles)}
+              </TabsContent>
+              <TabsContent value="keyword">
+                {viewMode === "grid" ? renderProfileGrid(profiles) : renderProfileList(profiles)}
               </TabsContent>
             </Tabs>
           </>

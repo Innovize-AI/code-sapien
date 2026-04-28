@@ -70,6 +70,7 @@ import {
 } from "@/components/ui/select";
 import { ensureProtocol, cn, normalizeUrl } from "@/lib/utils";
 import { CompanyDetailModal, ReportDetailModal } from "@/components/modals";
+import { ProfileGridV2, ProfileListV2 } from "@/components/profiles/profile-views-v2";
 
 function formatTimestamp(dateStr: string) {
   try {
@@ -134,7 +135,7 @@ export default function ProfilesPage() {
         return (
           <Badge
             variant="outline"
-            className="text-[9px] h-5 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1"
+            className="text-[9px] h-4 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1"
           >
             <ShieldCheck className="w-2.5 h-2.5" />
             Verified
@@ -142,13 +143,27 @@ export default function ProfilesPage() {
         );
       case "unverified":
       case "invalid":
+      case "error":
+      case "failed":
         return (
           <Badge
             variant="outline"
-            className="text-[9px] h-5 px-1.5 bg-red-50 text-red-700 border-red-200 flex items-center gap-1"
+            className="text-[9px] h-4 px-1.5 bg-red-600 text-white border-red-700 flex items-center gap-1 font-bold shadow-sm"
           >
             <ShieldAlert className="w-2.5 h-2.5" />
-            Unverified
+            {s === "invalid" ? "Invalid" : "Error"}
+          </Badge>
+        );
+      case "catch_all":
+      case "catchall":
+      case "risky":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-amber-100 text-amber-700 border-amber-300 flex items-center gap-1 font-bold"
+          >
+            <ShieldAlert className="w-2.5 h-2.5" />
+            Risky
           </Badge>
         );
       default:
@@ -184,6 +199,13 @@ export default function ProfilesPage() {
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [selectedProfileMeta, setSelectedProfileMeta] = useState<{ email?: string; email_verification_status?: string } | null>(null);
+
+  const openReport = (reportId: string, profile: { email?: string; email_verification_status?: string }) => {
+    setSelectedReportId(reportId);
+    setSelectedProfileMeta({ email: profile.email, email_verification_status: profile.email_verification_status });
+    setIsReportModalOpen(true);
+  };
 
   const getDateRange = () => {
     const now = new Date();
@@ -244,9 +266,10 @@ export default function ProfilesPage() {
 
   // SSE Listener for Real-Time Updates
   useEffect(() => {
-    const eventSource = new EventSource(
-      `${API_URL}/api/competitor-analysis/events/classification`,
-    );
+    const token = typeof window !== 'undefined' ? localStorage.getItem("accessToken") : null;
+    const sseUrl = `${API_URL}/api/competitor-analysis/events/classification${token ? `?token_query=${token}` : ""}`;
+    
+    const eventSource = new EventSource(sseUrl);
 
     eventSource.onmessage = (event) => {
       try {
@@ -269,10 +292,15 @@ export default function ProfilesPage() {
                   name: update.name || profile.name,
                   headline: update.headline || profile.headline,
                   linkedin_url: update.linkedin_url || profile.linkedin_url,
+                  email: update.email || profile.email,
+                  email_verification_status: update.email_verification_status || profile.email_verification_status,
+                  company: update.company || profile.company,
                   is_fit: update.is_fit !== undefined ? update.is_fit : profile.is_fit,
                   is_competitor: update.is_competitor !== undefined ? update.is_competitor : profile.is_competitor,
                   is_decision_maker: update.is_decision_maker !== undefined ? update.is_decision_maker : profile.is_decision_maker,
                   fit_reasoning: update.fit_reasoning || profile.fit_reasoning,
+                  intent: update.intent || profile.intent,
+                  sentiment: update.sentiment || profile.sentiment,
                 };
               }
               return profile;
@@ -419,509 +447,6 @@ export default function ProfilesPage() {
     });
   };
 
-  const renderProfileGrid = (profileList: IdentifiedProfile[]) => {
-    if (profileList.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-xl border-2 border-dashed text-center">
-          <Users className="w-12 h-12 text-muted-foreground/30 mb-4" />
-          <h3 className="text-lg font-semibold text-muted-foreground">
-            No profiles found
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-xs mt-1">
-            Try adjusting your search or filters.
-          </p>
-        </div>
-      );
-    }
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {profileList.map((profile) => {
-          let comments: string[] = [];
-          let sources: any[] = [];
-          try {
-            comments = JSON.parse(profile.comment_history || "[]");
-            sources = JSON.parse(profile.source_posts || "[]");
-          } catch (e) {
-            console.error("Error parsing profile data", e);
-          }
-
-          return (
-            <Card
-              key={profile.id}
-              className="group hover:border-primary/50 transition-all duration-300 overflow-hidden flex flex-col relative"
-            >
-              <div className="absolute top-5 left-4 z-20">
-                <Checkbox
-                  checked={selectedIds.has(profile.id)}
-                  onCheckedChange={() => toggleSelection(profile.id)}
-                  disabled={
-                    leadsStatus?.find((s) => s.url === profile.linkedin_url)
-                      ?.status === "analyzing" ||
-                    leadsStatus?.find((s) => s.url === profile.linkedin_url)
-                      ?.status === "pending"
-                  }
-                />
-              </div>
-              <div className="h-1 bg-muted group-hover:bg-primary/50 transition-colors" />
-              <CardHeader className="pb-3 pl-12">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors">
-                      {profile.name || "Anonymous Profile"}
-                    </CardTitle>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <a
-                        href={profile.linkedin_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 opacity-80"
-                      >
-                        <Globe className="w-2.5 h-2.5" />
-                        LinkedIn
-                        <ExternalLink className="w-2 h-2" />
-                      </a>
-                      {profile.website && (
-                        <a
-                          href={ensureProtocol(profile.website)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1 opacity-80"
-                        >
-                          <Globe className="w-2.5 h-2.5" />
-                          Website
-                          <ExternalLink className="w-2 h-2" />
-                        </a>
-                      )}
-                      {profile.email && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-muted-foreground">{profile.email}</span>
-                          {renderEmailVerificationBadge(profile.email_verification_status)}
-                        </div>
-                      )}
-                    </div>
-                    {profile.headline && (
-                      <p className="text-xs text-muted-foreground mt-1 text-ellipsis overflow-hidden line-clamp-2">
-                        {profile.headline}
-                      </p>
-                    )}
-                    {/* Company Stats (New) */}
-                    {profile.company && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {profile.company.industries && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] bg-indigo-50 text-indigo-700 border-indigo-100"
-                          >
-                            {(() => {
-                              try {
-                                const inds = JSON.parse(
-                                  profile.company.industries,
-                                );
-                                return Array.isArray(inds) ? inds[0] : inds;
-                              } catch (e) {
-                                return profile.company.industries;
-                              }
-                            })()}
-                          </Badge>
-                        )}
-                        {profile.company.employee_count && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] bg-slate-50 text-slate-600 border-slate-100"
-                          >
-                            <Users className="w-2.5 h-2.5 mr-1" />
-                            {profile.company.employee_count.toLocaleString()}
-                          </Badge>
-                        )}
-                        {profile.company.revenue_estimate && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-100 font-bold"
-                          >
-                            $ {profile.company.revenue_estimate}
-                          </Badge>
-                        )}
-                        {profile.company.market_cap && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] bg-amber-50 text-amber-700 border-amber-100 font-bold"
-                          >
-                            MC: {profile.company.market_cap}
-                          </Badge>
-                        )}
-                        {profile.company.total_funding && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] bg-blue-50 text-blue-700 border-blue-100 font-bold cursor-pointer hover:bg-blue-100 transition-colors"
-                            onClick={() => {
-                              if (profile.company_id) {
-                                setSelectedCompanyId(profile.company_id);
-                                setIsCompanyModalOpen(true);
-                              }
-                            }}
-                          >
-                            Fund: {profile.company.total_funding}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {(() => {
-                        const profileUrl = normalizeUrl(profile.linkedin_url);
-                        const leadStatusObj = leadsStatus?.find(
-                          (s) => normalizeUrl(s.url) === profileUrl || s.url === profile.linkedin_url,
-                        );
-                        const status = leadStatusObj?.status;
-                        const currentStep = leadStatusObj?.currentStep;
-
-                        if (status === "analyzing") {
-                          return (
-                            <div className="flex flex-col gap-2 p-3 rounded-lg bg-blue-50 border border-blue-100 animate-pulse w-full">
-                              <div className="flex items-center justify-between text-[10px] font-bold text-blue-700">
-                                <span className="flex items-center gap-2">
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                  {currentStep || "Researching..."}
-                                </span>
-                                <span>{leadStatusObj?.progress || 0}%</span>
-                              </div>
-                              <Progress
-                                value={leadStatusObj?.progress || 0}
-                                className="h-1 bg-blue-200/50"
-                              />
-                            </div>
-                          );
-                        }
-                        if (status === "pending") {
-                          return (
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] h-5 px-1.5 bg-gray-100 text-gray-500 border-gray-200"
-                            >
-                              Queued
-                            </Badge>
-                          );
-                        }
-                        return null;
-                      })()}
-                      {!profile.fit_reasoning &&
-                        !profile.is_fit &&
-                        !profile.is_competitor &&
-                        !(() => {
-                          const profileUrl = normalizeUrl(profile.linkedin_url);
-                          return leadsStatus?.find(
-                            (s) => normalizeUrl(s.url) === profileUrl || s.url === profile.linkedin_url,
-                          );
-                        })() && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] h-5 px-1.5 bg-gray-100 text-gray-500 animate-pulse"
-                          >
-                            AI Analyzing...
-                          </Badge>
-                        )}
-                      {profile.outreach_status && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[9px] h-5 px-1.5",
-                            profile.outreach_status === "not_started"
-                              ? "bg-zinc-100 text-zinc-500 border-zinc-200"
-                              : profile.outreach_status === "in_progress"
-                                ? "bg-amber-50 text-amber-600 border-amber-200"
-                                : "bg-green-50 text-green-700 border-green-200",
-                          )}
-                        >
-                          {profile.outreach_status.replace("_", " ")}
-                        </Badge>
-                      )}
-                      {profile.is_competitor && (
-                        <Badge
-                          variant="destructive"
-                          className="text-[10px] h-5 px-1.5"
-                        >
-                          Competitor
-                        </Badge>
-                      )}
-                      {profile.is_fit && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] h-5 px-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-help"
-                          title={profile.fit_reasoning}
-                        >
-                          <CheckCircle2 className="w-3 h-3 mr-1" />
-                          Potential Fit
-                        </Badge>
-                      )}
-                      {profile.is_buy_signal && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] h-5 px-1.5 bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100"
-                        >
-                          <Zap className="w-3 h-3 mr-1" />
-                          Buy Signal
-                        </Badge>
-                      )}
-                      {profile.is_strategic_seller && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] h-5 px-1.5 bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-                        >
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                          Strategic Seller
-                        </Badge>
-                      )}
-                      {profile.is_decision_maker && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] h-5 px-1.5 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                        >
-                          <UserCheck className="w-3 h-3 mr-1" />
-                          Decision Maker
-                        </Badge>
-                      )}
-                    </div>
-                    {profile.fit_reasoning && (
-                      <div className="mt-3 text-[10px] text-muted-foreground bg-muted/40 p-2 rounded border border-muted/50 italic leading-relaxed">
-                        <span className="font-semibold not-italic text-primary/70 mr-1">
-                          AI Reasoning:
-                        </span>
-                        {profile.fit_reasoning}
-                      </div>
-                    )}
-                  </div>
-                  {sources.length > 0 && (
-                    <TooltipProvider>
-                      <Tooltip delayDuration={100}>
-                        <TooltipTrigger asChild>
-                          <div className="group/touchpoints cursor-help">
-                            <Badge
-                              variant="secondary"
-                              className="bg-primary/5 text-[10px] text-primary border-primary/10 hover:bg-primary/10 transition-colors py-1 flex items-center gap-1.5"
-                            >
-                              <div className="flex items-center gap-1">
-                                <Search className="w-2.5 h-2.5 opacity-60" />
-                                {getTouchpointStats(profile).keywordCount}
-                              </div>
-                              <div className="w-px h-2.5 bg-primary/20" />
-                              <div className="flex items-center gap-1">
-                                <Users className="w-2.5 h-2.5 opacity-60" />
-                                {getTouchpointStats(profile).competitorCount}
-                              </div>
-                            </Badge>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="left"
-                          className="w-80 p-0 shadow-xl border-primary/20 overflow-hidden"
-                        >
-                          <div className="p-3 bg-muted/30 border-b border-primary/10 flex items-center justify-between">
-                            <span className="font-bold text-xs uppercase tracking-tight">
-                              All Discoveries
-                            </span>
-                            <Badge variant="outline" className="text-[10px]">
-                              {getTouchpointStats(profile).totalCount} Total
-                            </Badge>
-                          </div>
-                          <div className="max-h-60 overflow-y-auto p-2 space-y-2 scrollbar-thin">
-                            {getTouchpointStats(profile).allTouchpoints.map(
-                              (tp, i) => (
-                                <div
-                                  key={i}
-                                  className="p-2 rounded bg-muted/40 border border-muted/50 hover:bg-muted/60 transition-colors"
-                                >
-                                  <div className="flex items-center gap-1.5 mb-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0" />
-                                    <span className="text-[10px] font-bold uppercase text-primary/70">
-                                      {tp.competitor}
-                                    </span>
-                                  </div>
-                                  <a
-                                    href={tp.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] text-blue-600 hover:underline whitespace-normal italic block pl-3"
-                                  >
-                                    "{tp.title}"
-                                  </a>
-                                  {tp.comments.length > 0 && (
-                                    <div className="mt-2 pl-3 space-y-1.5 border-l border-primary/10 ml-1">
-                                      {tp.comments.map((comment, ci) => (
-                                        <div
-                                          key={ci}
-                                          className="text-[10px] text-muted-foreground leading-relaxed flex gap-1.5"
-                                        >
-                                          <MessageSquare className="w-2.5 h-2.5 mt-0.5 opacity-40 shrink-0" />
-                                          <p className="line-clamp-3">
-                                            {comment}
-                                          </p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ),
-                            )}
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col space-y-6">
-                {(() => {
-                  const leadStatusObj = leadsStatus?.find(
-                    (s) =>
-                      normalizeUrl(s.url) === normalizeUrl(profile.linkedin_url),
-                  );
-                  const status = leadStatusObj?.status;
-                  const result = leadStatusObj?.result;
-                  const currentStep = leadStatusObj?.currentStep;
-                  const reportId =
-                    status === "completed" && result?.id
-                      ? result.id
-                      : profile.latest_report_id;
-
-                  if (reportId) {
-                    return (
-                      <div
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setSelectedReportId(reportId);
-                          setIsReportModalOpen(true);
-                        }}
-                        className="group/report flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="bg-primary/10 text-primary p-1.5 rounded-md">
-                            <FileText className="w-3.5 h-3.5" />
-                          </div>
-                          <span className="text-xs font-semibold text-primary">
-                            View Research Report
-                          </span>
-                        </div>
-                        <Eye className="w-3.5 h-3.5 text-primary opacity-60 group-hover/report:opacity-100 transition-opacity" />
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-                {profile.interaction_history ? (
-                  <div className="space-y-4">
-                    {JSON.parse(profile.interaction_history).map(
-                      (comp: any, ci: number) => (
-                        <div
-                          key={ci}
-                          className="space-y-3 p-3 rounded-lg bg-muted/20 border border-muted/50"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="bg-primary/10 text-primary p-1 rounded-md">
-                              <Users className="w-3.5 h-3.5" />
-                            </div>
-                            <span className="text-xs font-bold uppercase tracking-tight">
-                              {comp.competitor}
-                            </span>
-                          </div>
-
-                          <div className="space-y-3 pl-2 border-l-2 border-primary/20">
-                            {comp.posts.map((post: any, pi: number) => (
-                              <div key={pi} className="space-y-2">
-                                <a
-                                  href={post.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs font-semibold text-blue-600 hover:underline line-clamp-1 italic flex items-center gap-1.5"
-                                >
-                                  <ExternalLink className="w-3 h-3 opacity-60" />
-                                  "{post.title}"
-                                </a>
-
-                                <div className="space-y-1.5 pl-3">
-                                  {post.comments.map(
-                                    (comment: string, comi: number) => (
-                                      <div
-                                        key={comi}
-                                        className="flex gap-2 items-start"
-                                      >
-                                        <div className="mt-1.5 w-1 h-1 rounded-full bg-muted-foreground/30 shrink-0" />
-                                        <p className="text-[11px] text-muted-foreground leading-relaxed italic border-l pl-2 py-0.5 border-primary/10">
-                                          "{comment}"
-                                        </p>
-                                      </div>
-                                    ),
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ),
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    {/* Fallback for legacy data */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/70">
-                        <MessageSquare className="w-3 h-3" />
-                        Interaction history
-                      </div>
-                      <div className="space-y-2 max-h-32 overflow-y-auto pr-2 scrollbar-thin">
-                        {comments.map((comment, i) => (
-                          <p
-                            key={i}
-                            className="text-[10px] text-muted-foreground italic bg-muted/30 p-2 rounded-md border border-muted/50"
-                          >
-                            "{comment}"
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/70">
-                        <History className="w-3 h-3" />
-                        Discovered through
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        {sources.map((source, i) => (
-                          <a
-                            key={i}
-                            href={source.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-muted-foreground hover:text-blue-600 hover:underline flex items-start gap-1 p-1 rounded hover:bg-muted/50 transition-colors"
-                          >
-                            <ExternalLink className="w-2.5 h-2.5 mt-0.5 shrink-0 opacity-40" />
-                            <span className="line-clamp-1 italic truncate">
-                              "{source.title}"{" "}
-                              <span className="text-[9px] not-italic text-primary/50 font-medium">
-                                ({source.competitor})
-                              </span>
-                            </span>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="pt-4 border-t flex justify-between items-center text-[9px] text-muted-foreground font-medium">
-                  <span className="flex items-center gap-1">
-                    Last Active: {formatTimestamp(profile.last_interaction_at)}
-                  </span>
-                  <span className="flex items-center gap-1 opacity-70">
-                    Identified by: {profile.rep_name || "System"}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-    );
-  };
 
   const toggleSort = (column: string) => {
     if (sortBy === column) {
@@ -933,464 +458,6 @@ export default function ProfilesPage() {
     setPage(0);
   };
 
-  const SortButton = ({
-    column,
-    label,
-  }: {
-    column: string;
-    label: string | React.ReactNode;
-  }) => {
-    const isActive = sortBy === column;
-    return (
-      <button
-        onClick={() => toggleSort(column)}
-        className={`flex items-center gap-1 hover:text-primary transition-colors ${isActive ? "text-primary font-bold" : ""
-          }`}
-      >
-        {label}
-        {isActive ? (
-          sortOrder === "asc" ? (
-            <ArrowUp className="w-3 h-3" />
-          ) : (
-            <ArrowDown className="w-3 h-3" />
-          )
-        ) : (
-          <ArrowUpDown className="w-3 h-3 opacity-30" />
-        )}
-      </button>
-    );
-  };
-
-  const renderProfileList = (profileList: IdentifiedProfile[]) => {
-    if (profileList.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-xl border-2 border-dashed text-center">
-          <Users className="w-12 h-12 text-muted-foreground/30 mb-4" />
-          <h3 className="text-lg font-semibold text-muted-foreground">
-            No profiles found
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-xs mt-1">
-            Try adjusting your search or filters.
-          </p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="rounded-md border bg-card overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[40px]">
-                <Checkbox
-                  checked={
-                    selectedIds.size === profileList.length &&
-                    profileList.length > 0
-                  }
-                  onCheckedChange={toggleSelectAll}
-                />
-              </TableHead>
-              <TableHead>
-                <SortButton column="name" label="Profile" />
-              </TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Industry</TableHead>
-              <TableHead>Stats</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>
-                <SortButton
-                  column="touchpoint_count"
-                  label="Interaction History"
-                />
-              </TableHead>
-              <TableHead>AI Reasoning</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {profileList.map((profile) => {
-              const profileUrl = normalizeUrl(profile.linkedin_url);
-              const leadStatusObj = leadsStatus?.find(
-                (s) => normalizeUrl(s.url) === profileUrl || s.url === profile.linkedin_url,
-              );
-              const status = leadStatusObj?.status;
-              const result = leadStatusObj?.result;
-              const currentStep = leadStatusObj?.currentStep;
-              const reportId =
-                status === "completed" && result?.id
-                  ? result.id
-                  : profile.latest_report_id;
-
-              let interactionHistory: any[] = [];
-              let profileMeta: any = {};
-              try {
-                interactionHistory = JSON.parse(
-                  profile.interaction_history || "[]",
-                );
-              } catch (e) { }
-              try {
-                profileMeta = JSON.parse(profile.profile_metadata || "{}");
-              } catch (e) { }
-
-              return (
-                <TableRow key={profile.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(profile.id)}
-                      onCheckedChange={() => toggleSelection(profile.id)}
-                      disabled={status === "analyzing" || status === "pending" || profile.linkedin_url.startsWith("apollo_id:")}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col max-w-[300px]">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold truncate">
-                          {profile.name || "Anonymous"}
-                        </span>
-                        {renderEmailVerificationBadge(profile.email_verification_status)}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                        <a
-                          href={profile.linkedin_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          LinkedIn <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                        {profile.website && (
-                          <a
-                            href={ensureProtocol(profile.website)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1"
-                          >
-                            Website <Globe className="w-2.5 h-2.5" />
-                          </a>
-                        )}
-                        {profile.email && (
-                          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            {profile.email}
-                            {renderEmailVerificationBadge(profile.email_verification_status)}
-                          </span>
-                        )}
-                      </div>
-                      {profile.headline && (
-                        <p className="text-[10px] text-muted-foreground truncate italic mt-0.5">
-                          {profile.headline}
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div
-                      className="flex flex-col group/company cursor-pointer"
-                      onClick={() => {
-                        if (profile.company_id) {
-                          setSelectedCompanyId(profile.company_id);
-                          setIsCompanyModalOpen(true);
-                        }
-                      }}
-                    >
-                      <span className="text-xs font-semibold truncate max-w-[150px] group-hover/company:text-primary group-hover/company:underline">
-                        {profile.company?.name || profile.profile_metadata?.company_name || "—"}
-                      </span>
-                      {profile.company?.website || profile.website ? (
-                        <span className="text-[9px] text-muted-foreground truncate max-w-[150px] opacity-70">
-                          {(profile.company?.website || profile.website || "").replace(/^https?:\/\//, "")}
-                        </span>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className="text-[9px] bg-indigo-50 text-indigo-700 border-indigo-100 max-w-[120px] truncate block text-center"
-                    >
-                      {(() => {
-                        try {
-                          const inds = profile.company?.industries 
-                            ? JSON.parse(profile.company.industries)
-                            : (profile.profile_metadata?.company_industries || []);
-                          return Array.isArray(inds) ? inds[0] : inds || "—";
-                        } catch (e) {
-                          return "—";
-                        }
-                      })()}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      {profile.company?.employee_count && (
-                        <div className="text-[9px] text-muted-foreground flex items-center gap-1">
-                          <Users className="w-2.5 h-2.5" />
-                          {profile.company.employee_count.toLocaleString()}
-                        </div>
-                      )}
-                      {profile.company?.revenue_estimate && (
-                        <div className="text-[9px] text-emerald-600 font-bold">
-                          $ {profile.company.revenue_estimate}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {profile.is_competitor && (
-                        <Badge variant="destructive" className="text-[9px] h-4">
-                          Comp
-                        </Badge>
-                      )}
-                      {profile.is_fit && (
-                        <Badge
-                          variant="outline"
-                          className="text-[9px] h-4 bg-green-50 text-green-700 border-green-200"
-                          title={profile.fit_reasoning}
-                        >
-                          Fit
-                        </Badge>
-                      )}
-                      {profile.is_buy_signal && (
-                        <Badge
-                          variant="outline"
-                          className="text-[9px] h-4 bg-violet-50 text-violet-700 border-violet-200"
-                        >
-                          Buyer
-                        </Badge>
-                      )}
-                      {profile.is_strategic_seller && (
-                        <Badge
-                          variant="outline"
-                          className="text-[9px] h-4 bg-zinc-50 text-zinc-700 border-zinc-200"
-                        >
-                          Seller
-                        </Badge>
-                      )}
-                      {profile.is_decision_maker && (
-                        <Badge
-                          variant="outline"
-                          className="text-[9px] h-4 bg-blue-50 text-blue-700 border-blue-200"
-                        >
-                          DM
-                        </Badge>
-                      )}
-                      {profile.outreach_status && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[9px] h-4",
-                            profile.outreach_status === "not_started"
-                              ? "bg-zinc-100 text-zinc-500 border-zinc-200"
-                              : profile.outreach_status === "in_progress"
-                                ? "bg-amber-50 text-amber-600 border-amber-200"
-                                : "bg-green-50 text-green-700 border-green-200",
-                          )}
-                        >
-                          {profile.outreach_status.replace("_", " ")}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-normal min-w-[240px] max-w-[450px]">
-                    <div className="">
-                      {interactionHistory.length > 0 ? (
-                        <TooltipProvider>
-                          <Tooltip delayDuration={100}>
-                            <TooltipTrigger asChild>
-                              <div className="flex flex-col gap-1.5 cursor-help group/touchpoints hover:bg-muted/30 p-1.5 rounded-md transition-colors">
-                                <div className="flex items-center gap-2">
-                                  <Badge
-                                    variant="secondary"
-                                    className="bg-primary/5 text-[9px] text-primary border-primary/10 py-0.5"
-                                  >
-                                    <Search className="w-2.5 h-2.5 mr-1 opacity-60" />
-                                    {getTouchpointStats(profile).keywordCount}
-                                  </Badge>
-                                  <Badge
-                                    variant="secondary"
-                                    className="bg-primary/5 text-[9px] text-primary border-primary/10 py-0.5"
-                                  >
-                                    <Users className="w-2.5 h-2.5 mr-1 opacity-60" />
-                                    {
-                                      getTouchpointStats(profile)
-                                        .competitorCount
-                                    }
-                                  </Badge>
-                                  <Info className="w-3.5 h-3.5 text-primary/30 group-hover/touchpoints:text-primary transition-colors ml-auto" />
-                                </div>
-                                {interactionHistory
-                                  .slice(0, 1)
-                                  .map((comp, i) => (
-                                    <div
-                                      key={i}
-                                      className="text-[10px] whitespace-normal"
-                                    >
-                                      <span className="font-semibold uppercase text-primary/70">
-                                        {comp.competitor}:
-                                      </span>{" "}
-                                      <span className="text-muted-foreground italic">
-                                        "{comp.posts?.[0]?.comments?.[0]}"
-                                      </span>
-                                    </div>
-                                  ))}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent
-                              side="left"
-                              className="w-80 p-0 shadow-xl border-primary/20 overflow-hidden"
-                            >
-                              <div className="p-3 bg-muted/30 border-b border-primary/10 flex items-center justify-between">
-                                <span className="font-bold text-xs uppercase tracking-tight">
-                                  All Discoveries
-                                </span>
-                                <Badge variant="outline" className="text-[10px] bg-white">
-                                  {getTouchpointStats(profile).totalCount} Total
-                                </Badge>
-                              </div>
-                              <div className="max-h-72 overflow-y-auto p-2 space-y-2 scrollbar-thin">
-                                {getTouchpointStats(profile).allTouchpoints.map(
-                                  (tp, i) => (
-                                    <div
-                                      key={i}
-                                      className="p-2 rounded bg-muted/40 border border-muted/50 hover:bg-muted/60 transition-all"
-                                    >
-                                      <div className="flex items-center gap-1.5 mb-1">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0" />
-                                        <span className="text-[10px] font-bold uppercase text-primary/70">
-                                          {tp.competitor}
-                                        </span>
-                                      </div>
-                                      <a
-                                        href={tp.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-[10px] text-blue-600 hover:underline whitespace-normal italic block pl-3"
-                                      >
-                                        "{tp.title}"
-                                      </a>
-                                      {tp.comments.length > 0 && (
-                                        <div className="mt-2 pl-3 space-y-1.5 border-l border-primary/10 ml-1">
-                                          {tp.comments.map((comment, ci) => (
-                                            <div
-                                              key={ci}
-                                              className="text-[10px] text-muted-foreground leading-relaxed flex gap-1.5"
-                                            >
-                                              <MessageSquare className="w-2.5 h-2.5 mt-0.5 opacity-40 shrink-0" />
-                                              <p className="line-clamp-3">
-                                                {comment}
-                                              </p>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ),
-                                )}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground italic">
-                          No history
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-normal min-w-[200px] max-w-[400px]">
-                    {profile.fit_reasoning ? (
-                      <div className="text-[10px] text-muted-foreground italic">
-                        {profile.fit_reasoning}
-                      </div>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground italic">
-                        No reasoning available
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {profile.linkedin_url.startsWith("apollo_id:") && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-[10px] px-2 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors shrink-0 gap-1.5"
-                          onClick={() => {
-                            if (profileMeta.apollo_id) {
-                              handleEnrich([profileMeta.apollo_id]);
-                            }
-                          }}
-                          disabled={isLoading || (profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id))}
-                        >
-                          {(profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id)) ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Zap className="w-3 h-3 text-amber-500" />
-                          )}
-                          Enrich
-                        </Button>
-                      )}
-                      {status === "analyzing" && (
-                        <Badge
-                          variant="secondary"
-                          className="text-[9px] h-7 bg-blue-100/50 text-blue-700 animate-pulse border-blue-200"
-                        >
-                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                          {currentStep ? currentStep : "Processing..."}
-                        </Badge>
-                      )}
-                      {reportId && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-primary hover:text-primary hover:bg-primary/10"
-                          onClick={() => {
-                            setSelectedReportId(reportId);
-                            setIsReportModalOpen(true);
-                          }}
-                        >
-                          <Eye className="w-3.5 h-3.5 mr-1" />
-                          Report
-                        </Button>
-                      )}
-                      {!status && !reportId && !profile.linkedin_url.startsWith("apollo_id:") && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2"
-                          onClick={() => {
-                            const payload = [
-                              {
-                                url: profile.linkedin_url,
-                                website: profile.website || "",
-                              },
-                            ];
-                            setBulkLeads(payload);
-                            setIsBulkModalOpen(true);
-                            startBulkAnalysis(payload, {
-                              project_urgency: 2,
-                              lead_source: "Competitor Analysis",
-                              refresh: false,
-                            });
-                          }}
-                        >
-                          <Play className="w-3.5 h-3.5 mr-1" />
-                          Analyze
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -1718,18 +785,53 @@ export default function ProfilesPage() {
                   </Badge>
                 </TabsTrigger>
               </TabsList>
-              <TabsContent value="all">
-                {viewMode === "grid" ? renderProfileGrid(profiles) : renderProfileList(profiles)}
-              </TabsContent>
-              <TabsContent value="apollo">
-                {viewMode === "grid" ? renderProfileGrid(profiles) : renderProfileList(profiles)}
-              </TabsContent>
-              <TabsContent value="competitor">
-                {viewMode === "grid" ? renderProfileGrid(profiles) : renderProfileList(profiles)}
-              </TabsContent>
-              <TabsContent value="keyword">
-                {viewMode === "grid" ? renderProfileGrid(profiles) : renderProfileList(profiles)}
-              </TabsContent>
+              {["all","apollo","competitor","keyword"].map(tab => (
+                <TabsContent key={tab} value={tab}>
+                  {viewMode === "grid" ? (
+                    <ProfileGridV2
+                      profiles={profiles}
+                      selectedIds={selectedIds}
+                      toggleSelection={toggleSelection}
+                      toggleSelectAll={toggleSelectAll}
+                      leadsStatus={leadsStatus || []}
+                      onOpenReport={(id) => { setSelectedReportId(id); setIsReportModalOpen(true); }}
+                      onOpenCompany={(id) => { setSelectedCompanyId(id); setIsCompanyModalOpen(true); }}
+                      onAnalyze={(profile) => {
+                        const payload = [{ url: profile.linkedin_url, website: profile.website || "" }];
+                        setBulkLeads(payload);
+                        setIsBulkModalOpen(true);
+                        startBulkAnalysis(payload, { project_urgency: 2, lead_source: "Competitor Analysis", refresh: false });
+                      }}
+                      onEnrich={(apolloId) => handleEnrich([apolloId])}
+                      enrichingIds={enrichingIds}
+                      sortBy={sortBy}
+                      sortOrder={sortOrder}
+                      onSort={toggleSort}
+                    />
+                  ) : (
+                    <ProfileListV2
+                      profiles={profiles}
+                      selectedIds={selectedIds}
+                      toggleSelection={toggleSelection}
+                      toggleSelectAll={toggleSelectAll}
+                      leadsStatus={leadsStatus || []}
+                      onOpenReport={(id) => { setSelectedReportId(id); setIsReportModalOpen(true); }}
+                      onOpenCompany={(id) => { setSelectedCompanyId(id); setIsCompanyModalOpen(true); }}
+                      onAnalyze={(profile) => {
+                        const payload = [{ url: profile.linkedin_url, website: profile.website || "" }];
+                        setBulkLeads(payload);
+                        setIsBulkModalOpen(true);
+                        startBulkAnalysis(payload, { project_urgency: 2, lead_source: "Competitor Analysis", refresh: false });
+                      }}
+                      onEnrich={(apolloId) => handleEnrich([apolloId])}
+                      enrichingIds={enrichingIds}
+                      sortBy={sortBy}
+                      sortOrder={sortOrder}
+                      onSort={toggleSort}
+                    />
+                  )}
+                </TabsContent>
+              ))}
             </Tabs>
           </>
         )}

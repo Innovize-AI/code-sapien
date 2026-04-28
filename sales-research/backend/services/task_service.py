@@ -198,31 +198,55 @@ async def apollo_discovery_rule_task(rule_id: str):
             config_data = json.loads(rule.value)
             if not config_data: return
 
+            # Pagination Logic: Fetch the next page each day
+            last_page = config_data.get("last_page_searched", 0)
+            next_page = last_page + 1
+            logger.info(f"Apollo Discovery: Fetching page {next_page} for rule {rule_id}")
+
+            # Construct input with all available filters
             discovery_input = LeadDiscoveryInput(
-                industry=config_data.get("industry", ""),
-                job_title=config_data.get("job_title", ""),
+                provider="apollo",
+                industry=config_data.get("industry"),
+                job_title=config_data.get("job_title"),
                 location=config_data.get("location"),
                 company_size=config_data.get("company_size"),
-                provider="apollo"
+                # Advanced filters
+                person_titles=config_data.get("person_titles"),
+                person_seniorities=config_data.get("person_seniorities"),
+                person_locations=config_data.get("person_locations"),
+                organization_locations=config_data.get("organization_locations"),
+                organization_domains=config_data.get("organization_domains"),
+                contact_email_status=config_data.get("contact_email_status"),
+                organization_num_employees_ranges=config_data.get("organization_num_employees_ranges"),
+                revenue_min=config_data.get("revenue_min"),
+                revenue_max=config_data.get("revenue_max"),
+                currently_using_any_of_technology_uids=config_data.get("currently_using_any_of_technology_uids"),
+                q_organization_job_titles=config_data.get("q_organization_job_titles")
             )
             
             # find_leads_apollo is synchronous (requests), using to_thread
-            leads = await asyncio.to_thread(find_leads_apollo, discovery_input, api_key=settings.apollo_api_key)
+            leads = await asyncio.to_thread(find_leads_apollo, discovery_input, api_key=settings.apollo_api_key, page=next_page)
             all_raw_leads = []
             for l in leads:
                 all_raw_leads.append({
                     "linkedin_url": l["url"],
                     "website": l.get("website", ""),
                     "created_by_id": rule.created_by_id,
+                    "competitor": "Apollo", # Tag for filtering in the dashboard
                     "is_fit": False,
                     "is_competitor": False,
                     "is_decision_maker": False,
-                    "fit_reasoning": ""
+                    "fit_reasoning": "",
+                    "source_post": "Apollo Discovery Rule",
+                    "source_post_url": "https://apollo.io"
                 })
             
             if all_raw_leads:
                 await batch_upsert_identified_profiles(db, all_raw_leads)
             
+            # Update pagination and last run
+            config_data["last_page_searched"] = next_page
+            rule.value = json.dumps(config_data)
             rule.last_run_at = datetime.now(timezone.utc)
             await db.commit()
 

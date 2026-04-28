@@ -220,6 +220,7 @@ class IdentifiedProfile(Base):
     interaction_history = Column(Text, nullable=True) # Hierarchical: [ { competitor, posts: [ {url, title, comments: []} ] } ]
     
     # Status/Metadata
+    lead_source = Column(String(50), nullable=True, index=True)  # 'apollo' | 'keyword' | 'competitor'
     last_interaction_at = Column(DateTime(timezone=True), server_default=text("now()"))
     touchpoint_count = Column(Integer, default=0, server_default=text("0"))
     profile_metadata = Column(Text, nullable=True)         # JSON for flexibility

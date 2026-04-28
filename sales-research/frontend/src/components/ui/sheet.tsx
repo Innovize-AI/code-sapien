@@ -21,9 +21,10 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <SheetPrimitive.Overlay
         className={cn(
-            "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "fixed inset-0 left-[var(--sidebar-width,0px)] z-50 bg-black/80 transition-[left] duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             className
         )}
+
         {...props}
         ref={ref}
     />
@@ -51,24 +52,29 @@ const sheetVariants = cva(
 
 interface SheetContentProps
     extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> { }
+    VariantProps<typeof sheetVariants> {
+    hideOverlay?: boolean;
+}
 
 const SheetContent = React.forwardRef<
     React.ElementRef<typeof SheetPrimitive.Content>,
     SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
+>(({ side = "right", className, children, hideOverlay, ...props }, ref) => (
     <SheetPortal>
-        <SheetOverlay />
+        {!hideOverlay && <SheetOverlay />}
         <SheetPrimitive.Content
             ref={ref}
             className={cn(sheetVariants({ side }), className)}
             {...props}
         >
+
             {children}
-            <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+            <SheetPrimitive.Close className="absolute right-6 top-6 z-50 rounded-full p-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border border-white/20 dark:border-zinc-200 shadow-xl transition-all hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:pointer-events-none">
                 <X className="h-4 w-4" />
                 <span className="sr-only">Close</span>
             </SheetPrimitive.Close>
+
+
         </SheetPrimitive.Content>
     </SheetPortal>
 ))

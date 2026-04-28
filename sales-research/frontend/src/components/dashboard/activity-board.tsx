@@ -13,12 +13,17 @@ import {
     AlertCircle 
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/context/auth-context";
 
 export function ActivityBoard({ className }: { className?: string }) {
+    const { user, loading: authLoading } = useAuth();
     const [activities, setActivities] = useState<Activity[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const loadActivities = async () => {
+        // Guard against unauthorized calls
+        if (!user) return;
+        
         try {
             const data = await fetchActivities(15);
             setActivities(data);
@@ -30,11 +35,13 @@ export function ActivityBoard({ className }: { className?: string }) {
     };
 
     useEffect(() => {
-        loadActivities();
-        // Poll for updates every 30 seconds
-        const interval = setInterval(loadActivities, 30000);
-        return () => clearInterval(interval);
-    }, []);
+        if (!authLoading && user) {
+            loadActivities();
+            // Poll for updates every 30 seconds
+            const interval = setInterval(loadActivities, 30000);
+            return () => clearInterval(interval);
+        }
+    }, [authLoading, user]);
 
     const getIcon = (type: string) => {
         switch (type) {

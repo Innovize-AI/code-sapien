@@ -309,12 +309,27 @@ export function LeadForm({ onSuccess, defaultUrl, defaultWebsite }: LeadFormProp
                 </div>
 
                 {error && (
-                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                        <p className="text-sm font-medium text-red-500 flex items-center gap-2">
-                            <XCircle className="w-4 h-4" />
-                            Research Error
-                        </p>
-                        <p className="text-sm text-red-500/80 mt-1 ml-6">{error}</p>
+                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-red-500 flex items-center gap-2">
+                                <XCircle className="w-4 h-4" />
+                                Research Error
+                            </p>
+                        </div>
+                        <p className="text-sm text-red-500/80 ml-6">{error}</p>
+                        
+                        {error.includes("Selling Profile") && (
+                            <div className="ml-6 pt-2">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="text-xs bg-red-500/5 border-red-500/20 hover:bg-red-500/10 text-red-600"
+                                    onClick={() => window.location.href = "/settings?tab=organization"}
+                                >
+                                    Configure Selling Profile
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
 

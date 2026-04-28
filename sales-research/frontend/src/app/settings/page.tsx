@@ -17,6 +17,7 @@ import {
   User,
   Briefcase,
   ArrowLeft,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ import {
   getSellingProfile,
   saveSellingProfile,
   SellingProfileConfig,
+  getUsageStats,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -120,6 +122,7 @@ const keysFormSchema = z.object({
 const sellingProfileSchema = z.object({
   company_name: z.string().min(1, "Company Name is required"),
   description: z.string().min(1, "Description is required"),
+  business_model: z.enum(["product", "service", "hybrid"]).default("product"),
   products: z.array(
     z.object({
       name: z.string().min(1, "Product Name is required"),
@@ -141,6 +144,7 @@ export default function SettingsPage() {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [newCompetitorUrl, setNewCompetitorUrl] = useState("");
   const [isAddingCompetitor, setIsAddingCompetitor] = useState(false);
+  const [usage, setUsage] = useState<any>(null);
 
   // --- Forms ---
 
@@ -183,6 +187,7 @@ export default function SettingsPage() {
     defaultValues: {
       company_name: "",
       description: "",
+      business_model: "product",
       products: [],
     },
   });
@@ -307,6 +312,7 @@ export default function SettingsPage() {
           const sanitizedSelling = {
             company_name: globalSelling.company_name || "",
             description: globalSelling.description || "",
+            business_model: globalSelling.business_model || "product",
             products: globalSelling.products || [],
           };
           sellingProfileForm.reset(sanitizedSelling);
@@ -314,6 +320,9 @@ export default function SettingsPage() {
         if (competitorsList) {
           setCompetitors(competitorsList);
         }
+        
+        const usageStats = await getUsageStats();
+        setUsage(usageStats);
       } catch (e) {
         console.error("Failed to load settings", e);
         setError("Failed to load settings.");
@@ -482,6 +491,51 @@ export default function SettingsPage() {
           <AlertTitle>Success</AlertTitle>
           <AlertDescription>{success}</AlertDescription>
         </Alert>
+      )}
+
+      {usage?.trial_mode && (
+        <Card className="mb-6 border-primary/20 bg-primary/5">
+          <CardHeader className="py-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              Trial Usage & Limits
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+             <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Deep Researches</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{usage.research.used}</span>
+                  <span className="text-sm text-muted-foreground">/ {usage.research.limit} used</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all" 
+                    style={{ width: `${Math.min(100, (usage.research.used / usage.research.limit) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-1">
+                  {usage.research.remaining} researches remaining
+                </span>
+             </div>
+             <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Profile Classifications</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{usage.classification.used}</span>
+                  <span className="text-sm text-muted-foreground">/ {usage.classification.limit} leads</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all" 
+                    style={{ width: `${Math.min(100, (usage.classification.used / usage.classification.limit) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-1">
+                  {usage.classification.remaining} classifications remaining
+                </span>
+             </div>
+          </CardContent>
+        </Card>
       )}
 
       <Tabs defaultValue="personal" className="w-full space-y-6">
@@ -767,6 +821,37 @@ export default function SettingsPage() {
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={sellingProfileForm.control}
+                    name="business_model"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Model</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          disabled={!isAdmin}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your model" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="product">Product-Led (Tools, SaaS, HW)</SelectItem>
+                            <SelectItem value="service">Service-Led (Agency, Consulting, Managed)</SelectItem>
+                            <SelectItem value="hybrid">Hybrid (Product + Services)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Determines if the AI pitches technical features or strategic expertise.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">

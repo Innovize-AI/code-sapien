@@ -1,7 +1,7 @@
 "use client"
 
 import { LeadForm } from "@/components/lead-form"
-import { ReportDisplay } from "@/components/report-display"
+import { ReportDisplayV2 as ReportDisplay } from "@/components/report-display-v2"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useSearchParams } from "next/navigation"

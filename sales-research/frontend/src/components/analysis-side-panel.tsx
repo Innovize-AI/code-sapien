@@ -13,7 +13,7 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet"
 import { LeadForm } from "@/components/lead-form"
-import { ReportDisplay } from "@/components/report-display"
+import { ReportDisplayV2 as ReportDisplay } from "@/components/report-display-v2"
 import { Button } from "@/components/ui/button"
 
 export function AnalysisSidePanel({

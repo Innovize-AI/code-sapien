@@ -31,24 +31,37 @@ import {
 } from "@/lib/api";
 import { ActivityBoard } from "@/components/dashboard/activity-board";
 import { AnalyticsCharts } from "@/components/dashboard/analytics-charts";
+import { useAuth } from "@/context/auth-context";
 
 export default function Home() {
   const router = useRouter();
+  const { user, isOnboarded, loading: authLoading, checkOnboarding } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
   const [recentReports, setRecentReports] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!isOnboarded); // Initial state depends on cache
 
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        // Check onboarding status first
-        const status = await getOnboardingStatus();
-        if (!status.complete) {
-          router.push("/onboarding");
-          return;
-        }
+    // Wait for auth to initialize and ensure we have a user
+    if (authLoading || !user) return;
 
+    const loadDashboardData = async () => {
+      setIsLoading(true); // Ensure loader shows if we need to check onboarding
+      try {
+        // If we don't have a cached "onboarded" status, check it
+        if (!isOnboarded) {
+          const complete = await checkOnboarding();
+          if (!complete) {
+            router.push("/onboarding");
+            return;
+          }
+        }
+        
+        // Final guard: if auth changed while we were checking onboarding
+        if (!user) return;
+
+        // Start fetching
+        setIsLoading(!isOnboarded);
         const [statsData, historyData, analyticsData] = await Promise.all([
           fetchDashboardStats(),
           fetchHistory(),
@@ -65,23 +78,24 @@ export default function Home() {
           )
           .slice(0, 5);
         setRecentReports(sortedHistory);
+        setIsLoading(false);
       } catch (e) {
         console.error("Failed to load dashboard data", e);
-      } finally {
         setIsLoading(false);
       }
     };
 
     loadDashboardData();
-  }, [router]);
+  }, [router, authLoading, user]);
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex h-full items-center justify-center min-h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground animate-pulse">Initializing your workspace...</p>
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
@@ -111,16 +125,14 @@ export default function Home() {
         {/* Stats Row */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Total Leads Found"
+            title="Total Leads Researched"
             value={stats?.total_leads.toLocaleString() || "0"}
             icon={Users}
-          // trend={{ value: 12, isPositive: true }} // Trend needs historical data diff
           />
           <StatCard
             title="Avg. Lead Score"
             value={stats?.avg_lead_score.toString() || "0"}
             icon={BarChart3}
-          // trend={{ value: 4, isPositive: true }}
           />
           <StatCard
             title="High Potential Leads"

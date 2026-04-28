@@ -92,16 +92,36 @@ const sidebarItems: SidebarItem[] = [
 ];
 
 import { useAuth } from "@/context/auth-context";
+import { getUsageStats } from "@/lib/api";
 
 export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
+  const [usage, setUsage] = useState<any>(null);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
       return localStorage.getItem("sidebar-collapsed") === "true";
     }
     return false;
   });
+
+  useEffect(() => {
+    const fetchUsage = async () => {
+      // Only fetch if we have a user
+      if (!user) return;
+      
+      try {
+        const data = await getUsageStats();
+        setUsage(data);
+      } catch (e) {
+        console.error("Failed to fetch usage in sidebar", e);
+      }
+    };
+    
+    if (!loading) {
+      fetchUsage();
+    }
+  }, [user, loading]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
@@ -112,6 +132,18 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
     }
   }, []);
 
+  useEffect(() => {
+    const updateWidth = () => {
+      const width = window.innerWidth < 768 ? "0px" : (isCollapsed ? "72px" : "256px");
+      document.documentElement.style.setProperty("--sidebar-width", width);
+    };
+
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, [isCollapsed]);
+
+
   const toggleCollapse = () => {
     const next = !isCollapsed;
     setIsCollapsed(next);
@@ -119,6 +151,7 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
       localStorage.setItem("sidebar-collapsed", String(next));
     }
   };
+
 
   const filteredItems = sidebarItems.filter((item) => {
     if (!item.roles) return true;
@@ -217,6 +250,53 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
           );
         })}
       </nav>
+
+      {/* Usage Indicator for Trial Users */}
+      {!isCollapsed && usage?.trial_mode && (
+        <div className="mx-3 mb-4 p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-4">
+          {/* Research Usage */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <span className="flex items-center gap-1">
+                <Search className="w-3 h-3 text-primary" />
+                Research
+              </span>
+              <span>{usage.research.used}/{usage.research.limit}</span>
+            </div>
+            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+               <div 
+                  className="h-full bg-primary transition-all duration-500" 
+                  style={{ width: `${Math.min(100, (usage.research.used / usage.research.limit) * 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Classification Usage */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <span className="flex items-center gap-1">
+                <UserCheck className="w-3 h-3 text-emerald-500" />
+                Classifications
+              </span>
+              <span>{usage.classification.used}/{usage.classification.limit}</span>
+            </div>
+            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+               <div 
+                  className="h-full bg-emerald-500 transition-all duration-500" 
+                  style={{ width: `${Math.min(100, (usage.classification.used / usage.classification.limit) * 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      {isCollapsed && usage?.trial_mode && (
+        <div className="flex justify-center mb-4" title={`Usage: ${usage.research.used}/${usage.research.limit}`}>
+          <div className="relative">
+            <Zap className="w-5 h-5 text-primary" />
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
+          </div>
+        </div>
+      )}
 
       <div className="p-4 border-t border-sidebar-border space-y-2">
         {!isCollapsed ? (

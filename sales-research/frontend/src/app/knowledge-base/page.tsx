@@ -250,20 +250,28 @@ export default function KnowledgeBasePage() {
     );
   }
 
-  const playbooks = knowledgeFiles.filter(
-    (f) => !f.name.includes("one-pager") && !f.name.includes("offerings"),
-  );
   // Solutions are now driven by DB products, not files
   const products = strategyProfile?.products || [];
-  const caseStudies = knowledgeFiles.filter((f) =>
-    f.name.includes("case-study"),
+
+  const caseStudies = knowledgeFiles.filter(
+    (f) =>
+      f.name.toLowerCase().includes("case-study") ||
+      f.name.toLowerCase().includes("casestudy"),
+  );
+
+  const playbooks = knowledgeFiles.filter(
+    (f) =>
+      !f.name.toLowerCase().includes("one-pager") &&
+      !f.name.toLowerCase().includes("offerings") &&
+      !f.name.toLowerCase().includes("case-study") &&
+      !f.name.toLowerCase().includes("casestudy"),
   );
 
   // Categorize files for modal selection
   const availableFilesForModal = knowledgeFiles.map((f) => ({
     name: f.name,
     path: f.path,
-    type: f.name.includes("case-study")
+    type: (f.name.toLowerCase().includes("case-study") || f.name.toLowerCase().includes("casestudy"))
       ? "case-studies"
       : ("playbooks" as "playbooks" | "case-studies"),
   }));

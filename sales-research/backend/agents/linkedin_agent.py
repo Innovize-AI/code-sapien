@@ -415,13 +415,14 @@ async def get_linkedin_company_data(state: AgentState):
 
 async def enrich_company_waterfall(
     person_url: str = None, 
+    person_id: str = None,
     company_url: str = None, 
     existing_stats: dict = None,
     million_verifier_enabled: bool = False
 ):
     """
     Centralized enrichment coordinator:
-    1. Apollo Match (via person_url)
+    1. Apollo Match (via person_url or person_id)
     2. LinkedIn Details (via company_url) - Only if Apollo falls short
     """
     apollo_data = {}
@@ -430,13 +431,14 @@ async def enrich_company_waterfall(
     hiring = []
 
     # 1. Primary: Apollo match by person profile
-    if person_url:
-        logger.debug(f"CENTRAL WATERFALL: Trialing Apollo for {person_url}")
+    if person_url or person_id:
+        logger.debug(f"CENTRAL WATERFALL: Trialing Apollo for {person_url or person_id}")
         apollo_data = await get_apollo_company_data(
-            person_url,
+            linkedin_url=person_url,
+            apollo_id=person_id,
             million_verifier_enabled=million_verifier_enabled
         )
-
+    print("Apollo data", apollo_data)
     # 2. Check if we need LinkedIn fallback
     # Skip if Apollo was successful AND provided core stats
     core_found = apollo_data.get("employee_count")
@@ -452,6 +454,8 @@ async def enrich_company_waterfall(
             if "basic_info" in company_res:
                  linkedin_data["basic_info"] = company_res["basic_info"]
 
+    is_person_lookup = bool(person_url or person_id)
+    
     # 3. Merge Strategy
     stats = {**linkedin_data}
     if apollo_data:
@@ -464,6 +468,18 @@ async def enrich_company_waterfall(
             "website": apollo_data.get("website") or stats.get("website"),
             "headcount_growth": apollo_data.get("headcount_growth"),
         })
+        if is_person_lookup:
+            stats.update({
+                "person_name": apollo_data.get("person_name"),
+                "first_name": apollo_data.get("first_name"),
+                "last_name": apollo_data.get("last_name"),
+                "headline": apollo_data.get("headline"),
+                "linkedin_url": apollo_data.get("linkedin_url"),
+                "person_email": apollo_data.get("person_email"),
+                "city": apollo_data.get("city"),
+                "state": apollo_data.get("state"),
+                "photo_url": apollo_data.get("photo_url"),
+            })
 
     # Backup from existing injections
     if existing_stats:
@@ -492,11 +508,11 @@ async def enrich_company_waterfall(
         "apollo_id": str(apollo_data.get("apollo_id")) if apollo_data.get("apollo_id") else None,
         "headquarters": apollo_data.get("headquarters"),
         "domain": apollo_data.get("domain") or (stats.get("website").replace("http://", "").replace("https://", "").split("/")[0] if stats.get("website") else None),
-        "apollo_id": str(apollo_data.get("apollo_id")) if apollo_data.get("apollo_id") else None,
     }
 
-    return {
+    result = {
         "name": stats.get("name") or apollo_data.get("company_name") or basic.get("name") or "Unknown Company",
+        "company_name": apollo_data.get("company_name") or stats.get("name") or basic.get("name"),
         "description": apollo_data.get("description") or basic.get("description") or apollo_data.get("company_name"),
         "industries": apollo_data.get("industries") or basic.get("industries", []) or ([apollo_data.get("industry")] if apollo_data.get("industry") else []),
         "news": news[:5],
@@ -504,15 +520,27 @@ async def enrich_company_waterfall(
         "website": stats.get("website"),
         "person_email": apollo_data.get("person_email"),
         "email_verification_status": apollo_data.get("email_verification_status"),
-        "linkedin_url": apollo_data.get("company_linkedin_url"),
+        "linkedin_url": apollo_data.get("linkedin_url") if is_person_lookup else apollo_data.get("company_linkedin_url") or stats.get("linkedin_url"),
+        "company_linkedin_url": apollo_data.get("company_linkedin_url") or stats.get("linkedin_url"),
         "domain": apollo_data.get("domain") or (stats.get("website").replace("http://", "").replace("https://", "").split("/")[0] if stats.get("website") else None),
-
-        # Compatibility
         "company_stats": company_stats,
-        
-        # Flattened fields for table sync
         **company_stats
     }
+
+    if is_person_lookup:
+        result.update({
+            "person_name": apollo_data.get("person_name"),
+            "headline": apollo_data.get("headline"),
+            "first_name": apollo_data.get("first_name"),
+            "last_name": apollo_data.get("last_name"),
+            "photo_url": apollo_data.get("photo_url"),
+            "city": apollo_data.get("city"),
+            "state": apollo_data.get("state"),
+            "country": apollo_data.get("country"),
+        })
+
+    return result
+
 
 def linkedin_profile_analyzer(state: AgentState):
     """Analyzes a profile using LLM based on headline and company context."""
@@ -556,130 +584,189 @@ def linkedin_profile_analyzer(state: AgentState):
         logger.error(f"Error in linkedin_profile_analyzer: {e}")
         return {"user_profile_analysis": "Error generating structured analysis."}
 
+async def _map_apollo_response_to_enrichment(res: dict, million_verifier_enabled: bool = False) -> dict:
+    """
+    Internal helper to map Apollo API response (person + org) to standard enrichment dict.
+    Ensures person data is captured even if organization data is missing.
+    """
+    person = res.get("person", {})
+    if not person:
+        return {}
+        
+    org = person.get("organization", {}) or {}
+    
+    # --- Revenue ---
+    raw_rev = org.get("annual_revenue") or org.get("organization_revenue")
+    rev_str = org.get("annual_revenue_printed") or org.get("organization_revenue_printed")
+    if not rev_str and raw_rev:
+        if raw_rev >= 1_000_000_000:
+            rev_str = f"{raw_rev / 1_000_000_000:.1f}B"
+        elif raw_rev >= 1_000_000:
+            rev_str = f"{raw_rev / 1_000_000:.1f}M"
+        else:
+            rev_str = str(raw_rev)
+
+    # --- Technologies ---
+    technologies = [
+        {"uid": t.get("uid"), "name": t.get("name"), "category": t.get("category")}
+        for t in (org.get("current_technologies") or [])
+    ]
+    technology_names = org.get("technology_names") or [t["name"] for t in technologies]
+
+    # --- Funding Events ---
+    funding_events = [
+        {
+            "date": e.get("date"),
+            "type": e.get("type"),
+            "amount": e.get("amount"),
+            "currency": e.get("currency"),
+            "investors": e.get("investors"),
+            "news_url": e.get("news_url")
+        }
+        for e in (org.get("funding_events") or [])
+    ]
+
+    # --- Headcount Growth ---
+    headcount_growth = {
+        "6_month": org.get("organization_headcount_six_month_growth"),
+        "12_month": org.get("organization_headcount_twelve_month_growth"),
+        "24_month": org.get("organization_headcount_twenty_four_month_growth"),
+    }
+
+    # Prepare company_stats (only if org exists, otherwise empty but present)
+    company_stats = {}
+    if org:
+        company_stats = {
+            "revenue_estimate": rev_str,
+            "employee_count": org.get("estimated_num_employees") or org.get("num_employees"),
+            "market_cap": org.get("market_cap"),
+            "total_funding": org.get("total_funding_printed"),
+            "total_funding_raw": org.get("total_funding"),
+            "industry": org.get("primary_industry") or org.get("industry"),
+            "industries": org.get("industries") or [],
+            "technologies": technologies,
+            "technology_names": technology_names,
+            "funding_events": funding_events,
+            "latest_funding_stage": org.get("latest_funding_stage"),
+            "latest_funding_date": org.get("latest_funding_round_date"),
+            "headcount_growth": headcount_growth,
+            "follower_count": org.get("num_followers") or org.get("linkedin_follower_count"),
+            "employee_count_range": org.get("employee_count_range"),
+            "headquarters": f"{org.get('city', '')}, {org.get('state', '')}, {org.get('country', '')}".strip(", "),
+            "apollo_id": org.get("id"),
+            "domain": org.get("domain")
+        }
+
+    result = {
+        "person_name": person.get("name"),
+        "company_name": org.get("name") or org.get("company_name"),
+        "first_name": person.get("first_name"),
+        "last_name": person.get("last_name"),
+        "person_email": person.get("email"),
+        "linkedin_url": person.get("linkedin_url"),
+        "headline": person.get("headline") or person.get("title"),
+        "photo_url": person.get("photo_url"),
+        "city": person.get("city"),
+        "state": person.get("state"),
+        "country": person.get("country"),
+        "apollo_person_id": person.get("id"),
+        "apollo_organization_id": org.get("id"),
+        "description": org.get("short_description"),
+        "industries": org.get("industries") or ([org.get("industry")] if org.get("industry") else []),
+        "website": org.get("website_url"),
+        "domain": org.get("domain"),
+        "company_linkedin_url": org.get("linkedin_url"),
+        "company_stats": company_stats,
+        **company_stats
+    }
+
+    # --- Million Verifier Integration ---
+    if result.get("person_email") and million_verifier_enabled:
+        try:
+            from utils.email_verifier import verify_email
+            mv_key = os.getenv("MILLION_VERIFIER_API_KEY")
+            if mv_key:
+                logger.info(f"MILLION VERIFIER: Verifying email {result['person_email']}...")
+                verification_status = await verify_email(result["person_email"], mv_key)
+                result["email_verification_status"] = verification_status
+            else:
+                result["email_verification_status"] = None
+        except Exception as e:
+            logger.error(f"Error during email verification: {e}")
+            result["email_verification_status"] = None
+    else:
+        result["email_verification_status"] = None
+
+    return result
+
+    # --- Million Verifier Integration ---
+    if result.get("person_email") and million_verifier_enabled:
+        try:
+            from utils.email_verifier import verify_email
+            mv_key = os.getenv("MILLION_VERIFIER_API_KEY")
+            if mv_key:
+                logger.info(f"MILLION VERIFIER: Verifying email {result['person_email']}...")
+                verification_status = await verify_email(result["person_email"], mv_key)
+                result["email_verification_status"] = verification_status
+            else:
+                result["email_verification_status"] = None
+        except Exception as e:
+            logger.error(f"Error during email verification: {e}")
+            result["email_verification_status"] = None
+    else:
+        result["email_verification_status"] = None
+
+    return result
+
 async def get_apollo_company_data(
-    linkedin_url: str,
+    linkedin_url: str = None,
+    apollo_id: str = None,
     million_verifier_enabled: bool = False
 ):
     """
-    Enrichment using Apollo People Match API.
-    Extracts company stats, technologies, funding events,
-    headcount growth, keywords and lead details.
+    Enrichment using Apollo People Match or Bulk Match API.
     """
     api_key = os.getenv("APOLLO_API_KEY", "").strip()
     if not api_key:
         logger.warning("APOLLO_API_KEY not found in environment.")
         return {}
     
-    # Masked log for diagnosis of 401
-    masked = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 8 else "***"
-    logger.debug(f"DEBUG: Apollo API Call with key: {masked} (Len: {len(api_key)})")
-
-    url = "https://api.apollo.io/v1/people/match"
-    headers = {
-        "Cache-Control": "no-cache",
-        "Content-Type": "application/json",
-        "x-api-key": api_key
-    }
-    
-    data = {"linkedin_url": linkedin_url, "reveal_personal_emails": True}
-    
     import httpx
     try:
+        if apollo_id:
+            logger.debug(f"DEBUG: Apollo Enrichment by ID: {apollo_id}")
+            url = "https://api.apollo.io/v1/people/match"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Api-Key": api_key
+            }
+            payload = {
+                "id": apollo_id,
+                "reveal_personal_emails": True
+            }
+        else:
+            logger.debug(f"DEBUG: Apollo Enrichment by URL: {linkedin_url}")
+            url = "https://api.apollo.io/v1/people/match"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Api-Key": api_key
+            }
+            payload = {
+                "linkedin_url": linkedin_url,
+                "reveal_personal_emails": True
+            }
+
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=data, timeout=10.0)
+            response = await client.post(url, headers=headers, json=payload, timeout=15.0)
             if response.status_code != 200:
                 logger.error(f"Apollo API Error: {response.status_code} - {response.text}")
                 return {}
 
             res = response.json()
-            person = res.get("person", {})
-            org = person.get("organization", {})
             
-            if org:
-                # --- Revenue ---
-                raw_rev = org.get("annual_revenue") or org.get("organization_revenue")
-                rev_str = org.get("annual_revenue_printed") or org.get("organization_revenue_printed")
-                if not rev_str and raw_rev:
-                    if raw_rev >= 1_000_000_000:
-                        rev_str = f"{raw_rev / 1_000_000_000:.1f}B"
-                    elif raw_rev >= 1_000_000:
-                        rev_str = f"{raw_rev / 1_000_000:.1f}M"
-                    else:
-                        rev_str = str(raw_rev)
+            # both endpoints now return {"person": {...}} structure when successful
+            return await _map_apollo_response_to_enrichment(res, million_verifier_enabled)
 
-                # --- Technologies ---
-                # Full list with uid + name + category
-                technologies = [
-                    {"uid": t.get("uid"), "name": t.get("name"), "category": t.get("category")}
-                    for t in (org.get("current_technologies") or [])
-                ]
-                technology_names = org.get("technology_names") or [t["name"] for t in technologies]
-
-                # --- Funding Events ---
-                funding_events = [
-                    {
-                        "date": e.get("date"),
-                        "type": e.get("type"),
-                        "amount": e.get("amount"),
-                        "currency": e.get("currency"),
-                        "investors": e.get("investors"),
-                        "news_url": e.get("news_url")
-                    }
-                    for e in (org.get("funding_events") or [])
-                ]
-
-                # --- Headcount Growth (Hiring Signal) ---
-                headcount_growth = {
-                    "6_month": org.get("organization_headcount_six_month_growth"),
-                    "12_month": org.get("organization_headcount_twelve_month_growth"),
-                    "24_month": org.get("organization_headcount_twenty_four_month_growth"),
-                }
-
-                result = {
-                    # Core stats
-                    "revenue_estimate": rev_str,
-                    "employee_count": org.get("estimated_num_employees") or org.get("num_employees"),
-                    "market_cap": org.get("market_cap"),
-                    "total_funding": org.get("total_funding_printed"),
-                    "total_funding_raw": org.get("total_funding"),
-                    "apollo_id": org.get("id"),
-                    "industry": org.get("primary_industry") or org.get("industry"),
-                    "industries": org.get("industries") or [],
-                    "secondary_industries": org.get("secondary_industries") or [],
-                    "website": org.get("website_url"),
-                    "domain": org.get("domain"),
-                    "company_linkedin_url": org.get("linkedin_url"),
-                    "company_name": org.get("name"),
-                    "description": org.get("short_description"),
-                    # Tech stack
-                    "technologies": technologies,
-                    "technology_names": technology_names,
-                    # Funding
-                    "funding_events": funding_events,
-                    "latest_funding_stage": org.get("latest_funding_stage"),
-                    "latest_funding_date": org.get("latest_funding_round_date"),
-                    # Hiring signals
-                    "headcount_growth": headcount_growth,
-                    "follower_count": org.get("num_followers") or org.get("linkedin_follower_count"),
-                    "employee_count_range": org.get("employee_count_range"),
-                    "headquarters": f"{org.get('city', '')}, {org.get('state', '')}, {org.get('country', '')}".strip(", "),
-                    # Lead person_email + context
-                    "person_email": person.get("email"),
-                }
-
-                # --- Million Verifier Integration ---
-                if result.get("person_email") and million_verifier_enabled:
-                    from utils.email_verifier import verify_email
-                    api_key = os.getenv("MILLION_VERIFIER_API_KEY")
-                    logger.info(f"MILLION VERIFIER: Verifying email {result['person_email']}...")
-                    verification_status = await verify_email(result["person_email"], api_key)
-                    print(f"Verification Status: {verification_status}")
-                    result["email_verification_status"] = verification_status
-                else:
-                    result["email_verification_status"] = None
-
-                return result
-            return {}
     except Exception as e:
         logger.error(f"Error calling Apollo API: {e}")
         

@@ -1,8 +1,6 @@
-import React from 'react';
-import { ShieldCheck, Zap, Info, Clock, Target, ListChecks, BookOpen } from "lucide-react";
+import React from "react";
+import { ShieldCheck, ShieldAlert, Clock, Target, ListChecks, Zap, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -23,137 +21,194 @@ interface CSOCommandCardProps {
 export function CSOCommandCard({ data }: CSOCommandCardProps) {
   if (!data) return null;
 
-  const isNegative = data.verdict.toLowerCase().includes('monitor') ||
-    data.verdict.toLowerCase().includes('deprioritize') ||
-    data.verdict.toLowerCase().includes('poor fit') ||
-    data.verdict.toLowerCase().includes('disqualif');
+  const isNegative =
+    data.verdict.toLowerCase().includes("monitor") ||
+    data.verdict.toLowerCase().includes("deprioritize") ||
+    data.verdict.toLowerCase().includes("poor fit") ||
+    data.verdict.toLowerCase().includes("disqualif");
 
-  const themeColor = isNegative ? 'zinc' : 'amber';
-  const glowColor = isNegative ? 'via-zinc-500/10' : 'via-primary/20';
-  const borderColor = isNegative ? 'border-zinc-200 dark:border-zinc-800' : 'border-amber-500/20 dark:border-amber-500/10';
+  const isGreenLight =
+    data.timing_advice.toLowerCase().includes("green") ||
+    data.timing_advice.toLowerCase().includes("ideal") ||
+    data.timing_advice.toLowerCase().includes("proceed");
+
+  const accent = isNegative
+    ? {
+        bar: "bg-rose-500",
+        headerBg: "bg-rose-50 dark:bg-rose-500/10",
+        headerBorder: "border-rose-100 dark:border-rose-500/15",
+        iconBg: "bg-rose-100 dark:bg-rose-500/20",
+        iconText: "text-rose-600 dark:text-rose-400",
+        label: "text-rose-600 dark:text-rose-400",
+        verdictBg: "bg-rose-50 dark:bg-rose-500/5",
+        verdictBorder: "border-rose-200 dark:border-rose-500/15",
+        verdictText: "text-rose-900 dark:text-rose-100",
+        dot: "bg-rose-500",
+        timingBg: "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400",
+        frameworkBg: "bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400",
+      }
+    : isGreenLight
+    ? {
+        bar: "bg-emerald-500",
+        headerBg: "bg-emerald-50 dark:bg-emerald-500/10",
+        headerBorder: "border-emerald-100 dark:border-emerald-500/15",
+        iconBg: "bg-emerald-100 dark:bg-emerald-500/20",
+        iconText: "text-emerald-700 dark:text-emerald-400",
+        label: "text-emerald-700 dark:text-emerald-400",
+        verdictBg: "bg-emerald-50 dark:bg-emerald-500/5",
+        verdictBorder: "border-emerald-200 dark:border-emerald-500/15",
+        verdictText: "text-emerald-900 dark:text-emerald-100",
+        dot: "bg-emerald-500",
+        timingBg: "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400",
+        frameworkBg: "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400",
+      }
+    : {
+        bar: "bg-amber-500",
+        headerBg: "bg-amber-50 dark:bg-amber-500/10",
+        headerBorder: "border-amber-100 dark:border-amber-500/15",
+        iconBg: "bg-amber-100 dark:bg-amber-500/20",
+        iconText: "text-amber-700 dark:text-amber-400",
+        label: "text-amber-700 dark:text-amber-400",
+        verdictBg: "bg-amber-50 dark:bg-amber-500/5",
+        verdictBorder: "border-amber-200 dark:border-amber-500/15",
+        verdictText: "text-amber-900 dark:text-amber-100",
+        dot: "bg-amber-500",
+        timingBg: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400",
+        frameworkBg: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400",
+      };
 
   return (
-    <div className="relative group mb-12">
-      {/* Decorative Glow */}
-      <div className={`absolute -inset-0.5 bg-gradient-to-r from-${themeColor}-500/20 ${glowColor} to-${themeColor}-500/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200`} />
+    <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm">
 
-      <div className={`relative grid grid-cols-1 lg:grid-cols-3 gap-0 bg-white dark:bg-zinc-950 border ${borderColor} rounded-2xl overflow-hidden shadow-2xl`}>
+      {/* Left accent bar */}
+      <div className={cn("absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl", accent.bar)} />
 
-        {/* Left Section: The Command */}
-        <div className="lg:col-span-2 p-10 lg:p-12 space-y-8 border-b lg:border-b-0 lg:border-r border-zinc-100 dark:border-zinc-900">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className={`h-10 w-10 rounded-lg bg-${themeColor}-500 text-white flex items-center justify-center shadow-lg shadow-${themeColor}-500/20`}>
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <div className="space-y-0.5">
-                <span className={`text-[10px] font-black text-${themeColor}-600 dark:text-${themeColor}-500 uppercase tracking-[0.25em]`}>Strategic Command</span>
-                <h2 className="text-2xl font-black italic tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">CSO Unified Verdict</h2>
-              </div>
-            </div>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant="outline" className={`text-[10px] font-black border-${themeColor}-500/30 text-${themeColor}-600 bg-${themeColor}-500/5 px-3 py-1 uppercase tracking-widest cursor-help`}>
-                    {data.framework_selected} Framework
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs bg-zinc-950 text-white border-zinc-800">
-                  <p className="text-xs font-medium">{data.framework_reasoning || "Optimized for persona engagement."}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+      {/* ── Header ── */}
+      <div className={cn("pl-6 pr-5 pt-4 pb-3.5 flex items-center justify-between gap-3 border-b", accent.headerBg, accent.headerBorder)}>
+        <div className="flex items-center gap-3">
+          <div className={cn("h-8 w-8 rounded-xl flex items-center justify-center", accent.iconBg)}>
+            {isNegative
+              ? <ShieldAlert className={cn("h-4 w-4", accent.iconText)} />
+              : <ShieldCheck className={cn("h-4 w-4", accent.iconText)} />}
           </div>
-
-          <div className={`p-8 rounded-xl bg-${themeColor}-500/5 border border-${themeColor}-500/10 shadow-inner`}>
-            <p className="text-2xl font-black text-zinc-900 dark:text-white leading-tight italic">
-              "{data.verdict}"
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {data.product_selection_reasoning && (
-              <div className="mb-6 pb-6 border-b border-dashed border-zinc-200 dark:border-zinc-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className={`h-3.5 w-3.5 text-${themeColor}-500`} />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Winning Offering Selection</span>
-                </div>
-                <p className="text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed font-bold italic">
-                  "{data.product_selection_reasoning}"
-                </p>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 mb-2">
-              <Info className="h-3.5 w-3.5 text-zinc-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Strategic Reasoning</span>
+          <div>
+            <div className={cn("text-[9px] font-black uppercase tracking-[0.3em]", accent.label)}>
+              CSO Unified Verdict
             </div>
-            <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed font-medium">
-              {data.strategic_reasoning}
-            </p>
+            <div className="text-[11px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">
+              Strategic Command
+            </div>
           </div>
         </div>
 
-        {/* Right Section: Tactical Advice */}
-        <div className="bg-zinc-50/50 dark:bg-zinc-900/30 p-10 lg:p-12 space-y-10">
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className={`h-4 w-4 text-${themeColor}-500`} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Timing Advice</span>
-            </div>
-            <Badge className={cn(
-              "text-[11px] font-black px-4 py-1.5 rounded-lg border",
-              data.timing_advice.toLowerCase().includes('green')
-                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                : (isNegative ? "bg-zinc-500/10 text-zinc-600 border-zinc-500/20" : "bg-amber-500/10 text-amber-600 border-amber-500/20")
-            )}>
-              {data.timing_advice}
-            </Badge>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {/* Framework */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest cursor-help", accent.frameworkBg)}>
+                  <div className={cn("h-1.5 w-1.5 rounded-full", accent.dot)} />
+                  {data.framework_selected}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="text-xs font-medium">{data.framework_reasoning || "Optimized for this persona and engagement context."}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Timing */}
+          <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest", accent.timingBg)}>
+            <Clock className="h-2.5 w-2.5" />
+            {data.timing_advice}
           </div>
 
-          {data.strategic_proof_points && data.strategic_proof_points.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-emerald-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Strategic Proof Points (RAG)</span>
-              </div>
-              <ul className="space-y-3">
-                {data.strategic_proof_points.map((proof, i) => (
-                  <li key={i} className="flex gap-3 text-xs font-bold text-zinc-700 dark:text-zinc-300 items-start">
-                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                    {proof}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Source count */}
+          <div className="px-2 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{data.sources.length} sources</span>
+          </div>
+        </div>
+      </div>
 
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <ListChecks className={`h-4 w-4 text-${themeColor}-500`} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{isNegative ? 'Disqualification Reasons' : 'Objection Preemption'}</span>
+      {/* ── Verdict ── */}
+      <div className="pl-6 pr-6 pt-5 pb-4">
+        <div className={cn("relative rounded-xl p-5 border", accent.verdictBg, accent.verdictBorder)}>
+          {/* Decorative quote mark */}
+          <div className={cn("absolute -top-3 left-4 text-5xl font-black leading-none select-none opacity-20", accent.label)}>"</div>
+          <blockquote className={cn("text-lg md:text-xl font-black italic leading-snug tracking-tight", accent.verdictText)}>
+            {data.verdict}
+          </blockquote>
+        </div>
+      </div>
+
+      {/* Product Selection */}
+      {data.product_selection_reasoning && (
+        <div className="pl-6 pr-6 pb-4">
+          <div className={cn("flex items-start gap-3 p-4 rounded-xl border", accent.verdictBg, accent.verdictBorder)}>
+            <Zap className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", accent.iconText)} />
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-1">Winning Offering</div>
+              <p className={cn("text-[13px] font-bold italic leading-relaxed", accent.iconText)}>
+                {data.product_selection_reasoning}
+              </p>
             </div>
-            <ul className="space-y-3">
-              {data.objection_preemption.map((obj, i) => (
-                <li key={i} className="flex gap-3 text-xs font-bold text-zinc-700 dark:text-zinc-300 items-start">
-                  <div className={`mt-1 h-1.5 w-1.5 rounded-full bg-${themeColor}-500 shrink-0`} />
-                  {obj}
+          </div>
+        </div>
+      )}
+
+      {/* Strategic Reasoning */}
+      <div className="pl-6 pr-6 pb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <Info className="h-3 w-3 text-zinc-400" />
+          <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">Strategic Reasoning</span>
+        </div>
+        <p className="text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium border-l-2 border-zinc-200 dark:border-zinc-700 pl-3">
+          {data.strategic_reasoning}
+        </p>
+      </div>
+
+      {/* ── Bottom: Objections + Proof Points ── */}
+      <div className={cn(
+        "grid border-t border-zinc-100 dark:border-zinc-800",
+        data.strategic_proof_points?.length ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1",
+      )}>
+        {/* Objections */}
+        <div className={cn("p-5", data.strategic_proof_points?.length ? "md:border-r border-zinc-100 dark:border-zinc-800" : "")}>
+          <div className="flex items-center gap-2 mb-3">
+            <ListChecks className={cn("h-3.5 w-3.5", accent.iconText)} />
+            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">
+              {isNegative ? "Disqualification Reasons" : "Objection Preemption"}
+            </span>
+          </div>
+          <ul className="space-y-2">
+            {data.objection_preemption.slice(0, 5).map((obj, i) => (
+              <li key={i} className="flex items-start gap-2.5">
+                <div className={cn("mt-1.5 h-1.5 w-1.5 rounded-full shrink-0", accent.dot)} />
+                <span className="text-[12px] font-medium text-zinc-600 dark:text-zinc-400 leading-relaxed">{obj}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Proof Points */}
+        {data.strategic_proof_points && data.strategic_proof_points.length > 0 && (
+          <div className="p-5 bg-zinc-50 dark:bg-zinc-800/40">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">Proof Points · RAG</span>
+            </div>
+            <ul className="space-y-2">
+              {data.strategic_proof_points.slice(0, 5).map((proof, i) => (
+                <li key={i} className="flex items-start gap-2.5">
+                  <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="text-[12px] font-medium text-zinc-600 dark:text-zinc-400 leading-relaxed">{proof}</span>
                 </li>
               ))}
             </ul>
           </div>
-
-          <Button variant="outline" className="w-full justify-between h-12 rounded-xl border-zinc-200 dark:border-zinc-800 hover:bg-white dark:hover:bg-zinc-900 shadow-sm">
-            <div className="flex items-center gap-3">
-              <BookOpen className={`h-4 w-4 text-${isNegative ? 'zinc-500' : 'primary'}`} />
-              <span className="text-xs font-black uppercase tracking-tight">View Proofs ({data.sources.length})</span>
-            </div>
-            <Badge variant="secondary" className={`bg-${isNegative ? 'zinc' : 'primary'}/10 text-${isNegative ? 'zinc-500' : 'primary'} border-none text-[9px] font-black`}>RAG Verified</Badge>
-          </Button>
-        </div>
-
+        )}
       </div>
+
     </div>
   );
 }

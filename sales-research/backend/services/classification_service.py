@@ -12,32 +12,7 @@ from utils.activity_helper import log_activity_and_notify
 from agents.linkedin_agent import batch_classify_profiles_async, enrich_company_waterfall
 from agents.lead_scoring_agent import revalidate_lead_fit_async
 
-class EventStreamManager:
-    def __init__(self):
-        self.active_connections: List[asyncio.Queue] = []
-
-    async def subscribe(self):
-        queue = asyncio.Queue()
-        self.active_connections.append(queue)
-        logger.debug(f"New SSE subscriber. Total: {len(self.active_connections)}")
-        return queue
-
-    async def unsubscribe(self, queue):
-        if queue in self.active_connections:
-            self.active_connections.remove(queue)
-            logger.debug(f"SSE subscriber disconnected. Total: {len(self.active_connections)}")
-
-    async def broadcast(self, data: dict):
-        if not self.active_connections:
-            return
-        
-        payload = json.dumps(data)
-        event = f"data: {payload}\n\n"
-        
-        for queue in self.active_connections:
-            await queue.put(event)
-
-event_manager = EventStreamManager()
+from utils.sse_manager import event_manager
 
 async def run_classification_and_update(raw_leads: List[dict], user_id: str | None = None):
     """
@@ -120,6 +95,7 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                 for p in existing_res.scalars().all():
                     existing_profile_data_map[p.linkedin_url] = {
                         "linkedin_url": p.linkedin_url,
+                        "url": p.linkedin_url, # Frontend matches on .url sometimes
                         "is_fit": p.is_fit,
                         "is_competitor": p.is_competitor,
                         "is_decision_maker": p.is_decision_maker,
@@ -130,71 +106,76 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                         "headline": p.headline
                     }
 
-        # If there are NO new profiles but there are existing ones, broadcast them now
-        if not new_profiles_list and existing_profile_data_map:
-            logger.info("All discovered profiles already exist in DB. Broadcasting existing data.")
+        # IMMEDIATE BROADCAST of existing data so UI doesn't spin
+        if existing_profile_data_map:
+            logger.info(f"Broadcasting existing data for {len(existing_profile_data_map)} profiles immediately.")
             await event_manager.broadcast({
                 "type": "classification_update",
                 "leads": list(existing_profile_data_map.values())
             })
-            return
-        
-        if not new_profiles_list:
-            logger.info("No new profiles to classify. Returning.")
-            return
 
-        # 2. Batch Classify & Update Iteratively
+        if not new_profiles_list:
+            logger.info("No profiles need AI classification. Proceeding to broadcast phase...")
+            # Still proceed to process any explicitly provided raw_leads for broadcast
+            new_profiles_list = []
+
+        # 2. Process All Leads (Classify if needed, then Enrich & Broadcast)
+        # We use raw_leads_to_process to ensure ALL leads passed in are considered for broadcast
         batch_size = 100
-        for i in range(0, len(new_profiles_list), batch_size):
-            batch = new_profiles_list[i : i + batch_size]
-            logger.info(f"Triggering AI for batch {i//batch_size + 1} ({len(batch)} profiles)...")
+        leads_to_process = list(unique_profiles_map.values())
+        
+        for i in range(0, len(leads_to_process), batch_size):
+            batch = leads_to_process[i : i + batch_size]
             
-            # A. Native Async AI Call
-            batch_res = await batch_classify_profiles_async(batch)
-            logger.debug(f"AI returned {len(batch_res)} results: {list(batch_res.keys())} | Values: {list(batch_res.values())}")
+            # A. Identify which ones actually need AI Call
+            ai_sub_batch = [p for p in batch if p["id"] in [new["id"] for new in new_profiles_list]]
+            batch_res = {}
+            if ai_sub_batch:
+                logger.info(f"Triggering AI for sub-batch {i//batch_size + 1} ({len(ai_sub_batch)} profiles)...")
+                batch_res = await batch_classify_profiles_async(ai_sub_batch)
             
             # B. Identify which leads to update from this batch
-            batch_urls = set(item['id'] for item in batch)
             leads_to_update_batch = []
             event_leads_batch = []
 
-            # Include existing profile data in the first batch broadcast if available
-            if i == 0 and existing_profile_data_map:
-                event_leads_batch.extend(existing_profile_data_map.values())
-            logger.debug(f"Raw Lead Count: {len(event_leads_batch)}")
-            for lead in raw_leads:
-                lead_n_url = normalize_linkedin_url(lead["linkedin_url"])
-                logger.debug(f"Checking lead {lead_n_url} against batch_urls...")
-                if lead_n_url in batch_urls:
-                    logger.debug(f"Found lead {lead_n_url} in batch. Fetching AI result...")
-                    c = batch_res.get(lead_n_url)
-                    if c:
-                        logger.debug(f"Applying AI result for {lead_n_url}: fit={c.get('is_fit')}")
-                        updated_data = {
-                            "linkedin_url": lead_n_url,
-                            "is_fit": c.get("is_fit"),
-                            "is_competitor": c.get("is_competitor"),
-                            "is_decision_maker": c.get("is_decision_maker"),
-                            "fit_reasoning": c.get("reasoning"),
-                            "intent": c.get("intent"),
-                            "post_topic_depth": c.get("post_topic_depth"),
-                            "sentiment": c.get("sentiment"),
+            # We don't need to re-add existing_profile_data_map here because we broadcasted them above.
+            
+            for lead in batch:
+                lead_n_url = lead.get("id")
+                # If we have an AI result, use it. Otherwise, use existing lead data.
+                c = batch_res.get(lead_n_url)
+                
+                if c:
+                    updated_data = {
+                        "linkedin_url": lead_n_url,
+                        "url": lead_n_url, # Ensure lead.url match works
+                        "is_fit": c.get("is_fit"),
+                        "is_competitor": c.get("is_competitor"),
+                        "is_decision_maker": c.get("is_decision_maker"),
+                        "fit_reasoning": c.get("reasoning"),
+                        "intent": c.get("intent"),
+                        "post_topic_depth": c.get("post_topic_depth"),
+                        "sentiment": c.get("sentiment"),
+                        "is_buy_signal": c.get("is_buy_signal"),
+                        "is_strategic_seller": c.get("is_strategic_seller"),
+                        "profile_metadata": {
                             "is_buy_signal": c.get("is_buy_signal"),
-                            "is_strategic_seller": c.get("is_strategic_seller"),
-                            "profile_metadata": {
-                                "is_buy_signal": c.get("is_buy_signal"),
-                                "is_strategic_seller": c.get("is_strategic_seller")
-                            },
-                            # Carry over metadata from raw lead
-                            "name": lead.get("name"),
-                            "headline": lead.get("headline"),
-                            "comment": lead.get("comment"),
-                            "source_post": lead.get("source_post"),
-                            "source_post_url": lead.get("source_post_url"),
-                            "competitor": lead.get("competitor")
-                        }
-                        leads_to_update_batch.append(updated_data)
-                        event_leads_batch.append(updated_data)
+                            "is_strategic_seller": c.get("is_strategic_seller")
+                        },
+                        # Carry over metadata from raw lead
+                        "name": lead.get("name"),
+                        "headline": lead.get("headline"),
+                        "comment": lead.get("comment"),
+                        "source_post": lead.get("source_post"),
+                        "source_post_url": lead.get("source_post_url"),
+                        "competitor": lead.get("competitor")
+                    }
+                    leads_to_update_batch.append(updated_data)
+                    event_leads_batch.append(updated_data)
+                else:
+                    # Even if no AI update, we still want to broadcast the current lead state
+                    # Especially for manual enrichment where URL/Name might have changed
+                    event_leads_batch.append(lead)
 
             # C/D. Save, Enrich & Notify
             if leads_to_update_batch:
@@ -203,6 +184,17 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                     async with session.begin():
                         icp_data = await get_active_icp(session, user_id=user_id)
                         await batch_upsert_identified_profiles(session, leads_to_update_batch)
+                        
+                        # Fetch IDs and current URLs for ALL leads in the batch to ensure stable identity tracking
+                        profile_urls = [l["linkedin_url"] for l in event_leads_batch]
+                        id_res = await session.execute(
+                            select(IdentifiedProfile.id, IdentifiedProfile.linkedin_url)
+                            .where(IdentifiedProfile.linkedin_url.in_(profile_urls))
+                        )
+                        id_map = {r[1]: str(r[0]) for r in id_res.all()}
+                        for lu in event_leads_batch:
+                            if lu.get("linkedin_url") in id_map:
+                                lu["id"] = id_map[lu["linkedin_url"]]
                 
                 logger.info(f"Batch {i//batch_size + 1} - Updated {len(leads_to_update_batch)} profiles")
                 
@@ -254,14 +246,56 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                                                 db_profile.email = person_email
                                             if email_status:
                                                 db_profile.email_verification_status = email_status
-                                            logger.info(f"Updated profile {db_profile.name} with email: {person_email} (Status: {email_status})")
+                                            
+                                            # Update Identity if newly discovered from Apollo
+                                            if enriched.get("person_name"):
+                                                db_profile.name = enriched["person_name"]
+                                                lu["name"] = enriched["person_name"]
+                                            if enriched.get("headline"):
+                                                db_profile.headline = enriched["headline"]
+                                                lu["headline"] = enriched["headline"]
+                                            if enriched.get("linkedin_url") and db_profile.linkedin_url.startswith("apollo_id:"):
+                                                old_url = db_profile.linkedin_url
+                                                db_profile.linkedin_url = enriched["linkedin_url"]
+                                                lu["linkedin_url"] = enriched["linkedin_url"]
+                                                lu["old_linkedin_url"] = old_url
+                                                # Also update the ID map if needed, but the ID remains stable
+                                                lu["id"] = str(db_profile.id)
 
-                                        # Re-define update_vals for company upsert
+                                            logger.info(f"Updated profile {db_profile.name} with email: {person_email}")
+
+                                        # Re-define update_vals for company upsert and profile persistence
                                         update_vals = {}
                                         if person_email:
                                             update_vals["email"] = person_email
                                         if email_status:
                                             update_vals["email_verification_status"] = email_status
+                                        if enriched.get("person_name"):
+                                            update_vals["name"] = enriched["person_name"]
+                                        if enriched.get("headline"):
+                                            update_vals["headline"] = enriched["headline"]
+                                        
+                                        # Synchronize Metadata (mirroring enrich_leads logic)
+                                        if db_profile:
+                                            lu["id"] = str(db_profile.id)
+                                            try:
+                                                current_meta = json.loads(db_profile.profile_metadata or "{}")
+                                            except:
+                                                current_meta = {}
+                                            
+                                            current_meta.update({
+                                                "person_email": person_email,
+                                                "email_status": email_status,
+                                                "is_enriched": True,
+                                                "company_name": enriched.get("company_name"),
+                                                "first_name": enriched.get("first_name"),
+                                                "last_name": enriched.get("last_name"),
+                                                "city": enriched.get("city"),
+                                                "state": enriched.get("state"),
+                                                "photo_url": enriched.get("photo_url")
+                                            })
+                                            update_vals["profile_metadata"] = json.dumps(current_meta)
+                                            lu["profile_metadata"] = current_meta
 
                                         # Guard: Only upsert company if we have a valid identifier (LinkedIn URL or Domain)
                                         if enriched.get("linkedin_url") or enriched.get("domain"):
@@ -274,7 +308,7 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                                                 )
                                                 lu.update({
                                                     "company_id": str(company.id),
-                                                    "company_name": enriched.get("name"),
+                                                    "company_name": enriched.get("company_name"),
                                                     "company_description": enriched.get("description"),
                                                     "company_industries": enriched.get("industries"),
                                                     "employee_count": enriched.get("employee_count"),

@@ -342,11 +342,20 @@ export const saveGlobalICP = async (data: IdealProfileData) => {
     return response.data;
 };
 
+export interface UsageStats {
+    used: number;
+    limit: number;
+    remaining: number;
+}
+
 export interface DashboardStats {
     total_leads: number;
     avg_lead_score: number;
     high_potential_leads: number;
     time_saved_hours: number;
+    trial_mode: boolean;
+    research_usage?: UsageStats;
+    classification_usage?: UsageStats;
 }
 
 export const fetchDashboardStats = async (): Promise<DashboardStats | null> => {
@@ -422,6 +431,11 @@ export const saveIntegrations = async (data: IntegrationSettings) => {
     return response.data;
 };
 
+export const getUsageStats = async (): Promise<any> => {
+    const response = await axios.get(`${API_URL}/api/settings/usage`);
+    return response.data;
+};
+
 export const getUserIntegrations = async (): Promise<{ user_linkedin_url: string | null, email_config: string | null, slack_user_id: string | null } | null> => {
     try {
         const response = await axios.get(`${API_URL}/api/settings/user-integrations`);
@@ -448,6 +462,7 @@ export interface ProductConfig {
 export interface SellingProfileConfig {
     company_name: string;
     description: string;
+    business_model?: 'product' | 'service' | 'hybrid';
     products: ProductConfig[];
 }
 
@@ -583,6 +598,11 @@ export interface IdentifiedProfile {
     rep_name?: string;
     touchpoint_count: number;
     outreach_status?: string;
+    
+    // New Intelligence Signals
+    intent?: string;
+    sentiment?: number;
+
     company?: {
         id: string;
         name: string;
@@ -613,6 +633,7 @@ export const getIdentifiedProfiles = async (
     });
     return response.data;
 };
+
 
 export interface Activity {
     id: string;

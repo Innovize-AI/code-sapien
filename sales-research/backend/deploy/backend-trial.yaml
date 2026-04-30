@@ -33,7 +33,7 @@ spec:
             - name: DB_SCHEMA
               value: trial
             - name: ALLOW_ORIGINS
-              value: "https://trial.glial.innovizeai.com,http://localhost:3000"
+              value: "https://trial.glial.innovizeai.com,http://localhost:3000,https://glial-research-frontend-service-trial-512561667165.us-central1.run.app"
             - name: FRONTEND_URL
               value: "https://trial.glial.innovizeai.com"
             - name: PYTHONUNBUFFERED

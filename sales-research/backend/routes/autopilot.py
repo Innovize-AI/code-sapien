@@ -20,7 +20,12 @@ async def get_autopilot_rules(
     """
     Get all active autopilot rules for the organization.
     """
-    return await crud.get_autopilot_rules(db, rule_type=type)
+    return await crud.get_autopilot_rules(
+        db, 
+        rule_type=type,
+        org_id=current_user.organization_id,
+        user_id=str(current_user.id)
+    )
 
 @autopilot_router.post("/autopilot/rules", response_model=AutopilotRule)
 async def create_autopilot_rule(
@@ -28,11 +33,21 @@ async def create_autopilot_rule(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
-    """
-    Create a new autopilot rule.
-    """
+    import os
+    is_trial = os.getenv("TRIAL_MODE", "false").lower() == "true"
+    if is_trial and rule_data.type == 'apollo_config':
+        raise HTTPException(
+            status_code=400, 
+            detail="Apollo Discovery is not available in Trial Mode."
+        )
+
     if rule_data.type == 'keyword':
-        existing_rules = await crud.get_autopilot_rules(db, rule_type='keyword')
+        existing_rules = await crud.get_autopilot_rules(
+            db, 
+            rule_type='keyword',
+            org_id=current_user.organization_id,
+            user_id=str(current_user.id)
+        )
         if len(existing_rules) >= 5:
             raise HTTPException(
                 status_code=400, 
@@ -40,8 +55,12 @@ async def create_autopilot_rule(
             )
             
     rule_dict = rule_data.model_dump()
-    # Ensure organization_id is set if available (fallback to None if single-tenant for now)
-    return await crud.create_autopilot_rule(db, rule_dict, user_id=current_user.id)
+    return await crud.create_autopilot_rule(
+        db, 
+        rule_dict, 
+        user_id=str(current_user.id),
+        org_id=current_user.organization_id
+    )
 
 @autopilot_router.delete("/autopilot/rules/{rule_id}")
 async def delete_autopilot_rule(
@@ -62,7 +81,10 @@ async def delete_autopilot_rule(
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
         
-    if rule.created_by_id != current_user.id and current_user.role != "admin":
+    is_owner = rule.created_by_id == current_user.id
+    is_same_org = current_user.organization_id and rule.organization_id == current_user.organization_id
+    
+    if not (is_owner or (is_same_org and current_user.role == "admin") or current_user.role == "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized to delete this rule")
 
     success = await crud.delete_autopilot_rule(db, rule_id)
@@ -74,7 +96,11 @@ async def get_autopilot_competitors(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
-    return await crud.get_competitors(db)
+    return await crud.get_competitors(
+        db,
+        org_id=current_user.organization_id,
+        user_id=str(current_user.id)
+    )
 
 @autopilot_router.post("/autopilot/competitors", response_model=Competitor)
 async def create_autopilot_competitor(
@@ -82,7 +108,11 @@ async def create_autopilot_competitor(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
-    existing_competitors = await crud.get_competitors(db)
+    existing_competitors = await crud.get_competitors(
+        db,
+        org_id=current_user.organization_id,
+        user_id=str(current_user.id)
+    )
     if len(existing_competitors) >= 3:
         raise HTTPException(
             status_code=400, 
@@ -90,7 +120,12 @@ async def create_autopilot_competitor(
         )
         
     comp_dict = comp_data.model_dump()
-    return await crud.create_competitor(db, comp_dict, user_id=current_user.id)
+    return await crud.create_competitor(
+        db, 
+        comp_dict, 
+        user_id=str(current_user.id),
+        org_id=current_user.organization_id
+    )
 
 @autopilot_router.delete("/autopilot/competitors/{comp_id}")
 async def delete_autopilot_competitor(
@@ -108,7 +143,10 @@ async def delete_autopilot_competitor(
     if not comp:
         raise HTTPException(status_code=404, detail="Competitor not found")
         
-    if comp.created_by_id != current_user.id and current_user.role != "admin":
+    is_owner = comp.created_by_id == current_user.id
+    is_same_org = current_user.organization_id and comp.organization_id == current_user.organization_id
+
+    if not (is_owner or (is_same_org and current_user.role == "admin") or current_user.role == "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized to delete this competitor")
 
     success = await crud.delete_competitor(db, comp_id)

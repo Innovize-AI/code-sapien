@@ -14,6 +14,7 @@ async def log_activity_and_notify(
     description: str = None, 
     metadata: dict = None,
     user_id: str = None,
+    org_id: str = None,
     idempotency_key: str = None
 ):
     """
@@ -35,6 +36,7 @@ async def log_activity_and_notify(
         intent=intent,
         sentiment=sentiment,
         user_id=user_id,
+        org_id=org_id,
         idempotency_key=idempotency_key
     )
 
@@ -55,8 +57,15 @@ async def log_activity_and_notify(
             rep_name = profile.email.split("@")[0].replace(".", " ").title()
     
     # 2. Fetch Slack webhook and notify
-    settings = await get_org_settings(db)
+    webhook_url = None
+    
+    # Try fetching OrganizationSettings for the webhook
+    settings = await get_org_settings(db, user_id=user_id, org_id=org_id)
     if settings and settings.slack_webhook_url:
+        webhook_url = settings.slack_webhook_url
+        logger.info(f"DEBUG: Using settings owned by {user_id or 'System'}")
+
+    if webhook_url:
         blocks = None
         
         # Build specific blocks based on type/metadata
@@ -114,13 +123,13 @@ async def log_activity_and_notify(
             blocks = build_generic_activity_blocks(title, description, rep_name=rep_name)
 
         # 3. Send Slack Notification
-        if settings.slack_webhook_url:
+        if webhook_url:
             logger.info(f"DEBUG: Sending Slack notification for {title}. Blocks: {len(blocks) if blocks else 0}")
             if blocks:
                 logger.info(f"DEBUG: Payload: {json.dumps(blocks, indent=2)[:1000]}") # Log first 1000 chars of blocks
             
             slack_text = f"*{title}*\n{description}" if description else f"*{title}*"
-            await send_slack_notification(settings.slack_webhook_url, slack_text, blocks=blocks)
+            await send_slack_notification(webhook_url, slack_text, blocks=blocks)
 
     # SECURE THE TRANSACTION: Clean up any implicitly opened read-transactions
     # (like from selecting the Profile or UserSettings) to ensure the session 

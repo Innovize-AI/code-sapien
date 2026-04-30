@@ -2,29 +2,36 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import List
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
 class EventStreamManager:
     def __init__(self):
-        self.active_connections: List[asyncio.Queue] = []
+        # org_id -> List[asyncio.Queue]
+        self.active_connections: dict[str, List[asyncio.Queue]] = {}
 
-    async def subscribe(self):
+    async def subscribe(self, org_id: str):
         queue = asyncio.Queue()
-        self.active_connections.append(queue)
-        logger.debug(f"New SSE subscriber. Total: {len(self.active_connections)}")
+        if org_id not in self.active_connections:
+            self.active_connections[org_id] = []
+        
+        self.active_connections[org_id].append(queue)
+        logger.debug(f"New SSE subscriber for org {org_id}. Total for org: {len(self.active_connections[org_id])}")
         return queue
 
-    async def unsubscribe(self, queue):
-        if queue in self.active_connections:
-            self.active_connections.remove(queue)
-            logger.debug(f"SSE subscriber disconnected. Total: {len(self.active_connections)}")
+    async def unsubscribe(self, org_id: str, queue: asyncio.Queue):
+        if org_id in self.active_connections and queue in self.active_connections[org_id]:
+            self.active_connections[org_id].remove(queue)
+            if not self.active_connections[org_id]:
+                del self.active_connections[org_id]
+            logger.debug(f"SSE subscriber disconnected from org {org_id}.")
 
-    async def broadcast(self, data: dict):
-        if not self.active_connections:
-            return
-        
+    async def broadcast(self, data: dict, org_id: Optional[str] = None):
+        """
+        Broadcasts data to all subscribers of a specific organization.
+        If org_id is None, it broadcasts to EVERYONE (use sparingly).
+        """
         def default(obj):
             if isinstance(obj, uuid.UUID):
                 return str(obj)
@@ -33,7 +40,16 @@ class EventStreamManager:
         payload = json.dumps(data, default=default)
         event = f"data: {payload}\n\n"
         
-        for queue in self.active_connections:
+        targets = []
+        if org_id:
+            if org_id in self.active_connections:
+                targets = self.active_connections[org_id]
+        else:
+            # Global broadcast
+            for queues in self.active_connections.values():
+                targets.extend(queues)
+
+        for queue in targets:
             await queue.put(event)
 
 # Global instance for shared state across modules

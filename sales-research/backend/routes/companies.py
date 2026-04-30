@@ -4,10 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 from db import get_db
-from db.models import Company
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
+from dependencies import get_current_user
+from db.models import Profile, IdentifiedProfile, ResearchReport, Company
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class CompanySchema(BaseModel):
         from_attributes = True
 
 @router.get("/{company_id}", response_model=CompanySchema)
-async def get_company(company_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_company(company_id: UUID, db: AsyncSession = Depends(get_db), current_user: Profile = Depends(get_current_user)):
     """
     Fetch full details for a specific company by its UUID, including identified people.
     """
@@ -77,13 +78,13 @@ async def get_company(company_id: UUID, db: AsyncSession = Depends(get_db)):
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    # Fetch identified profiles for this company, joining with ResearchReport to get latest_report_id
-    from db.models import IdentifiedProfile, ResearchReport
-    from sqlalchemy import func
-    
-    profiles_res = await db.execute(
-        select(IdentifiedProfile).where(IdentifiedProfile.company_id == company_id)
-    )
+    stmt = select(IdentifiedProfile).where(IdentifiedProfile.company_id == company_id)
+    if current_user.organization_id:
+        stmt = stmt.where(IdentifiedProfile.organization_id == current_user.organization_id)
+    else:
+        stmt = stmt.where(IdentifiedProfile.created_by_id == current_user.id)
+        
+    profiles_res = await db.execute(stmt)
     profiles = profiles_res.scalars().all()
     
     if profiles:

@@ -6,6 +6,7 @@ import json
 import uuid
 import re
 from typing import Optional, List
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import SessionLocal
 from db.crud import save_report, get_report_by_email_or_linkedin, upsert_company
@@ -14,19 +15,21 @@ from utils.activity_helper import log_activity_and_notify
 from workflow.state import IdealProfile, InputLeadData, AgentState
 from workflow.graph import get_graph, NODE_STATUS_MAPPING
 from utils.common import add_https_if_missing
-from prompts.sales_prompts import COMPANY_CONTEXT
+from prompts.sales_prompts import DEFAULT_COMPANY_CONTEXT
+from fastapi import HTTPException
 
 async def _get_organization_settings(user_id: str = None) -> dict:
     """Helper to fetch settings from database with per-user overrides."""
     async with SessionLocal() as db:
-        from sqlalchemy import select
-        from db.models import OrganizationSettings, UserSettings
+        from db.crud import get_org_settings
         
-        # 1. Fetch Global Settings
-        result = await db.execute(select(OrganizationSettings).limit(1))
-        global_settings = result.scalars().first()
+        logger.info(f"Fetching Org Settings for user_id: {user_id}")
+        # 1. Fetch Global Settings using the robust helper
+        global_settings = await get_org_settings(db, user_id=user_id)
         
         # 2. Fetch User Settings (if user_id provided)
+        from sqlalchemy import select
+        from db.models import UserSettings
         user_settings = None
         if user_id:
             result = await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
@@ -74,6 +77,25 @@ async def _get_organization_settings(user_id: str = None) -> dict:
             except Exception as e:
                 logger.info(f"Error parsing Selling Profile: {e}")
 
+        # Priority: Settings > Derived (Trial) > None
+        index_name = global_settings.pinecone_index_name if global_settings else None
+        is_trial = os.getenv("TRIAL_MODE", "false").lower() == "true"
+        if not index_name and is_trial and user_id:
+            from uuid import UUID
+            from db.models import Profile
+            u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+            # Resolve org_id in one go
+            result = await db.execute(select(Profile.organization_id).where(Profile.id == u_id))
+            org_id = result.scalar()
+            if org_id:
+                index_name = f"tr-{org_id}"
+                logger.info(f"Derived Trial Index Name from Org ID: {index_name}")
+            else:
+                logger.warning(f"Could not derive index_name: No organization_id found for profile {user_id}")
+
+        if is_trial and not index_name:
+             logger.error(f"CRITICAL: No pinecone_index_name resolved for user {user_id} in TRIAL_MODE!")
+
         return {
             "icp": icp,
             "selling_profile": selling_profile,
@@ -81,7 +103,8 @@ async def _get_organization_settings(user_id: str = None) -> dict:
             "company_linkedin_url": company_linkedin,
             "email_config": email_config,
             "million_verifier_api_key": global_settings.million_verifier_api_key if global_settings else None,
-            "integrations_config": global_settings.integrations_config if global_settings else None
+            "integrations_config": global_settings.integrations_config if global_settings else None,
+            "pinecone_index_name": index_name
         }
 
 def _safe_serialize(val):
@@ -104,11 +127,19 @@ def _prepare_state_for_json(state):
             cleaned[k] = v
     return cleaned
 
-async def _persist_results(db, linkedin_url, website, final_state, options, user_id=None):
+async def _persist_results(db, linkedin_url, website, final_state, options, user_id=None, org_id=None):
     """Common logic to save research results to DB with multi-tenant support."""
     if not final_state.get("sales_research_report"):
         logger.info("Skipping database save: No research report generated.")
         return None
+
+    # Resolve org_id from profile if user_id is provided and org_id not passed
+    if user_id and not org_id:
+        from db.models import Profile
+        result = await db.execute(select(Profile.organization_id).where(Profile.id == user_id))
+        org_id = result.scalar_one_or_none()
+        if not org_id:
+            logger.warning(f"Could not resolve organization_id for user {user_id} during persistence.")
 
     # Extract numeric lead score if possible
     lead_score = None
@@ -153,7 +184,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
         # Modular Nodules
         target_pain_points=json.dumps(final_state.get("target_pain_points") or {}),
         strategic_solutions=json.dumps(final_state.get("strategic_solutions") or {}),
-        personalized_outreach=json.dumps(final_state.get("personalized_outreach") or []),
+        personalized_outreach=json.dumps(final_state.get("final_outreach_sequences") or final_state.get("personalized_outreach") or []),
 
         follow_up_strategy=_safe_serialize(final_state.get("follow_up_strategy")),
         cso_strategic_briefing=json.dumps(final_state.get("cso_strategic_briefing") or {}),
@@ -210,7 +241,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
         except Exception as ce:
             logger.info(f"Error during company autopopulation: {ce}")
 
-    saved_report = await save_report(db, report_data, user_id=user_id)
+    saved_report = await save_report(db, report_data, user_id=user_id, org_id=org_id)
 
     
     if saved_report:
@@ -270,7 +301,7 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
             "lead_score": lead_score, 
             "name": fullname,
             "why_now": report.get("why_now"),
-            "action_plan": report.get("advanced_next_steps"), # This is the list of next steps
+            "action_plan": report.get("outreach_sequence", {}).get("steps", []),
             "journey_stage": journey_analysis.get("journey_stage"),
             "heat_rating": journey_analysis.get("sentiment_score"),
             "urgency": journey_analysis.get("urgency_level"),
@@ -325,9 +356,19 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     
     org_settings = await _get_organization_settings(user_id=user_id)
     
-    # Inject Million Verifier API Key into environment from DB
-    if org_settings.get("million_verifier_api_key"):
+    # Enforce Trial Limits
+    await check_research_limit(user_id)
+    
+    # Inject Million Verifier API Key into environment
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+    if trial_mode:
+        million_verifier_key = os.getenv("MILLION_VERIFIER_API_KEY")
+        if million_verifier_key:
+            os.environ["MILLION_VERIFIER_API_KEY"] = million_verifier_key
+            logger.debug("Million Verifier API Key injected from environment (Trial Mode)")
+    elif org_settings.get("million_verifier_api_key"):
         os.environ["MILLION_VERIFIER_API_KEY"] = org_settings["million_verifier_api_key"]
+        logger.debug("Million Verifier API Key injected from DB")
         
     ideal_profile = org_settings["icp"]
 
@@ -372,7 +413,26 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                     # Store for initial_state injection
                     discovery_history = interactions
                     
-                    if sources:
+                    # Prioritize explicit lead_source field if available
+                    if profile.lead_source == "apollo":
+                        options.discovery_source = "apollo_discovery"
+                        options.discovery_context = {
+                            "fit_reasoning": profile.fit_reasoning,
+                            "intent": profile.intent,
+                            "profile_metadata": profile.profile_metadata,
+                            "comments": unique_comments,
+                            "source_posts": sources
+                        }
+                    elif profile.lead_source == "keyword":
+                        options.discovery_source = "keyword_search"
+                        options.discovery_context = {
+                            "fit_reasoning": profile.fit_reasoning,
+                            "intent": profile.intent,
+                            "profile_metadata": profile.profile_metadata,
+                            "comments": unique_comments,
+                            "source_posts": sources
+                        }
+                    elif sources:
                         # Intelligently detect if it's a keyword search even if sources exist
                         # (Because keyword discovered leads also save their source posts)
                         is_keyword = any(isinstance(s, dict) and str(s.get("competitor", "")).startswith("Keyword:") for s in sources)
@@ -403,6 +463,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                             "profile_metadata": profile.profile_metadata
                         }
 
+
         except Exception as e:
             logger.info(f"Error loading identified profile context in _run_research_gen: {e}")
 
@@ -428,39 +489,46 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
     
     # Load Selling Profile from Settings OR Default
     selling_profile_data = org_settings.get("selling_profile")
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     
-    if selling_profile_data:
-        # Convert Schema Schema to State Schema (if different, but they look compatible)
-        # Using the loaded profile directly
+    if selling_profile_data and selling_profile_data.company_name and selling_profile_data.company_name.strip() != "":
         selling_company_profile = selling_profile_data
     else:
-        # Fallback Default
-        selling_company_profile = SellingCompanyProfile(
-            name="Innovize AI",
-            description="Specialized AI Transformation and Autonomous Agent Orchestration",
-            products=[
-                Product(name="Glial", description="Revenue Intelligence", target_pain_points=["Sales"]),
-                Product(name="AI Consulting", description="Strategy", target_pain_points=["Strategy"])
-            ]
+        # Check if the user has configured their selling profile (Strict Profile Enforcement)
+        raise HTTPException(
+            status_code=400, 
+            detail="Trial profile incomplete. Please configure your 'Selling Profile' in Settings."
         )
 
-    million_verifier_enabled = False
-    try:
-        int_config = json.loads(org_settings.get("integrations_config") or "{}")
-        # Support both flat and nested structure during transition
-        mv_config = int_config.get("million_verifier", False)
-        if isinstance(mv_config, dict):
-            million_verifier_enabled = mv_config.get("enabled", False)
-        else:
-            million_verifier_enabled = bool(mv_config)
-    except:
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+    if trial_mode and os.getenv("MILLION_VERIFIER_API_KEY"):
+        million_verifier_enabled = True
+    else:
         million_verifier_enabled = False
+        try:
+            int_config = json.loads(org_settings.get("integrations_config") or "{}")
+            # Support both flat and nested structure during transition
+            mv_config = int_config.get("million_verifier", False)
+            if isinstance(mv_config, dict):
+                million_verifier_enabled = mv_config.get("enabled", False)
+            else:
+                million_verifier_enabled = bool(mv_config)
+        except:
+            million_verifier_enabled = False
+
+    # Construct dynamic company context
+    dynamic_context = DEFAULT_COMPANY_CONTEXT
+    if selling_company_profile:
+        name = getattr(selling_company_profile, 'company_name', 'Our Company')
+        desc = getattr(selling_company_profile, 'description', 'AI and automation')
+        dynamic_context = f"{name} is an elite firm specializing in {desc}."
 
     initial_state = {
+        "user_id": user_id,
         "email_id": email,
         "linkedin_url": linkedin_url or existing_state.get("linkedin_url"),
         "website": website or existing_state.get("website"),
-        "company_context": COMPANY_CONTEXT,
+        "company_context": dynamic_context,
         "selling_company_profile": selling_company_profile, # dynamic context
         "ideal_profile": ideal_profile,
         "user_linkedin_url": org_settings["user_linkedin_url"],
@@ -469,6 +537,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "input_lead_data": options,
         "extra_research_context": options.extra_metadata if options else existing_state.get("extra_metadata"),
         "million_verifier_enabled": million_verifier_enabled,
+        "pinecone_index_name": org_settings.get("pinecone_index_name"),
         
         "user_profile_details": existing_state.get("user_profile_details", {}),
         "scraped_website_content": existing_state.get("scraped_website_content", ""),
@@ -498,9 +567,8 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         
         "sales_research_report": existing_state.get("sales_research_report", {}),
         "meeting_notes": getattr(options, 'meeting_notes', '') if hasattr(options, 'meeting_notes') else options.get('meeting_notes', '') if isinstance(options, dict) else '',
-        "discovery_interaction_history": discovery_history or existing_state.get("discovery_interaction_history", [])
     }
-
+    logger.info(f"RAG Isolation Prep: user_id={user_id}, index={initial_state.get('pinecone_index_name')}, linkedin={initial_state.get('user_linkedin_url')}")
 
     final_state = initial_state.copy()
     
@@ -521,7 +589,7 @@ async def _push_to_hubspot_if_enabled(db, user_id, report, final_state):
     from db.crud import get_org_settings
     from services.hubspot_service import HubspotService
     
-    settings = await get_org_settings(db)
+    settings = await get_org_settings(db, user_id)
     if settings and settings.hubspot_access_token and settings.hubspot_sync_enabled:
         try:
             hs = HubspotService(settings.hubspot_access_token)
@@ -555,6 +623,7 @@ async def run_single_research(
     options: InputLeadData = None,
     email: Optional[str] = None,
     user_id: Optional[str] = None,
+    org_id: Optional[str] = None,
     progress_callback=None
 ):
     """
@@ -573,7 +642,7 @@ async def run_single_research(
 
         # Persist results to DB
         async with SessionLocal() as db:
-            saved_report = await _persist_results(db, linkedin_url, website, final_state, options, user_id=user_id)
+            saved_report = await _persist_results(db, linkedin_url, website, final_state, options, user_id=user_id, org_id=org_id)
             if saved_report:
                 # HubSpot Bidirectional Sync
                 await _push_to_hubspot_if_enabled(db, user_id, saved_report, final_state)
@@ -585,4 +654,31 @@ async def run_single_research(
         return {"linkedin_url": linkedin_url, "result": result_payload}
     except Exception as e:
         logger.info(f"Error in run_single_research: {e}")
-        # Return error/none but don't crash caller
+        # Re-raise so the caller (e.g. bulk endpoint or SSE) can handle it
+        raise e
+
+async def check_research_limit(user_id: str):
+    """
+    Checks if a trial user has reached their deep research limit.
+    """
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+    if not trial_mode:
+        return
+
+    async with SessionLocal() as db:
+        from db.models import ResearchReport
+        from sqlalchemy import select, func
+        
+        limit = int(os.getenv("TRIAL_RESEARCH_LIMIT", "5"))
+        
+        result = await db.execute(
+            select(func.count(ResearchReport.id)).where(ResearchReport.created_by_id == user_id)
+        )
+        count = result.scalar() or 0
+        
+        if count >= limit:
+            logger.warning(f"User {user_id} reached trial research limit: {count}/{limit}")
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Trial limit reached. You have used your {limit} deep research credits. Please contact sales to upgrade."
+            )

@@ -15,6 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isOnboarded: boolean;
+  isMigrated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -38,6 +39,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isOnboarded, setIsOnboarded] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("onboarding_complete") === "true";
+    }
+    return false;
+  });
+  const [isMigrated, setIsMigrated] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("migration_complete") === "true";
     }
     return false;
   });
@@ -92,6 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem("onboarding_complete");
         setIsOnboarded(false);
       }
+      
+      if (status.migration_complete) {
+        localStorage.setItem("migration_complete", "true");
+        setIsMigrated(true);
+      } else {
+        localStorage.removeItem("migration_complete");
+        setIsMigrated(false);
+      }
+
       return status.complete;
     } catch (e) {
       console.error("Failed to check onboarding status", e);
@@ -103,8 +119,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("user");
     localStorage.removeItem("onboarding_complete");
+    localStorage.removeItem("migration_complete");
     setUser(null);
     setIsOnboarded(false);
+    setIsMigrated(false);
     router.push("/login");
   };
 
@@ -117,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, loading, pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, isOnboarded, loading, login, logout, checkOnboarding }}>
+    <AuthContext.Provider value={{ user, isOnboarded, isMigrated, loading, login, logout, checkOnboarding }}>
       {children}
     </AuthContext.Provider>
   );

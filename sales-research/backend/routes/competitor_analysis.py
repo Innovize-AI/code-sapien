@@ -29,7 +29,8 @@ async def get_profiles(
     date_end: str = None,
     sort_by: str = "touchpoint_count",
     sort_order: str = "desc",
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     """
     Fetch identified profiles with rep attribution, source filtering, and pagination.
@@ -63,6 +64,11 @@ async def get_profiles(
             if date_end:
                 from datetime import datetime
                 clauses.append(IdentifiedProfile.created_at <= datetime.fromisoformat(date_end.replace("Z", "+00:00")))
+            if current_user.organization_id:
+                clauses.append(IdentifiedProfile.organization_id == current_user.organization_id)
+            else:
+                clauses.append(IdentifiedProfile.created_by_id == current_user.id)
+                
             return clauses
 
         search_filter = None
@@ -177,7 +183,8 @@ async def get_profiles(
 async def trigger_audience_discovery(
     profile_id: str,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     """
     Manually triggers audience discovery (fetching commenters) for a specific profile.
@@ -196,7 +203,8 @@ async def trigger_audience_discovery(
         background_tasks.add_task(
             strategic_seller_discovery_task, 
             seller_url=profile.linkedin_url, 
-            user_id=str(profile.created_by_id) if profile.created_by_id else None
+            user_id=str(current_user.id),
+            org_id=current_user.organization_id
         )
         
         return {
@@ -211,7 +219,11 @@ class CompetitorInput(BaseModel):
     urls: List[str] = []
 
 @competitor_router.post("/analyze")
-async def run_competitor_analysis(input_data: CompetitorInput, db: AsyncSession = Depends(get_db)):
+async def run_competitor_analysis(
+    input_data: CompetitorInput, 
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
     """
     Endpoint to analyze competitor LinkedIn posts.
     """
@@ -229,12 +241,16 @@ async def run_competitor_analysis(input_data: CompetitorInput, db: AsyncSession 
 
 
 @competitor_router.get("/events/classification")
-async def sse_classification(request: Request):
+async def sse_classification(
+    request: Request,
+    current_user: Profile = Depends(get_current_user)
+):
     """
     Server-Sent Events endpoint for classification updates.
     """
     from services.classification_service import event_manager
-    queue = await event_manager.subscribe()
+    org_id = current_user.organization_id
+    queue = await event_manager.subscribe(org_id)
 
     async def event_generator():
         try:
@@ -251,7 +267,7 @@ async def sse_classification(request: Request):
             pass
         finally:
             from services.classification_service import event_manager
-            await event_manager.unsubscribe(queue)
+            await event_manager.unsubscribe(org_id, queue)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -317,6 +333,11 @@ async def discover_leads(
         # 1. Save Raw Leads Immediately
         if raw_leads_to_save:
             logger.debug(f"Saving {len(raw_leads_to_save)} raw leads to DB...")
+            # Assign attribution before save
+            for l in raw_leads_to_save:
+                l["created_by_id"] = current_user.id
+                l["organization_id"] = current_user.organization_id
+
             await batch_upsert_identified_profiles(db, raw_leads_to_save)
             await db.commit()
             
@@ -336,7 +357,12 @@ async def discover_leads(
             
         # 2. Trigger Background Classification
         from services.classification_service import run_classification_and_update
-        background_tasks.add_task(run_classification_and_update, raw_leads_to_save, user_id=str(current_user.id))
+        background_tasks.add_task(
+            run_classification_and_update, 
+            raw_leads_to_save, 
+            user_id=str(current_user.id),
+            org_id=current_user.organization_id
+        )
         
         logger.debug(f"Returning {len(all_leads)} leads immediately to frontend.")
         return {"leads": all_leads}

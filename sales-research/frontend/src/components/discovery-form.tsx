@@ -40,6 +40,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { normalizeUrl } from "@/lib/utils";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { useConfig } from "@/context/config-context";
 import {
   JOB_TITLE_OPTIONS,
   LINKEDIN_INDUSTRIES,
@@ -156,6 +157,7 @@ export function DiscoveryForm({
   ) => void;
   leadsStatus?: LeadStatus[];
 }) {
+  const { trialMode } = useConfig();
   const [keywordInput, setKeywordInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -569,10 +571,12 @@ export function DiscoveryForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="tavily">
-                          Web Search (Tavily)
+                        <SelectItem value="tavily" disabled={trialMode}>
+                          Web Search (Tavily) {trialMode && "(NOT IN TRIAL)"}
                         </SelectItem>
-                        <SelectItem value="apollo">Apollo Database</SelectItem>
+                        <SelectItem value="apollo" disabled={trialMode}>
+                          Apollo Database {trialMode && "(NOT IN TRIAL)"}
+                        </SelectItem>
                         <SelectItem value="linkedin_keyword">
                           LinkedIn Keywords
                         </SelectItem>

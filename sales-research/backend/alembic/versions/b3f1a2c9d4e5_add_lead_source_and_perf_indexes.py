@@ -47,6 +47,11 @@ def upgrade() -> None:
     raw_conn.rollback()
     raw_conn.autocommit = True
     cur = raw_conn.cursor()
+    
+    # Ensure raw connection respects the targeted schema (e.g., 'trial')
+    from db.config import DB_SCHEMA
+    cur.execute(f'SET search_path TO "{DB_SCHEMA}"')
+    
     cur.execute("SET statement_timeout = 0")
 
     # 1. Add lead_source column — IF NOT EXISTS guards against re-runs.

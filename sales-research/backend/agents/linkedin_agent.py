@@ -4,17 +4,55 @@ import requests
 import json
 import os
 import time
+import re
+import datetime
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
-from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, COMPANY_CONTEXT
+from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, DEFAULT_COMPANY_CONTEXT
 from models.gemini_models import get_gemini_model
 from models.structured_output import LinkedInAnalysis
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_classifications(response) -> list:
+    """Robustly pull the classifications list out of whatever the LLM returns.
+
+    Gemini's structured output can come back as a Pydantic model, a clean dict,
+    a dict with whitespace/quote-polluted keys (e.g. '\n"classifications'),
+    or a raw JSON string — handle all four cases.
+    """
+    if not response:
+        return []
+
+    # Pydantic model
+    if hasattr(response, "classifications"):
+        return response.classifications or []
+
+    # Dict — may have malformed keys like '\n"classifications'
+    if isinstance(response, dict):
+        if "classifications" in response:
+            return response["classifications"] or []
+        for key, value in response.items():
+            if key.strip().strip('"') == "classifications":
+                return value or []
+        return []
+
+    # Raw string — strip markdown fences and parse
+    if isinstance(response, str):
+        try:
+            text = re.sub(r"```(?:json)?\s*", "", response).strip().rstrip("`").strip()
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return parsed.get("classifications", [])
+        except Exception:
+            pass
+
+    return []
 
 load_dotenv()
 
@@ -43,7 +81,7 @@ class ProfileClassification(BaseModel):
 
 # Using LinkedInAnalysis from models.structured_output
 
-def batch_classify_profiles(profiles: List[Dict]):
+def batch_classify_profiles(profiles: List[Dict], company_context: str | None = None):
     """
     Classifies a batch of profiles using LLM based on headline and company context.
     Expects profiles list of dicts: [{'id': 'url', 'headline': '...'}, ...]
@@ -52,7 +90,6 @@ def batch_classify_profiles(profiles: List[Dict]):
         return {}
         
     try:
-        # Reverting to gpt-4o-mini as gpt-4.1-mini is not a valid model
         llm = get_gemini_model(temperature=0, model="gemini-3-flash-preview")
         structured_llm = llm.with_structured_output(BatchProfileClassification)
         
@@ -60,7 +97,7 @@ def batch_classify_profiles(profiles: List[Dict]):
         profiles_text = json.dumps(profiles, indent=2)
         
         prompt = BATCH_PROFILE_CLASSIFIER_PROMPT.format(
-            company_context=COMPANY_CONTEXT,
+            company_context=company_context or DEFAULT_COMPANY_CONTEXT,
             profiles_data=profiles_text
         )
         
@@ -70,27 +107,46 @@ def batch_classify_profiles(profiles: List[Dict]):
         ])
         
         results_map = {}
-        if response and response.classifications:
-            for res in response.classifications:
-                results_map[res.id] = {
-                    "is_fit": res.is_fit,
-                    "is_competitor": res.is_competitor,
-                    "is_decision_maker": res.is_decision_maker,
-                    "is_buy_signal": res.is_buy_signal,
-                    "is_strategic_seller": res.is_strategic_seller,
-                    "reasoning": res.reasoning,
-                    "intent": res.intent,
-                    "post_topic_depth": res.post_topic_depth,
-                    "sentiment": res.sentiment
+
+        for res in _extract_classifications(response):
+            # Handle res as either a Pydantic model or a dict
+            if hasattr(res, "id"):
+                r_id = res.id
+                r_data = {
+                    "is_fit": getattr(res, "is_fit", False),
+                    "is_competitor": getattr(res, "is_competitor", False),
+                    "is_decision_maker": getattr(res, "is_decision_maker", False),
+                    "is_buy_signal": getattr(res, "is_buy_signal", False),
+                    "is_strategic_seller": getattr(res, "is_strategic_seller", False),
+                    "reasoning": getattr(res, "reasoning", ""),
+                    "intent": getattr(res, "intent", None),
+                    "post_topic_depth": getattr(res, "post_topic_depth", None),
+                    "sentiment": getattr(res, "sentiment", None)
                 }
+            else:
+                r_id = res.get("id")
+                r_data = {
+                    "is_fit": res.get("is_fit", False),
+                    "is_competitor": res.get("is_competitor", False),
+                    "is_decision_maker": res.get("is_decision_maker", False),
+                    "is_buy_signal": res.get("is_buy_signal", False),
+                    "is_strategic_seller": res.get("is_strategic_seller", False),
+                    "reasoning": res.get("reasoning", ""),
+                    "intent": res.get("intent"),
+                    "post_topic_depth": res.get("post_topic_depth"),
+                    "sentiment": res.get("sentiment")
+                }
+            
+            if r_id:
+                results_map[r_id] = r_data
                 
         return results_map
 
     except Exception as e:
-        logger.error(f"Error in batch classification: {e}")
+        logger.error(f"Error in batch classification: {type(e).__name__}: {e}")
         return {}
 
-def classify_profile(name: str, headline: str):
+def classify_profile(name: str, headline: str, company_context: str | None = None):
     """
     Classifies a profile using LLM based on headline and company context.
     Uses structured output for reliable JSON parsing.
@@ -105,7 +161,7 @@ def classify_profile(name: str, headline: str):
         prompt = PROFILE_CLASSIFIER_PROMPT.format(
             name=name, 
             headline=headline,
-            company_context=COMPANY_CONTEXT
+            company_context=company_context or DEFAULT_COMPANY_CONTEXT
         )
         
         response = structured_llm.invoke([
@@ -408,10 +464,12 @@ async def get_linkedin_company_data(state: AgentState):
         "company_website": enriched_data.get("website"),
 
         # Lead email surfaced to top-level for quick access
-        "email_id": enriched_data.get("email"),
+        "email_id": enriched_data.get("person_email"),
+        "email_verification_status": enriched_data.get("email_verification_status"),
         "company_linkedin_url": enriched_data.get("company_linkedin_url"),
 
     }
+
 
 async def enrich_company_waterfall(
     person_url: str = None, 
@@ -542,16 +600,90 @@ async def enrich_company_waterfall(
     return result
 
 
+def is_recent_post(post: dict) -> bool:
+    """
+    Checks if a LinkedIn post is recent (within ~30 days).
+    Prioritizes structured date/timestamp for precision, fallbacks to relative strings.
+    """
+    posted_at_data = post.get("posted_at")
+    if not posted_at_data:
+        return False
+    
+    # 1. Try Precise Date String (e.g. "2025-07-30 22:02:04")
+    if isinstance(posted_at_data, dict) and posted_at_data.get("date"):
+        try:
+            # Parse the date string
+            post_date = datetime.datetime.strptime(posted_at_data["date"], "%Y-%m-%d %H:%M:%S")
+            now = datetime.datetime.now()
+            # Check if within 30 days
+            if (now - post_date).days <= 30:
+                return True
+            return False
+        except Exception as e:
+            logger.debug(f"Failed to parse post date string: {e}")
+
+    # 2. Try Timestamp (milliseconds)
+    if isinstance(posted_at_data, dict) and posted_at_data.get("timestamp"):
+        try:
+            ts = posted_at_data["timestamp"] / 1000.0
+            post_date = datetime.datetime.fromtimestamp(ts)
+            now = datetime.datetime.now()
+            if (now - post_date).days <= 30:
+                return True
+            return False
+        except Exception as e:
+            logger.debug(f"Failed to parse post timestamp: {e}")
+
+    # 3. Fallback to Relative String (e.g. "2 weeks ago" or dict.relative)
+    relative_str = ""
+    if isinstance(posted_at_data, dict):
+        relative_str = posted_at_data.get("relative") or posted_at_data.get("text") or ""
+    elif isinstance(posted_at_data, str):
+        relative_str = posted_at_data
+        
+    if not relative_str:
+        return False
+        
+    relative_str = relative_str.lower()
+    
+    # Simple logic for relative strings
+    if "second" in relative_str or "minute" in relative_str or "hour" in relative_str or "day" in relative_str or "week" in relative_str:
+        return True
+        
+    if "month" in relative_str:
+        # "1 month ago" is fine, "2 months ago" is not
+        match = re.search(r'\d+', relative_str)
+        if match:
+            num = int(match.group())
+            return num <= 1
+        return "months" not in relative_str # "month ago" is fine, "months ago" usually > 1
+        
+    return False
+
 def linkedin_profile_analyzer(state: AgentState):
     """Analyzes a profile using LLM based on headline and company context."""
-    user_profile = state.get("user_profile_details", {})
-    recent_posts = user_profile.get("recent_posts", []) if isinstance(user_profile, dict) else []
+    user_profile_raw = state.get("user_profile_details", {})
+    # Ensure we work with a copy to avoid side effects
+    user_profile = user_profile_raw.copy() if isinstance(user_profile_raw, dict) else {}
+    
+    raw_posts = user_profile.get("recent_posts", []) if isinstance(user_profile, dict) else []
+    
+    # Filter for recency (last 30 days)
+    recent_posts = [p for p in raw_posts if is_recent_post(p)]
+    
+    # CRITICAL: Strip raw/stale posts from the profile object so Gemini doesn't "find" them
+    if "recent_posts" in user_profile:
+        del user_profile["recent_posts"]
+    
+    if raw_posts and not recent_posts:
+        logger.info(f"Filtered out {len(raw_posts)} stale posts (> 1 month old).")
 
     content = {
         "profile": user_profile,
         "recent_posts": recent_posts,
         "engagements": state.get("post_engagements", []),
         "company_name": state.get("company_name", {}),
+        "lead_segment": state.get("lead_segment", "POTENTIAL_CLIENT"),
         "company_description": state.get("company_description", {}),
         "company_industries": state.get("company_industries", []),
         "company_stats": state.get("company_stats", {}),
@@ -1007,7 +1139,7 @@ def discover_leads_from_competitor(competitor_url: str):
         raise e
 
 
-async def batch_classify_profiles_async(profiles: List[Dict]):
+async def batch_classify_profiles_async(profiles: List[Dict], company_context: str | None = None):
     """
     Async version: Classifies a batch of profiles using LLM based on headline and company context.
     Expects profiles list of dicts: [{'id': 'url', 'headline': '...'}, ...]
@@ -1021,12 +1153,12 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
         
         # Format profiles for prompt
         profiles_text = json.dumps(profiles, indent=2)
-        
+        logger.info(f"Profiles text: {profiles_text}")
         prompt = BATCH_PROFILE_CLASSIFIER_PROMPT.format(
-            company_context=COMPANY_CONTEXT,
+            company_context=company_context or DEFAULT_COMPANY_CONTEXT,
             profiles_data=profiles_text
         )
-        
+        logger.info(f"Prompt: {prompt}")
         # Native async call
         response = await structured_llm.ainvoke([
             SystemMessage(content="You are a helpful assistant."),
@@ -1034,24 +1166,43 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
         ])
         
         results_map = {}
-        if response and response.classifications:
-            for item in response.classifications:
-                results_map[item.id] = {
-                    "is_fit": item.is_fit,
-                    "is_competitor": item.is_competitor,
-                    "is_decision_maker": item.is_decision_maker,
-                    "is_buy_signal": item.is_buy_signal,
-                    "is_strategic_seller": item.is_strategic_seller,
-                    "reasoning": item.reasoning,
-                    "intent": item.intent,
-                    "post_topic_depth": item.post_topic_depth,
-                    "sentiment": item.sentiment
+
+        for item in _extract_classifications(response):
+            # Handle item as either a Pydantic model or a dict
+            if hasattr(item, "id"):
+                r_id = item.id
+                r_data = {
+                    "is_fit": getattr(item, "is_fit", False),
+                    "is_competitor": getattr(item, "is_competitor", False),
+                    "is_decision_maker": getattr(item, "is_decision_maker", False),
+                    "is_buy_signal": getattr(item, "is_buy_signal", False),
+                    "is_strategic_seller": getattr(item, "is_strategic_seller", False),
+                    "reasoning": getattr(item, "reasoning", ""),
+                    "intent": getattr(item, "intent", None),
+                    "post_topic_depth": getattr(item, "post_topic_depth", None),
+                    "sentiment": getattr(item, "sentiment", None)
                 }
+            else:
+                r_id = item.get("id")
+                r_data = {
+                    "is_fit": item.get("is_fit", False),
+                    "is_competitor": item.get("is_competitor", False),
+                    "is_decision_maker": item.get("is_decision_maker", False),
+                    "is_buy_signal": item.get("is_buy_signal", False),
+                    "is_strategic_seller": item.get("is_strategic_seller", False),
+                    "reasoning": item.get("reasoning", ""),
+                    "intent": item.get("intent"),
+                    "post_topic_depth": item.get("post_topic_depth"),
+                    "sentiment": item.get("sentiment")
+                }
+            
+            if r_id:
+                results_map[r_id] = r_data
                 
         return results_map
 
     except Exception as e:
-        logger.error(f"Error in async batch classification: {e}")
+        logger.error(f"Error in async batch classification: {type(e).__name__}: {e}")
         return {}
 
 async def get_posts_by_keyword(keywords: List[str]):

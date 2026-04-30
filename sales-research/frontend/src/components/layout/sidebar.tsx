@@ -154,6 +154,9 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
 
 
   const filteredItems = sidebarItems.filter((item) => {
+    // Hide Analyze Lead in Trial Mode
+    if (usage?.trial_mode && item.href === "/analyze") return false;
+    
     if (!item.roles) return true;
     return item.roles.includes(user?.role || "user");
   });

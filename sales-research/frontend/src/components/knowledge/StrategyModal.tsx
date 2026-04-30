@@ -109,6 +109,7 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                             onChange={setSelectedRoles}
                             placeholder="Select roles..."
                             allowCustom
+                            usePortal={false}
                         />
 
                         <MultiSelect
@@ -118,6 +119,7 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                             onChange={setSelectedIndustries}
                             placeholder="Select industries..."
                             allowCustom
+                            usePortal={false}
                         />
                     </div>
 

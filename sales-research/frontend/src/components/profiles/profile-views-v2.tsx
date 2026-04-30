@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, ensureProtocol, normalizeUrl } from "@/lib/utils";
 import { IdentifiedProfile } from "@/lib/api";
+import { Spinner } from "@/components/ui/spinner"
 
 // ─── Shared props ─────────────────────────────────────────────────────────────
 export interface ProfileViewProps {
@@ -233,7 +234,7 @@ function ProfileCardV2({
         <div className="flex-1 flex flex-wrap justify-end gap-1">
           {status === "analyzing" && (
             <Badge className="text-[8px] h-4 px-1.5 bg-blue-100 text-blue-700 border-blue-200 animate-pulse gap-1">
-              <Loader2 className="h-2 w-2 animate-spin" />{leadStatus?.currentStep || "Analyzing"}
+              <Spinner size="xs" />{leadStatus?.currentStep || "Analyzing"}
             </Badge>
           )}
           <StatusChips profile={profile} size="xs" />
@@ -437,7 +438,7 @@ function ProfileCardV2({
       {status === "analyzing" && (
         <div className="px-4 py-2 border-t border-blue-100 bg-blue-50/50">
           <div className="flex items-center justify-between text-[10px] font-bold text-blue-700 mb-1">
-            <span className="flex items-center gap-1.5"><Loader2 className="h-2.5 w-2.5 animate-spin" />{leadStatus?.currentStep || "Researching..."}</span>
+            <span className="flex items-center gap-1.5"><Spinner size="xs" />{leadStatus?.currentStep || "Researching..."}</span>
             <span>{leadStatus?.progress || 0}%</span>
           </div>
           <Progress value={leadStatus?.progress || 0} className="h-1 bg-blue-200/50" />
@@ -455,7 +456,7 @@ function ProfileCardV2({
               className="h-7 px-2 text-[10px] font-black uppercase gap-1 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200"
               disabled={profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id)}
               onClick={() => profileMeta.apollo_id && onEnrich(profileMeta.apollo_id)}>
-              {profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id) ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5 text-amber-500" />}
+              {profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id) ? <Spinner size="xs" /> : <Zap className="h-2.5 w-2.5 text-amber-500" />}
               Enrich
             </Button>
           )}
@@ -669,7 +670,7 @@ export function ProfileListV2({
               <div>
                 {status === "analyzing" ? (
                   <Badge className="text-[8px] h-4 px-1.5 bg-blue-100 text-blue-700 border-blue-200 animate-pulse gap-1">
-                    <Loader2 className="h-2 w-2 animate-spin" />Analyzing
+                    <Spinner size="xs" />Analyzing
                   </Badge>
                 ) : (
                   <StatusChips profile={profile} size="xs" />
@@ -708,7 +709,7 @@ export function ProfileListV2({
                     className="h-7 px-2 text-[9px] font-black uppercase gap-1 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200"
                     disabled={profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id)}
                     onClick={() => profileMeta.apollo_id && onEnrich(profileMeta.apollo_id)}>
-                    {profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id) ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5 text-amber-500" />}
+                    {profileMeta.apollo_id && enrichingIds.has(profileMeta.apollo_id) ? <Spinner size="xs" /> : <Zap className="h-2.5 w-2.5 text-amber-500" />}
                     Enrich
                   </Button>
                 )}

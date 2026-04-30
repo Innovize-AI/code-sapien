@@ -5,9 +5,10 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Trash2, Loader2, BarChart3, Users } from "lucide-react"
+import { Plus, Trash2, BarChart3, Users } from "lucide-react"
 import { analyzeCompetitors } from "@/lib/api"
 import ReactMarkdown from "react-markdown"
+import { Spinner } from "@/components/ui/spinner"
 
 export default function CompetitorAnalysisPage() {
     const [urls, setUrls] = useState<string[]>([""])
@@ -116,7 +117,7 @@ export default function CompetitorAnalysisPage() {
                                 >
                                     {isLoading ? (
                                         <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            <Spinner size="md" className="mr-2" />
                                             Analyzing...
                                         </>
                                     ) : (

@@ -67,6 +67,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { LeadStatus } from "@/components/bulk-analysis-modal";
+import { Spinner } from "@/components/ui/spinner"
 
 const findFormSchema = z
   .object({
@@ -1112,7 +1113,7 @@ export function DiscoveryForm({
                 }
                 className="w-full"
               >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isLoading && <Spinner size="md" className="mr-2" />}
                 Find Leads
               </Button>
             </form>
@@ -1218,7 +1219,7 @@ export function DiscoveryForm({
                   }}
                 >
                   {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Spinner size="md" />
                   ) : (
                     `Analyze Selected (${selectedUrls.length})`
                   )}
@@ -1279,7 +1280,7 @@ export function DiscoveryForm({
                                 variant="secondary"
                                 className="text-[9px] h-4 px-1 bg-blue-100 text-blue-700 animate-pulse border-blue-200"
                               >
-                                <Loader2 className="w-2 h-2 mr-1 animate-spin" />
+                                <Spinner size="xs" className="mr-1" />
                                 Researching...
                               </Badge>
                             )}
@@ -1481,7 +1482,7 @@ export function DiscoveryForm({
 
                       {status === "analyzing" ? (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <Spinner size="sm" />
                           Analyzing
                         </div>
                       ) : status === "completed" ||
@@ -1527,7 +1528,7 @@ export function DiscoveryForm({
           <div className="h-64 border-2 border-dashed rounded-lg flex items-center justify-center text-muted-foreground p-8 text-center bg-muted/20">
             {isLoading ? (
               <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Spinner size="lg" />
                 <p>Searching for leads...</p>
               </div>
             ) : (

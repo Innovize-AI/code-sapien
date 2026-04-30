@@ -5,7 +5,8 @@ import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Eye, EyeOff, Zap, BarChart3, Target, Shield } from "lucide-react"
+import { Eye, EyeOff, Zap, BarChart3, Target, Shield } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 const LOADING_STEPS = [
   "Signing in...",
@@ -183,7 +184,7 @@ export default function LoginPage() {
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size="md" />
                   {LOADING_STEPS[loadingStep]}
                 </span>
               ) : (

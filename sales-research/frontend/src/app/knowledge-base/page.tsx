@@ -19,7 +19,6 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   ArrowUpRight,
   Plus,
   FolderOpen,
@@ -73,6 +72,7 @@ import {
 } from "@/components/ui/select";
 
 import { useAuth } from "@/context/auth-context";
+import { Spinner } from "@/components/ui/spinner"
 
 export default function KnowledgeBasePage() {
   const { user } = useAuth();
@@ -267,7 +267,7 @@ export default function KnowledgeBasePage() {
     return (
       <DashboardLayout>
         <div className="flex h-full items-center justify-center min-h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Spinner size="lg" />
         </div>
       </DashboardLayout>
     );
@@ -390,7 +390,7 @@ export default function KnowledgeBasePage() {
                       className="w-full"
                     >
                       {isIngesting && (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Spinner size="md" className="mr-2" />
                       )}
                       Run Ingestion
                     </Button>
@@ -810,7 +810,7 @@ function DocumentItem({
               }}
               disabled={isDeleting}
             >
-              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 rotate-45" />}
+              {isDeleting ? <Spinner size="md" /> : <Plus className="w-4 h-4 rotate-45" />}
             </Button>
           )}
           
@@ -843,7 +843,7 @@ function DocumentItem({
         <div className="mx-6 p-6 rounded-xl border bg-muted/30 animate-in slide-in-from-top-2 duration-200">
           {isLoadingContent ? (
             <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Spinner size="md" />
               Fetching content from storage...
             </div>
           ) : content ? (

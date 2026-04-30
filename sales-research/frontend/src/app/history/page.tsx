@@ -31,7 +31,6 @@ import {
   Calendar,
   ExternalLink,
   ArrowRight,
-  Loader2,
   Globe,
   User,
   ArrowUpDown,
@@ -46,6 +45,7 @@ import { useBulkAnalysis } from "@/context/bulk-analysis-context";
 import { useAuth } from "@/context/auth-context";
 import { ensureProtocol } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner"
 
 interface HistoryItem {
   id: string;
@@ -408,7 +408,7 @@ export default function HistoryPage() {
                           {item.status === "analyzing" ||
                           item.status === "pending" ? (
                             <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <Spinner size="sm" />
                               <span
                                 className="truncate max-w-[150px]"
                                 title={item.currentStep || "Analyzing..."}

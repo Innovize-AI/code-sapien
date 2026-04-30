@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Book, Award } from "lucide-react";
+import { Book, Award } from "lucide-react";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { LINKEDIN_INDUSTRIES, JOB_TITLE_OPTIONS } from "@/lib/constants";
+import { Spinner } from "@/components/ui/spinner"
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -198,7 +199,7 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
                     <Button onClick={handleSave} disabled={isSaving || !name || !isAdmin}>
-                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isSaving && <Spinner size="md" className="mr-2" />}
                         Save Product
                     </Button>
                 </DialogFooter>

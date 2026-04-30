@@ -8,8 +8,9 @@ import {
     SheetDescription
 } from "@/components/ui/sheet"
 import { Progress } from "@/components/ui/progress"
-import { CheckCircle2, CircleDashed, XCircle, Loader2, BarChart3 } from "lucide-react"
+import { CheckCircle2, CircleDashed, XCircle, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 
 export type AnalysisStatus = "pending" | "analyzing" | "completed" | "error"
 
@@ -103,7 +104,7 @@ export function BulkAnalysisModal({
                                     </div>
                                     <div className="flex shrink-0 items-center">
                                         {lead.status === "pending" && <CircleDashed className="w-4 h-4 text-muted-foreground" />}
-                                        {lead.status === "analyzing" && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                                        {lead.status === "analyzing" && <Spinner size="md" />}
                                         {lead.status === "completed" && <CheckCircle2 className="w-4 h-4 text-green-500" />}
                                         {lead.status === "error" && <XCircle className="w-4 h-4 text-red-500" />}
                                     </div>

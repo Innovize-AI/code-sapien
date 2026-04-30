@@ -35,7 +35,7 @@ import { useAuth } from "@/context/auth-context";
 
 export default function Home() {
   const router = useRouter();
-  const { user, isOnboarded, loading: authLoading, checkOnboarding } = useAuth();
+  const { user, isOnboarded, isMigrated, loading: authLoading, checkOnboarding } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
   const [recentReports, setRecentReports] = useState<any[]>([]);
@@ -46,22 +46,29 @@ export default function Home() {
     if (authLoading || !user) return;
 
     const loadDashboardData = async () => {
-      setIsLoading(true); // Ensure loader shows if we need to check onboarding
       try {
-        // If we don't have a cached "onboarded" status, check it
         if (!isOnboarded) {
+          // Cache says NOT onboarded → block and eagerly verify before rendering.
+          setIsLoading(true);
           const complete = await checkOnboarding();
           if (!complete) {
             router.push("/onboarding");
             return;
           }
+        } else {
+          // Cache says onboarded → render dashboard immediately (no loading delay),
+          // then re-validate in the background. Only redirect if the server disagrees.
+          checkOnboarding().then((complete) => {
+            if (!complete) {
+              router.push("/onboarding");
+            }
+          });
         }
-        
-        // Final guard: if auth changed while we were checking onboarding
+
         if (!user) return;
 
-        // Start fetching
-        setIsLoading(!isOnboarded);
+        // Fetch dashboard data
+        setIsLoading(true);
         const [statsData, historyData, analyticsData] = await Promise.all([
           fetchDashboardStats(),
           fetchHistory(),
@@ -93,7 +100,9 @@ export default function Home() {
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Initializing your workspace...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">
+            {!isMigrated ? "Provisioning your knowledge base..." : "Initializing your workspace..."}
+          </p>
         </div>
       </div>
     );
@@ -102,6 +111,27 @@ export default function Home() {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-8">
+        {!isMigrated && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-center justify-between animate-in slide-in-from-top duration-500">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-full">
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-primary">Provisioning Knowledge Base...</p>
+                <p className="text-xs text-muted-foreground">We're setting up your organization space and indexing data. You can start using the platform, but some records may still be syncing.</p>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs"
+              onClick={() => checkOnboarding()}
+            >
+              Refresh Status
+            </Button>
+          </div>
+        )}
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>

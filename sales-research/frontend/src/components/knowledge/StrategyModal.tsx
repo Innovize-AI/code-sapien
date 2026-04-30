@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { LINKEDIN_INDUSTRIES, JOB_TITLE_OPTIONS } from "@/lib/constants";
 
 interface StrategyModalProps {
     isOpen: boolean;
@@ -21,19 +23,20 @@ export interface StrategyConfig {
     filename: string;
     is_strategic_pivot: boolean;
     target_roles: string[];
+    target_industries: string[];
     product_name?: string;
     attached_playbooks: string[];
     attached_case_studies: string[];
     relevant_files: string[];
 }
 
-const COMMON_ROLES = ["Founder", "CEO", "CRO", "VP Sales", "Head of Growth", "CTO", "COO", "Director of Sales"];
 
 export function StrategyModal({ isOpen, onClose, filename, description, onSave, initialConfig, availableFiles }: StrategyModalProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [isPivot, setIsPivot] = useState(initialConfig?.is_strategic_pivot || false);
     const [productName, setProductName] = useState(initialConfig?.product_name || filename.replace(".md", "").replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase()));
     const [selectedRoles, setSelectedRoles] = useState<string[]>(initialConfig?.target_roles || []);
+    const [selectedIndustries, setSelectedIndustries] = useState<string[]>(initialConfig?.target_industries || []);
 
     // Categorized selection
     const [selectedPlaybooks, setSelectedPlaybooks] = useState<string[]>(initialConfig?.attached_playbooks || (filename && filename.includes('playbook') ? [filename] : []));
@@ -42,13 +45,6 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
     const playbooks = availableFiles.filter(f => f.type === 'playbooks');
     const caseStudies = availableFiles.filter(f => f.type === 'case-studies');
 
-    const handleRoleToggle = (role: string) => {
-        setSelectedRoles(prev =>
-            prev.includes(role)
-                ? prev.filter(r => r !== role)
-                : [...prev, role]
-        );
-    };
 
     const handlePlaybookToggle = (fname: string) => {
         setSelectedPlaybooks(prev =>
@@ -69,6 +65,7 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                 filename,
                 is_strategic_pivot: isPivot,
                 target_roles: selectedRoles,
+                target_industries: selectedIndustries,
                 product_name: productName,
                 attached_playbooks: selectedPlaybooks,
                 attached_case_studies: selectedCaseStudies,
@@ -92,7 +89,7 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-6 py-4">
+                <div className="grid gap-6 py-4 overflow-y-auto max-h-[70vh] pr-2 custom-scrollbar">
                     <div className="flex items-center justify-between space-x-2 border p-4 rounded-lg bg-muted/50">
                         <div className="flex flex-col space-y-1">
                             <Label htmlFor="pivot-mode" className="font-semibold text-primary">Strategic Pivot Mode</Label>
@@ -101,6 +98,26 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                             </span>
                         </div>
                         <Switch id="pivot-mode" checked={isPivot} onCheckedChange={setIsPivot} />
+                    </div>
+
+                    <div className="grid gap-4">
+                        <MultiSelect
+                            label="Target Roles"
+                            options={JOB_TITLE_OPTIONS}
+                            value={selectedRoles}
+                            onChange={setSelectedRoles}
+                            placeholder="Select roles..."
+                            allowCustom
+                        />
+
+                        <MultiSelect
+                            label="Target Industries"
+                            options={LINKEDIN_INDUSTRIES}
+                            value={selectedIndustries}
+                            onChange={setSelectedIndustries}
+                            placeholder="Select industries..."
+                            allowCustom
+                        />
                     </div>
 
                     {isPivot && (
@@ -112,30 +129,6 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                                     value={productName}
                                     onChange={(e) => setProductName(e.target.value)}
                                 />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label className="mb-2">Target Roles (Strict Filter)</Label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {COMMON_ROLES.map(role => (
-                                        <div key={role} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`role-${role}`}
-                                                checked={selectedRoles.includes(role)}
-                                                onCheckedChange={() => handleRoleToggle(role)}
-                                            />
-                                            <label
-                                                htmlFor={`role-${role}`}
-                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                            >
-                                                {role}
-                                            </label>
-                                        </div>
-                                    ))}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                    The agent will ONLY pitch this product if the lead matches one of these roles.
-                                </p>
                             </div>
 
                             <div className="space-y-4">

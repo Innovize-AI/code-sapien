@@ -11,12 +11,24 @@ serialPipeline:
     - targetId: frontend-production
       profiles:
         - production
+    - targetId: frontend-trial
+      profiles:
+        - trial
 ---
 apiVersion: deploy.cloud.google.com/v1
 kind: Target
 metadata:
   name: frontend-staging
 description: Frontend Staging environment
+run:
+  location: projects/innovize-ai/locations/us-central1
+deployParameters: {}
+---
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: frontend-trial
+description: Frontend Trial environment
 run:
   location: projects/innovize-ai/locations/us-central1
 deployParameters: {}

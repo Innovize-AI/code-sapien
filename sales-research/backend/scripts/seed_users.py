@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.database import SessionLocal
-from db.models import Profile
+from db.models import Profile, Organization, OrganizationSettings, UserSettings
 
 # Load .env from root project directory (3 levels up from backend/scripts/seed_users.py)
 # backend/scripts/seed_users.py -> backend/scripts -> backend -> sales-research -> code-sapien/.env ?
@@ -28,6 +28,9 @@ root_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
 env_path = os.path.join(root_dir, ".env")
 
 print(f"Loading .env from: {env_path}")
+from db.config import DB_SCHEMA
+print(f"Targeting Schema: {DB_SCHEMA}")
+
 load_dotenv(env_path)
 
 SUBABASE_URL = os.getenv("SUPABASE_URL")
@@ -60,16 +63,23 @@ if "pooler.supabase.com" in SUBABASE_URL or not SUBABASE_URL.startswith("http"):
         except Exception as e:
             print(f"Failed to extract project ref: {e}")
     else:
-        # Fallback manual check for the specific ref seen in logs
-        if "ydaxbgrofvsyqyaohopm" in SUBABASE_URL or "ydaxbgrofvsyqyaohopm" in str(os.getenv("DATABASE_URL", "")):
-             SUBABASE_URL = "https://ydaxbgrofvsyqyaohopm.supabase.co"
-             print(f"Using hardcoded project ref URL: {SUBABASE_URL}")
+        pass
 
+# Initialize Supabase client
 supabase: Client = create_client(SUBABASE_URL, SERVICE_KEY)
 
 PARTNERS = [
     {"email": "jp@innovizeai.com", "password": "GlialSecure2026!", "role": "user", "name": "Jon Partner"},
-    {"email": "pavan.kumar@innovizeai.com", "password": "adminpassword123", "role": "admin", "name": "Pavan Kumar"}
+    {"email": "pavan.kumar@innovizeai.com", "password": "adminpassword123", "role": "admin", "name": "Pavan Kumar"},
+    {"email": "pavan.k@innovizeai.com", "password": "AdminPassword123!", "role": "admin", "name": "Pavan K"},
+    # Dummy Trial Users with separate domains
+    {"email": "alice@acmecorp.com", "password": "TrialPassword123!", "role": "admin", "name": "Alice Acme"},
+    {"email": "bob@globex.io", "password": "TrialPassword123!", "role": "admin", "name": "Bob Globex"},
+    {"email": "charlie@starktech.dev", "password": "TrialPassword123!", "role": "admin", "name": "Charlie Stark"},
+    {"email": "bruce@wayne.co", "password": "TrialPassword123!", "role": "admin", "name": "Bruce Wayne"},
+    {"email": "gavin@hooli.xyz", "password": "TrialPassword123!", "role": "admin", "name": "Gavin Belson"},
+    {"email": "erlich@bachmanity.com", "password": "TrialPassword123!", "role": "admin", "name": "Erlich Bachman"},
+    {"email": "richard@piedpiper.com", "password": "TrialPassword123!", "role": "admin", "name": "Richard Hendricks"}
 ]
 
 # Quick key validation
@@ -87,7 +97,7 @@ async def seed_users():
     async with SessionLocal() as db:
         try:
             for p in PARTNERS:
-                print(f"Processing {p['email']}...")
+                print(f"Processing {p['email']} (Domain: {p['email'].split('@')[1]})...")
                 
                 # 1. Create Supabase User
                 user_id = None

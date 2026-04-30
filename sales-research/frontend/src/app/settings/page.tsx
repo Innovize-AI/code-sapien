@@ -128,12 +128,16 @@ const sellingProfileSchema = z.object({
       name: z.string().min(1, "Product Name is required"),
       description: z.string().min(1, "Product Description is required"),
       is_strategic_pivot: z.boolean().optional(),
-      target_roles: z.array(z.string()).optional(), // Handled as comma-sep string in UI for simplicity
+      target_roles: z.array(z.string()).optional(),
+      target_industries: z.array(z.string()).optional(),
     }),
   ),
 });
 
+import { useConfig } from "@/context/config-context";
+
 export default function SettingsPage() {
+  const { trialMode } = useConfig();
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -868,6 +872,7 @@ export default function SettingsPage() {
                               name: "",
                               description: "",
                               target_roles: [],
+                              target_industries: [],
                             })
                           }
                         >
@@ -935,20 +940,31 @@ export default function SettingsPage() {
                           name={`products.${index}.target_roles`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">
-                                Target Roles
-                              </FormLabel>
-                              <FormControl>
-                                <MultiSelect
-                                  label="Target Roles"
-                                  options={JOB_TITLE_OPTIONS}
-                                  value={field.value || []}
-                                  onChange={field.onChange}
-                                  placeholder="Founder, CTO, VP Sales..."
-                                  allowCustom
-                                  disabled={!isAdmin}
-                                />
-                              </FormControl>
+                              <MultiSelect
+                                label="Target Roles"
+                                options={JOB_TITLE_OPTIONS}
+                                value={field.value || []}
+                                onChange={field.onChange}
+                                placeholder="Founder, CTO, VP Sales..."
+                                allowCustom
+                              />
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={sellingProfileForm.control}
+                          name={`products.${index}.target_industries`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <MultiSelect
+                                label="Target Industries"
+                                options={LINKEDIN_INDUSTRIES}
+                                value={field.value || []}
+                                onChange={field.onChange}
+                                placeholder="Logistics, Software, Healthcare..."
+                                allowCustom
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1214,35 +1230,44 @@ export default function SettingsPage() {
                           <Input
                             type="password"
                             {...field}
-                            disabled={!isAdmin}
+                            disabled={!isAdmin || trialMode}
+                            placeholder={trialMode ? "Contact support to enable Web Search" : ""}
                           />
                         </FormControl>
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={globalKeysForm.control}
-                    name="apollo_api_key"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Apollo API Key</FormLabel>
-                          {!isAdmin && (
-                            <Badge variant="outline" className="text-xs h-5">
-                              <Lock className="w-2 h-2 mr-1" /> Admin Only
-                            </Badge>
-                          )}
-                        </div>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            {...field}
-                            disabled={!isAdmin}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={globalKeysForm.control}
+                        name="apollo_api_key"
+                        render={({ field }) => (
+                          <FormItem>
+                            <div className="flex items-center justify-between">
+                              <FormLabel className="flex items-center gap-2">
+                                Apollo API Key
+                                {trialMode && (
+                                  <Badge variant="secondary" className="text-[10px] h-4 bg-amber-500 text-white border-none">
+                                    NOT IN TRIAL
+                                  </Badge>
+                                )}
+                              </FormLabel>
+                              {!isAdmin && !trialMode && (
+                                <Badge variant="outline" className="text-xs h-5">
+                                  <Lock className="w-2 h-2 mr-1" /> Admin Only
+                                </Badge>
+                              )}
+                            </div>
+                            <FormControl>
+                              <Input
+                                type="password"
+                                {...field}
+                                disabled={!isAdmin || trialMode}
+                                placeholder={trialMode ? "Contact support to enable Apollo integration" : ""}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
                   <div className="flex justify-end pt-2">
                     {isAdmin && (
                       <Button

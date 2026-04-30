@@ -25,6 +25,9 @@ import {
   FolderOpen,
   Star,
   UploadCloud,
+  Target,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -45,6 +48,8 @@ import {
   fetchStrategy,
   configureStrategy,
   uploadKnowledgeFile,
+  deleteKnowledgeFile,
+  getKnowledgeFileContent,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -184,6 +189,23 @@ export default function KnowledgeBasePage() {
     }
   };
 
+  const handleDelete = async (assetId: string) => {
+    try {
+      await deleteKnowledgeFile(assetId);
+      toast({
+        title: "Asset Deleted",
+        description: "Removed from database, storage, and index.",
+      });
+      loadData();
+    } catch (e) {
+      toast({
+        title: "Delete Failed",
+        description: "An error occurred while deleting the asset.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSaveStrategy = async (config: StrategyConfig) => {
     try {
       await configureStrategy(config);
@@ -208,6 +230,7 @@ export default function KnowledgeBasePage() {
         filename: config.relevant_files?.[0] || "", // Backend uses this as ID if no product name, but we have product name
         is_strategic_pivot: config.is_strategic_pivot,
         target_roles: config.target_roles,
+        target_industries: config.target_industries,
         product_name: config.product_name,
         relevant_files: config.relevant_files || [],
         attached_playbooks: config.attached_playbooks || [],
@@ -254,24 +277,18 @@ export default function KnowledgeBasePage() {
   const products = strategyProfile?.products || [];
 
   const caseStudies = knowledgeFiles.filter(
-    (f) =>
-      f.name.toLowerCase().includes("case-study") ||
-      f.name.toLowerCase().includes("casestudy"),
+    (f) => f.namespace === "case-studies" || f.namespace === "casestudies"
   );
 
   const playbooks = knowledgeFiles.filter(
-    (f) =>
-      !f.name.toLowerCase().includes("one-pager") &&
-      !f.name.toLowerCase().includes("offerings") &&
-      !f.name.toLowerCase().includes("case-study") &&
-      !f.name.toLowerCase().includes("casestudy"),
+    (f) => f.namespace === "playbooks" || !f.namespace // fallback for old data if any
   );
 
   // Categorize files for modal selection
   const availableFilesForModal = knowledgeFiles.map((f) => ({
     name: f.name,
-    path: f.path,
-    type: (f.name.toLowerCase().includes("case-study") || f.name.toLowerCase().includes("casestudy"))
+    path: f.path || f.name,
+    type: (f.namespace === "case-studies" || f.namespace === "casestudies")
       ? "case-studies"
       : ("playbooks" as "playbooks" | "case-studies"),
   }));
@@ -485,10 +502,18 @@ export default function KnowledgeBasePage() {
                   {playbooks.length > 0 ? (
                     playbooks.map((f) => (
                       <DocumentItem
-                        key={f.path}
+                        key={f.id || f.path || f.name}
                         name={f.name}
                         status="Available"
-                        date={`Size: ${(f.size / 1024).toFixed(1)} KB`}
+                        date={f.storage_path || (typeof f.modified === 'string' ? new Date(f.modified).toLocaleDateString() : `Size: ${(f.size / 1024).toFixed(1)} KB`)}
+                        onStrategyClick={() => {
+                          setSelectedFileForStrategy(f);
+                        }}
+                        pivotInfo={strategyProfile?.products?.find((p: any) => p.relevant_files?.includes(f.name))?.is_strategic_pivot}
+                        isAdmin={isAdmin}
+                        assetMetadata={f.asset_metadata}
+                        onDelete={f.id ? () => handleDelete(f.id!) : undefined}
+                        assetId={f.id}
                       />
                     ))
                   ) : (
@@ -534,6 +559,7 @@ export default function KnowledgeBasePage() {
                             description: p.description,
                             is_strategic_pivot: p.is_strategic_pivot,
                             target_roles: p.target_roles,
+                            target_industries: p.target_industries || [],
                             attached_playbooks: p.attached_playbooks || [],
                             attached_case_studies:
                               p.attached_case_studies || [],
@@ -595,11 +621,18 @@ export default function KnowledgeBasePage() {
                   {caseStudies.length > 0 ? (
                     caseStudies.map((f) => (
                       <DocumentItem
-                        key={f.path}
+                        key={f.id || f.path || f.name}
                         name={f.name}
                         status="Available"
-                        date={`Size: ${(f.size / 1024).toFixed(1)} KB`}
+                        date={f.storage_path || (typeof f.modified === 'string' ? new Date(f.modified).toLocaleDateString() : `Size: ${(f.size / 1024).toFixed(1)} KB`)}
+                        onStrategyClick={() => {
+                          setSelectedFileForStrategy(f);
+                        }}
+                        pivotInfo={strategyProfile?.products?.find((p: any) => p.relevant_files?.includes(f.name))?.is_strategic_pivot}
                         isAdmin={isAdmin}
+                        assetMetadata={f.asset_metadata}
+                        onDelete={f.id ? () => handleDelete(f.id!) : undefined}
+                        assetId={f.id}
                       />
                     ))
                   ) : (
@@ -642,6 +675,21 @@ export default function KnowledgeBasePage() {
             isAdmin={isAdmin}
           />
         )}
+
+        {selectedFileForStrategy && (
+          <StrategyModal
+            isOpen={!!selectedFileForStrategy}
+            onClose={() => setSelectedFileForStrategy(null)}
+            filename={selectedFileForStrategy.name}
+            description={selectedFileForStrategy.description || ""}
+            onSave={handleSaveStrategy}
+            initialConfig={strategyProfile?.products?.find((p: any) => 
+                p.filename === selectedFileForStrategy.name || 
+                p.relevant_files?.includes(selectedFileForStrategy.name)
+            )}
+            availableFiles={availableFilesForModal}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
@@ -654,6 +702,10 @@ function DocumentItem({
   onStrategyClick,
   pivotInfo,
   isAdmin,
+  assetMetadata,
+  onDelete,
+  isDeleting,
+  assetId,
 }: {
   name: string;
   status: string;
@@ -661,61 +713,152 @@ function DocumentItem({
   onStrategyClick?: () => void;
   pivotInfo?: any;
   isAdmin?: boolean;
+  assetMetadata?: Record<string, any>;
+  onDelete?: () => void;
+  isDeleting?: boolean;
+  assetId?: string;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [content, setContent] = useState<string | null>(null);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+
+  const toggleExpand = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isExpanded && !content && assetId) {
+      setIsLoadingContent(true);
+      try {
+        const res = await getKnowledgeFileContent(assetId);
+        setContent(res.content);
+      } catch (e) {
+        console.error("Failed to fetch content", e);
+      } finally {
+        setIsLoadingContent(false);
+      }
+    }
+    setIsExpanded(!isExpanded);
+  };
+
   return (
-    <div className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors cursor-pointer group">
-      <div className="flex items-center gap-4">
-        <div className="p-2 rounded-lg bg-primary/10 text-primary">
-          <FileText className="w-5 h-5" />
+    <div className="space-y-2">
+      <div 
+        className={`flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors cursor-pointer group ${isExpanded ? 'border-primary/30 bg-muted/20' : ''}`}
+        onClick={toggleExpand}
+      >
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 p-0 hover:bg-transparent"
+              onClick={toggleExpand}
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              )}
+            </Button>
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <FileText className="w-5 h-5" />
+            </div>
+          </div>
+          <div>
+            <h4 className="font-medium group-hover:text-primary transition-colors flex items-center gap-2">
+              {name}
+              {pivotInfo && (
+                <Badge
+                  variant="default"
+                  className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/20 text-[10px] px-1 py-0 h-5"
+                >
+                  <Star className="w-3 h-3 mr-1 fill-amber-600" />
+                  Hero Product
+                </Badge>
+              )}
+            </h4>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-xs text-muted-foreground">{date}</p>
+              {assetMetadata?.product && (
+                <>
+                  <span className="text-muted-foreground/30">•</span>
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-primary/10 bg-primary/5">
+                    {assetMetadata.product}
+                  </Badge>
+                </>
+              )}
+              {assetMetadata?.industry && (
+                <>
+                  <span className="text-muted-foreground/30">•</span>
+                  <span className="text-[10px] text-muted-foreground italic">
+                    {assetMetadata.industry}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <div>
-          <h4 className="font-medium group-hover:text-primary transition-colors flex items-center gap-2">
-            {name}
-            {pivotInfo && (
-              <Badge
-                variant="default"
-                className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/20 text-[10px] px-1 py-0 h-5"
-              >
-                <Star className="w-3 h-3 mr-1 fill-amber-600" />
-                Hero Product
-              </Badge>
-            )}
-          </h4>
-          <p className="text-xs text-muted-foreground">{date}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        <Badge
-          variant="outline"
-          className="bg-green-500/10 text-green-600 border-green-500/20 gap-1 px-2 py-0"
-        >
-          <CheckCircle2 className="w-3 h-3" />
-          {status}
-        </Badge>
-
-        {onStrategyClick && isAdmin && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 transition-all ${pivotInfo ? "text-amber-500 opacity-100" : "text-muted-foreground opacity-20 group-hover:opacity-100"}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onStrategyClick();
-            }}
-            title="Configure Strategic Pivot"
+        <div className="flex items-center gap-3">
+          {onDelete && isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Are you sure you want to delete ${name}? This will remove it from the DB, Storage, and Pinecone.`)) {
+                  onDelete();
+                }
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 rotate-45" />}
+            </Button>
+          )}
+          
+          <Badge
+            variant="outline"
+            className="bg-green-500/10 text-green-600 border-green-500/20 gap-1 px-2 py-0"
           >
-            <Star className={`w-4 h-4 ${pivotInfo ? "fill-current" : ""}`} />
-          </Button>
-        )}
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground"
-        >
-          <ArrowUpRight className="w-4 h-4" />
-        </Button>
+            <CheckCircle2 className="w-3 h-3" />
+            {status}
+          </Badge>
+          
+          {onStrategyClick && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStrategyClick();
+              }}
+              className="h-8 gap-1.5"
+            >
+              <Target className="w-3.5 h-3.5" />
+              Strategy
+            </Button>
+          )}
+        </div>
       </div>
+      
+      {isExpanded && (
+        <div className="mx-6 p-6 rounded-xl border bg-muted/30 animate-in slide-in-from-top-2 duration-200">
+          {isLoadingContent ? (
+            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Fetching content from storage...
+            </div>
+          ) : content ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted-foreground overflow-auto max-h-[400px]">
+                {content}
+              </pre>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              No content available for this file.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -28,6 +28,7 @@ import {
   RefreshCcw,
   Trash2,
   User,
+  Lock,
 } from "lucide-react";
 import {
   fetchActivities,
@@ -57,8 +58,11 @@ import {
   LINKEDIN_INDUSTRIES
 } from "@/lib/constants";
 
+import { useConfig } from "@/context/config-context";
+
 export default function AutopilotPage() {
   const { user } = useAuth();
+  const { trialMode } = useConfig();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -337,11 +341,16 @@ export default function AutopilotPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">
-            <Tabs defaultValue="apollo" className="w-full">
+            <Tabs defaultValue={trialMode ? "linkedin" : "apollo"} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="apollo" className="gap-2">
+                <TabsTrigger value="apollo" className="gap-2 relative">
                   <Search className="w-4 h-4" />
                   Apollo Search
+                  {trialMode && (
+                    <Badge variant="secondary" className="text-[8px] h-3 px-1 absolute -top-1 -right-1 bg-amber-500 text-white border-none">
+                      NOT IN TRIAL
+                    </Badge>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="linkedin" className="gap-2">
                   <Globe className="w-4 h-4" />
@@ -354,14 +363,32 @@ export default function AutopilotPage() {
               </TabsList>
 
               <TabsContent value="apollo" className="mt-6">
-                <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
-                  <CardHeader>
-                    <CardTitle>Apollo Search Configuration</CardTitle>
-                    <CardDescription>
-                      Configure advanced Apollo filters. We'll find matching profiles and add them to your pipeline automatically.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
+                {trialMode ? (
+                  <Card className="border-amber-500/20 bg-amber-500/5 backdrop-blur-sm">
+                    <CardHeader className="text-center">
+                      <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
+                        <Lock className="w-6 h-6 text-amber-600" />
+                      </div>
+                      <CardTitle>Apollo Discovery is Locked</CardTitle>
+                      <CardDescription>
+                        Apollo Search is not available in the trial version. Contact support to enable premium discovery features.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardFooter className="justify-center pb-8">
+                      <Button variant="outline" className="border-amber-500/50 text-amber-700 hover:bg-amber-500/10">
+                        Contact Support to Enable
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ) : (
+                  <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle>Apollo Search Configuration</CardTitle>
+                      <CardDescription>
+                        Configure advanced Apollo filters. We'll find matching profiles and add them to your pipeline automatically.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Person Filters */}
                       <div className="space-y-4">
@@ -558,6 +585,7 @@ export default function AutopilotPage() {
                     </Button>
                   </CardFooter>
                 </Card>
+                )}
               </TabsContent>
 
               <TabsContent value="linkedin" className="mt-6">

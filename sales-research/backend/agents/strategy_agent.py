@@ -1,26 +1,27 @@
+from models.structured_output_cso import MultiOutreachSequence
 import logging
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
 from models.gemini_models import get_gemini_model
+from datetime import datetime
 from prompts.sales_prompts import (
     PAIN_POINT_DISCOVERY_PROMPT, 
     STRATEGIC_SOLUTION_PROMPT, 
     OUTREACH_DESIGN_PROMPT
 )
 import json
-from models.structured_output import OutreachStrategy, CampaignVariant, Solution, StrategicSolutions
+from models.structured_output import OutreachStrategy, Solution, StrategicSolutions
+from models.structured_output_cso import OutreachSequence
 from pydantic import BaseModel, Field
 from typing import List
 
 logger = logging.getLogger(__name__)
-from services.knowledge_service import KnowledgeService
-
-class MultiCampaignResponse(BaseModel):
-    variants: List[CampaignVariant] = Field(description="List of distinct outreach campaigns (e.g., Best Fit vs Strategic Pivot).")
 
 
-# Initialize KnowledgeService
-knowledge_service = KnowledgeService(index_name="glial-index")
+
+
+
+# No global knowledge_service - must be resolved per-request
 
 
 def format_profile_analysis(analysis: dict) -> str:
@@ -121,124 +122,41 @@ def pain_point_node(state: AgentState):
         logger.error(f"Error in pain_point_node: {e}")
         return {"target_pain_points": {}}
 
-def solution_node(state: AgentState):
-    """Maps identified pain points to Innovize AI's specific offerings using verified RAG intelligence."""
-    pain_points_dict = state.get("target_pain_points", {})
-    pain_points_str = json.dumps(pain_points_dict)
-    lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
-    selling_profile = state.get("selling_company_profile")
-    
-    # Defaults for backward compatibility
-    selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
-    selling_company_context = f"{selling_company_name} specializes in {getattr(selling_profile, 'description', 'AI automation') if selling_profile else 'AI automation'}."
-    
-    # Build mapping logic string
-    if selling_profile:
-        # Use description for dynamic mapping since target_pain_points is not in schema
-        mapping_logic = "\n".join([f"    - If needs relate to '{getattr(p, 'description', '')}' -> Use **{p.name}**." for p in selling_profile.products])
-    else:
-        mapping_logic = "- If Sales -> Use Glial.\n    - If Logistics -> Use IDP.\n    - If Internal -> Use Agentic KB."
 
-    rag_briefing = state.get("strategic_rag_briefing", "No RAG context available.")
-    
-    # Build the Prompt with Agentic RAG context
-    prompt = STRATEGIC_SOLUTION_PROMPT.format(
-        pain_points=pain_points_str,
-        lead_segment=lead_segment,
-        selling_company_name=selling_company_name,
-        selling_company_context=selling_company_context,
-        solution_context=rag_briefing,
-        selling_mapping_logic=mapping_logic
-    )
-    
-    # Inject Pivot Context if Fit
-    if state.get("is_strategic_pivot_fit"):
-        pivot_name = state.get("pivot_product_name")
-        prompt += f"\n\nIMPORTANT: The lead has been identified as a STRICT FIT for the Strategic Pivot Product: '{pivot_name}'.\nYou MUST include a solution mapping that leverages '{pivot_name}' as a primary or alternative option."
-
-
-    messages = [
-        SystemMessage(content=f"You are a Senior AI Solutions Architect for {selling_company_name}. Your task is to transform discovered pain points into high-impact AI solutions."),
-        HumanMessage(content=f"STRATEGIC RAG BRIEFING: {rag_briefing}\n\nPROMPT: {prompt}")
-    ]
-    
-    try:
-        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
-        structured_llm = model.with_structured_output(StrategicSolutionProposal)
-        response = structured_llm.invoke(messages)
-        return {"strategic_solutions": response.model_dump() if response else {}}
-    except Exception as e:
-        logger.error(f"Error in solution_node: {e}")
-        return {"strategic_solutions": {}}
 
 def outreach_node(state: AgentState):
     """Crafts the personalized "hook" and outbound message using structured output."""
     user_analysis_dict = state.get("user_profile_analysis", {})
     user_analysis = format_profile_analysis(user_analysis_dict)
-    solutions = state.get("strategic_solutions", {})
-    solutions_str = json.dumps(solutions) if isinstance(solutions, dict) else str(solutions)
+    
+    # Context from CSO
+    cso_briefing = state.get("cso_strategic_briefing", {})
+    selected_product = cso_briefing.get("selected_product_name", "Our Solution")
+    
     engagements = state.get("post_engagements", [])
     lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
     
-    journey_analysis = state.get("buyer_journey_analysis", {})
-    cso_briefing = state.get("cso_strategic_briefing", {})
+    # Dynamically derive persona
+    selling_profile = state.get("selling_company_profile")
+    selling_company_name = getattr(selling_profile, "company_name", "Our Company") if selling_profile else "Our Company"
+
+    # Extract lookalike_peer from CSO briefing
+    lookalike_peer = cso_briefing.get("lookalike_peer", "N/A")
 
     prompt = OUTREACH_DESIGN_PROMPT.format(
         user_analysis=user_analysis,
         lead_segment=lead_segment,
-        engagements=json.dumps(engagements),
-        solutions=solutions_str,
-        journey_context=json.dumps(journey_analysis),
-        cso_context=json.dumps(cso_briefing)
+        lookalike_peer=lookalike_peer,
+        solutions=f"PRODUCT SELECTED BY CSO: {selected_product}\nJUSTIFICATION: {cso_briefing.get('selected_product_justification')}",
+        cso_context=json.dumps(cso_briefing),
+        current_date=datetime.now().strftime("%A, %B %d, %Y")
     )
 
-    messages = [
-        SystemMessage(content="### ROLE: You are a world-class direct response copywriter and cold email strategist."),
-        HumanMessage(content=prompt)
-    ]
-    
-    # Determine if we need multi-campaign generation
-    is_pivot_fit = state.get("is_strategic_pivot_fit", False)
-    pivot_name = state.get("pivot_product_name", "")
-    
+    # Add RAG Instruction (The "Winning Intel" passed from CSO)
     rag_briefing = state.get("strategic_rag_briefing", "No RAG context available.")
-
-    # Style & RAG Instruction
-    style_and_rag_instruction = f"""
-### STYLE GUIDE (CRITICAL):
-- **Reading Level**: Write at a **7th-grade reading level**. Use simple words, short sentences, and clear ideas.
-- **Punctuation**: Never use em dashes (—). Use simpler sentence structures.
-- **Avoid AI Cliches**: Never use phrases like "most companies," "in today's landscape," "leveraging AI," "AI-powered," or "streamlining operations."
-- **Be Human & Specific**: Write like a Senior Strategic Consultant who has done their homework. Use the specific proof points and ROI markers provided in the RAG briefing.
-- **Directness**: Get straight to the value. No fluff.
-
-### STRATEGIC RAG BRIEFING (GROUND TRUTH):
+    prompt += f"""
+### STRATEGIC RAG BRIEFING (THE WINNING INTEL):
 {rag_briefing}
-"""
-
-    solution_based_instruction = f"""
-### SOLUTION BASED PITCH GROUND TRUTH:
-Use the following validated solutions from the Strategy Node as your ONLY source for the Solution Based Pitch. Do NOT invent new solutions.
-{solutions_str}
-"""
-
-    if is_pivot_fit:
-        prompt += f"""
-{style_and_rag_instruction}
-{solution_based_instruction}
-
-TASK MODIFICATION: You MUST generate EXACTLY TWO distinct campaign variants:
-Variant 1: "Strategic Pivot - {pivot_name}" -> A high-authority campaign specifically pitching '{pivot_name}'. Use the RAG evidence and playbooks as the primary hook.
-Variant 2: "Solution Based Pitch" -> Use ONLY the `SOLUTION BASED PITCH GROUND TRUTH` above. Map those specific solutions to the prospect's pain points. Do NOT spotlight a single product. Focus on transformation outcomes.
-"""
-    else:
-        prompt += f"""
-{style_and_rag_instruction}
-{solution_based_instruction}
-
-TASK MODIFICATION: You MUST generate EXACTLY ONE campaign variant:
-Variant 1: "Solution Based Pitch" -> Use ONLY the `SOLUTION BASED PITCH GROUND TRUTH` above. Map those specific solutions to the prospect's pain points. Do NOT spotlight a single product. Focus on transformation outcomes.
-DO NOT generate a second variant.
 """
 
     messages = [
@@ -248,41 +166,33 @@ DO NOT generate a second variant.
         """),
         HumanMessage(content=prompt)
     ]
+
     
     try:
-        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0.2) # Slightly higher temp for creativity
-        structured_llm = model.with_structured_output(MultiCampaignResponse)
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0.2)
+        # The Outreach Designer takes the CSO's Blueprints and returns the fully populated Sequences
+        structured_llm = model.with_structured_output(MultiOutreachSequence)
         response = structured_llm.invoke(messages)
         
-        variants = response.variants if response else []
+        if not response or not response.sequences:
+            logger.warning("Strategy Agent: Model returned empty or null sequences. Check CSO context and prompt grounding.")
+            return {
+                "final_outreach_sequences": [],
+                "personalized_outreach": [], 
+                "campaign_outreach_variants": []
+            }
         
-        # Fallback if empty or failed - Construct a default variant from legacy parsing if possible, or just fail gracefully
-        if not variants:
-            # Attempt to rescue by asking for a single non-structured response? 
-            # For now, let's just ensure we return what we have or empty.
-            # But better: if we have a legacy path, we could wrap it. 
-            # Since we are enforcing structured output, let's trust it or return empty.
-            return {"personalized_outreach": [], "campaign_outreach_variants": []}
-
-        # Select primary (Best Fit) for backward compatibility
-        primary_variant = variants[0]
-        # Attempt to find 'Best Fit' or use first
-        for v in variants:
-            if "Best Fit" in v.variant_name:
-                primary_variant = v
-                break
+        all_sequences_dict = [s.model_dump() for s in response.sequences]
+        logger.info(f"Strategy Agent: Successfully generated {len(all_sequences_dict)} outreach sequences.")
         
-        # Convert all variants to dict for storage
-        variant_dicts = [v.model_dump() for v in variants]
-        
-        # ALWAYS return the variants list in personalized_outreach
         return {
-            "personalized_outreach": variant_dicts,
-            "campaign_outreach_variants": variant_dicts
+            "final_outreach_sequences": all_sequences_dict,
+            "personalized_outreach": all_sequences_dict, # Sync for legacy persistence fallback
         }
-
+        
     except Exception as e:
-        logger.error(f"Error in outreach_node: {e}")
-        return {"personalized_outreach": [], "campaign_outreach_variants": []}
-
-
+        logger.error(f"Error in outreach_node: {e}", exc_info=True)
+        return {
+            "final_outreach_sequences": [],
+            "personalized_outreach": [],
+        }

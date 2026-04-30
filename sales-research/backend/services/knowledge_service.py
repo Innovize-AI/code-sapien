@@ -6,7 +6,7 @@ import json
 from typing import List, Optional
 from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
-from pinecone import Pinecone
+from pinecone import Pinecone, ServerlessSpec
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from services.document_classifier import document_classifier
@@ -14,6 +14,9 @@ from models.gemini_models import get_gemini_model
 from langchain_core.messages import SystemMessage, HumanMessage
 
 logger = logging.getLogger(__name__)
+
+# Track indices currently being provisioned to avoid redundant background tasks
+_indices_in_creation: set[str] = set()
 
 # Per-namespace chunking config.
 # case-studies: large chunks so each full case study stays atomic.
@@ -50,19 +53,99 @@ def _prepend_breadcrumb(doc: Document) -> Document:
 
 
 class KnowledgeService:
-    def __init__(self, index_name: str = "sales-intelligence"):
-        self.pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-        # Match glial-index 1536 dimensions
+    def __init__(self, index_name: Optional[str] = None):
+        """
+        In TRIAL_MODE, index_name MUST be provided.
+        """
+        api_key = os.getenv("PINECONE_API_KEY")
+        if not api_key:
+            logger.error("PINECONE_API_KEY not found in environment")
+            
+        self.pc = Pinecone(api_key=api_key)
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=1536)
-        self.index_name = index_name
-        self.index = self.pc.Index(self.index_name)
+        
+        # Fallback to env var or raise error if in trial mode
+        self.trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+        self.index_name = index_name or os.getenv("PINECONE_INDEX_NAME")
+        
+        if not self.index_name:
+            if not self.trial_mode:
+                self.index_name = "glial-index" # Production fallback
+        
+        if self.index_name:
+            logger.info(f"KnowledgeService initialized with index: {self.index_name}")
+            # Lazy load index on first use to avoid 404 if index is still being created
+            self._index = None
+        else:
+            self._index = None
 
-    def _get_vectorstore(self, namespace: str):
+    @property
+    def index(self):
+        if not self._index:
+            if not self.index_name:
+                if self.trial_mode:
+                    logger.error(f"CRITICAL: No index_name provided to {self.__class__.__name__} for index access in TRIAL_MODE! Isolation will FAIL.")
+                    return None
+                self.index_name = "glial-index"
+            
+            self._index = self.pc.Index(self.index_name)
+        return self._index
+
+    def _get_vectorstore(self, namespace: str, index_name: Optional[str] = None):
+        """
+        Retrieves a vectorstore instance. Handles the cooling/warming period for newly created indexes.
+        """
+        actual_index = index_name or self.index_name
+        
         return PineconeVectorStore(
-            index=self.index,
+            index_name=actual_index,
             embedding=self.embeddings,
-            namespace=namespace
+            namespace=namespace,
+            index=self.pc.Index(actual_index)
         )
+
+    async def create_trial_index(self, index_name: str) -> bool:
+        """
+        Programmatically provisions a new Serverless Pinecone index for a trial user.
+        Uses a background guard to avoid redundant creation attempts.
+        """
+        if index_name in _indices_in_creation:
+            return True
+            
+        try:
+            _indices_in_creation.add(index_name)
+            
+            def get_indexes():
+                return [idx.name for idx in self.pc.list_indexes()]
+            
+            existing_indexes = await asyncio.to_thread(get_indexes)
+            if index_name in existing_indexes:
+                logger.info(f"Index {index_name} already exists. Skipping creation.")
+                return True
+
+            logger.info(f"Provisioning new Pinecone index: {index_name}...")
+            
+            def do_create():
+                self.pc.create_index(
+                    name=index_name,
+                    dimension=1536, # OpenAI text-embedding-3-small
+                    metric="cosine",
+                    spec=ServerlessSpec(
+                        cloud="aws",
+                        region="us-east-1"
+                    )
+                )
+            
+            await asyncio.to_thread(do_create)
+            
+            # Note: Index will take ~60-120s to be fully ready
+            return True
+        except Exception as e:
+            logger.error(f"Failed to create Pinecone index {index_name}: {e}")
+            return False
+        finally:
+            if index_name in _indices_in_creation:
+                _indices_in_creation.remove(index_name)
 
     def _chunk_documents(self, docs: List[Document], namespace: str) -> List[Document]:
         """
@@ -133,15 +216,21 @@ class KnowledgeService:
             content = f.read()
 
         # 1. Auto-classify if metadata/namespace is missing or enrichment needed
-        if namespace is None or metadata is None:
+        # We now check if 'product' is missing to ensure we always get the rich AI metadata
+        if namespace is None or metadata is None or "product" not in metadata:
             doc_meta = await document_classifier.classify_document(content, os.path.basename(file_path))
             logger.info(f"doc_meta: {doc_meta}")
             if namespace is None:
                 namespace = doc_meta.suggested_namespace
+            
+            classification_dict = doc_meta.dict()
             if metadata is None:
-                metadata = doc_meta.dict()
+                metadata = classification_dict
             else:
-                metadata.update(doc_meta.dict())
+                # Merge: preserve existing keys (like source/org_id), add new ones
+                for k, v in classification_dict.items():
+                    if k not in metadata:
+                        metadata[k] = v
 
         # 2. First-pass: header-based split
         # case-studies: split only on H1/H2 so each full case study (with all its
@@ -160,7 +249,10 @@ class KnowledgeService:
         for doc in splits:
             if metadata:
                 doc.metadata.update(metadata)
-            doc.metadata["source"] = os.path.basename(file_path)
+            
+            # If source not already in metadata, use basename
+            if "source" not in doc.metadata:
+                doc.metadata["source"] = os.path.basename(file_path)
 
         # 6. Ingest
         vectorstore = self._get_vectorstore(namespace)
@@ -217,9 +309,12 @@ class KnowledgeService:
         {doc_list_text}
         
         TASK:
-        1. Identify the top {top_n} most helpful chunks for answering the query.
-        2. Return ONLY a JSON list of the IDs in order of relevance. 
-        Example: [3, 0, 1]
+        1. Identify chunks that DIRECTLY address or provide evidence for the query. 
+        2. If a chunk is not relevant or only tangentially related, EXCLUDE it.
+        3. Return a JSON list of the IDs (0-indexed) for ONLY the relevant chunks, in order of importance.
+        4. If NO chunks are relevant, return an empty list: [].
+        
+        Example: [3, 0] or []
         """
         
         try:
@@ -249,17 +344,41 @@ class KnowledgeService:
             logger.error(f"Fallback Reranker failed: {e}")
             return documents[:top_n] # Absolute fallback to similarity order
 
-    def retrieve_context(self, query: str, namespace: str, k: int = 10, top_n: int = 4, score_threshold: float = 0.5) -> str:
+    def retrieve_context(self, query: str, namespace: str, k: int = 10, top_n: int = 4, score_threshold: float = 0.5, user_id: Optional[str] = None, index_name: Optional[str] = None) -> str:
         """
         Retrieves the top k chunks via similarity, then reranks to top_n using cross-encoders.
+        In TRIAL_MODE, it ONLY searches the provided index/namespaces (no global fallback).
         """
-        vectorstore = self._get_vectorstore(namespace)
-        # 1. Recall (Broad)
-        docs_with_scores = vectorstore.similarity_search_with_score(query, k=k)
-        initial_docs = [d for d, s in docs_with_scores if s >= score_threshold]
+        trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
         
-        if not initial_docs:
-            return f"No initially similar knowledge found in the '{namespace}' namespace."
+        # In trial mode, we strictly search only the assigned namespaces
+        # We assume the index isolation is handled by 'index_name' parameter
+        namespaces_to_search = [namespace]
+        
+        # If we are NOT in trial mode, we might want to check the user's private space within the global index
+        # (This handles the previous logic where trials were just namespaces)
+        if not trial_mode and user_id and namespace in ["playbooks", "solutions"]:
+             namespaces_to_search.append(f"{user_id}_{namespace}")
+
+        all_docs_with_scores = []
+        for ns in namespaces_to_search:
+            try:
+                # Use the provided index_name (for trial isolation) or the default index
+                vectorstore = self._get_vectorstore(ns, index_name=index_name)
+                docs_with_scores = vectorstore.similarity_search_with_score(query, k=k)
+                for d, s in docs_with_scores:
+                    if s >= score_threshold:
+                        d.metadata["found_in_namespace"] = ns
+                        all_docs_with_scores.append((d, s))
+            except Exception as e:
+                logger.warning(f"Error searching namespace {ns} in index {index_name or self.index_name}: {e}")
+
+        if not all_docs_with_scores:
+            return f"No initially similar knowledge found in index '{index_name or self.index_name}' namespaces '{namespaces_to_search}'."
+
+        # Sort by similarity score and take top k
+        all_docs_with_scores.sort(key=lambda x: x[1], reverse=True)
+        initial_docs = [d for d, s in all_docs_with_scores[:k]]
 
         # 2. Precision (Rerank)
         reranked_docs = self.rerank_documents(query, initial_docs, top_n=top_n)
@@ -269,10 +388,23 @@ class KnowledgeService:
             score = doc.metadata.get("relevance_score", 0.0)
             source = doc.metadata.get("source", "Unknown")
             header = doc.metadata.get("Header 1") or doc.metadata.get("Header 2") or ""
-            context_parts.append(f"--- [Source: {source} | {header} | Relevance: {score:.4f}] ---\n{doc.page_content}")
+            
+            # Extract rich metadata
+            product = doc.metadata.get("product")
+            industry = doc.metadata.get("industry")
+            persona = doc.metadata.get("target_persona")
+            if isinstance(persona, list):
+                persona = ", ".join(persona)
+            
+            meta_str = f"Source: {source}"
+            if product: meta_str += f" | Product: {product}"
+            if industry: meta_str += f" | Industry: {industry}"
+            if persona: meta_str += f" | Targets: {persona}"
+            
+            context_parts.append(f"--- [{meta_str} | {header} | Relevance: {score:.4f}] ---\n{doc.page_content}")
 
         if not context_parts:
-            return f"No relevant internal knowledge found after reranking in the '{namespace}' namespace."
+            return f"No relevant internal knowledge found after reranking."
             
         return "\n\n".join(context_parts)
 
@@ -298,27 +430,75 @@ class KnowledgeService:
             
         return "\n\n".join(aggregated_context)
 
-    def retrieve_from_files(self, filenames: List[str], query: str, k: int = 15, top_n: int = 5, score_threshold: float = 0.3) -> str:
+    def delete_vectors(self, source_metadata: str, index_name: Optional[str] = None):
         """
-        Retrieves context specifically from a list of files across all namespaces, applying semantic reranking.
+        Deletes all vectors belonging to a specific source from all namespaces.
         """
-        namespaces = ["playbooks", "case-studies", "solutions"]
-        all_candidate_docs = []
+        try:
+            target_index = self.pc.Index(index_name) if index_name else self.index
+            namespaces = ["playbooks", "case-studies", "solutions"]
+            for ns in namespaces:
+                logger.info(f"Deleting vectors for source '{source_metadata}' in namespace '{ns}'...")
+                # Pinecone allows deleting by metadata filter
+                target_index.delete(filter={"source": {"$eq": source_metadata}}, namespace=ns)
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting vectors for '{source_metadata}': {e}")
+            return False
 
-        # 1. Recall from all relevant namespaces with a broad filter
+    def retrieve_from_files(self, filenames: List[str], query: str, k: int = 15, top_n: int = 5, score_threshold: float = 0.3, user_id: Optional[str] = None, index_name: Optional[str] = None, selective_filters: Optional[dict] = None) -> str:
+        """
+        Retrieves context specifically from a list of files across all namespaces.
+        Supports selective filtering (e.g. only filter case-studies by industry)
+        and fallback logic (if filtered search fails, try unfiltered).
+        """
+        trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+        base_namespaces = ["playbooks", "case-studies", "solutions"]
+        namespaces = base_namespaces.copy()
+        
+        if not trial_mode and user_id:
+            for ns in base_namespaces:
+                namespaces.append(f"{user_id}_{ns}")
+ 
+        all_candidate_docs = []
+ 
+        org_id = index_name.replace("tr-", "") if index_name and index_name.startswith("tr-") else "unknown"
+        prefixed_filenames = [f"org_{org_id}_{f}" if not f.startswith("org_") else f for f in filenames]
+        
+        logger.info(f"Searching prefixed filenames: {prefixed_filenames} with selective_filters: {selective_filters}")
+ 
         for ns in namespaces:
             try:
-                vectorstore = self._get_vectorstore(ns)
-                filter_dict = {"source": {"$in": filenames}}
-                # Broad similarity search
-                docs_with_scores = vectorstore.similarity_search_with_score(query, k=k, filter=filter_dict)
+                vectorstore = self._get_vectorstore(ns, index_name=index_name)
+                
+                # Determine filter for this namespace
+                base_filter = {"source": {"$in": prefixed_filenames}}
+                
+                # Check if we have a selective filter for this namespace (or base namespace)
+                active_filter = base_filter.copy()
+                ns_key = ns.split("_")[-1] if "_" in ns else ns # Handle user_id_playbooks
+                
+                specific_filter = None
+                if selective_filters and ns_key in selective_filters:
+                    specific_filter = selective_filters[ns_key]
+                    for key, val in specific_filter.items():
+                        active_filter[key] = val
+                
+                # Pass 1: Try with filters
+                docs_with_scores = vectorstore.similarity_search_with_score(query, k=k, filter=active_filter)
+                
+                # Fallback: If filtered search failed and we HAD a specific filter, try again without it
+                if not docs_with_scores and specific_filter:
+                    logger.info(f"Fallback: No results for filtered {ns}, retrying with broad source filter.")
+                    docs_with_scores = vectorstore.similarity_search_with_score(query, k=k, filter=base_filter)
+
                 for doc, score in docs_with_scores:
                     if score >= score_threshold:
                         doc.metadata["initial_score"] = score
                         doc.metadata["namespace"] = ns
                         all_candidate_docs.append(doc)
             except Exception as e:
-                logger.warning(f"Error searching namespace {ns} with filter: {e}")
+                logger.error(f"Error searching namespace {ns}: {e}")
                 continue
 
         if not all_candidate_docs:

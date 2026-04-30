@@ -16,8 +16,7 @@ import {
   BarChart3,
   Users,
   Zap,
-  Loader2,
-} from "lucide-react";
+  } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -32,6 +31,7 @@ import {
 import { ActivityBoard } from "@/components/dashboard/activity-board";
 import { AnalyticsCharts } from "@/components/dashboard/analytics-charts";
 import { useAuth } from "@/context/auth-context";
+import { Spinner } from "@/components/ui/spinner"
 
 export default function Home() {
   const router = useRouter();
@@ -99,7 +99,7 @@ export default function Home() {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Spinner size="lg" />
           <p className="text-sm text-muted-foreground animate-pulse">
             {!isMigrated ? "Provisioning your knowledge base..." : "Initializing your workspace..."}
           </p>
@@ -115,7 +115,7 @@ export default function Home() {
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-center justify-between animate-in slide-in-from-top duration-500">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-full">
-                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                <Spinner size="md" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-primary">Provisioning Knowledge Base...</p>

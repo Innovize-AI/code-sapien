@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { BarChart3, Search, Loader2 } from "lucide-react"
+import { BarChart3, Search, } from "lucide-react"
 import { generateResearch } from "@/lib/api"
 import { useBulkAnalysis } from "@/context/bulk-analysis-context"
 import {
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 
 import { useConfig } from "@/context/config-context"
 import { Lock } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 export function AnalysisSidePanel({
     trigger,
@@ -138,7 +139,7 @@ export function AnalysisSidePanel({
                                 </Button>
                                 {isRefreshing && (
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
-                                        <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                                        <Spinner size="sm" />
                                         {refreshStatus}
                                     </div>
                                 )}

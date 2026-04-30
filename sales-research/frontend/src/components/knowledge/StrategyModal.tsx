@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { } from "lucide-react";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { LINKEDIN_INDUSTRIES, JOB_TITLE_OPTIONS } from "@/lib/constants";
+import { Spinner } from "@/components/ui/spinner"
 
 interface StrategyModalProps {
     isOpen: boolean;
@@ -191,7 +192,7 @@ export function StrategyModal({ isOpen, onClose, filename, description, onSave, 
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
                     <Button onClick={handleSave} disabled={isSaving}>
-                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isSaving && <Spinner size="md" className="mr-2" />}
                         Save Configuration
                     </Button>
                 </DialogFooter>

@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ReportDisplayV2 } from "@/components/report-display-v2";
 import { fetchReport } from "@/lib/api";
-import { Loader2, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner"
 
 interface ReportDetailModalProps {
   reportId: string | null;
@@ -57,7 +58,7 @@ export function ReportDetailModal({
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+              <Spinner size="lg" className="mb-4" />
               <p className="text-muted-foreground animate-pulse font-medium">
                 Fetching comprehensive research...
               </p>

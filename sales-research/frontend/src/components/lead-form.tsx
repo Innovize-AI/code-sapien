@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Loader2, XCircle } from "lucide-react"
+import { XCircle } from "lucide-react"
 import { useBulkAnalysis } from "@/context/bulk-analysis-context"
 
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { generateResearch, LeadData } from "@/lib/api"
+import { Spinner } from "@/components/ui/spinner"
 
 const formSchema = z.object({
     linkedin_url: z.string().optional(),
@@ -338,7 +339,7 @@ export function LeadForm({ onSuccess, defaultUrl, defaultWebsite }: LeadFormProp
                 <Button type="submit" disabled={isLoading} className="w-full">
                     {isLoading ? (
                         <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Spinner size="md" />
                             <span>{statusMessage || "Analyzing..."}</span>
                         </div>
                     ) : (

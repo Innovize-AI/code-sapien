@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Loader2,
-  Save,
+import { Save,
   Plus,
   Trash2,
   ShieldAlert,
@@ -135,6 +133,7 @@ const sellingProfileSchema = z.object({
 });
 
 import { useConfig } from "@/context/config-context";
+import { Spinner } from "@/components/ui/spinner"
 
 export default function SettingsPage() {
   const { trialMode } = useConfig();
@@ -443,7 +442,7 @@ export default function SettingsPage() {
   if (isFetching) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -750,7 +749,7 @@ export default function SettingsPage() {
               <div className="flex justify-end">
                 <Button type="submit" disabled={isLoading} size="lg">
                   {isLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Spinner size="md" className="mr-2" />
                   ) : (
                     <Save className="mr-2 h-4 w-4" />
                   )}
@@ -1001,7 +1000,7 @@ export default function SettingsPage() {
                         variant="outline"
                       >
                         {isLoading ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Spinner size="md" className="mr-2" />
                         ) : (
                           <Save className="mr-2 h-4 w-4" />
                         )}

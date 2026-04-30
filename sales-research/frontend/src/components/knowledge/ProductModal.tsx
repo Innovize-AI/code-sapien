@@ -136,6 +136,7 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                             onChange={setSelectedRoles}
                             placeholder="Select roles..."
                             allowCustom
+                            usePortal={false}
                         />
 
                         <MultiSelect
@@ -145,6 +146,7 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                             onChange={setSelectedIndustries}
                             placeholder="Select industries..."
                             allowCustom
+                            usePortal={false}
                         />
                     </div>
 

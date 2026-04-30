@@ -21,6 +21,7 @@ export interface MultiSelectProps {
     disabled?: boolean
     hideSearch?: boolean
     className?: string
+    usePortal?: boolean
 }
 
 export function MultiSelect({
@@ -33,6 +34,7 @@ export function MultiSelect({
     disabled = false,
     hideSearch = false,
     className,
+    usePortal = true,
 }: MultiSelectProps) {
     const [open, setOpen] = React.useState(false)
     const [search, setSearch] = React.useState("")
@@ -50,12 +52,20 @@ export function MultiSelect({
         const spaceBelow = window.innerHeight - rect.bottom
         const du = spaceBelow < 320
         setDropUp(du)
-        setDropdownStyle(
-            du
-                ? { position: "fixed", bottom: window.innerHeight - rect.top + 4, left: rect.left, width: rect.width, zIndex: 9999 }
-                : { position: "fixed", top: rect.bottom + 4, left: rect.left, width: rect.width, zIndex: 9999 }
-        )
-    }, [])
+        if (du) {
+            setDropdownStyle(
+                usePortal
+                    ? { position: "fixed", bottom: window.innerHeight - rect.top + 4, left: rect.left, width: rect.width, zIndex: 9999 }
+                    : { position: "absolute", bottom: "calc(100% + 4px)", left: 0, width: "100%", zIndex: 50 }
+            )
+        } else {
+            setDropdownStyle(
+                usePortal
+                    ? { position: "fixed", top: rect.bottom + 4, left: rect.left, width: rect.width, zIndex: 9999 }
+                    : { position: "absolute", top: "calc(100% + 4px)", left: 0, width: "100%", zIndex: 50 }
+            )
+        }
+    }, [usePortal])
 
     // Close on outside click — must check both trigger and portal dropdown
     React.useEffect(() => {
@@ -243,8 +253,8 @@ export function MultiSelect({
                     <div className="flex-1" />
                     <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                 </div>
+                {mounted && dropdown && (usePortal ? ReactDOM.createPortal(dropdown, document.body) : dropdown)}
             </div>
-            {mounted && dropdown && ReactDOM.createPortal(dropdown, document.body)}
         </div>
     )
 }

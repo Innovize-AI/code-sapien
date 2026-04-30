@@ -5,9 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import {
-  Loader2,
-  CheckCircle2,
+import { CheckCircle2,
   ChevronRight,
   ChevronLeft,
   Zap,
@@ -40,6 +38,7 @@ import {
   JOB_TITLE_OPTIONS,
 } from "@/lib/constants";
 import { useAuth } from "@/context/auth-context";
+import { Spinner } from "@/components/ui/spinner"
 
 // --- Schemas ---
 
@@ -155,7 +154,7 @@ export default function OnboardingPage() {
   if (isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="h-6 w-6 animate-spin text-zinc-300" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -435,7 +434,7 @@ export default function OnboardingPage() {
                   </Button>
                   <Button type="submit" className="flex-1 h-11 font-bold" disabled={isLoading}>
                     {isLoading ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Finalizing...</>
+                      <><Spinner size="md" className="mr-2" /> Finalizing...</>
                     ) : (
                       <><CheckCircle2 className="mr-2 h-4 w-4" /> Complete Setup</>
                     )}

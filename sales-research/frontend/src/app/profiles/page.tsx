@@ -10,9 +10,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { getIdentifiedProfiles, IdentifiedProfile, API_URL, enrichLeads } from "@/lib/api";
-import {
-  Loader2,
-  ExternalLink,
+import { ExternalLink,
   MessageSquare,
   History,
   UserCheck,
@@ -71,6 +69,7 @@ import {
 import { ensureProtocol, cn, normalizeUrl } from "@/lib/utils";
 import { CompanyDetailModal, ReportDetailModal } from "@/components/modals";
 import { ProfileGridV2, ProfileListV2 } from "@/components/profiles/profile-views-v2";
+import { Spinner } from "@/components/ui/spinner"
 
 function formatTimestamp(dateStr: string) {
   try {
@@ -544,7 +543,7 @@ export default function ProfilesPage() {
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-xl border-2 border-dashed">
-            <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+            <Spinner size="lg" className="mb-4" />
             <p className="text-muted-foreground animate-pulse font-medium">
               Fetching high-signal profiles...
             </p>

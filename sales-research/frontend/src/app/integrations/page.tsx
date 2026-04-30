@@ -23,7 +23,6 @@ import {
   Layout,
   Globe,
   RefreshCw,
-  Loader2,
   Slack,
   UserCheck,
   Lock,
@@ -33,6 +32,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useConfig } from "@/context/config-context";
+import { Spinner } from "@/components/ui/spinner"
 
 type Category = "All" | "Form" | "Scheduler" | "Email" | "CRM & Tools";
 
@@ -427,14 +427,14 @@ export default function IntegrationsPage() {
                                 <Label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Active Forms</Label>
                               </div>
                               <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={loadKitForms} disabled={isLoadingForms}>
-                                {isLoadingForms ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                                {isLoadingForms ? <Spinner size="sm" className="mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
                                 Sync
                               </Button>
                             </div>
                             <div className="grid gap-2 max-h-[200px] overflow-y-auto">
                               {isLoadingForms && kitForms.length === 0 ? (
                                 <div className="flex items-center justify-center py-6 gap-2 text-zinc-400">
-                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <Spinner size="md" />
                                   <span className="text-xs">Fetching forms...</span>
                                 </div>
                               ) : kitForms.length > 0 ? (

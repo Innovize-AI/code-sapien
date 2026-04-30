@@ -23,7 +23,6 @@ import {
   Briefcase,
   ExternalLink,
   ChevronRight,
-  Loader2,
   Sparkles,
   Activity,
   FileText,
@@ -36,6 +35,7 @@ import {
 import axios from "axios";
 import { ensureProtocol, cn } from "@/lib/utils";
 import { API_URL } from "@/lib/api";
+import { Spinner } from "@/components/ui/spinner"
 
 interface CompanyDetailModalProps {
   companyId: string | null;
@@ -181,7 +181,7 @@ export function CompanyDetailModal({
       <SheetContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-full overflow-y-auto p-0 border-l border-primary/10 transition-all duration-300">
         {isLoading ? (
           <div className="flex h-full items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Spinner size="lg" />
           </div>
         ) : company ? (
           <div className="flex flex-col h-full bg-background">

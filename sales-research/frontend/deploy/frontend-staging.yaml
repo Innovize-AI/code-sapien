@@ -4,7 +4,6 @@ metadata:
   name: glial-research-frontend-service-staging
   annotations:
     run.googleapis.com/minScale: "0"
-    run.googleapis.com/cpu-throttling: false
     run.googleapis.com/invoker-iam-disabled: true
 spec:
   template:

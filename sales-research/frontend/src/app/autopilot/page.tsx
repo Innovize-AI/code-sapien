@@ -15,6 +15,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Zap,
   Search,
@@ -25,7 +26,6 @@ import {
   Users,
   Briefcase,
   Activity,
-  RefreshCcw,
   Trash2,
   User,
   Lock,
@@ -318,7 +318,7 @@ export default function AutopilotPage() {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-[50vh]">
-          <RefreshCcw className="w-8 h-8 animate-spin text-primary" />
+          <Spinner size="lg" />
         </div>
       </DashboardLayout>
     );
@@ -577,7 +577,7 @@ export default function AutopilotPage() {
                       disabled={saving}
                     >
                       {saving ? (
-                        <RefreshCcw className="w-4 h-4 mr-2 animate-spin" />
+                        <Spinner size="md" className="mr-2" />
                       ) : (
                         <Zap className="w-4 h-4 mr-2" />
                       )}

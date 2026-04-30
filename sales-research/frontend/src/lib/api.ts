@@ -17,7 +17,12 @@ const getApiUrl = () => {
         return 'https://glial-research-backend-service-staging-512561667165.us-central1.run.app';
     }
 
-    // 3. Default to Production
+    // 3. Trial Check
+    if (hostname.includes('trial')) {
+        return 'https://glial-research-backend-service-trial-512561667165.us-central1.run.app';
+    }
+
+    // 4. Default to Production
     return 'https://glial-research-backend-service-512561667165.us-central1.run.app';
 };
 
@@ -455,6 +460,7 @@ export interface ProductConfig {
     description: string;
     is_strategic_pivot?: boolean;
     target_roles?: string[];
+    target_industries?: string[];
     relevant_files?: string[];
     rag_context?: string;
 }
@@ -483,7 +489,12 @@ export const saveSellingProfile = async (data: SellingProfileConfig) => {
     return response.data;
 };
 
-export const getOnboardingStatus = async (): Promise<{ complete: boolean }> => {
+export const getGlobalConfig = async (): Promise<{ trial_mode: boolean; environment: string }> => {
+    const response = await axios.get(`${API_URL}/api/config`);
+    return response.data;
+};
+
+export const getOnboardingStatus = async (): Promise<{ complete: boolean; migration_complete: boolean }> => {
     const response = await axios.get(`${API_URL}/api/settings/onboarding-status`);
     return response.data;
 };
@@ -671,10 +682,15 @@ export const syncKnowledgeBase = async () => {
 };
 
 export interface KnowledgeFile {
+    id?: string;
     name: string;
-    path: string;
+    description?: string;
+    path?: string;
+    namespace?: string;
+    storage_path?: string;
+    asset_metadata?: Record<string, any>;
     size: number;
-    modified: number;
+    modified: number | string;
 }
 
 export const fetchKnowledgeFiles = async (): Promise<KnowledgeFile[]> => {
@@ -697,6 +713,16 @@ export const fetchStrategy = async () => {
 
 export const configureStrategy = async (config: any) => {
     const response = await axios.post(`${API_URL}/api/knowledge/configure-strategy`, config);
+    return response.data;
+};
+
+export const deleteKnowledgeFile = async (assetId: string) => {
+    const response = await axios.delete(`${API_URL}/api/knowledge/assets/${assetId}`);
+    return response.data;
+};
+
+export const getKnowledgeFileContent = async (assetId: string) => {
+    const response = await axios.get(`${API_URL}/api/knowledge/assets/${assetId}/content`);
     return response.data;
 };
 

@@ -203,6 +203,7 @@ async def enrich_and_save_leads(
     db: AsyncSession, 
     person_ids: List[str], 
     user_id: str = None,
+    org_id: str = None,
     source_post: str = "Apollo Discovery",
     competitor: str = "Apollo"
 ) -> List[dict]:
@@ -290,7 +291,7 @@ async def enrich_and_save_leads(
             continue
 
     if raw_leads_to_save:
-        await batch_upsert_identified_profiles(db, raw_leads_to_save)
+        await batch_upsert_identified_profiles(db, raw_leads_to_save, user_id=user_id, org_id=org_id)
         await db.commit()
         
         # BROADCAST to frontend via SSE
@@ -304,7 +305,11 @@ async def enrich_and_save_leads(
         if user_id:
             try:
                 from services.classification_service import run_classification_and_update
-                await run_classification_and_update(raw_leads_to_save, user_id=str(user_id))
+                await run_classification_and_update(
+                    raw_leads_to_save, 
+                    user_id=str(user_id),
+                    org_id=org_id
+                )
             except Exception as e:
                 logger.error(f"Failed to trigger follow-up classification: {e}")
 
@@ -316,6 +321,9 @@ async def find_leads_apollo(input_data: LeadDiscoveryInput, api_key: str = None,
     Search for leads using Apollo.io API.
     """
     import os
+    if os.getenv("TRIAL_MODE", "false").lower() == "true":
+        raise Exception("Apollo Discovery is disabled in Trial Mode.")
+    
     final_api_key = api_key or os.getenv("APOLLO_API_KEY")
     if not final_api_key:
         raise Exception("Apollo API Key is required. Please set it in Organization Settings.")

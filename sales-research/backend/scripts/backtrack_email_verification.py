@@ -38,13 +38,21 @@ async def backtrack_email_verification():
     
     async with SessionLocal() as session:
         # 1. Fetch Million Verifier API Key
-        # Ensure we are querying the right schema - sqlalchemy models are bound to Base.metadata.schema (DB_SCHEMA)
-        stmt = select(OrganizationSettings.million_verifier_api_key).limit(1)
-        result = await session.execute(stmt)
-        api_key = result.scalar_one_or_none()
+        trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+        api_key = None
+        if trial_mode:
+            api_key = os.getenv("MILLION_VERIFIER_API_KEY")
+            if api_key:
+                logger.info("Using Million Verifier API Key from environment (Trial Mode)")
         
         if not api_key:
-            logger.error("No Million Verifier API Key found in OrganizationSettings. Please configure it first.")
+            # Ensure we are querying the right schema - sqlalchemy models are bound to Base.metadata.schema (DB_SCHEMA)
+            stmt = select(OrganizationSettings.million_verifier_api_key).limit(1)
+            result = await session.execute(stmt)
+            api_key = result.scalar_one_or_none()
+        
+        if not api_key:
+            logger.error("No Million Verifier API Key found in OrganizationSettings or environment. Please configure it first.")
             return
 
         # 2. Identify profiles needing verification

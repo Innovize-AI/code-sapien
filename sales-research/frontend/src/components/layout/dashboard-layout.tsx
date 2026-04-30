@@ -8,8 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Menu, BarChart3, X } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
+import { useConfig } from "@/context/config-context"
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const [isAnalysisOpen, setIsAnalysisOpen] = useState(false)
+    const { trialMode } = useConfig()
 
     return (
         <div className="flex h-screen w-full bg-background overflow-hidden">
@@ -22,7 +25,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <div className="md:hidden fixed top-0 left-0 right-0 h-16 border-b bg-background z-40 flex items-center justify-between px-4">
                 <div className="flex items-center gap-2 font-semibold text-lg tracking-tight">
                     <BarChart3 className="w-5 h-5 text-primary" />
-                    <span>SalesAgent<span className="text-primary">.ai</span></span>
+                    <span>Glial</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" size="icon" onClick={() => setIsAnalysisOpen(true)}>

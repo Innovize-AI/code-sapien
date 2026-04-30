@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import axios from "axios";
 import {
@@ -356,12 +356,22 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
   const [activeIntelSection, setActiveIntelSection] = useState("synthesis");
   const [isProofOpen, setIsProofOpen] = useState(false);
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
-  const [outreachStatus, setOutreachStatus] = useState(data?.outreach_status || "not_started");
+  const [outreachStatus, setOutreachStatus] = useState<string>(data?.outreach_status || "not_started");
+  const [isOutreachEdited, setIsOutreachEdited] = useState<boolean>(data?.is_outreach_edited || false);
+  const [editDepthPercentage, setEditDepthPercentage] = useState<number>(data?.edit_depth_percentage || 0);
+
+  useEffect(() => {
+    if (data) {
+      setOutreachStatus(data.outreach_status || "not_started");
+      setIsOutreachEdited(data.is_outreach_edited || false);
+      setEditDepthPercentage(data.edit_depth_percentage || 0);
+    }
+  }, [data]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isEditingOutreach, setIsEditingOutreach] = useState(false);
   const [isSavingOutreach, setIsSavingOutreach] = useState(false);
   const [activeOutreachTab, setActiveOutreachTab] = useState<"tactical" | "strategic">("tactical");
-  const [editedOutreach, setEditedOutreach] = useState({ linkedin_message: "", email_subject: "", email_body: "", hook: "" });
+  const [editedOutreach, setEditedOutreach] = useState<any>({ linkedin_message: "", email_subject: "", email_body: "", hook: "", steps: [] });
   const [editedStrategicOutreach, setEditedStrategicOutreach] = useState({ linkedin_message: "", email_body: "" });
   const [isEditingJourney, setIsEditingJourney] = useState(false);
   const [isSavingJourney, setIsSavingJourney] = useState(false);
@@ -375,19 +385,43 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
   const [isEditingStrategicCommand, setIsEditingStrategicCommand] = useState(false);
   const [isSavingStrategic, setIsSavingStrategic] = useState(false);
   const [editedStrategicCommand, setEditedStrategicCommand] = useState<any[]>([]);
+  const [selectedSubjectVariants, setSelectedSubjectVariants] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   React.useEffect(() => {
     if (!data) return;
-    const outreach = data.personalized_outreach;
-    if (outreach) {
-      if (Array.isArray(outreach) && outreach.length > 0) {
-        const p = outreach[selectedVariantIndex] || outreach[0];
-        setEditedOutreach({ linkedin_message: p.linkedin_message || "", email_subject: p.email_subject || "", email_body: p.email_body || "", hook: p.hook || "" });
-      } else if (typeof outreach === "object" && !Array.isArray(outreach)) {
-        const p = outreach as any;
-        setEditedOutreach({ linkedin_message: p.linkedin_message || "", email_subject: p.email_subject || "", email_body: p.email_body || "", hook: p.hook || "" });
-      }
+
+    // Normalize variants for initial state
+    const rawV = (() => {
+      const p = data.personalized_outreach;
+      if (Array.isArray(p) && p.length > 0) return p;
+      if (p && typeof p === "object" && !Array.isArray(p)) return [p];
+      const seqs = data.final_outreach_sequences || data.outreach_sequences || data.sales_research_report?.outreach_sequences;
+      if (Array.isArray(seqs) && seqs.length > 0) return seqs;
+      const legacy = data.campaign_outreach_variants || data.sales_research_report?.campaign_variants;
+      if (Array.isArray(legacy) && legacy.length > 0) return legacy;
+      if (p) return [p];
+      return [];
+    })();
+
+    const campaignV = rawV.map((v: any) => {
+      if (Array.isArray(v.steps) && v.steps.length > 0) return v;
+      const steps: any[] = [];
+      if (v.linkedin_message || v.hook) steps.push({ step_number: 1, engagement_type: "LI_DM", narrative_angle: "LinkedIn Request", draft: v.linkedin_message || v.hook, delay_days: 0, internal_note: "" });
+      if (v.email_body) steps.push({ step_number: steps.length + 1, engagement_type: "EMAIL_DIRECT", narrative_angle: "Email Outreach", draft: v.email_body, email_subject: v.email_subject, delay_days: 2, internal_note: "" });
+      return { ...v, steps };
+    });
+
+    const p = campaignV[selectedVariantIndex] || {};
+    if (p) {
+      setEditedOutreach({
+        ...p,
+        email_subject: p.email_subject || "",
+        linkedin_message: p.linkedin_message || "",
+        email_body: p.email_body || "",
+        hook: p.hook || p.strategic_hook || "",
+        steps: p.steps || []
+      });
     }
     if (data.cso_strategic_briefing) {
       setEditedStrategicOutreach({ linkedin_message: data.cso_strategic_briefing.refined_linkedin_message || "", email_body: data.cso_strategic_briefing.refined_email_body || "" });
@@ -399,7 +433,7 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
     if (data.buyer_journey_analysis) setEditedJourney({ ...data.buyer_journey_analysis });
     if (data.sales_research_report) setEditedStrategicCommand(data.sales_research_report.advanced_next_steps || []);
     setOutreachStatus(data.outreach_status || "not_started");
-  }, [data, selectedVariantIndex]);
+  }, [data, selectedVariantIndex, selectedSubjectVariants]);
 
   const handleUpdateStatus = async (newStatus: string) => {
     if (!data?.id) return;
@@ -423,7 +457,20 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
         ? { refined_linkedin_message: editedStrategicOutreach.linkedin_message, refined_email_body: editedStrategicOutreach.email_body }
         : { ...editedOutreach, ...(hasVariantsLocal ? { variant_index: selectedVariantIndex } : {}) };
       const endpoint = isStrategic ? "cso-outreach" : "outreach";
-      await axios.put(`${API_URL}/sales-research/reports/${data.id}/${endpoint}`, body);
+      const res = await axios.put(`${API_URL}/sales-research/reports/${data.id}/${endpoint}`, body);
+      
+      // Update local data to reflect changes immediately and include calculated metadata (like edit_depth_percentage)
+      const respData = res.data?.data;
+      if (respData) {
+        // Sync the most important fields back to the prop object
+        Object.assign(data, respData);
+        
+        // Also update local state derived from data
+        if (respData.outreach_status) setOutreachStatus(respData.outreach_status);
+        setIsOutreachEdited(respData.is_outreach_edited ?? data.is_outreach_edited);
+        setEditDepthPercentage(respData.edit_depth_percentage ?? data.edit_depth_percentage);
+      }
+
       toast({ title: "Saved", description: `${isStrategic ? "Strategic" : "Tactical"} outreach updated` });
       setIsEditingOutreach(false);
     } catch {
@@ -435,8 +482,9 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
     if (!data?.id) return;
     setIsSavingStrategic(true);
     try {
-      await updateExecutiveBlueprint(data.id, { advanced_next_steps: editedStrategicCommand });
-      if (data.sales_research_report) data.sales_research_report.advanced_next_steps = editedStrategicCommand;
+      const res = await updateExecutiveBlueprint(data.id, { advanced_next_steps: editedStrategicCommand });
+      const respData = res.data?.data || res.data;
+      if (respData) Object.assign(data, respData);
       toast({ title: "Saved", description: "Strategic Command updated" });
       setIsEditingStrategicCommand(false);
     } catch {
@@ -448,8 +496,9 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
     if (!data?.id) return;
     setIsSavingIntent(true);
     try {
-      await updateIntentAnalysis(data.id, editedIntent);
-      if (data.intent_analysis) Object.assign(data.intent_analysis, editedIntent);
+      const res = await updateIntentAnalysis(data.id, editedIntent);
+      const respData = res.data?.data || res.data;
+      if (respData) Object.assign(data, respData);
       toast({ title: "Saved", description: "Intent Analysis updated" });
       setIsEditingIntent(false);
     } catch {
@@ -457,30 +506,32 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
     } finally { setIsSavingIntent(false); }
   };
 
+  const handleSaveIntentEmail = async () => {
+    if (!data?.id) return;
+    setIsSavingIntentEmail(true);
+    try {
+      const res = await axios.put(`${API_URL}/sales-research/reports/${data.id}/intent-email`, { email_text: editedIntentEmail });
+      const respData = res.data?.data;
+      if (respData) Object.assign(data, respData);
+      toast({ title: "Saved", description: "Follow-up email updated" });
+      setIsEditingIntentEmail(false);
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Failed to save email" });
+    } finally { setIsSavingIntentEmail(false); }
+  };
+
   const handleSaveJourney = async () => {
     if (!data?.id) return;
     setIsSavingJourney(true);
     try {
-      await updateBuyerJourney(data.id, editedJourney);
-      if (data.buyer_journey_analysis) Object.assign(data.buyer_journey_analysis, editedJourney);
+      const res = await updateBuyerJourney(data.id, editedJourney);
+      const respData = res.data?.data || res.data;
+      if (respData) Object.assign(data, respData);
       toast({ title: "Saved", description: "Buyer Journey updated" });
       setIsEditingJourney(false);
     } catch {
       toast({ variant: "destructive", title: "Error", description: "Failed to save" });
     } finally { setIsSavingJourney(false); }
-  };
-
-  const handleSaveIntentEmail = async () => {
-    if (!data?.id) return;
-    setIsSavingIntentEmail(true);
-    try {
-      await axios.put(`${API_URL}/sales-research/reports/${data.id}/intent-email`, { email_text: editedIntentEmail });
-      if (data.intent_analysis) data.intent_analysis.recommended_email = editedIntentEmail;
-      toast({ title: "Saved", description: "Follow-up email updated" });
-      setIsEditingIntentEmail(false);
-    } catch {
-      toast({ variant: "destructive", title: "Error", description: "Failed to save" });
-    } finally { setIsSavingIntentEmail(false); }
   };
 
   if (!data) return null;
@@ -583,8 +634,20 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
   const briefing = data.cso_strategic_briefing;
   const strategicActions = briefing
     ? [
-        briefing.refined_linkedin_message && { type: "linkedin", title: "LinkedIn Message", content: briefing.refined_linkedin_message, icon: <Linkedin className="h-3.5 w-3.5" /> },
-        briefing.refined_email_body && { type: "email", title: "Refined Email", content: briefing.refined_email_body, icon: <FileText className="h-3.5 w-3.5" /> },
+        briefing.refined_linkedin_message && { 
+          type: "linkedin", 
+          title: "LinkedIn Message", 
+          content: briefing.refined_linkedin_message, 
+          icon: <Linkedin className="h-3.5 w-3.5" />,
+          _edit_depth: briefing._edit_depths?.refined_linkedin_message || 0
+        },
+        briefing.refined_email_body && { 
+          type: "email", 
+          title: "Refined Email", 
+          content: briefing.refined_email_body, 
+          icon: <FileText className="h-3.5 w-3.5" />,
+          _edit_depth: briefing._edit_depths?.refined_email_body || 0
+        },
       ].filter(Boolean)
     : [];
 
@@ -779,6 +842,18 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                 </div>
               </>
             )}
+            {isOutreachEdited && (
+              <>
+                <div className="h-4 w-px bg-white/10 shrink-0" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[9px] font-black uppercase text-white/40 tracking-widest">Edited</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xl font-black text-amber-400 leading-none">{editDepthPercentage}%</span>
+                    <Edit2 className="h-3 w-3 text-amber-400/60" />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -893,9 +968,9 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {data.is_outreach_edited && (
+                {isOutreachEdited && (
                   <Badge variant="outline" className="h-7 px-2.5 gap-1.5 border-amber-500/30 text-amber-600 bg-amber-500/5 text-[9px] font-black uppercase">
-                    <Edit2 className="h-2.5 w-2.5" /> Edited · {data.edit_depth_percentage || 0}%
+                    <Edit2 className="h-2.5 w-2.5" /> Edited · {editDepthPercentage}%
                   </Badge>
                 )}
                 {isEditingOutreach ? (
@@ -925,11 +1000,14 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                 <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest mr-1">Variant</span>
                 {campaignVariants.map((v: any, i: number) => (
                   <button key={i} onClick={() => setSelectedVariantIndex(i)}
-                    className={cn("px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-tight transition-all",
+                    className={cn("px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-tight transition-all flex items-center gap-1.5",
                       selectedVariantIndex === i
                         ? "bg-primary text-white"
                         : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700")}>
                     {v.variant_name || `Variant ${i + 1}`}
+                    {v._edit_depth > 0 && (
+                        <span className="text-[8px] opacity-70">· {v._edit_depth}%</span>
+                    )}
                   </button>
                 ))}
                 {activeOutreach?.primary_pain_point && (
@@ -995,20 +1073,168 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                                 If No Reply
                               </Badge>
                             )}
+                            {action.cta_type && (
+                              <Badge variant="outline" className="text-[8px] font-black text-indigo-500 border-indigo-500/30 h-4 px-1.5 uppercase">
+                                {action.cta_type.replace(/_/g, " ")}
+                              </Badge>
+                            )}
+                            {/* Per-step edited indicator */}
+                            {action._edit_depth > 0 && (
+                                <Badge variant="outline" className="text-[8px] font-black text-emerald-500 border-emerald-500/30 h-4 px-1.5 gap-1">
+                                    <Edit2 className="h-2 w-2" /> {action._edit_depth}% Edited
+                                </Badge>
+                            )}
                           </div>
-                          <CopyButton text={action.content} label="Copy" />
+                          <CopyButton text={isEditingOutreach ? (editedOutreach.steps?.[i]?.draft || action.content) : action.content} label="Copy" />
                         </div>
-                        {action.email_subject && (
-                          <div className="flex items-center gap-2 mb-2 py-1.5 px-3 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">
-                            <span className="text-[9px] font-black text-zinc-400 uppercase">Sub:</span>
-                            <span className="text-[12px] font-bold text-zinc-900 dark:text-zinc-100">{action.email_subject}</span>
+                        {(action.email_subject || (isEditingOutreach && action.type === "email")) && (
+                          <div className="flex flex-col gap-1.5 mb-3 py-2 px-3 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">
+                            <span className="text-[9px] font-black text-zinc-400 uppercase">Subject:</span>
+                            {isEditingOutreach ? (
+                              <div className="space-y-2">
+                                <Input
+                                  value={editedOutreach.steps?.[i]?.email_subject || ""}
+                                  onChange={(e) => {
+                                    const newSteps = [...(editedOutreach.steps || [])];
+                                    if (newSteps[i]) newSteps[i] = { ...newSteps[i], email_subject: e.target.value };
+                                    setEditedOutreach((p: any) => ({ ...p, steps: newSteps }));
+                                  }}
+                                  className="h-8 text-[12px] font-bold bg-transparent border-primary/20 focus:border-primary/50"
+                                  placeholder="Enter email subject..."
+                                />
+                                <Input
+                                  value={editedOutreach.steps?.[i]?.preview_text || ""}
+                                  onChange={(e) => {
+                                    const newSteps = [...(editedOutreach.steps || [])];
+                                    if (newSteps[i]) newSteps[i] = { ...newSteps[i], preview_text: e.target.value };
+                                    setEditedOutreach((p: any) => ({ ...p, steps: newSteps }));
+                                  }}
+                                  className="h-7 text-[10px] bg-transparent border-primary/10 focus:border-primary/30 italic"
+                                  placeholder="Mobile preview text..."
+                                />
+                                {action.subject_line_variants?.length > 0 && (
+                                  <div className="pt-1 flex flex-wrap gap-2">
+                                    {action.subject_line_variants.map((v: string, idx: number) => (
+                                      <TooltipProvider key={idx}>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Badge 
+                                              variant="secondary" 
+                                              className="cursor-pointer bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 text-[8px] font-bold transition-colors"
+                                              onClick={() => {
+                                                const newSteps = [...(editedOutreach.steps || [])];
+                                                if (newSteps[i]) newSteps[i] = { ...newSteps[i], email_subject: v };
+                                                setEditedOutreach((p: any) => ({ ...p, steps: newSteps }));
+                                              }}
+                                            >
+                                              Use Alt {idx + 1}
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p className="text-[11px]">{v}</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                <span className="text-[12px] font-bold text-zinc-900 dark:text-zinc-100">
+                                  {selectedSubjectVariants[`var_${selectedVariantIndex}_step_${i}`] || action.email_subject}
+                                </span>
+                                {action.preview_text && (
+                                  <p className="text-[10px] text-zinc-400 font-medium italic truncate">
+                                    Preview: {action.preview_text}
+                                  </p>
+                                )}
+                                {action.subject_line_variants?.length > 0 && (
+                                  <div className="pt-1 flex flex-wrap gap-2">
+                                    {action.subject_line_variants.map((v: string, idx: number) => {
+                                      const isSelected = selectedSubjectVariants[`var_${selectedVariantIndex}_step_${i}`] === v;
+                                      return (
+                                        <TooltipProvider key={idx}>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Badge 
+                                                variant="secondary" 
+                                                className={cn(
+                                                  "cursor-pointer text-[8px] font-bold transition-colors",
+                                                  isSelected 
+                                                    ? "bg-primary/20 text-primary border border-primary/30" 
+                                                    : "bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100"
+                                                )}
+                                                onClick={() => {
+                                                  setSelectedSubjectVariants(prev => ({ 
+                                                    ...prev, 
+                                                    [`var_${selectedVariantIndex}_step_${i}`]: v 
+                                                  }));
+                                                  toast({
+                                                    title: "Subject Swapped",
+                                                    description: `Swapped to variant ${idx + 1}.`,
+                                                  });
+                                                }}
+                                              >
+                                                {isSelected ? `Active: Alt ${idx + 1}` : `Swap to Alt ${idx + 1}`}
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p className="text-[11px]">{v}</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                         {action.internal_note && (
                           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-tight mb-2">Note: {action.internal_note}</p>
                         )}
                         <div className="prose prose-zinc dark:prose-invert max-w-none text-[13px] leading-relaxed font-medium text-zinc-700 dark:text-zinc-300 italic border-l-2 border-primary/10 pl-3">
-                          <ReactMarkdown>{action.content}</ReactMarkdown>
+                          {isEditingOutreach ? (
+                            <div className="space-y-3">
+                              <Textarea
+                                value={editedOutreach.steps?.[i]?.draft || ""}
+                                onChange={(e) => {
+                                  const newSteps = [...(editedOutreach.steps || [])];
+                                  if (newSteps[i]) newSteps[i] = { ...newSteps[i], draft: e.target.value };
+                                  setEditedOutreach((p: any) => ({ ...p, steps: newSteps }));
+                                }}
+                                className="min-h-[120px] text-[13px] leading-relaxed resize-none bg-transparent border-primary/20 focus:border-primary/50"
+                                placeholder="Enter draft content..."
+                              />
+                              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                                <span className="text-[9px] font-black text-zinc-400 uppercase mb-1 block">P.S. Line:</span>
+                                <Input
+                                  value={editedOutreach.steps?.[i]?.ps_line || ""}
+                                  onChange={(e) => {
+                                    const newSteps = [...(editedOutreach.steps || [])];
+                                    if (newSteps[i]) newSteps[i] = { ...newSteps[i], ps_line: e.target.value };
+                                    setEditedOutreach((p: any) => ({ ...p, steps: newSteps }));
+                                  }}
+                                  className="h-8 text-[11px] bg-transparent border-primary/10 focus:border-primary/30 italic text-primary"
+                                  placeholder="Add a P.S. line..."
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <ReactMarkdown>{action.draft || action.content || ""}</ReactMarkdown>
+                              {action.ps_line && (
+                                <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-700/50">
+                                  <p className="text-[12px] font-bold text-primary italic">
+                                    <span className="text-[10px] uppercase tracking-widest mr-2 opacity-50">P.S.</span>
+                                    {action.ps_line}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1037,9 +1263,9 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                           value={action.title.toLowerCase().includes("subject") ? editedOutreach.email_subject : action.title.toLowerCase().includes("linkedin") ? editedOutreach.linkedin_message : editedOutreach.email_body}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (action.title.toLowerCase().includes("subject")) setEditedOutreach(p => ({ ...p, email_subject: val }));
-                            else if (action.title.toLowerCase().includes("linkedin")) setEditedOutreach(p => ({ ...p, linkedin_message: val }));
-                            else setEditedOutreach(p => ({ ...p, email_body: val }));
+                            if (action.title.toLowerCase().includes("subject")) setEditedOutreach((p: any) => ({ ...p, email_subject: val }));
+                            else if (action.title.toLowerCase().includes("linkedin")) setEditedOutreach((p: any) => ({ ...p, linkedin_message: val }));
+                            else setEditedOutreach((p: any) => ({ ...p, email_body: val }));
                           }}
                           className={cn("min-h-[100px] text-[13px] leading-relaxed resize-none", action.type === "email" ? "bg-zinc-800 border-zinc-700 text-zinc-100" : "")}
                         />
@@ -1065,6 +1291,11 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                           </div>
                           <span className={cn("text-[10px] font-black uppercase tracking-widest", action.type === "email" ? "text-zinc-400" : "text-zinc-500")}>{action.title}</span>
                           <Badge variant="outline" className="text-[8px] font-black text-amber-500 border-amber-500/30 h-4 px-1.5">CSO</Badge>
+                          {action._edit_depth > 0 && (
+                            <Badge variant="outline" className="text-[8px] font-black text-emerald-500 border-emerald-500/30 h-4 px-1.5 gap-1">
+                                <Edit2 className="h-2 w-2" /> {action._edit_depth}% Edited
+                            </Badge>
+                          )}
                         </div>
                         <CopyButton text={isEditingOutreach ? (action.type === "linkedin" ? editedStrategicOutreach.linkedin_message : editedStrategicOutreach.email_body) : action.content} />
                       </div>
@@ -1073,8 +1304,8 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                           value={action.type === "linkedin" ? editedStrategicOutreach.linkedin_message : editedStrategicOutreach.email_body}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (action.type === "linkedin") setEditedStrategicOutreach(p => ({ ...p, linkedin_message: val }));
-                            else setEditedStrategicOutreach(p => ({ ...p, email_body: val }));
+                            if (action.type === "linkedin") setEditedStrategicOutreach((p: any) => ({ ...p, linkedin_message: val }));
+                            else setEditedStrategicOutreach((p: any) => ({ ...p, email_body: val }));
                           }}
                           className={cn("min-h-[100px] text-[13px] leading-relaxed resize-none", action.type === "email" ? "bg-zinc-800 border-zinc-700 text-zinc-100" : "")}
                         />
@@ -1097,7 +1328,7 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                   <div className="space-y-1 flex-1 min-w-0">
                     <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Psychological Hook</span>
                     {isEditingOutreach ? (
-                      <Textarea value={editedOutreach.hook} onChange={(e) => setEditedOutreach(p => ({ ...p, hook: e.target.value }))}
+                      <Textarea value={editedOutreach.hook} onChange={(e) => setEditedOutreach((p: any) => ({ ...p, hook: e.target.value }))}
                         className="min-h-[60px] text-[13px] italic resize-none" placeholder="Strategic hook..." />
                     ) : (
                       <p className="text-[14px] font-black text-zinc-900 dark:text-white italic leading-snug">"{hook}"</p>
@@ -1633,6 +1864,35 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                 </div>
 
                 {/* Follow-up email — rendered separately below intent block */}
+                {data.intent_analysis.recommended_email && (
+                  <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600/70 flex items-center gap-1.5"><Mail className="h-3 w-3" /> Recommended Follow-up</span>
+                      {isEditingIntentEmail ? (
+                        <div className="flex gap-1.5">
+                          <Button size="sm" variant="ghost" onClick={() => { setIsEditingIntentEmail(false); setEditedIntentEmail(data.intent_analysis?.recommended_email ?? ""); }} disabled={isSavingIntentEmail} className="h-6 px-2 text-[9px] font-black uppercase gap-1">Cancel</Button>
+                          <Button size="sm" onClick={handleSaveIntentEmail} disabled={isSavingIntentEmail} className="h-6 px-2 text-[9px] font-black uppercase gap-1">{isSavingIntentEmail ? "Saving..." : "Save"}</Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => setIsEditingIntentEmail(true)} className="h-6 px-2 text-[9px] font-black uppercase text-zinc-400 gap-1"><Edit2 className="h-2.5 w-2.5" /> Edit</Button>
+                          <CopyButton text={data.intent_analysis.recommended_email} />
+                        </div>
+                      )}
+                    </div>
+                    {isEditingIntentEmail ? (
+                      <Textarea
+                        value={editedIntentEmail}
+                        onChange={(e) => setEditedIntentEmail(e.target.value)}
+                        className="min-h-[150px] text-[13px] leading-relaxed resize-none bg-emerald-500/10 border-emerald-500/20"
+                      />
+                    ) : (
+                      <div className="prose prose-zinc dark:prose-invert max-w-none text-[13px] leading-relaxed font-medium text-zinc-700 dark:text-zinc-300 italic border-l-2 border-emerald-500/20 pl-3">
+                        <ReactMarkdown>{data.intent_analysis.recommended_email}</ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Summary */}
                 {data.intent_analysis.summary && (

@@ -165,7 +165,7 @@ def get_graph():
     from agents.lead_scoring_agent import lead_data_extractor, lead_scorer
     from agents.report_agent import sales_research_report_generator
     from agents.intent_agent import email_history_fetcher_node, email_intent_analyzer_node
-    from agents.strategy_agent import pain_point_node, solution_node, outreach_node
+    from agents.strategy_agent import pain_point_node, outreach_node
     from agents.recommender_agent import strategic_recommender_node
     from agents.follow_up_agent import follow_up_strategy_node
     from agents.cso_agent import narrative_arbitrator_node
@@ -196,7 +196,6 @@ def get_graph():
     # Strategic Nodules
     builder.add_node("pain_point_discovery", pain_point_node)
     builder.add_node("strategic_rag_researcher", strategic_rag_researcher_node)
-    builder.add_node("solution_mapping", solution_node)
     builder.add_node("outreach_designer", outreach_node)
     builder.add_node("follow_up_designer", follow_up_strategy_node)
     builder.add_node("strategic_recommender", strategic_recommender_node)
@@ -208,7 +207,7 @@ def get_graph():
     builder.add_node("email_history_fetcher", email_history_fetcher_node)
     builder.add_node("email_intent_analyzer", email_intent_analyzer_node)
     builder.add_node("signal_waterfall", signal_waterfall_node)
-    builder.add_node("narrative_arbitrator", narrative_arbitrator_node)
+    builder.add_node("narrative_arbitrator", narrative_arbitrator_node, defer= True)
     builder.add_node("crm_lookup", crm_lookup_node)
 
     # Set entry point
@@ -245,15 +244,17 @@ def get_graph():
         "strategic_merger": "strategic_merger"
     })
     builder.add_edge("pain_point_discovery", "strategic_rag_researcher")
-    builder.add_edge("strategic_rag_researcher", "solution_mapping")
-    builder.add_edge("solution_mapping", "strategic_merger")
+    builder.add_edge("strategic_rag_researcher", "strategic_merger")
 
-    # Narrative Arbitrator (CSO) runs BEFORE sub-agents
-    builder.add_edge("strategic_merger", "narrative_arbitrator")
+    # Strategic Pre-Processing (Data Analysis -> CSO)
+    builder.add_edge("strategic_merger", "strategic_recommender")
+    builder.add_edge("strategic_merger", "email_intent_analyzer")
+    
+    # Narrative Arbitrator (CSO) waits for all intelligence
+    builder.add_edge("strategic_recommender", "narrative_arbitrator")
+    builder.add_edge("email_intent_analyzer", "narrative_arbitrator")
 
-    # Guided Parallel Execution
-    builder.add_edge("narrative_arbitrator", "strategic_recommender")
-    builder.add_edge("narrative_arbitrator", "email_intent_analyzer")
+    # Execution Layer (Sub-Agents)
     builder.add_conditional_edges("narrative_arbitrator", strategy_router, {
         "outreach_designer": "outreach_designer",
         "follow_up_strategy": "follow_up_designer"
@@ -262,8 +263,6 @@ def get_graph():
     # Convergence to Report
     builder.add_edge("outreach_designer", "report_generator")
     builder.add_edge("follow_up_designer", "report_generator")
-    builder.add_edge("strategic_recommender", "report_generator")
-    builder.add_edge("email_intent_analyzer", "report_generator")
 
     builder.add_edge("report_generator", END)
 
@@ -295,7 +294,6 @@ NODE_STATUS_MAPPING = {
     "email_history_fetcher": "Reviewing past email interactions...",
     "pain_point_discovery": "Identifying specific business pain points...",
     "strategic_rag_researcher": "Agentic RAG: Retrieving & verifying strategic playbooks...",
-    "solution_mapping": "Mapping verified solutions to lead profile...",
     "outreach_designer": "Designing personalized outreach strategy...",
     "follow_up_designer": "Crafting context-aware follow-up strategy...",
     "strategic_recommender": "Determining buyer journey stage & strategy...",

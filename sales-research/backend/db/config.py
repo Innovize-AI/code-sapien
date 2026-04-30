@@ -41,8 +41,13 @@ env = (os.getenv("ENVIRONMENT") or "staging").lower().strip() # Default to produ
 
 # Handle cases where Cloud Deploy placeholders are not resolved or env is missing
 if not DB_SCHEMA or DB_SCHEMA == "${db_schema}":
-    # Only use staging if explicitly requested
-    DB_SCHEMA = "staging" if env == "staging" else "public"
+    # Use environment-specific schema if not explicitly set
+    if env == "trial":
+        DB_SCHEMA = "trial"
+    elif env == "staging":
+        DB_SCHEMA = "staging"
+    else:
+        DB_SCHEMA = "public"
 
 logger.info(f"--- DB INITIALIZATION ---")
 logger.info(f"ENV: {env}")

@@ -7,6 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Book, Award } from "lucide-react";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { LINKEDIN_INDUSTRIES, JOB_TITLE_OPTIONS } from "@/lib/constants";
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -22,12 +24,12 @@ export interface ProductConfig {
     description: string;
     is_strategic_pivot: boolean;
     target_roles: string[];
+    target_industries: string[];
     attached_playbooks: string[];
     attached_case_studies: string[];
     relevant_files?: string[];
 }
 
-const COMMON_ROLES = ["Founder", "CEO", "CRO", "VP Sales", "Head of Growth", "CTO", "COO", "Director of Sales"];
 
 export function ProductModal({ isOpen, onClose, onSave, initialConfig, availableFiles, isAdmin }: ProductModalProps) {
     const [isSaving, setIsSaving] = useState(false);
@@ -37,6 +39,7 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
     const [description, setDescription] = useState(initialConfig?.description || "");
     const [isPivot, setIsPivot] = useState(initialConfig?.is_strategic_pivot || false);
     const [selectedRoles, setSelectedRoles] = useState<string[]>(initialConfig?.target_roles || []);
+    const [selectedIndustries, setSelectedIndustries] = useState<string[]>(initialConfig?.target_industries || []);
     const [selectedPlaybooks, setSelectedPlaybooks] = useState<string[]>(initialConfig?.attached_playbooks || []);
     const [selectedCaseStudies, setSelectedCaseStudies] = useState<string[]>(initialConfig?.attached_case_studies || []);
 
@@ -44,11 +47,6 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
     const playbooks = availableFiles.filter(f => f.type === 'playbooks');
     const caseStudies = availableFiles.filter(f => f.type === 'case-studies');
 
-    const handleRoleToggle = (role: string) => {
-        setSelectedRoles(prev =>
-            prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
-        );
-    };
 
     const handlePlaybookToggle = (fname: string) => {
         setSelectedPlaybooks(prev =>
@@ -71,6 +69,7 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                 description,
                 is_strategic_pivot: isPivot,
                 target_roles: selectedRoles,
+                target_industries: selectedIndustries,
                 attached_playbooks: selectedPlaybooks,
                 attached_case_studies: selectedCaseStudies,
                 relevant_files: [...selectedPlaybooks, ...selectedCaseStudies] // Sync for legacy
@@ -128,28 +127,25 @@ export function ProductModal({ isOpen, onClose, onSave, initialConfig, available
                         <Switch id="pivot-mode" checked={isPivot} onCheckedChange={setIsPivot} />
                     </div>
 
-                    {isPivot && (
-                        <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
-                            <Label className="mb-2">Target Roles (Who buys this?)</Label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {COMMON_ROLES.map(role => (
-                                    <div key={role} className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id={`role-${role}`}
-                                            checked={selectedRoles.includes(role)}
-                                            onCheckedChange={() => handleRoleToggle(role)}
-                                        />
-                                        <label
-                                            htmlFor={`role-${role}`}
-                                            className="text-sm cursor-pointer"
-                                        >
-                                            {role}
-                                        </label>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                    <div className="grid gap-4">
+                        <MultiSelect
+                            label="Target Roles"
+                            options={JOB_TITLE_OPTIONS}
+                            value={selectedRoles}
+                            onChange={setSelectedRoles}
+                            placeholder="Select roles..."
+                            allowCustom
+                        />
+
+                        <MultiSelect
+                            label="Target Industries"
+                            options={LINKEDIN_INDUSTRIES}
+                            value={selectedIndustries}
+                            onChange={setSelectedIndustries}
+                            placeholder="Select industries..."
+                            allowCustom
+                        />
+                    </div>
 
                     {/* Asset Linking */}
                     <div className="space-y-4">

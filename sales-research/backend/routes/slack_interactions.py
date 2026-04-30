@@ -40,16 +40,24 @@ async def handle_slack_interactions(
         action_id = action.get("action_id")
         linkedin_url = action.get("value")
 
-        # Resolve User ID from Slack ID
+        # Resolve User ID and Org ID from Slack ID
         slack_user_id = data.get("user", {}).get("id")
         internal_user_id = None
+        org_id = None
         if slack_user_id:
             try:
-                result = await db.execute(select(UserSettings).where(UserSettings.slack_user_id == slack_user_id))
-                user_settings = result.scalars().first()
-                if user_settings:
-                    internal_user_id = str(user_settings.user_id)
-                    logger.debug(f"Resolved Slack User {slack_user_id} to Internal User {internal_user_id}")
+                from db.models import Profile
+                stmt = (
+                    select(UserSettings.user_id, Profile.organization_id)
+                    .join(Profile, UserSettings.user_id == Profile.id)
+                    .where(UserSettings.slack_user_id == slack_user_id)
+                )
+                result = await db.execute(stmt)
+                row = result.first()
+                if row:
+                    internal_user_id = str(row.user_id)
+                    org_id = row.organization_id
+                    logger.debug(f"Resolved Slack User {slack_user_id} to Internal User {internal_user_id}, Org {org_id}")
                 else:
                     logger.debug(f"No internal user found for Slack User {slack_user_id}")
             except Exception as e:
@@ -87,7 +95,7 @@ async def handle_slack_interactions(
                 )
             
             # 2. Start research in background (run_single_research handles internal locking too)
-            background_tasks.add_task(run_single_research, linkedin_url=norm_url, user_id=internal_user_id)
+            background_tasks.add_task(run_single_research, linkedin_url=norm_url, user_id=internal_user_id, org_id=org_id)
         
         elif action_id == "ignore_lead":
             if response_url:

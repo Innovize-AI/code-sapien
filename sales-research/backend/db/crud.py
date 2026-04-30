@@ -14,26 +14,42 @@ from db.schemas import ResearchReportCreate, LeadSubmissionCreate, OrganizationS
 from utils.url_normalize import normalize_linkedin_url
 from uuid import UUID
 
-async def get_active_icp(db: AsyncSession, user_id: UUID | str | None = None) -> dict | None:
+async def get_active_icp(db: AsyncSession, user_id: UUID | str | None = None, org_id: UUID | str | None = None) -> dict | None:
     """
     Fetches the active ICP. 
     1. If user_id is provided, checks UserSettings for a personal override.
-    2. Falls back to OrganizationSettings.
+    2. Falls back to OrganizationSettings by org_id.
     """
     # 1. Check for User Override
     if user_id:
         try:
-            # Convert string to UUID if needed for the query
             u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
             result = await db.execute(select(UserSettings).where(UserSettings.user_id == u_id))
             u_settings = result.scalars().first()
             if u_settings and u_settings.icp_json:
                 return json.loads(u_settings.icp_json)
         except Exception as e:
-            logger.warning(f"Error fetching personal ICP override for user {user_id}: {e}")
+            logger.warning(f"Error fetching personal ICP override: {e}")
 
-    # 2. Fallback to Organization Global Settings
-    result = await db.execute(select(OrganizationSettings).limit(1))
+    # 2. Fallback to Organization Settings
+    query = select(OrganizationSettings)
+    conditions = []
+    if org_id:
+        o_id = UUID(str(org_id)) if isinstance(org_id, str) else org_id
+        conditions.append(OrganizationSettings.organization_id == o_id)
+    if user_id:
+        u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+        conditions.append(OrganizationSettings.owner_id == u_id)
+    
+    if conditions:
+        query = query.where(or_(*conditions))
+        # Prioritize Org-linked, then Owner-linked
+        query = query.order_by(desc(OrganizationSettings.organization_id), desc(OrganizationSettings.owner_id))
+    else:
+        # Final fallback: orphaned settings
+        query = query.where(and_(OrganizationSettings.organization_id == None, OrganizationSettings.owner_id == None))
+    
+    result = await db.execute(query.limit(1))
     settings = result.scalars().first()
     if settings and settings.icp_json:
         try:
@@ -257,7 +273,7 @@ async def batch_upsert(
 
     return results
 
-async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
+async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict], user_id: str = None, org_id: str = None):
     """
     leads: List of dicts with keys: linkedin_url, name, comment, source_post, source_post_url, competitor
     """
@@ -530,6 +546,8 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "touchpoint_count": tp_count,
                 "last_interaction_at": now,
                 "company_id": data.get("company_id") or p.company_id,
+                "organization_id": p.organization_id or org_id,
+                "created_by_id": p.created_by_id or user_id,
                 "profile_metadata": json.dumps({
                     **(json.loads(p.profile_metadata or "{}") if isinstance(p.profile_metadata, str) else (p.profile_metadata or {})),
                     **(data.get("profile_metadata") or {})
@@ -594,7 +612,9 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
                 "last_interaction_at": now,
                 "company_id": data.get("company_id"),
                 "profile_metadata": json.dumps(data.get("profile_metadata") or {}),
-                "normalized_linkedin_url": url
+                "normalized_linkedin_url": url,
+                "created_by_id": user_id,
+                "organization_id": org_id
             })
 
     if upsert_rows:
@@ -604,7 +624,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
             IdentifiedProfile.__table__,
             upsert_rows,
             conflict_cols=["linkedin_url"],
-            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "lead_source", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "email_verification_status", "profile_metadata", "normalized_linkedin_url"],
+            update_cols=["name", "headline", "is_fit", "is_competitor", "is_decision_maker", "fit_reasoning", "intent", "sentiment", "post_topic_depth", "lead_source", "comment_history", "source_posts", "interaction_history", "touchpoint_count", "last_interaction_at", "company_id", "email", "email_verification_status", "profile_metadata", "normalized_linkedin_url", "organization_id", "created_by_id"],
             chunk_size=100
         )
         logger.info(f"DEBUG: Batch upsert executed. Results count: {len(results)}")
@@ -612,7 +632,7 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict]):
     
     return []
 
-async def upsert_identified_profile(db: AsyncSession, profile_data: dict, company_id: UUID | None = None):
+async def upsert_identified_profile(db: AsyncSession, profile_data: dict, company_id: UUID | None = None, user_id: str = None, org_id: str = None):
     """
     profile_data: {
         "linkedin_url": str,
@@ -699,7 +719,9 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict, compan
             touchpoint_count=tp_count,
             last_interaction_at=datetime.datetime.now(datetime.timezone.utc),
             company_id=company_id,
-            normalized_linkedin_url=normalize_linkedin_url(profile_data["linkedin_url"])
+            normalized_linkedin_url=normalize_linkedin_url(profile_data["linkedin_url"]),
+            created_by_id=user_id,
+            organization_id=org_id
         )
         db.add(db_profile)
     
@@ -707,7 +729,7 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict, compan
     await db.refresh(db_profile)
     return db_profile
 
-async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100, search_query: str = None, user_id: str = None):
+async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 100, search_query: str = None, user_id: str = None, org_id: str = None):
     # Sort by number of touchpoints (length of source_posts array)
     from sqlalchemy.dialects.postgresql import JSONB
     
@@ -721,7 +743,9 @@ async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 
         Company, IdentifiedProfile.company_id == Company.id
     )
     
-    if user_id:
+    if org_id:
+        query = query.where(IdentifiedProfile.organization_id == org_id)
+    elif user_id:
         query = query.where(or_(IdentifiedProfile.created_by_id == user_id, IdentifiedProfile.created_by_id.is_(None)))
     
     if search_query:
@@ -756,8 +780,13 @@ async def get_identified_profiles(db: AsyncSession, skip: int = 0, limit: int = 
         
     return profiles
 
-async def count_identified_profiles(db: AsyncSession, search_query: str = None):
+async def count_identified_profiles(db: AsyncSession, search_query: str = None, user_id: str = None, org_id: str = None):
     query = select(func.count()).select_from(IdentifiedProfile)
+    
+    if org_id:
+        query = query.where(IdentifiedProfile.organization_id == org_id)
+    elif user_id:
+        query = query.where(or_(IdentifiedProfile.created_by_id == user_id, IdentifiedProfile.created_by_id.is_(None)))
     if search_query:
         search = f"%{search_query}%"
         query = query.where(
@@ -771,14 +800,17 @@ async def count_identified_profiles(db: AsyncSession, search_query: str = None):
     result = await db.execute(query)
     return result.scalar()
 
-async def save_report(db: AsyncSession, report_data: ResearchReportCreate, user_id: str = None):
+async def save_report(db: AsyncSession, report_data: ResearchReportCreate, user_id: str = None, org_id: str = None):
     data = report_data.model_dump()
     if 'linkedin_url' in data and data['linkedin_url']:
         data['normalized_linkedin_url'] = normalize_linkedin_url(data['linkedin_url'])
     db_report = ResearchReport(**data)
+    if org_id:
+        import uuid
+        db_report.organization_id = uuid.UUID(str(org_id)) if isinstance(org_id, str) else org_id
     if user_id:
         import uuid
-        db_report.created_by_id = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        db_report.created_by_id = uuid.UUID(str(user_id)) if isinstance(user_id, str) else user_id
     db.add(db_report)
     await db.commit()
     await db.refresh(db_report)
@@ -814,7 +846,7 @@ async def delete_user_icp_override(db: AsyncSession, user_id: str):
         return True
     return False
 
-async def get_report_by_email_or_linkedin(db: AsyncSession, email_id: str = None, linkedin_url: str = None):
+async def get_report_by_email_or_linkedin(db: AsyncSession, email_id: str = None, linkedin_url: str = None, user_id: str = None, org_id: str = None):
     if not email_id and not linkedin_url:
         return None
     
@@ -830,13 +862,21 @@ async def get_report_by_email_or_linkedin(db: AsyncSession, email_id: str = None
             func.trim(func.split_part(ResearchReport.linkedin_url, '?', 1), '/') == func.trim(func.split_part(normalized_li, '?', 1), '/')
         ))
         
-    query = select(ResearchReport).where(or_(*conditions)).order_by(desc(ResearchReport.created_at)).limit(1)
+    query = select(ResearchReport).where(or_(*conditions))
+    if org_id:
+        query = query.where(ResearchReport.organization_id == org_id)
+    elif user_id:
+        query = query.where(ResearchReport.created_by_id == user_id)
+        
+    query = query.order_by(desc(ResearchReport.created_at)).limit(1)
     result = await db.execute(query)
     return result.scalar_one_or_none()
 
-async def get_history(db: AsyncSession, skip: int = 0, limit: int = 100, user_id: str = None):
+async def get_history(db: AsyncSession, skip: int = 0, limit: int = 100, user_id: str = None, org_id: str = None):
     query = select(ResearchReport)
-    if user_id:
+    if org_id:
+        query = query.where(ResearchReport.organization_id == org_id)
+    elif user_id:
         query = query.where(ResearchReport.created_by_id == user_id)
     query = query.order_by(desc(ResearchReport.created_at)).offset(skip).limit(limit)
     result = await db.execute(query)
@@ -868,20 +908,47 @@ async def update_report_outreach(db: AsyncSession, report_id: str, outreach_data
                         if isinstance(val, str) and key != "_edit_depths":
                             field_mod = _calculate_text_modification_percentage(str(orig_data.get(key, "")), val)
                             edit_depths[key] = max(existing_depths.get(key, 0), field_mod)
+                        elif key == "steps" and isinstance(val, list):
+                            # Special handling for sequence steps
+                            orig_steps = orig_data.get("steps", [])
+                            if isinstance(orig_steps, list):
+                                for idx, step in enumerate(val):
+                                    if idx < len(orig_steps):
+                                        orig_content = str(orig_steps[idx].get("content", "") or orig_steps[idx].get("draft", ""))
+                                        upd_content = str(step.get("draft", "") or step.get("content", ""))
+                                        step_mod = _calculate_text_modification_percentage(orig_content, upd_content)
+                                        step["_edit_depth"] = max(orig_steps[idx].get("_edit_depth", 0), step_mod)
+                                        if step_mod > 5: # Threshold for "edited"
+                                            edit_depths["steps"] = max(edit_depths.get("steps", 0), step_mod)
             else:
                 orig_data = _safe_deserialize(db_report.personalized_outreach) or {}
                 if isinstance(orig_data, dict):
                     mod_pct = _calculate_json_modification_percentage(orig_data, outreach_data)
                     existing_depths = orig_data.get("_edit_depths", {})
+                    outreach_data["_edit_depth"] = max(orig_data.get("_edit_depth", 0), mod_pct)
                     for key, val in outreach_data.items():
-                        if isinstance(val, str) and key != "_edit_depths":
+                        if isinstance(val, str) and key != "_edit_depths" and key != "_edit_depth":
                             field_mod = _calculate_text_modification_percentage(str(orig_data.get(key, "")), val)
                             edit_depths[key] = max(existing_depths.get(key, 0), field_mod)
+                        elif key == "steps" and isinstance(val, list):
+                             # Special handling for single-touch sequence
+                            orig_steps = orig_data.get("steps", [])
+                            if isinstance(orig_steps, list):
+                                for idx, step in enumerate(val):
+                                    if idx < len(orig_steps):
+                                        orig_content = str(orig_steps[idx].get("content", "") or orig_steps[idx].get("draft", ""))
+                                        upd_content = str(step.get("draft", "") or step.get("content", ""))
+                                        step_mod = _calculate_text_modification_percentage(orig_content, upd_content)
+                                        step["_edit_depth"] = max(orig_steps[idx].get("_edit_depth", 0), step_mod)
+                                        if step_mod > 5:
+                                            edit_depths["steps"] = max(edit_depths.get("steps", 0), step_mod)
                 else:
                     mod_pct = _calculate_text_modification_percentage(str(orig_data), str(outreach_data))
             
             db_report.is_outreach_edited = True
             db_report.edit_depth_percentage = max(db_report.edit_depth_percentage or 0, mod_pct)
+            if edit_depths:
+                db_report.edit_depth_percentage = max(db_report.edit_depth_percentage, max(edit_depths.values()))
             
             # If manually editing, consider outreach "in_progress" or "completed"
             if db_report.outreach_status == 'not_started':
@@ -946,6 +1013,7 @@ async def update_report_cso_outreach(db: AsyncSession, report_id: str, cso_data:
                     "refined_linkedin_message": max(existing_depths.get("refined_linkedin_message", 0), mod_pct_li),
                     "refined_email_body": max(existing_depths.get("refined_email_body", 0), mod_pct_email)
                 }
+                current_cso["_edit_depth"] = max(current_cso.get("_edit_depth", 0), avg_mod)
                 
                 if db_report.outreach_status == 'not_started':
                     db_report.outreach_status = 'in_progress'
@@ -987,6 +1055,9 @@ async def update_report_intent_email(db: AsyncSession, report_id: str, email_tex
             intent_data = json.loads(db_report.intent_analysis) if db_report.intent_analysis else {}
             intent_data['recommended_email'] = email_text
             db_report.intent_analysis = json.dumps(intent_data)
+            db_report.is_outreach_edited = True
+            # For intent email, we assume a decent amount of modification if they are saving it
+            db_report.edit_depth_percentage = max(db_report.edit_depth_percentage or 0, 5) 
             await db.commit()
             await db.refresh(db_report)
             return db_report
@@ -1095,8 +1166,10 @@ async def get_competitor_analyses(db: AsyncSession, skip: int = 0, limit: int = 
     result = await db.execute(query)
     return result.scalars().all()
 
-async def create_competitor(db: AsyncSession, competitor_data: dict, user_id: str = None):
+async def create_competitor(db: AsyncSession, competitor_data: dict, user_id: str = None, org_id: str = None):
     db_competitor = Competitor(**competitor_data)
+    if org_id:
+        db_competitor.organization_id = org_id
     if user_id:
         db_competitor.created_by_id = user_id
     db.add(db_competitor)
@@ -1112,11 +1185,13 @@ async def create_competitor(db: AsyncSession, competitor_data: dict, user_id: st
             
     return db_competitor
 
-async def get_competitors(db: AsyncSession, user_id: str = None):
+async def get_competitors(db: AsyncSession, user_id: str = None, org_id: str = None):
     query = select(Competitor, func.coalesce(Profile.full_name, Profile.email).label("creator_name")).outerjoin(
         Profile, Competitor.created_by_id == Profile.id
     )
-    if user_id:
+    if org_id:
+        query = query.where(Competitor.organization_id == org_id)
+    elif user_id:
         query = query.where(Competitor.created_by_id == user_id)
     query = query.order_by(desc(Competitor.created_at))
     result = await db.execute(query)
@@ -1138,7 +1213,7 @@ async def delete_competitor(db: AsyncSession, competitor_id: str):
         return True
     return False
 
-async def create_activity(db: AsyncSession, type: str, title: str, description: str = None, metadata_json: str = None, intent: str = None, sentiment: str = None, user_id: str = None, idempotency_key: str = None):
+async def create_activity(db: AsyncSession, type: str, title: str, description: str = None, metadata_json: str = None, intent: str = None, sentiment: str = None, user_id: str = None, org_id: str = None, idempotency_key: str = None):
     from sqlalchemy.dialects.postgresql import insert
     
     stmt = insert(Activity).values(
@@ -1149,7 +1224,8 @@ async def create_activity(db: AsyncSession, type: str, title: str, description: 
         intent=intent,
         sentiment=sentiment,
         idempotency_key=idempotency_key,
-        created_by_id=user_id
+        created_by_id=user_id,
+        organization_id=org_id
     )
     
     # If idempotency_key exists and conflicts, do nothing (prevents duplicates)
@@ -1170,11 +1246,13 @@ async def delete_activity_by_key(db: AsyncSession, idempotency_key: str):
     await db.commit()
     return True
 
-async def get_activities(db: AsyncSession, limit: int = 50, user_id: str = None):
+async def get_activities(db: AsyncSession, limit: int = 50, user_id: str = None, org_id: str = None):
     query = select(Activity, func.coalesce(Profile.full_name, Profile.email).label("creator_name")).outerjoin(
         Profile, Activity.created_by_id == Profile.id
     )
-    if user_id:
+    if org_id:
+        query = query.where(Activity.organization_id == org_id)
+    elif user_id:
         query = query.where(Activity.created_by_id == user_id)
     query = query.order_by(desc(Activity.created_at)).limit(limit)
     result = await db.execute(query)
@@ -1186,8 +1264,10 @@ async def get_activities(db: AsyncSession, limit: int = 50, user_id: str = None)
     return activities
 
 # Autopilot Rules CRUD
-async def create_autopilot_rule(db: AsyncSession, rule_data: dict, user_id: str = None):
+async def create_autopilot_rule(db: AsyncSession, rule_data: dict, user_id: str = None, org_id: str = None):
     db_rule = AutopilotRule(**rule_data)
+    if org_id:
+        db_rule.organization_id = org_id
     if user_id:
         db_rule.created_by_id = user_id
     db.add(db_rule)
@@ -1203,10 +1283,15 @@ async def create_autopilot_rule(db: AsyncSession, rule_data: dict, user_id: str 
             
     return db_rule
 
-async def get_autopilot_rules(db: AsyncSession, rule_type: str = None):
+async def get_autopilot_rules(db: AsyncSession, rule_type: str = None, user_id: str = None, org_id: str = None):
     query = select(AutopilotRule, func.coalesce(Profile.full_name, Profile.email).label("creator_name")).outerjoin(
         Profile, AutopilotRule.created_by_id == Profile.id
     )
+    if org_id:
+        query = query.where(AutopilotRule.organization_id == org_id)
+    elif user_id:
+        query = query.where(AutopilotRule.created_by_id == user_id)
+        
     if rule_type:
         query = query.where(AutopilotRule.type == rule_type)
     query = query.where(AutopilotRule.is_active == True).order_by(desc(AutopilotRule.created_at))
@@ -1229,8 +1314,25 @@ async def delete_autopilot_rule(db: AsyncSession, rule_id: str):
         return True
     return False
 
-async def get_org_settings(db: AsyncSession):
-    result = await db.execute(select(OrganizationSettings).limit(1))
+async def get_org_settings(db: AsyncSession, user_id: UUID | str | None = None, org_id: UUID | str | None = None):
+    query = select(OrganizationSettings)
+    conditions = []
+    if org_id:
+        o_id = UUID(str(org_id)) if isinstance(org_id, str) else org_id
+        conditions.append(OrganizationSettings.organization_id == o_id)
+    if user_id:
+        u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+        conditions.append(OrganizationSettings.owner_id == u_id)
+    
+    if conditions:
+        query = query.where(or_(*conditions))
+        # Prioritize Org-linked, then Owner-linked
+        query = query.order_by(desc(OrganizationSettings.organization_id), desc(OrganizationSettings.owner_id))
+    else:
+        # Final fallback: orphaned settings
+        query = query.where(and_(OrganizationSettings.organization_id == None, OrganizationSettings.owner_id == None))
+    
+    result = await db.execute(query.limit(1))
     return result.scalars().first()
 
 # CRM Context CRUD

@@ -175,8 +175,6 @@ export function DiscoveryForm({
       source_post_url?: string;
     }[]
   >([]);
-  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
-  const [refreshAll, setRefreshAll] = useState(false);
   const [existingReports, setExistingReports] = useState<Record<string, any>>(
     {},
   );
@@ -187,9 +185,15 @@ export function DiscoveryForm({
   >([]);
   // SSE Listener for Real-Time Updates
   useEffect(() => {
-    const eventSource = new EventSource(
-      `${API_URL}/api/competitor-analysis/events/classification`,
-    );
+    const token = typeof window !== 'undefined' ? localStorage.getItem("accessToken") : null;
+    const sseUrl = `${API_URL}/api/competitor-analysis/events/classification${token ? `?token_query=${token}` : ""}`;
+    
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onerror = (err) => {
+      console.error("SSE Error in DiscoveryForm:", err);
+      eventSource.close();
+    };
 
     eventSource.onmessage = (event) => {
       try {
@@ -197,24 +201,36 @@ export function DiscoveryForm({
         if (data.type === "classification_update" && data.leads) {
           setResults((prevResults) => {
             // Create a map for faster lookup (using normalized URLs)
-            const updatesMap = new Map<string, any>(
-              data.leads.map((l: any) => [normalizeUrl(l.linkedin_url), l]),
-            );
+            const updatesMap = new Map<string, any>();
+            data.leads.forEach((l: any) => {
+              if (l.linkedin_url) updatesMap.set(normalizeUrl(l.linkedin_url), l);
+              if (l.old_linkedin_url) updatesMap.set(normalizeUrl(l.old_linkedin_url), l);
+            });
 
             return prevResults.map((lead) => {
               const leadNorm = normalizeUrl(lead.url);
               const update = updatesMap.get(leadNorm);
               if (update) {
+                // If the update provides a better URL (e.g. real LI instead of apollo_id), use it
+                const newUrl = (update.linkedin_url && !update.linkedin_url.startsWith('apollo_id:')) 
+                  ? update.linkedin_url 
+                  : lead.url;
+
                 return {
                   ...lead,
-                  name: lead.name || update.name, // Update name if missing
+                  url: newUrl,
+                  name: lead.name || update.name,
                   metadata: {
                     ...lead.metadata,
-                    is_fit: update.is_fit,
-                    is_competitor: update.is_competitor,
-                    is_decision_maker: update.is_decision_maker,
-                    fit_reasoning: update.fit_reasoning,
-                    apollo_id: update.apollo_id || lead.metadata?.apollo_id
+                    is_fit: update.is_fit !== undefined ? update.is_fit : lead.metadata?.is_fit,
+                    is_competitor: update.is_competitor !== undefined ? update.is_competitor : lead.metadata?.is_competitor,
+                    is_decision_maker: update.is_decision_maker !== undefined ? update.is_decision_maker : lead.metadata?.is_decision_maker,
+                    is_buy_signal: update.is_buy_signal !== undefined ? update.is_buy_signal : lead.metadata?.is_buy_signal,
+                    is_strategic_seller: update.is_strategic_seller !== undefined ? update.is_strategic_seller : lead.metadata?.is_strategic_seller,
+                    fit_reasoning: update.fit_reasoning || lead.metadata?.fit_reasoning,
+                    apollo_id: update.apollo_id || lead.metadata?.apollo_id,
+                    intent: update.intent || lead.metadata?.intent,
+                    sentiment: update.sentiment || lead.metadata?.sentiment
                   },
                 };
               }
@@ -245,35 +261,6 @@ export function DiscoveryForm({
     load();
   }, []);
   
-  const handleEnrich = async (personIds: string[]) => {
-    if (isLoading || personIds.length === 0) return [];
-    
-    setIsLoading(true);
-    try {
-      const data = await enrichLeads(personIds);
-      if (data.leads) {
-        setResults(prev => prev.map(lead => {
-          const enriched = data.leads.find((l: any) => l.metadata?.apollo_id === lead.metadata?.apollo_id);
-          if (enriched) {
-            return {
-              ...lead,
-              ...enriched,
-              is_enriched: true
-            };
-          }
-          return lead;
-        }));
-        return data.leads as any[];
-      }
-      return [];
-    } catch (err) {
-      console.error("Enrichment failed:", err);
-      setError("Failed to enrich leads.");
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const findForm = useForm<FindFormValues>({
     resolver: zodResolver(findFormSchema),
@@ -305,19 +292,6 @@ export function DiscoveryForm({
     },
   });
 
-  const toggleUrl = (url: string) => {
-    setSelectedUrls((prev) =>
-      prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url],
-    );
-  };
-
-  const selectAll = () => {
-    if (selectedUrls.length === results.length && results.length > 0) {
-      setSelectedUrls([]);
-    } else {
-      setSelectedUrls(results.map((r) => r.url));
-    }
-  };
 
   // Keyword logic
   const handleAddKeyword = (currentDetails: string | undefined) => {
@@ -360,7 +334,6 @@ export function DiscoveryForm({
     setIsLoading(true);
     setError(null);
     setResults([]);
-    setSelectedUrls([]);
     setExistingReports({}); // Clear existing reports on new search
     try {
       if (values.provider === "competitor") {
@@ -1127,104 +1100,9 @@ export function DiscoveryForm({
           <div className="flex items-center gap-4">
             <h3 className="text-lg font-medium">Results</h3>
             {results.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAll}
-                className="h-8 gap-2"
-              >
-                {selectedUrls.length === results.length ? (
-                  <CheckSquare className="w-4 h-4" />
-                ) : (
-                  <Square className="w-4 h-4" />
-                )}
-                <span className="text-xs uppercase tracking-wider font-semibold">
-                  Select All
-                </span>
-              </Button>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              {results.length} found
-            </span>
-            {selectedUrls.length > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-full border mr-2">
-                  <Checkbox
-                    id="refresh-all"
-                    checked={refreshAll}
-                    onCheckedChange={(checked) => setRefreshAll(!!checked)}
-                  />
-                  <label
-                    htmlFor="refresh-all"
-                    className="text-[10px] font-medium cursor-pointer"
-                  >
-                    Re-run All
-                  </label>
-                </div>
-                {selectedUrls.length > 0 && results.some(r => selectedUrls.includes(r.url) && r.is_enriched === false) && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center gap-2"
-                    onClick={() => {
-                      const idsToEnrich = results
-                        .filter(r => selectedUrls.includes(r.url) && r.is_enriched === false)
-                        .map(r => r.metadata?.apollo_id)
-                        .filter(Boolean);
-                      handleEnrich(idsToEnrich);
-                    }}
-                    disabled={isLoading}
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-500" />
-                    Enrich Selected
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  disabled={isLoading}
-                  onClick={async () => {
-                    if (onBulkSelect) {
-                      const currentSelectedUrls = [...selectedUrls];
-                      const selectedLeads = results.filter((r) =>
-                        currentSelectedUrls.includes(r.url),
-                      );
-                      
-                      const unenrichedIds = selectedLeads
-                        .filter(r => r.is_enriched === false)
-                        .map(r => r.metadata?.apollo_id)
-                        .filter(Boolean);
-
-                      if (unenrichedIds.length > 0) {
-                        // Automatically enrich before analysis
-                        const enrichedResults = await handleEnrich(unenrichedIds);
-                        
-                        // Combine already enriched leads with newly enriched ones
-                        const alreadyEnrichedLeads = selectedLeads.filter(r => r.is_enriched !== false);
-                        const validNewLeads = enrichedResults.filter((l: any) => l.url && !l.url.startsWith('apollo_id:'));
-                        
-                        const allValidLeads = [...alreadyEnrichedLeads, ...validNewLeads];
-                        
-                        if (allValidLeads.length > 0) {
-                          onBulkSelect(allValidLeads, { refresh: refreshAll });
-                        }
-                      } else {
-                        onBulkSelect(selectedLeads, { refresh: refreshAll });
-                      }
-                      
-                      setSelectedUrls([]); // Clear selection to allow new additions immediately
-                      setRefreshAll(false);
-                    }
-                  }}
-                >
-                  {isLoading ? (
-                    <Spinner size="md" />
-                  ) : (
-                    `Analyze Selected (${selectedUrls.length})`
-                  )}
-                </Button>
-              </div>
+              <span className="text-sm text-muted-foreground">
+                {results.length} found
+              </span>
             )}
           </div>
         </div>
@@ -1241,11 +1119,6 @@ export function DiscoveryForm({
                   className={`overflow-hidden transition-colors ${status === "completed" ? "border-green-500/50 bg-green-50/10" : "hover:border-primary/50"}`}
                 >
                   <CardContent className="p-4 flex items-start gap-4">
-                    <Checkbox
-                      checked={selectedUrls.includes(lead.url)}
-                      onCheckedChange={() => toggleUrl(lead.url)}
-                      className="mt-1"
-                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1267,14 +1140,6 @@ export function DiscoveryForm({
                             </a>
                           )}
                           <div className="flex flex-wrap gap-1.5 ml-2">
-                            {lead.is_enriched === false && (
-                              <Badge 
-                                variant="outline" 
-                                className="text-[8px] h-3.5 px-1 py-0 uppercase tracking-tighter font-bold bg-amber-50 text-amber-700 border-amber-200"
-                              >
-                                Apollo Locked
-                              </Badge>
-                            )}
                             {status === "analyzing" && (
                               <Badge
                                 variant="secondary"
@@ -1295,6 +1160,10 @@ export function DiscoveryForm({
                             {!lead.metadata?.fit_reasoning &&
                               !lead.metadata?.is_fit &&
                               !lead.metadata?.is_competitor &&
+                              !lead.metadata?.is_buy_signal &&
+                              !lead.metadata?.is_strategic_seller &&
+                              !lead.metadata?.intent &&
+                              !lead.metadata?.sentiment &&
                               status !== "analyzing" &&
                               status !== "pending" && (
                                 <Badge
@@ -1329,6 +1198,22 @@ export function DiscoveryForm({
                                 Decision Maker
                               </Badge>
                             )}
+                            {lead.metadata?.is_buy_signal && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] h-4 px-1 bg-violet-50 text-violet-700 border-violet-200"
+                              >
+                                Buy Signal
+                              </Badge>
+                            )}
+                            {lead.metadata?.is_strategic_seller && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] h-4 px-1 bg-zinc-50 text-zinc-700 border-zinc-200"
+                              >
+                                Strategic Seller
+                              </Badge>
+                            )}
                             {lead.metadata?.competitor && (
                               <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground shrink-0 border border-muted-foreground/10">
                                 vs {lead.metadata.competitor}
@@ -1337,39 +1222,6 @@ export function DiscoveryForm({
                           </div>
                         </div>
 
-                        {lead.is_enriched === false ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-[10px] px-2 ml-2 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors shrink-0 gap-1.5"
-                            onClick={() => handleEnrich([lead.metadata?.apollo_id].filter(Boolean) as string[])}
-                            disabled={isLoading}
-                          >
-                            <Zap className="w-3 h-3 text-amber-500" />
-                            Unlock Profile
-                          </Button>
-                        ) : status === "completed" && onSelect && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs px-2 ml-2 hover:bg-primary/5 hover:text-primary transition-colors shrink-0"
-                            onClick={() => {
-                              const leadNorm = normalizeUrl(lead.url);
-                              const leadResult = leadsStatus?.find(
-                                (s) => normalizeUrl(s.url) === leadNorm,
-                              );
-                              if (leadResult && leadResult.result) {
-                                onSelect({
-                                  ...lead,
-                                  result: leadResult.result,
-                                });
-                              }
-                            }}
-                          >
-                            <ExternalLink className="w-3 h-3 mr-1.5" />
-                            View Report
-                          </Button>
-                        )}
                       </div>
 
                       <div className="text-xs font-semibold text-primary truncate mt-0.5">
@@ -1462,61 +1314,6 @@ export function DiscoveryForm({
                         <p className="text-[10px] text-primary/80 mt-1 line-clamp-1 group-hover:line-clamp-none transition-all">
                           <strong>AI Insight:</strong> {lead.fit_reasoning}
                         </p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      {lead.fit_score !== undefined && (
-                        <div
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            lead.fit_score >= 8
-                              ? "bg-green-100 text-green-700 border-green-200"
-                              : lead.fit_score >= 5
-                                ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                                : "bg-red-100 text-red-700 border-red-200"
-                          }`}
-                        >
-                          Fit: {lead.fit_score}/10
-                        </div>
-                      )}
-
-                      {status === "analyzing" ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Spinner size="sm" />
-                          Analyzing
-                        </div>
-                      ) : status === "completed" ||
-                        existingReports[normalizeUrl(lead.url)] ? (
-                        (() => {
-                          const existingData =
-                            existingReports[normalizeUrl(lead.url)]?.data;
-                          const sessionResult = leadsStatus?.find(
-                            (s) => s.url === lead.url,
-                          )?.result;
-                          const finalResult = sessionResult || existingData;
-
-                          return (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-green-200 hover:bg-green-100 bg-green-50/50 text-green-700 font-bold gap-2"
-                              onClick={() =>
-                                onSelect &&
-                                onSelect({ ...lead, result: finalResult })
-                              }
-                            >
-                              View Report
-                            </Button>
-                          );
-                        })()
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onSelect && onSelect(lead)}
-                        >
-                          Analyze
-                        </Button>
                       )}
                     </div>
                   </CardContent>

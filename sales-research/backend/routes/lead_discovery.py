@@ -299,7 +299,7 @@ async def enrich_and_save_leads(
         await event_manager.broadcast({
             "type": "classification_update", 
             "leads": enriched_for_broadcast
-        })
+        }, org_id=org_id)
         
         # Trigger classification if user_id present
         if user_id:

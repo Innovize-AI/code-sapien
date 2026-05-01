@@ -72,14 +72,16 @@ PARTNERS = [
     {"email": "jp@innovizeai.com", "password": "GlialSecure2026!", "role": "user", "name": "Jon Partner"},
     {"email": "pavan.kumar@innovizeai.com", "password": "adminpassword123", "role": "admin", "name": "Pavan Kumar"},
     {"email": "pavan.k@innovizeai.com", "password": "AdminPassword123!", "role": "admin", "name": "Pavan K"},
+    {"email": "sakshi@innovizeai.com", "password": "Password123!", "role": "user", "name": "Pavan K"},
+
     # Dummy Trial Users with separate domains
-    {"email": "alice@acmecorp.com", "password": "TrialPassword123!", "role": "admin", "name": "Alice Acme"},
-    {"email": "bob@globex.io", "password": "TrialPassword123!", "role": "admin", "name": "Bob Globex"},
-    {"email": "charlie@starktech.dev", "password": "TrialPassword123!", "role": "admin", "name": "Charlie Stark"},
-    {"email": "bruce@wayne.co", "password": "TrialPassword123!", "role": "admin", "name": "Bruce Wayne"},
-    {"email": "gavin@hooli.xyz", "password": "TrialPassword123!", "role": "admin", "name": "Gavin Belson"},
-    {"email": "erlich@bachmanity.com", "password": "TrialPassword123!", "role": "admin", "name": "Erlich Bachman"},
-    {"email": "richard@piedpiper.com", "password": "TrialPassword123!", "role": "admin", "name": "Richard Hendricks"}
+    # {"email": "alice@acmecorp.com", "password": "TrialPassword123!", "role": "admin", "name": "Alice Acme"},
+    # {"email": "bob@globex.io", "password": "TrialPassword123!", "role": "admin", "name": "Bob Globex"},
+    # {"email": "charlie@starktech.dev", "password": "TrialPassword123!", "role": "admin", "name": "Charlie Stark"},
+    # {"email": "bruce@wayne.co", "password": "TrialPassword123!", "role": "admin", "name": "Bruce Wayne"},
+    # {"email": "gavin@hooli.xyz", "password": "TrialPassword123!", "role": "admin", "name": "Gavin Belson"},
+    # {"email": "erlich@bachmanity.com", "password": "TrialPassword123!", "role": "admin", "name": "Erlich Bachman"},
+    # {"email": "richard@piedpiper.com", "password": "TrialPassword123!", "role": "admin", "name": "Richard Hendricks"}
 ]
 
 # Quick key validation

@@ -290,6 +290,25 @@ export function Sidebar({ onAnalyzeClick }: { onAnalyzeClick?: () => void }) {
               />
             </div>
           </div>
+
+          {/* Lead Discovery Usage */}
+          {usage.lead_discovery && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                <span className="flex items-center gap-1">
+                  <Search className="w-3 h-3 text-orange-500" />
+                  Lead Bank
+                </span>
+                <span>{usage.lead_discovery.used}/{usage.lead_discovery.limit}</span>
+              </div>
+              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                    className="h-full bg-orange-500 transition-all duration-500" 
+                    style={{ width: `${Math.min(100, (usage.lead_discovery.used / usage.lead_discovery.limit) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
       {isCollapsed && usage?.trial_mode && (

@@ -292,6 +292,11 @@ async def discover_leads(
     if not urls:
         return {"error": "No URLs provided"}
 
+    # Trial Mode Discovery Limit Check
+    from utils.trial_utils import check_trial_lead_limit
+    if await check_trial_lead_limit(db, org_id=current_user.organization_id, user_id=str(current_user.id)):
+         return {"error": "Lead Discovery limit reached for Trial Mode. Please upgrade to continue finding more leads."}
+
     try:
         all_leads = []
         raw_leads_to_save = []

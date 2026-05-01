@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 import os
 from dependencies import get_current_user
+from utils.trial_utils import get_trial_limits
 
 dashboard_router = APIRouter(tags=['Dashboard'])
 
@@ -27,6 +28,7 @@ class DashboardStats(BaseModel):
     trial_mode: bool = False
     research_usage: Optional[UsageStats] = None
     classification_usage: Optional[UsageStats] = None
+    lead_discovery_usage: Optional[UsageStats] = None
 
 class AnalyticsDataPoint(BaseModel):
     date: str
@@ -85,10 +87,13 @@ async def get_dashboard_stats(
     # Usage Calculations
     research_usage = None
     classification_usage = None
+    lead_discovery_usage = None
 
     if trial_mode:
-        res_limit = int(os.getenv("TRIAL_RESEARCH_LIMIT", "5"))
-        class_limit = int(os.getenv("TRIAL_CLASSIFICATION_LIMIT", "50"))
+        limits = get_trial_limits()
+        res_limit = limits["research_limit"]
+        class_limit = limits["classification_limit"]
+        id_limit = limits["identified_limit"]
 
         # Classification count: Only count profiles that are actually useful (Fit OR Intent found)
         class_query = select(func.count(IdentifiedProfile.id)).where(
@@ -105,6 +110,16 @@ async def get_dashboard_stats(
         class_res = await db.execute(class_query)
         class_used = class_res.scalar() or 0
 
+        # Identified Profiles count
+        id_query = select(func.count(IdentifiedProfile.id))
+        if current_user.organization_id:
+            id_query = id_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+        else:
+            id_query = id_query.where(IdentifiedProfile.created_by_id == current_user.id)
+        
+        id_res = await db.execute(id_query)
+        id_used = id_res.scalar() or 0
+
         research_usage = UsageStats(
             used=total_leads,
             limit=res_limit,
@@ -115,6 +130,11 @@ async def get_dashboard_stats(
             limit=class_limit,
             remaining=max(0, class_limit - class_used)
         )
+        lead_discovery_usage = UsageStats(
+            used=id_used,
+            limit=id_limit,
+            remaining=max(0, id_limit - id_used)
+        )
 
     return DashboardStats(
         total_leads=total_leads,
@@ -123,7 +143,8 @@ async def get_dashboard_stats(
         time_saved_hours=time_saved_hours,
         trial_mode=trial_mode,
         research_usage=research_usage,
-        classification_usage=classification_usage
+        classification_usage=classification_usage,
+        lead_discovery_usage=lead_discovery_usage
     )
 
 @dashboard_router.get("/dashboard/analytics", response_model=DashboardAnalytics)

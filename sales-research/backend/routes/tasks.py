@@ -87,6 +87,7 @@ async def tasks_heartbeat(
     tasks_to_dispatch = [] # List of (task_type, payload, fallback_func, fallback_args)
     
     # 1. Collect Autopilot Rules
+    from utils.trial_utils import check_trial_lead_limit
     is_trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     result = await db.execute(select(AutopilotRule).where(AutopilotRule.is_active == True))
     rules = result.scalars().all()
@@ -101,6 +102,12 @@ async def tasks_heartbeat(
             if is_trial_mode and rule.type == "apollo_config":
                 logger.info(f"Skipping Apollo rule {rule.id} in Trial Mode.")
                 continue
+
+            # NEW: Global Trial Lead Limit Check
+            if is_trial_mode:
+                if await check_trial_lead_limit(db, org_id=rule.organization_id, user_id=rule.created_by_id):
+                    logger.info(f"Skipping rule {rule.id} (org {rule.organization_id}) - Trial Limit Reached.")
+                    continue
 
             payload = {"rule_id": str(rule.id), "rule_type": rule.type}
             fallback_func = task_service.keyword_discovery_rule_task if rule.type == "keyword" else task_service.apollo_discovery_rule_task
@@ -120,6 +127,11 @@ async def tasks_heartbeat(
             if task.name == "competitor_update":
                 comp_result = await db.execute(select(Competitor))
                 for comp in comp_result.scalars().all():
+                    # Trial Mode Check for Competitor Discovery
+                    if is_trial_mode:
+                        if await check_trial_lead_limit(db, org_id=comp.organization_id, user_id=comp.created_by_id):
+                            continue
+                            
                     tasks_to_dispatch.append(("competitor_sync", {"competitor_id": str(comp.id)}, task_service.update_single_competitor_task, (str(comp.id),)))
             elif task.name == "hubspot_sync":
                 # Skip for trial mode as requested

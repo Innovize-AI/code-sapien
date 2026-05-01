@@ -521,7 +521,7 @@ export default function SettingsPage() {
                   {usage.research.remaining} researches remaining
                 </span>
              </div>
-             <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+              <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
                 <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Profile Classifications</span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-bold">{usage.classification.used}</span>
@@ -535,6 +535,22 @@ export default function SettingsPage() {
                 </div>
                 <span className="text-[10px] text-muted-foreground mt-1">
                   {usage.classification.remaining} classifications remaining
+                </span>
+             </div>
+             <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border md:col-span-2">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Lead Discovery Bank</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{usage.lead_discovery.used}</span>
+                  <span className="text-sm text-muted-foreground">/ {usage.lead_discovery.limit} profiles identified</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-orange-500 transition-all" 
+                    style={{ width: `${Math.min(100, (usage.lead_discovery.used / usage.lead_discovery.limit) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-1">
+                  {usage.lead_discovery.remaining} slots remaining in your discovery bank
                 </span>
              </div>
           </CardContent>

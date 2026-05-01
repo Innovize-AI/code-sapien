@@ -14,35 +14,15 @@ from utils.activity_helper import log_activity_and_notify
 from agents.linkedin_agent import batch_classify_profiles_async, enrich_company_waterfall
 from agents.lead_scoring_agent import revalidate_lead_fit_async
 from utils.sse_manager import event_manager
+from utils.trial_utils import check_trial_classification_limit
 
 async def check_classification_limit(user_id: str) -> bool:
     """
     Checks if a trial user has reached their identified profile classification limit.
     Returns True if limit reached, False otherwise.
     """
-    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
-    if not trial_mode or not user_id:
-        return False
-
     async with SessionLocal() as db:
-        limit = int(os.getenv("TRIAL_CLASSIFICATION_LIMIT", "50"))
-        
-        # Count profiles that have been classified (have fit_reasoning) for this user
-        result = await db.execute(
-            select(IdentifiedProfile.id)
-            .where(
-                IdentifiedProfile.created_by_id == user_id,
-                IdentifiedProfile.fit_reasoning != None,
-                IdentifiedProfile.fit_reasoning != ""
-            )
-        )
-        count = len(result.all())
-        
-        if count >= limit:
-            logger.warning(f"User {user_id} reached trial classification limit: {count}/{limit}")
-            return True
-            
-    return False
+        return await check_trial_classification_limit(db, org_id=None, user_id=user_id)
 
 async def run_classification_and_update(raw_leads: List[dict], user_id: str | None = None, org_id: str | None = None):
     """

@@ -26,6 +26,12 @@ async def update_single_competitor_task(competitor_id: str):
                 logger.error(f"Competitor {competitor_id} not found.")
                 return
 
+            # Trial Mode Safety Check
+            from utils.trial_utils import check_trial_lead_limit
+            if await check_trial_lead_limit(db, org_id=competitor.organization_id, user_id=competitor.created_by_id):
+                logger.info(f"Skipping competitor scan {competitor.name} - Trial Limit Reached.")
+                return
+
             logger.info(f"Scanning competitor: {competitor.name} ({competitor.linkedin_url})")
             # discover_leads_from_competitor is synchronous (requests), 
             # so we run it in a thread to keep it non-blocking.
@@ -138,6 +144,12 @@ async def keyword_discovery_rule_task(rule_id: str):
                 logger.error(f"Keyword rule {rule_id} not found.")
                 return
 
+            # Trial Mode Safety Check
+            from utils.trial_utils import check_trial_lead_limit
+            if await check_trial_lead_limit(db, org_id=rule.organization_id, user_id=rule.created_by_id):
+                logger.info(f"Skipping keyword rule {rule.id} - Trial Limit Reached.")
+                return
+
             logger.info(f"Processing keyword rule: {rule.value}")
             keywords = [rule.value]
             # discover_leads_from_keywords is already async!
@@ -210,6 +222,12 @@ async def apollo_discovery_rule_task(rule_id: str):
             
             if not rule:
                 logger.error(f"Apollo rule {rule_id} not found.")
+                return
+
+            # Trial Mode Safety Check
+            from utils.trial_utils import check_trial_lead_limit
+            if await check_trial_lead_limit(db, org_id=rule.organization_id, user_id=rule.created_by_id):
+                logger.info(f"Skipping Apollo rule {rule.id} - Trial Limit Reached.")
                 return
 
             settings = await crud.get_org_settings(db, user_id=str(rule.created_by_id), org_id=rule.organization_id)

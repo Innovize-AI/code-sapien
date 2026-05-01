@@ -110,7 +110,10 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
         # 1. Prepare unique profiles for batch classification
         unique_profiles_map = {}
         for lead in raw_leads:
-            n_url = normalize_linkedin_url(lead["linkedin_url"])
+            l_url = lead.get("linkedin_url") or lead.get("url")
+            if not l_url:
+                continue
+            n_url = normalize_linkedin_url(l_url)
             if n_url not in unique_profiles_map:
                 unique_profiles_map[n_url] = {
                     "id": n_url,
@@ -184,37 +187,47 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                 else:
                     logger.info(f"Triggering AI for {len(ai_sub_batch)} profiles...")
                     batch_res = await batch_classify_profiles_async(ai_sub_batch, company_context=company_context)
-            
+            logger.info(f"batch res response: {batch_res}")
             leads_to_update_batch = []
             event_leads_batch = []
             
             for lead in batch:
-                lead_n_url = lead.get("id")
+                lead_n_url = lead.get("id") or lead.get("linkedin_url")
                 c = batch_res.get(lead_n_url)
                 
                 if c:
+                    logger.debug(f"Classifying {lead_n_url}: Result type={type(c)}")
+                    # Helper to get values from c (could be dict or Pydantic object)
+                    def get_val(obj, key, default=None):
+                        if isinstance(obj, dict):
+                            return obj.get(key, default)
+                        return getattr(obj, key, default)
+
                     updated_data = {
                         "linkedin_url": lead_n_url,
                         "url": lead_n_url,
-                        "is_fit": c.get("is_fit"),
-                        "is_competitor": c.get("is_competitor"),
-                        "is_decision_maker": c.get("is_decision_maker"),
-                        "fit_reasoning": c.get("reasoning"),
-                        "intent": c.get("intent"),
-                        "post_topic_depth": c.get("post_topic_depth"),
-                        "sentiment": c.get("sentiment"),
-                        "is_buy_signal": c.get("is_buy_signal"),
-                        "is_strategic_seller": c.get("is_strategic_seller"),
+                        "is_fit": get_val(c, "is_fit", False),
+                        "is_competitor": get_val(c, "is_competitor", False),
+                        "is_decision_maker": get_val(c, "is_decision_maker", False),
+                        "fit_reasoning": get_val(c, "reasoning", ""),
+                        "intent": get_val(c, "intent", "low_signal"),
+                        "post_topic_depth": get_val(c, "post_topic_depth", "generic_engagement"),
+                        "sentiment": get_val(c, "sentiment", "neutral"),
+                        "is_buy_signal": get_val(c, "is_buy_signal", False),
+                        "is_strategic_seller": get_val(c, "is_strategic_seller", False),
                         "profile_metadata": {
-                            "is_buy_signal": c.get("is_buy_signal"),
-                            "is_strategic_seller": c.get("is_strategic_seller")
+                            "is_buy_signal": get_val(c, "is_buy_signal", False),
+                            "is_strategic_seller": get_val(c, "is_strategic_seller", False),
+                            "post_topic_depth": get_val(c, "post_topic_depth"),
+                            "intent": get_val(c, "intent")
                         },
                         "name": lead.get("name"),
                         "headline": lead.get("headline"),
                         "comment": lead.get("comment"),
                         "source_post": lead.get("source_post"),
                         "source_post_url": lead.get("source_post_url"),
-                        "competitor": lead.get("competitor")
+                        "competitor": lead.get("competitor"),
+                        "old_linkedin_url": lead.get("old_linkedin_url")
                     }
                     leads_to_update_batch.append(updated_data)
                     event_leads_batch.append(updated_data)

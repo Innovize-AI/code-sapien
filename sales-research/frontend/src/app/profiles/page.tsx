@@ -275,15 +275,17 @@ export default function ProfilesPage() {
         const data = JSON.parse(event.data);
         if (data.type === "classification_update" && data.leads) {
           setProfiles((prevProfiles) => {
+            const updatesMap = new Map<string, any>();
+            data.leads.forEach((l: any) => {
+              if (l.id) updatesMap.set(l.id, l);
+              if (l.linkedin_url) updatesMap.set(normalizeUrl(l.linkedin_url), l);
+              if (l.old_linkedin_url) updatesMap.set(normalizeUrl(l.old_linkedin_url), l);
+            });
+
             return prevProfiles.map((profile) => {
-              // Find matching update: by id, old_url, or current url
-              const update = data.leads.find(
-                (l: any) =>
-                  (l.id && l.id === profile.id) ||
-                  (l.old_linkedin_url &&
-                    l.old_linkedin_url === profile.linkedin_url) ||
-                  l.linkedin_url === profile.linkedin_url,
-              );
+              const profileIdUpdate = updatesMap.get(profile.id);
+              const profileUrlUpdate = updatesMap.get(normalizeUrl(profile.linkedin_url));
+              const update = profileIdUpdate || profileUrlUpdate;
 
               if (update) {
                 return {
@@ -297,6 +299,8 @@ export default function ProfilesPage() {
                   is_fit: update.is_fit !== undefined ? update.is_fit : profile.is_fit,
                   is_competitor: update.is_competitor !== undefined ? update.is_competitor : profile.is_competitor,
                   is_decision_maker: update.is_decision_maker !== undefined ? update.is_decision_maker : profile.is_decision_maker,
+                  is_buy_signal: update.is_buy_signal !== undefined ? update.is_buy_signal : profile.is_buy_signal,
+                  is_strategic_seller: update.is_strategic_seller !== undefined ? update.is_strategic_seller : profile.is_strategic_seller,
                   fit_reasoning: update.fit_reasoning || profile.fit_reasoning,
                   intent: update.intent || profile.intent,
                   sentiment: update.sentiment || profile.sentiment,

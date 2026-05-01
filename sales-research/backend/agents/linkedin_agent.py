@@ -29,6 +29,7 @@ def _extract_classifications(response) -> list:
     if not response:
         return []
 
+    logger.info(f"classifications: {response.classifications}")
     # Pydantic model
     if hasattr(response, "classifications"):
         return response.classifications or []

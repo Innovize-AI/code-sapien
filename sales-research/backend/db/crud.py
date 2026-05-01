@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 import datetime
@@ -459,6 +460,10 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict], 
     query = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url.in_(urls))
     result = await db.execute(query)
     existing_profiles = {normalize_linkedin_url(p.linkedin_url): p for p in result.scalars().all()}
+    
+    # 3b. Trial Mode Threshold Check
+    from utils.trial_utils import check_trial_lead_limit
+    can_add_new = not (await check_trial_lead_limit(db, org_id, user_id))
 
     # 3. Prepare data for native batch upsert
     upsert_rows = []
@@ -556,6 +561,9 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict], 
             })
         else:
             # Create new row
+            if not can_add_new:
+                continue
+            
             new_history = []
             # Create new row logic mirrors update logic
             new_history = []
@@ -704,7 +712,11 @@ async def upsert_identified_profile(db: AsyncSession, profile_data: dict, compan
         db_profile.linkedin_url = normalize_linkedin_url(db_profile.linkedin_url)
         db_profile.normalized_linkedin_url = normalize_linkedin_url(db_profile.linkedin_url)
     else:
-        # Create new
+        # Trial Mode Threshold Check
+        from utils.trial_utils import check_trial_lead_limit
+        if await check_trial_lead_limit(db, org_id, user_id):
+            return None
+
         # Calculate touchpoint_count
         tp_count = len(new_sources)
         

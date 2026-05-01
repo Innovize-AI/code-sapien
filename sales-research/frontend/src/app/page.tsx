@@ -152,6 +152,73 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Trial Usage Alert */}
+        {stats?.trial_mode && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader className="py-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="w-5 h-5 text-primary" />
+                Trial Usage & Limits
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+               {/* Research Usage */}
+               <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Deep Researches</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold">{stats.research_usage?.used}</span>
+                    <span className="text-xs text-muted-foreground">/ {stats.research_usage?.limit} used</span>
+                  </div>
+                  <div className="w-full h-1 bg-muted rounded-full mt-2 overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all" 
+                      style={{ width: `${Math.min(100, ((stats.research_usage?.used || 0) / (stats.research_usage?.limit || 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {stats.research_usage?.remaining} remaining
+                  </span>
+               </div>
+
+               {/* Classification Usage */}
+               <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Classifications</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold">{stats.classification_usage?.used}</span>
+                    <span className="text-xs text-muted-foreground">/ {stats.classification_usage?.limit} used</span>
+                  </div>
+                  <div className="w-full h-1 bg-muted rounded-full mt-2 overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 transition-all" 
+                      style={{ width: `${Math.min(100, ((stats.classification_usage?.used || 0) / (stats.classification_usage?.limit || 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {stats.classification_usage?.remaining} remaining
+                  </span>
+               </div>
+
+               {/* Discovery Usage */}
+               <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Lead Discovery Bank</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold">{stats.lead_discovery_usage?.used}</span>
+                    <span className="text-xs text-muted-foreground">/ {stats.lead_discovery_usage?.limit} used</span>
+                  </div>
+                  <div className="w-full h-1 bg-muted rounded-full mt-2 overflow-hidden">
+                    <div 
+                      className="h-full bg-orange-500 transition-all" 
+                      style={{ width: `${Math.min(100, ((stats.lead_discovery_usage?.used || 0) / (stats.lead_discovery_usage?.limit || 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {stats.lead_discovery_usage?.remaining} slots remaining
+                  </span>
+               </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Row */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard

@@ -17,6 +17,7 @@ from workflow.graph import get_graph, NODE_STATUS_MAPPING
 from utils.common import add_https_if_missing
 from prompts.sales_prompts import DEFAULT_COMPANY_CONTEXT
 from fastapi import HTTPException
+from utils.trial_utils import check_trial_research_limit
 
 async def _get_organization_settings(user_id: str = None) -> dict:
     """Helper to fetch settings from database with per-user overrides."""
@@ -661,23 +662,13 @@ async def check_research_limit(user_id: str):
     """
     Checks if a trial user has reached their deep research limit.
     """
-    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
-    if not trial_mode:
-        return
-
     async with SessionLocal() as db:
-        from db.models import ResearchReport
-        from sqlalchemy import select, func
-        
-        limit = int(os.getenv("TRIAL_RESEARCH_LIMIT", "5"))
-        
-        result = await db.execute(
-            select(func.count(ResearchReport.id)).where(ResearchReport.created_by_id == user_id)
-        )
-        count = result.scalar() or 0
-        
-        if count >= limit:
-            logger.warning(f"User {user_id} reached trial research limit: {count}/{limit}")
+        limit_reached = await check_trial_research_limit(db, org_id=None, user_id=user_id)
+        if limit_reached:
+            # We still need to raise HTTPException here for the endpoint to catch it
+            # But the logic is now delegated to trial_utils
+            from utils.trial_utils import get_trial_limits
+            limit = get_trial_limits()["research_limit"]
             raise HTTPException(
                 status_code=403, 
                 detail=f"Trial limit reached. You have used your {limit} deep research credits. Please contact sales to upgrade."

@@ -361,6 +361,7 @@ export interface DashboardStats {
     trial_mode: boolean;
     research_usage?: UsageStats;
     classification_usage?: UsageStats;
+    lead_discovery_usage?: UsageStats;
 }
 
 export const fetchDashboardStats = async (): Promise<DashboardStats | null> => {

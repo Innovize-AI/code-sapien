@@ -16,6 +16,7 @@ import os
 from services.knowledge_service import KnowledgeService
 from sqlalchemy import func, or_, desc
 from db.crud import get_org_settings
+from utils.trial_utils import get_trial_limits
 
 settings_router = APIRouter(tags=['Settings'])
 
@@ -367,8 +368,10 @@ async def get_usage_stats(
     Useful for displaying trial limits.
     """
     trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
-    research_limit = int(os.getenv("TRIAL_RESEARCH_LIMIT", "5"))
-    classification_limit = int(os.getenv("TRIAL_CLASSIFICATION_LIMIT", "50"))
+    limits = get_trial_limits()
+    research_limit = limits["research_limit"]
+    classification_limit = limits["classification_limit"]
+    identified_limit = limits["identified_limit"]
 
     # Count Researches
     res_count_query = select(func.count(ResearchReport.id))
@@ -395,6 +398,16 @@ async def get_usage_stats(
     class_result = await db.execute(class_count_query)
     classification_used = class_result.scalar() or 0
 
+    # Count Identified Profiles (Total)
+    id_count_query = select(func.count(IdentifiedProfile.id))
+    if current_user.organization_id:
+        id_count_query = id_count_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+    else:
+        id_count_query = id_count_query.where(IdentifiedProfile.created_by_id == current_user.id)
+    
+    id_result = await db.execute(id_count_query)
+    identified_used = id_result.scalar() or 0
+
     return {
         "trial_mode": trial_mode,
         "research": {
@@ -406,6 +419,11 @@ async def get_usage_stats(
             "used": classification_used,
             "limit": classification_limit,
             "remaining": max(0, classification_limit - classification_used)
+        },
+        "lead_discovery": {
+            "used": identified_used,
+            "limit": identified_limit,
+            "remaining": max(0, identified_limit - identified_used)
         }
     }
 @settings_router.get("/settings/selling-profile", response_model=Optional[SellingProfileConfig])

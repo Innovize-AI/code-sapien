@@ -144,6 +144,11 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
         tavily_key = settings.tavily_api_key if settings else None
         apollo_key = settings.apollo_api_key if settings else None
         
+        # Trial Mode Discovery Limit Check
+        from utils.trial_utils import check_trial_lead_limit
+        if await check_trial_lead_limit(db, org_id=current_user.organization_id, user_id=str(current_user.id)):
+             return {"error": "Lead Discovery limit reached for Trial Mode. Please contact support to continue finding more leads."}
+        
         if input_data.provider in ["apollo", "tavily"]:
             if os.getenv("TRIAL_MODE", "false").lower() == "true":
                 provider_name = "Apollo" if input_data.provider == "apollo" else "Web Search (Tavily)"

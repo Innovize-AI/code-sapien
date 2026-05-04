@@ -663,6 +663,12 @@ export default function SettingsPage() {
                     Customize the Ideal Customer Profile for your specific
                     territory or focus.
                   </CardDescription>
+                  <Alert className="mt-4 border-amber-500/20 bg-amber-500/5">
+                    <ShieldAlert className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-700 text-xs font-medium">
+                      Note: Personal overrides will completely bypass organization-wide ICP settings for your account.
+                    </AlertDescription>
+                  </Alert>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -1214,91 +1220,8 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Global Keys */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Core API Keys</CardTitle>
-              <CardDescription>
-                Organization-wide keys for data providers.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...globalKeysForm}>
-                <form
-                  onSubmit={globalKeysForm.handleSubmit(handleSaveGlobalKeys)}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={globalKeysForm.control}
-                    name="tavily_api_key"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Tavily API Key</FormLabel>
-                          {!isAdmin && (
-                            <Badge variant="outline" className="text-xs h-5">
-                              <Lock className="w-2 h-2 mr-1" /> Admin Only
-                            </Badge>
-                          )}
-                        </div>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            {...field}
-                            disabled={!isAdmin || trialMode}
-                            placeholder={trialMode ? "Contact support to enable Web Search" : ""}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                      <FormField
-                        control={globalKeysForm.control}
-                        name="apollo_api_key"
-                        render={({ field }) => (
-                          <FormItem>
-                            <div className="flex items-center justify-between">
-                              <FormLabel className="flex items-center gap-2">
-                                Apollo API Key
-                                {trialMode && (
-                                  <Badge variant="secondary" className="text-[10px] h-4 bg-amber-500 text-white border-none">
-                                    NOT IN TRIAL
-                                  </Badge>
-                                )}
-                              </FormLabel>
-                              {!isAdmin && !trialMode && (
-                                <Badge variant="outline" className="text-xs h-5">
-                                  <Lock className="w-2 h-2 mr-1" /> Admin Only
-                                </Badge>
-                              )}
-                            </div>
-                            <FormControl>
-                              <Input
-                                type="password"
-                                {...field}
-                                disabled={!isAdmin || trialMode}
-                                placeholder={trialMode ? "Contact support to enable Apollo integration" : ""}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                  <div className="flex justify-end pt-2">
-                    {isAdmin && (
-                      <Button
-                        type="submit"
-                        disabled={isLoading}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Update Keys
-                      </Button>
-                    )}
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+          {/* Global Keys hidden as per request */}
+
         </TabsContent>
       </Tabs>
     </div>

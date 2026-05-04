@@ -23,6 +23,7 @@ SECRETS=(
   "LINKEDIN_RAPID_BASE_URL"
   "PINECONE_API_KEY"
   "TASK_SECRET"
+  "MILLION_VERIFIER_API_KEY"
 )
 
 # Function to create or update a secret

@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: glial-research-backend-service-trial
   annotations:
-    run.googleapis.com/minScale: "0"
+    run.googleapis.com/minScale: "1"
     run.googleapis.com/invoker-iam-disabled: true
 spec:
   template:

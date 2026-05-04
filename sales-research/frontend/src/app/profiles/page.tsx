@@ -70,6 +70,7 @@ import { ensureProtocol, cn, normalizeUrl } from "@/lib/utils";
 import { CompanyDetailModal, ReportDetailModal } from "@/components/modals";
 import { ProfileGridV2, ProfileListV2 } from "@/components/profiles/profile-views-v2";
 import { Spinner } from "@/components/ui/spinner"
+import { useConfig } from "@/context/config-context";
 
 function formatTimestamp(dateStr: string) {
   try {
@@ -87,6 +88,7 @@ function formatTimestamp(dateStr: string) {
 const PAGE_SIZE = 100;
 
 export default function ProfilesPage() {
+  const { trialMode } = useConfig();
   const [profiles, setProfiles] = useState<IdentifiedProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -766,13 +768,15 @@ export default function ProfilesPage() {
                     {tabCounts.all ?? 0}
                   </Badge>
                 </TabsTrigger>
-                <TabsTrigger value="apollo" className="gap-2 group">
-                  <Zap className="w-4 h-4 text-primary group-data-[state=active]:fill-primary/20" />
-                  Apollo
-                  <Badge variant="secondary" className="ml-1 px-1 py-0 h-4 min-w-4 text-[10px]">
-                    {tabCounts.apollo ?? 0}
-                  </Badge>
-                </TabsTrigger>
+                {!trialMode && (
+                  <TabsTrigger value="apollo" className="gap-2 group">
+                    <Zap className="w-4 h-4 text-primary group-data-[state=active]:fill-primary/20" />
+                    Apollo
+                    <Badge variant="secondary" className="ml-1 px-1 py-0 h-4 min-w-4 text-[10px]">
+                      {tabCounts.apollo ?? 0}
+                    </Badge>
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="competitor" className="gap-2">
                   <Globe className="w-4 h-4" />
                   Competitor Posts
@@ -788,7 +792,7 @@ export default function ProfilesPage() {
                   </Badge>
                 </TabsTrigger>
               </TabsList>
-              {["all","apollo","competitor","keyword"].map(tab => (
+              {["all","apollo","competitor","keyword"].filter(tab => tab !== "apollo" || !trialMode).map(tab => (
                 <TabsContent key={tab} value={tab}>
                   {viewMode === "grid" ? (
                     <ProfileGridV2

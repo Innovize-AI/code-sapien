@@ -9,6 +9,7 @@ spec:
   template:
     metadata:
       annotations:
+        autoscaling.knative.dev/minScale: "1"
         autoscaling.knative.dev/maxScale: "1"
         run.googleapis.com/startup-cpu-boost: "true"
         run.googleapis.com/cpu-throttling: false

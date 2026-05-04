@@ -548,9 +548,11 @@ export function DiscoveryForm({
                         <SelectItem value="tavily" disabled={trialMode}>
                           Web Search (Tavily) {trialMode && "(NOT IN TRIAL)"}
                         </SelectItem>
-                        <SelectItem value="apollo" disabled={trialMode}>
-                          Apollo Database {trialMode && "(NOT IN TRIAL)"}
-                        </SelectItem>
+                        {!trialMode && (
+                          <SelectItem value="apollo">
+                            Apollo Database
+                          </SelectItem>
+                        )}
                         <SelectItem value="linkedin_keyword">
                           LinkedIn Keywords
                         </SelectItem>

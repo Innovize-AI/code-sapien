@@ -75,6 +75,10 @@ function parseInteractionStats(profile: IdentifiedProfile) {
   } catch { return { keyword: 0, competitor: 0, total: 0, allTouchpoints: [], firstComment: null }; }
 }
 
+function isEnriched(profile: IdentifiedProfile) {
+  return !profile.linkedin_url.startsWith("apollo_id:");
+}
+
 function isDisqualified(profile: IdentifiedProfile) {
   return profile.is_fit === false && !profile.is_buy_signal && !profile.is_decision_maker && !profile.is_competitor;
 }
@@ -85,7 +89,12 @@ function getAccent(profile: IdentifiedProfile) {
   if (profile.is_buy_signal) return { bar: "bg-violet-500", badge: "bg-violet-50 text-violet-700 border-violet-200", avatar: "bg-violet-100 text-violet-700", dot: "bg-violet-500" };
   if (profile.is_decision_maker) return { bar: "bg-blue-500", badge: "bg-blue-50 text-blue-700 border-blue-200", avatar: "bg-blue-100 text-blue-700", dot: "bg-blue-500" };
   if (profile.is_strategic_seller) return { bar: "bg-zinc-400", badge: "bg-zinc-50 text-zinc-600 border-zinc-200", avatar: "bg-zinc-100 text-zinc-600", dot: "bg-zinc-400" };
-  if (isDisqualified(profile)) return { bar: "bg-rose-400", badge: "bg-rose-50 text-rose-600 border-rose-200", avatar: "bg-rose-100 text-rose-600", dot: "bg-rose-400" };
+  if (isDisqualified(profile)) {
+    if (!isEnriched(profile)) {
+      return { bar: "bg-amber-400", badge: "bg-amber-50 text-amber-600 border-amber-200", avatar: "bg-amber-100 text-amber-600", dot: "bg-amber-400" };
+    }
+    return { bar: "bg-rose-400", badge: "bg-rose-50 text-rose-600 border-rose-200", avatar: "bg-rose-100 text-rose-600", dot: "bg-rose-400" };
+  }
   return { bar: "bg-zinc-200 dark:bg-zinc-700", badge: "bg-zinc-50 text-zinc-600 border-zinc-200", avatar: "bg-zinc-100 text-zinc-500", dot: "bg-zinc-300" };
 }
 
@@ -143,7 +152,17 @@ function StatusChips({ profile, size = "sm" }: { profile: IdentifiedProfile; siz
     <div className="flex flex-wrap gap-1">
       {profile.is_competitor && <Badge variant="destructive" className={cn(h)}><span>Competitor</span></Badge>}
       {profile.is_fit && <Badge variant="outline" className={cn(h, "bg-emerald-50 text-emerald-700 border-emerald-200")}><CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />Fit</Badge>}
-      {isDisqualified(profile) && <Badge variant="outline" className={cn(h, "bg-rose-50 text-rose-600 border-rose-200")}><XCircle className="w-2.5 h-2.5 mr-0.5" />Not Fit</Badge>}
+      {isDisqualified(profile) && (
+        !isEnriched(profile) ? (
+          <Badge variant="outline" className={cn(h, "bg-amber-50 text-amber-600 border-amber-200")}>
+            <Zap className="w-2.5 h-2.5 mr-0.5" />Not Enriched
+          </Badge>
+        ) : (
+          <Badge variant="outline" className={cn(h, "bg-rose-50 text-rose-600 border-rose-200")}>
+            <XCircle className="w-2.5 h-2.5 mr-0.5" />Not Fit
+          </Badge>
+        )
+      )}
       {profile.is_buy_signal && <Badge variant="outline" className={cn(h, "bg-violet-50 text-violet-700 border-violet-200")}><Zap className="w-2.5 h-2.5 mr-0.5" />Buy Signal</Badge>}
       {profile.is_decision_maker && <Badge variant="outline" className={cn(h, "bg-blue-50 text-blue-700 border-blue-200")}><UserCheck className="w-2.5 h-2.5 mr-0.5" />Decision Maker</Badge>}
       {profile.is_strategic_seller && <Badge variant="outline" className={cn(h, "bg-zinc-50 text-zinc-600 border-zinc-200")}><TrendingUp className="w-2.5 h-2.5 mr-0.5" />Seller</Badge>}

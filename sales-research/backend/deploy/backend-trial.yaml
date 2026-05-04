@@ -30,6 +30,12 @@ spec:
               value: trial
             - name: TRIAL_MODE
               value: "true"
+            - name: TRIAL_IDENTIFIED_LIMIT
+              value: "2000"
+            - name: TRIAL_CLASSIFICATION_LIMIT
+              value: "2000"
+            - name: TRIAL_RESEARCH_LIMIT
+              value: "50"
             - name: DB_SCHEMA
               value: trial
             - name: ALLOW_ORIGINS

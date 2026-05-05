@@ -359,9 +359,21 @@ async def delete_asset(
         # 2. Delete from Pinecone (Graceful)
         try:
             from services.knowledge_service import KnowledgeService
-            ks = KnowledgeService() # Use default index from env
-            source_metadata = f"org_{admin_user.organization_id}_{asset['filename']}"
-            ks.delete_vectors(source_metadata)
+            from db.crud import get_org_settings
+            
+            # Resolve the correct index for this organization
+            settings = await get_org_settings(db, admin_user.id, admin_user.organization_id)
+            trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+            index_name = settings.pinecone_index_name if settings and settings.pinecone_index_name else None
+            
+            if trial_mode and not index_name:
+                logger.warning(f"Vector deletion skipped: No index provisioned for org {admin_user.organization_id}")
+            else:
+                index_name = index_name or "glial-index"
+                ks = KnowledgeService(index_name=index_name)
+                source_metadata = f"org_{admin_user.organization_id}_{asset['filename']}"
+                ks.delete_vectors(source_metadata, index_name=index_name)
+                logger.info(f"Successfully deleted vectors for source: {source_metadata} from index: {index_name}")
         except Exception as ve:
             logger.error(f"Vector deletion failed for {asset_id} but proceeding: {ve}")
         

@@ -63,8 +63,10 @@ interface ReportDisplayV2Props {
         step_number: number; step_type: string; narrative_angle: string; draft: string;
         email_subject?: string; engagement_type: string; delay_days: number;
         trigger: string; internal_note: string; reference_signal?: string;
+        sources?: Array<{ source: string; snippet: string }>;
       }>;
       exit_strategy: string;
+      sources?: Array<{ source: string; snippet: string }>;
     }>;
     buyer_journey_analysis?: {
       journey_stage: string; optimal_play: string; strategic_reasoning: string;
@@ -621,13 +623,32 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
         title: `Step ${s.step_number || 1}: ${(s.narrative_angle || "").replace(/_/g, " ").toUpperCase()}`,
         content: s.draft || s.internal_note || "",
         icon: s.engagement_type?.includes("EMAIL") ? <Mail className="h-3.5 w-3.5" /> : <Linkedin className="h-3.5 w-3.5" />,
+        sources: s.sources || [],
         ...s,
       }))
     : activeOutreach && typeof activeOutreach === "object"
       ? [
-          activeOutreach.linkedin_message && { type: "linkedin", title: "LinkedIn Request", content: activeOutreach.linkedin_message || activeOutreach.hook || "", icon: <Linkedin className="h-3.5 w-3.5" /> },
-          activeOutreach.email_subject && { type: "email", title: "Email Subject", content: activeOutreach.email_subject || "", icon: <Mail className="h-3.5 w-3.5" /> },
-          activeOutreach.email_body && { type: "email", title: "Email Body", content: activeOutreach.email_body || "", icon: <FileText className="h-3.5 w-3.5" /> },
+          activeOutreach.linkedin_message && { 
+            type: "linkedin", 
+            title: "LinkedIn Request", 
+            content: activeOutreach.linkedin_message || activeOutreach.hook || "", 
+            icon: <Linkedin className="h-3.5 w-3.5" />,
+            sources: activeOutreach.sources || []
+          },
+          activeOutreach.email_subject && { 
+            type: "email", 
+            title: "Email Subject", 
+            content: activeOutreach.email_subject || "", 
+            icon: <Mail className="h-3.5 w-3.5" />,
+            sources: activeOutreach.sources || []
+          },
+          activeOutreach.email_body && { 
+            type: "email", 
+            title: "Email Body", 
+            content: activeOutreach.email_body || "", 
+            icon: <FileText className="h-3.5 w-3.5" />,
+            sources: activeOutreach.sources || []
+          },
         ].filter(Boolean)
       : [];
 
@@ -639,14 +660,16 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
           title: "LinkedIn Message", 
           content: briefing.refined_linkedin_message, 
           icon: <Linkedin className="h-3.5 w-3.5" />,
-          _edit_depth: briefing._edit_depths?.refined_linkedin_message || 0
+          _edit_depth: briefing._edit_depths?.refined_linkedin_message || 0,
+          sources: briefing.unified_command?.sources || []
         },
         briefing.refined_email_body && { 
           type: "email", 
           title: "Refined Email", 
           content: briefing.refined_email_body, 
           icon: <FileText className="h-3.5 w-3.5" />,
-          _edit_depth: briefing._edit_depths?.refined_email_body || 0
+          _edit_depth: briefing._edit_depths?.refined_email_body || 0,
+          sources: briefing.unified_command?.sources || []
         },
       ].filter(Boolean)
     : [];
@@ -1236,6 +1259,35 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                             </div>
                           )}
                         </div>
+
+                        {/* Grounding Evidence / Sources for this step */}
+                        {action.sources && action.sources.length > 0 && !isEditingOutreach && (
+                          <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-700/50 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="h-3 w-3 text-primary" />
+                              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Grounding Evidence / Playbook</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {action.sources.map((src: any, idx: number) => (
+                                <TooltipProvider key={idx}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="cursor-help bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-[10px] font-bold py-1 px-2.5 text-zinc-600 dark:text-zinc-400 hover:text-primary transition-colors">
+                                        {src.source}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                      <div className="space-y-2">
+                                        <p className="text-[9px] font-black uppercase text-primary tracking-widest">Verified Snippet</p>
+                                        <p className="text-[11px] font-medium leading-relaxed italic text-zinc-700 dark:text-zinc-300">"{src.snippet}"</p>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1272,6 +1324,35 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                       ) : (
                         <div className={cn("prose prose-zinc dark:prose-invert max-w-none text-[13px] leading-relaxed font-medium italic border-l-2 pl-3", action.type === "email" ? "text-zinc-200 border-primary/20" : "text-zinc-800 dark:text-zinc-200 border-primary/10")}>
                           <ReactMarkdown>{action.content}</ReactMarkdown>
+                        </div>
+                      )}
+
+                      {/* Grounding Evidence for standalone messages */}
+                      {action.sources && action.sources.length > 0 && !isEditingOutreach && (
+                        <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-700/50 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-3 w-3 text-primary" />
+                            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Grounding Evidence / Playbook</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {action.sources.map((src: any, idx: number) => (
+                              <TooltipProvider key={idx}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className={cn("cursor-help border-zinc-200 dark:border-zinc-800 text-[10px] font-bold py-1 px-2.5 transition-colors", action.type === "email" ? "bg-zinc-800 text-zinc-400 hover:text-primary" : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-primary")}>
+                                      {src.source}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                    <div className="space-y-2">
+                                      <p className="text-[9px] font-black uppercase text-primary tracking-widest">Verified Snippet</p>
+                                      <p className="text-[11px] font-medium leading-relaxed italic text-zinc-700 dark:text-zinc-300">"{src.snippet}"</p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1314,6 +1395,35 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                           <ReactMarkdown>{action.content}</ReactMarkdown>
                         </div>
                       )}
+
+                      {/* Grounding Evidence for strategic messages */}
+                      {action.sources && action.sources.length > 0 && !isEditingOutreach && (
+                        <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-3 w-3 text-primary" />
+                            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Grounding Evidence / Playbook</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {action.sources.map((src: any, idx: number) => (
+                              <TooltipProvider key={idx}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className={cn("cursor-help border-zinc-200 dark:border-zinc-800 text-[10px] font-bold py-1 px-2.5 transition-colors", action.type === "email" ? "bg-zinc-800 text-zinc-400 hover:text-primary" : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-primary")}>
+                                      {src.source}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                    <div className="space-y-2">
+                                      <p className="text-[9px] font-black uppercase text-primary tracking-widest">Verified Snippet</p>
+                                      <p className="text-[11px] font-medium leading-relaxed italic text-zinc-700 dark:text-zinc-300">"{src.snippet}"</p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1334,6 +1444,18 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                       <p className="text-[14px] font-black text-zinc-900 dark:text-white italic leading-snug">"{hook}"</p>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Primary proofs for sequence */}
+              {activeOutreach?.sources && activeOutreach.sources.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2 items-center px-1">
+                  <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest mr-1">Primary Proof Assets:</span>
+                  {activeOutreach.sources.map((src: any, idx: number) => (
+                    <Badge key={idx} variant="secondary" className="bg-primary/10 text-primary border-none text-[9px] font-black uppercase tracking-tight">
+                      {src.source}
+                    </Badge>
+                  ))}
                 </div>
               )}
             </div>

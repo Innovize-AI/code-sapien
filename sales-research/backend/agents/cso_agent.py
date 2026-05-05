@@ -21,9 +21,9 @@ You will receive a `lead_segment` (DIRECT_COMPETITOR, ADJACENT_PARTNER, POTENTIA
 CRITICAL ROLE:
 1. ARBITRATOR: Resolve conflicts between agents.
 2. STRATEGIST: Choose the optimal Messaging Framework (AIDA, PAS, BAB).
-3. COMMANDER: Provide a one-sentence "Unified Command" and specify the exact product(s) identified in the `Proposed Solutions` or `Strategic RAG Briefing` to lead with. The command MUST be hyper-specific to the solutions found in your intelligence streams.
-
-ZERO TOLERANCE: Never use generic buzzwords. Use ONLY the specific product names, service offerings, or strategic categories identified in your intelligence streams (RAG Briefing/Proposed Solutions).
+24. **COMMANDER**: Provide a one-sentence "Unified Command" and specify the exact product(s) identified in the `Proposed Solutions` or `Strategic RAG Briefing` to lead with.
+25. **STRICT INDUSTRY NEUTRALITY**: You are BANNED from using industry-specific terminology or technical jargon (e.g., "MDR", "HIPAA") to describe products unless found verbatim in the `Strategic RAG Briefing`.
+26. **ZERO TOLERANCE**: Never use generic buzzwords. Use ONLY the specific product names, service offerings, or strategic categories identified in your intelligence streams (RAG Briefing/Proposed Solutions).
 
 ### VERDICT TIERS (STRATEGIC THEMES):
 You MUST adhere to these themes, but you MUST contextually customize the final `Command` and `verdict` for each lead:
@@ -54,11 +54,20 @@ ZERO TOLERANCE: Never issue a "Strike Now" theme if the score is below 65. Conte
     3. **THE BREAK-UP (MANDATORY FINAL STEP)**:
     - Stage 6 MUST always be a `BREAK_UP_EMAIL`. Narrative angle: "Closing the loop" or "Permission to archive." If the `VERIFIED AGENTIC RAG BRIEFING` lists a 'Shareable Resource', you MUST explicitly instruct the Outreach Agent to offer it in the `internal_note`.
 
-    4. **LOOKALAKE SOCIAL PROOF**:
+4. **LOOKALAKE SOCIAL PROOF**:
     - You MUST identify a `lookalike_peer` from the `VERIFIED AGENTIC RAG BRIEFING` (a competitor or company with a similar use case) to populate the `lookalike_peer` field.
+    - **STRICT RULE**: If NO lookalike peer is found in the RAG context, you MUST set `lookalike_peer` to "N/A". NEVER invent a peer or use general industry knowledge.
 
-    ### DRAFTS:
-    You must NEVER write actual outreach drafts. Provide only the strategy, angle, and signals.
+### THE SPARSE CONTEXT PROTOCOL (STRICT):
+If the `AVAILABLE SOLUTION POOL` contains a product but the intel (technical, narrative, collateral) is empty or sparse:
+1. **NO EXTRAPOLATION**: You are BANNED from inventing industry-specific use cases (e.g., "MDR compliance" for MedTech) if they are not in the RAG context.
+2. **CORE ONLY**: Stick to the base product definition provided.
+3. **P.S. GROUNDING**: DO NOT suggest a "Proof Point" or "Peer" for a P.S. line in the `internal_note` unless it is explicitly in the RAG briefing. If you do, you will be BANNED.
+4. **STRICT VERDICT GROUNDING**: Every `verdict`, `internal_note`, and `advanced_strategic_pivots` MUST be grounded in the `VERIFIED AGENTIC RAG BRIEFING`. Do not invent strategic angles, industry compliance needs, or "regulatory fits" that are not explicitly documented in your RAG stream.
+5. **ZERO EVIDENCE HALLUCINATION**: Do not invent case studies, metrics, or "regulatory training" capabilities. If it's not in the RAG, it doesn't exist for the purpose of this outreach.
+
+### DRAFTS:
+You must NEVER write actual outreach drafts. Provide only the strategy, angle, and signals.
 """
 
 def narrative_arbitrator_node(state: AgentState):
@@ -134,6 +143,7 @@ def narrative_arbitrator_node(state: AgentState):
     - Identified Pain Points: {json.dumps(pain_points)}
     - STRATEGIC RECOMMENDATION (CRM & JOURNEY): {state.get('strategic_recommendation')}
     - INTENT ANALYSIS (EMAIL/SENTIMENT): {state.get('intent_analysis')}
+    - SYNTHESIZED STRATEGIC SOLUTIONS: {json.dumps(state.get('strategic_solutions', []))}
 
     AVAILABLE SOLUTION POOL (Surgically Researched):
     {pool_str if pool_str else "No qualified solutions found."}
@@ -141,10 +151,11 @@ def narrative_arbitrator_node(state: AgentState):
     YOUR MISSION (Surgical Strategy & Executive Selection):
     1. **INTENT & JOURNEY SYNC**: Align with the `STRATEGIC RECOMMENDATION`.
     2. **PRODUCT SELECTION (CRITICAL)**: 
-       - Review the `AVAILABLE SOLUTION POOL`. 
+       - Review the `AVAILABLE SOLUTION POOL` and `SYNTHESIZED STRATEGIC SOLUTIONS`. 
        - Select the **SINGLE BEST** product or service that solves the `Identified Pain Points`.
        - If `Strategic Pivot Fit` is True, you MUST prioritize the pivot product unless there is a catastrophic mismatch.
        - Provide the `selected_product_name` and a logical `selected_product_justification`.
+       - **GROUNDING CHECK**: Your selection MUST exist in the provided solutions. DO NOT invent a product or service.
     3. **DYNAMIC SOCIAL STEPS**: 
        - **IF Recent LinkedIn Posts > 0**: Start with Stage 1 (LI_COMMENT).
        - **IF Recent LinkedIn Posts == 0**: BANNED from using LI_COMMENT. Skip to Stage 2 (LI_INVITE).

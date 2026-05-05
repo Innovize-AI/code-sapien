@@ -165,7 +165,7 @@ def get_graph():
     from agents.lead_scoring_agent import lead_data_extractor, lead_scorer
     from agents.report_agent import sales_research_report_generator
     from agents.intent_agent import email_history_fetcher_node, email_intent_analyzer_node
-    from agents.strategy_agent import pain_point_node, outreach_node
+    from agents.strategy_agent import pain_point_node, outreach_node, strategic_solution_synthesizer_node
     from agents.recommender_agent import strategic_recommender_node
     from agents.follow_up_agent import follow_up_strategy_node
     from agents.cso_agent import narrative_arbitrator_node
@@ -196,6 +196,7 @@ def get_graph():
     # Strategic Nodules
     builder.add_node("pain_point_discovery", pain_point_node)
     builder.add_node("strategic_rag_researcher", strategic_rag_researcher_node)
+    builder.add_node("strategic_solution_synthesizer", strategic_solution_synthesizer_node)
     builder.add_node("outreach_designer", outreach_node)
     builder.add_node("follow_up_designer", follow_up_strategy_node)
     builder.add_node("strategic_recommender", strategic_recommender_node)
@@ -244,7 +245,8 @@ def get_graph():
         "strategic_merger": "strategic_merger"
     })
     builder.add_edge("pain_point_discovery", "strategic_rag_researcher")
-    builder.add_edge("strategic_rag_researcher", "strategic_merger")
+    builder.add_edge("strategic_rag_researcher", "strategic_solution_synthesizer")
+    builder.add_edge("strategic_solution_synthesizer", "strategic_merger")
 
     # Strategic Pre-Processing (Data Analysis -> CSO)
     builder.add_edge("strategic_merger", "strategic_recommender")

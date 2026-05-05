@@ -433,14 +433,32 @@ class KnowledgeService:
     def delete_vectors(self, source_metadata: str, index_name: Optional[str] = None):
         """
         Deletes all vectors belonging to a specific source from all namespaces.
+        Attempts to match both the provided source_metadata and the raw filename.
         """
         try:
             target_index = self.pc.Index(index_name) if index_name else self.index
-            namespaces = ["playbooks", "case-studies", "solutions"]
+            # Check all possible namespaces (including legacy variations)
+            namespaces = ["playbooks", "case-studies", "casestudies", "solutions"]
+            
+            # Build a set of potential source patterns to clean up
+            source_patterns = {source_metadata}
+            
+            # Derive raw filename (stripping org_ prefix if present)
+            if source_metadata.startswith("org_"):
+                # org_UUID_filename.md -> filename.md
+                parts = source_metadata.split("_", 2)
+                if len(parts) > 2:
+                    source_patterns.add(parts[2])
+
+            logger.info(f"KnowledgeService: Purging vectors for patterns {source_patterns} in namespaces {namespaces}")
+
             for ns in namespaces:
-                logger.info(f"Deleting vectors for source '{source_metadata}' in namespace '{ns}'...")
-                # Pinecone allows deleting by metadata filter
-                target_index.delete(filter={"source": {"$eq": source_metadata}}, namespace=ns)
+                for pattern in source_patterns:
+                    try:
+                        target_index.delete(filter={"source": {"$eq": pattern}}, namespace=ns)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete pattern {pattern} in namespace {ns}: {e}")
+                    
             return True
         except Exception as e:
             logger.error(f"Error deleting vectors for '{source_metadata}': {e}")

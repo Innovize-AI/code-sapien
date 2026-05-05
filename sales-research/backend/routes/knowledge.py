@@ -371,7 +371,11 @@ async def delete_asset(
             else:
                 index_name = index_name or "glial-index"
                 ks = KnowledgeService(index_name=index_name)
-                source_metadata = f"org_{admin_user.organization_id}_{asset['filename']}"
+                org_prefix = f"org_{admin_user.organization_id}_"
+                source_metadata = asset['filename']
+                if not source_metadata.startswith(org_prefix):
+                    source_metadata = f"{org_prefix}{source_metadata}"
+                    
                 ks.delete_vectors(source_metadata, index_name=index_name)
                 logger.info(f"Successfully deleted vectors for source: {source_metadata} from index: {index_name}")
         except Exception as ve:

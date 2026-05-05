@@ -13,7 +13,7 @@ import json
 from models.structured_output import OutreachStrategy, Solution, StrategicSolutions
 from models.structured_output_cso import OutreachSequence
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +121,66 @@ def pain_point_node(state: AgentState):
     except Exception as e:
         logger.error(f"Error in pain_point_node: {e}")
         return {"target_pain_points": {}}
+
+
+def strategic_solution_synthesizer_node(state: AgentState):
+    """
+    Synthesizes the research_solution_pool into the structured strategic_solutions field.
+    This ensures the frontend receives the data in the high-fidelity format it expects.
+    """
+    solution_pool = state.get("research_solution_pool", [])
+    if not solution_pool:
+        logger.info("Synthesizer: No research solution pool found. Skipping.")
+        return {"strategic_solutions": []}
+
+    target_pain_points = state.get("target_pain_points", {})
+    selling_profile = state.get("selling_company_profile")
+    selling_company_name = getattr(selling_profile, "company_name", "Our Company") if selling_profile else "Our Company"
+    business_model = getattr(selling_profile, "business_model", "product") if selling_profile else "product"
+    
+    # Context summary for the prompt
+    selling_company_context = f"Business Model: {business_model}"
+    
+    # We pass the entire pool as the context
+    pool_str = ""
+    for idx, p in enumerate(solution_pool):
+        if not isinstance(p, dict): continue
+        pool_str += f"\nPRODUCT {idx+1}: {p.get('product_name')}\n"
+        pool_str += f"TECHNICAL: {p.get('technical_intel')}\n"
+        pool_str += f"NARRATIVE: {p.get('narrative_intel')}\n"
+        pool_str += f"COLLATERAL: {p.get('collateral_intel')}\n"
+        pool_str += f"OBJECTIONS: {p.get('objections')}\n"
+
+    prompt = STRATEGIC_SOLUTION_PROMPT.format(
+        pain_points=json.dumps(target_pain_points),
+        lead_segment=state.get("lead_segment", "POTENTIAL_CLIENT"),
+        selling_company_name=selling_company_name,
+        business_model=business_model,
+        selling_company_context=selling_company_context,
+        solution_context=pool_str
+    )
+
+    messages = [
+        SystemMessage(content="You are a Strategic Solution Architect. Your mission is to map RAG intelligence to specific prospect pain points with high-fidelity 'Logical Gap Mapping'."),
+        HumanMessage(content=prompt)
+    ]
+
+    try:
+        model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
+        structured_llm = model.with_structured_output(StrategicSolutions)
+        response = structured_llm.invoke(messages)
+        
+        if not response or not response.solutions:
+            return {"strategic_solutions": []}
+            
+        # Convert to list of dicts for state/persistence
+        solutions_list = [s.model_dump() for s in response.solutions]
+        logger.info(f"Synthesizer: Successfully generated {len(solutions_list)} strategic solutions.")
+        return {"strategic_solutions": solutions_list}
+        
+    except Exception as e:
+        logger.error(f"Error in strategic_solution_synthesizer_node: {e}", exc_info=True)
+        return {"strategic_solutions": []}
 
 
 

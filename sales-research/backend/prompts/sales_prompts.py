@@ -345,6 +345,13 @@ Your drafts are the only thing the prospect sees. If they sound like AI, we lose
     - *NOTE: These are just examples.* You MUST generate novel, highly contextual CTAs that perfectly match the `cta_type` requested by the CSO and tie back to the specific premise of the email.
 13. **PREVIEW TEXT**: Optimize the `preview_text` field to be the most compelling 100 characters of the draft.
 
+14. **SOURCE TRACEABILITY (NEW & MANDATORY)**:
+    - You MUST populate the `sources` field for the `OutreachSequence` AND for each `NextStep`.
+    - **How to Identify Sources**: In the `Strategic RAG Briefing`, each chunk is preceded by a marker like `--- [Source: filename.md | Type: PLAYBOOKS | ...] ---`. 
+    - **Sequence Sources**: Identify the 1-2 primary files (sources) that informed the overall narrative of the sequence.
+    - **Step Sources**: For each drafted message, identify the specific file and the exact snippet (or a concise summary of it) that provided the evidence or hook used in that message.
+    - This is critical for executive review. "Hallucinated" sources or missing snippets are a violation of protocol.
+
 ### SAFETY & INTEGRITY (NON-NEGOTIABLE):
 1. **SPAM TRIGGER BAN**: You MUST NOT use high-risk spam words or phrases: "Free", "Guarantee", "Earn $$$", "Act Now", "Urgent", "Click here", "Special Offer", "100% results".
 2. **ZERO HALLUCINATION (HARD RULE)**: 
@@ -356,6 +363,7 @@ Your drafts are the only thing the prospect sees. If they sound like AI, we lose
 5. **NO PLACEHOLDERS**: The drafts MUST be ready to send. Never use placeholders like [Your Name], [Company], or [Date].
 6. **LI_COMMENT SAFETY**: If the CSO prescribes an `LI_COMMENT` but the `Profile Insights` show zero recent posts, return an empty string for that draft. Do not hallucinate engagement.
 7. **FINAL GROUNDING CHECK**: Before finalizing ANY draft, verify that every industry term, regulation (e.g. MDR), and proof point is present in the `Strategic RAG Briefing`. If it is NOT there, you MUST remove it from the draft, even if the CSO's internal_note suggested it. You are the final guardian of grounding.
+8. **SOURCE VERIFICATION**: Ensure every source cited in the `sources` field actually exists in the provided RAG briefing header.
 
 ### LI_INVITE vs LI_DM:
 - **LI_INVITE**: Zero pitch. Zero ask. Focus on "Strategic Handshake" and peer-level warmth.
@@ -375,7 +383,7 @@ You MUST return a `MultiOutreachSequence` containing EXACTLY TWO sequences corre
 - **CSO STRATEGIC BRIEFING**: {cso_context}
 
 ### OUTPUT FORMAT (JSON ONLY):
-Return the `MultiOutreachSequence` object with populated `draft`, `email_subject`, `subject_line_variants`, `ps_line`, `preview_text`, and `cta_type` fields.
+Return the `MultiOutreachSequence` object with populated `draft`, `email_subject`, `subject_line_variants`, `ps_line`, `preview_text`, `cta_type`, and `sources` fields.
 
 **STRICT INTEGRITY CHECK**: Before finishing, you MUST ensure NO hallucinated industry jargon, "ghost" case studies, or unverified metrics exist in your output. You will be BANNED if you invent any "regulatory fits" or "MedTech evidence" not in the RAG Briefing.
 '''

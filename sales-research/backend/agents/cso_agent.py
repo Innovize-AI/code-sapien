@@ -190,7 +190,8 @@ def narrative_arbitrator_node(state: AgentState):
                 continue
                 
             if p.get('product_name', '').lower() in selected_name.lower() or selected_name.lower() in p.get('product_name', '').lower():
-                winning_intel = f"PRODUCT: {p['product_name']}\n\nTECHNICAL:\n{p['technical_intel']}\n\nNARRATIVE/MESSAGING:\n{p['narrative_intel']}\n\nCOLLATERAL/PROOF:\n{p['collateral_intel']}\n\nOBJECTIONS:\n{p['objections']}"
+                sources = p.get('attached_playbooks', []) + p.get('attached_case_studies', [])
+                winning_intel = f"PRODUCT: {p['product_name']}\n\nTECHNICAL:\n{p['technical_intel']}\n\nNARRATIVE/MESSAGING:\n{p['narrative_intel']}\n\nCOLLATERAL/PROOF:\n{p['collateral_intel']}\n\nOBJECTIONS:\n{p['objections']}\n\nSOURCES/PLAYBOOKS:\n{', '.join(sources) if sources else 'N/A'}"
                 break
         
         # If no exact match, use a fallback of the first one if only one exists

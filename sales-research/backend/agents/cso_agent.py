@@ -70,8 +70,14 @@ def narrative_arbitrator_node(state: AgentState):
     pain_points = state.get("target_pain_points", {})
     persona = state.get("user_profile_analysis", {}).get("engagement_persona", "Unknown")
     
-    # Solution Pool Context (New)
+    # Solution Pool Context (New) - Handle potential JSON string serialization
     solution_pool = state.get("research_solution_pool", [])
+    if isinstance(solution_pool, str):
+        try:
+            solution_pool = json.loads(solution_pool)
+        except:
+            logger.warning("CSO Agent: Could not parse research_solution_pool string as JSON")
+            solution_pool = []
     
     # Pivot Context
     is_strategic_pivot_fit = state.get("is_strategic_pivot_fit", False)
@@ -102,13 +108,18 @@ def narrative_arbitrator_node(state: AgentState):
     # Format Solution Pool for the CSO
     pool_str = ""
     for idx, p in enumerate(solution_pool):
+        # Defensive check: Ensure 'p' is a dictionary
+        if not isinstance(p, dict):
+            logger.warning(f"CSO Agent: Skipping malformed solution entry at index {idx} (Expected dict, got {type(p)})")
+            continue
+            
         pool_str += f"""
---- SOLUTION OPTION {idx+1}: {p['product_name']} ---
-- TECHNICAL INTEL: {p['technical_intel']}
-- NARRATIVE/MESSAGING: {p['narrative_intel']}
-- COLLATERAL/PROOF: {p['collateral_intel']}
-- OBJECTIONS/FRICTION: {p['objections']}
-- ATTACHED ASSETS: {", ".join(p['attached_playbooks'] + p['attached_case_studies'])}
+--- SOLUTION OPTION {idx+1}: {p.get('product_name', 'Unknown Product')} ---
+- TECHNICAL INTEL: {p.get('technical_intel', 'N/A')}
+- NARRATIVE/MESSAGING: {p.get('narrative_intel', 'N/A')}
+- COLLATERAL/PROOF: {p.get('collateral_intel', 'N/A')}
+- OBJECTIONS/FRICTION: {p.get('objections', 'N/A')}
+- ATTACHED ASSETS: {", ".join(p.get('attached_playbooks', []) + p.get('attached_case_studies', []))}
 """
 
     synthesis_input = f"""
@@ -163,7 +174,11 @@ def narrative_arbitrator_node(state: AgentState):
         winning_intel = ""
         selected_name = response.selected_product_name
         for p in solution_pool:
-            if p['product_name'].lower() in selected_name.lower() or selected_name.lower() in p['product_name'].lower():
+            # Defensive check for second loop
+            if not isinstance(p, dict):
+                continue
+                
+            if p.get('product_name', '').lower() in selected_name.lower() or selected_name.lower() in p.get('product_name', '').lower():
                 winning_intel = f"PRODUCT: {p['product_name']}\n\nTECHNICAL:\n{p['technical_intel']}\n\nNARRATIVE/MESSAGING:\n{p['narrative_intel']}\n\nCOLLATERAL/PROOF:\n{p['collateral_intel']}\n\nOBJECTIONS:\n{p['objections']}"
                 break
         

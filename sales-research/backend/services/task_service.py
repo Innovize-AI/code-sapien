@@ -52,7 +52,7 @@ async def update_single_competitor_task(competitor_id: str):
                     user_id=str(competitor.created_by_id) if competitor.created_by_id else None,
                     org_id=competitor.organization_id
                 )
-                logger.info(f"Saved and classified {len(leads)} leads for {competitor.name}")
+                logger.info(f"Saved and classified {len(leads)} leads for {competitor.linkedin_url}")
             
         except Exception as e:
             logger.error(f"Error scanning competitor {competitor_id}: {e}")

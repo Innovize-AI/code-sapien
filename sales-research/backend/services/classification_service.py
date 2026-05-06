@@ -166,17 +166,24 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                     logger.info(f"Trial limit reached. Skipping AI for {len(ai_sub_batch)} leads.")
                 else:
                     logger.info(f"Triggering AI for {len(ai_sub_batch)} profiles...")
-                    batch_res = await batch_classify_profiles_async(ai_sub_batch, company_context=company_context)
+                    raw_batch_res = await batch_classify_profiles_async(ai_sub_batch, company_context=company_context)
+                    # Normalize LLM output URLs to ensure they match our internal IDs
+                    for k, v in raw_batch_res.items():
+                        norm_k = normalize_linkedin_url(k)
+                        batch_res[norm_k] = v
+            
             logger.info(f"batch res response: {batch_res}")
             leads_to_update_batch = []
             event_leads_batch = []
             
             for lead in batch:
+                logger.info(f"Lead in batch: {lead}")
                 lead_n_url = lead.get("id") or lead.get("linkedin_url")
                 c = batch_res.get(lead_n_url)
+                logger.info(f"Looking up URL in batch_res: '{lead_n_url}'. Found? {bool(c)}")
                 
                 if c:
-                    logger.debug(f"Classifying {lead_n_url}: Result type={type(c)}")
+                    logger.info(f"Classifying {lead_n_url}: Result type={type(c)}")
                     # Helper to get values from c (could be dict or Pydantic object)
                     def get_val(obj, key, default=None):
                         if isinstance(obj, dict):
@@ -212,6 +219,8 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                     leads_to_update_batch.append(updated_data)
                     event_leads_batch.append(updated_data)
                 else:
+                    lead["linkedin_url"] = lead_n_url
+                    leads_to_update_batch.append(lead)
                     event_leads_batch.append(lead)
 
             if leads_to_update_batch:
@@ -227,15 +236,17 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                         )
                         
                         # Fetch IDs for ID map
-                        profile_urls = [l["linkedin_url"] for l in event_leads_batch]
+                        profile_urls = [l.get("linkedin_url") or l.get("id") for l in event_leads_batch if l.get("linkedin_url") or l.get("id")]
                         id_res = await session.execute(
                             select(IdentifiedProfile.id, IdentifiedProfile.linkedin_url)
                             .where(IdentifiedProfile.linkedin_url.in_(profile_urls))
                         )
                         id_map = {r[1]: str(r[0]) for r in id_res.all()}
                         for lu in event_leads_batch:
-                            if lu.get("linkedin_url") in id_map:
-                                lu["id"] = id_map[lu["linkedin_url"]]
+                            url = lu.get("linkedin_url") or lu.get("id")
+                            lu["linkedin_url"] = url
+                            if url in id_map:
+                                lu["id"] = id_map[url]
                 
                 # 2. Individual Enrichment & Notifications
                 for lu in leads_to_update_batch:

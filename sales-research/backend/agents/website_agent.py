@@ -31,11 +31,14 @@ def scrape_webpages(state: AgentState) -> dict:
     if not website:
         return {"scraped_website_content": "Could not scrape empty website"}
 
-    loader = WebBaseLoader(website)
-    docs = loader.load()
-    scraped_content = "\n\n".join([doc.page_content for doc in docs])
-    
-    return {"scraped_website_content": scraped_content}
+    try:
+        loader = WebBaseLoader(website)
+        docs = loader.load()
+        scraped_content = "\n\n".join([doc.page_content for doc in docs])
+        return {"scraped_website_content": scraped_content}
+    except Exception as e:
+        logger.warning(f"Failed to scrape website {website}: {e}")
+        return {"scraped_website_content": "Website could not be reached or scraped."}
 
 def website_analyzer(state: AgentState):
     """Analyzes scraped website content using Structured Output."""

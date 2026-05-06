@@ -62,8 +62,20 @@ async def log_activity_and_notify(
     # Try fetching OrganizationSettings for the webhook
     settings = await get_org_settings(db, user_id=user_id, org_id=org_id)
     if settings and settings.slack_webhook_url:
-        webhook_url = settings.slack_webhook_url
-        logger.info(f"DEBUG: Using settings owned by {user_id or 'System'}")
+        slack_enabled = True
+        if settings.integrations_config:
+            try:
+                config_json = json.loads(settings.integrations_config)
+                if config_json.get("slack") and not config_json["slack"].get("enabled", True):
+                    slack_enabled = False
+            except Exception:
+                pass
+                
+        if slack_enabled:
+            webhook_url = settings.slack_webhook_url
+            logger.info(f"DEBUG: Using settings owned by {user_id or 'System'}")
+        else:
+            logger.info("DEBUG: Slack notification skipped because it is disabled in integrations config.")
 
     if webhook_url:
         blocks = None

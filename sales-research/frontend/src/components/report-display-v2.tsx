@@ -96,6 +96,7 @@ interface ReportDisplayV2Props {
         sources: Array<{ source: string; snippet: string }>;
       };
       executive_blueprint_summary: string;
+      strategic_pivot_usecase?: string;
       refined_linkedin_message?: string;
       refined_email_body?: string;
       strategic_proof_points?: string[];
@@ -961,7 +962,7 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                 </Button>
               </div>
               <div className="cursor-pointer" onClick={() => setIsProofOpen(true)}>
-                <CSOCommandCard data={briefing.unified_command} />
+                <CSOCommandCard data={{ ...briefing.unified_command, strategic_pivot_usecase: briefing.strategic_pivot_usecase }} />
               </div>
               {briefing.advanced_strategic_pivots && briefing.advanced_strategic_pivots.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1622,7 +1623,7 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                 {activeIntelSection === "cso-verdict" && briefing && (
                   <div className="space-y-6">
                     <div className="cursor-pointer" onClick={() => setIsProofOpen(true)}>
-                      <CSOCommandCard data={briefing.unified_command} />
+                      <CSOCommandCard data={{ ...briefing.unified_command, strategic_pivot_usecase: briefing.strategic_pivot_usecase }} />
                     </div>
                     {briefing.executive_blueprint_summary && (
                       <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 space-y-2">

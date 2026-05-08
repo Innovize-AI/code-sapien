@@ -93,7 +93,24 @@ async def upsert_company(
         "updated_at": datetime.datetime.now(datetime.timezone.utc)
     }
     
+    # Normalize industries to standard categories if present
+    raw_industries = relevant_data.get("industries")
+    if raw_industries:
+        try:
+            from utils.industry_mapper import normalize_industry
+            if isinstance(raw_industries, list):
+                raw_str = ", ".join(raw_industries)
+            else:
+                raw_str = str(raw_industries)
+            
+            # Run async normalization
+            normalized = await normalize_industry(raw_str)
+            relevant_data["industries"] = [normalized]
+        except Exception as e:
+            logger.error(f"Error normalizing company industries in upsert_company: {e}")
+
     # Ensure ID and created_at are never overwritten
+
     relevant_data.pop("id", None)
     relevant_data.pop("created_at", None)
     

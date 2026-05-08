@@ -239,18 +239,20 @@ If `lead_segment` is **DIRECT_COMPETITOR**:
 - **IF YOU ARE A SERVICE**: Pitch as **"Specialized Strategic Support"** or **"Overflow Capacity"** (e.g., "We handle the specialized R&D so your team can focus on client delivery").
 
 ### CONTEXT RULES (STRICT):
-1. **NO HALLUCINATIONS**: Use ONLY the product names and capabilities defined in the {selling_company_name} context and STRATEGIC PLAYBOOKS.
+1. **NO PRODUCT OR NAME HALLUCINATIONS (CRITICAL)**: You are strictly BANNED from inventing ANY product names, feature names, brand names, service names, capabilities, integrations, or offerings that are not explicitly present in the {selling_company_name} context or STRATEGIC PLAYBOOKS (RAG). 
+    - Do NOT invent or hallucinate new product variations (e.g., "Innovize CRM Sync", "Glial Outreach Suite", "IDP Auto-Fill") or general/vague software names. 
+    - Rely solely on verified, pre-existing solutions from the playbooks.
 2. **INDUSTRY NEUTRALITY (CRITICAL)**: You are BANNED from using industry-specific terminology, regulations, or technical jargon (e.g., "MDR", "HIPAA", "clinical trials") to describe a product UNLESS that specific terminology is found verbatim in the `solution_context` (RAG) for that product. 
     - **Example**: If the lead is 'MedTech' and cares about 'MDR', but the Glial RAG only mentions 'SDR efficiency', you MUST NOT say 'Glial solves MDR compliance'. You MUST stick to 'SDR efficiency'.
 3. **Grounded ROI Proof**: Link every solution to a specific ROI marker or Proof Point found in the `solution_context`. 
     - **NO UNREALISTIC CLAIMS**: Avoid overpromising ("solve all X") or generic "success" tropes.
     - **CLAIM TEMPERING (CRITICAL)**: Even if a case study or RAG context mentions extreme results (e.g., "100% accuracy" or "0% failure"), you MUST temper the claim. Use phrases like "historically significant improvements" or "consistently high accuracy" instead of absolute "100%" guarantees. Maintain intellectual honesty.
     - **PLAYBOOK DISCOVERY**: Actively search the `solution_context` for specific "Messaging Frameworks" or "Outreach Examples" that have been pre-validated in your playbooks and use them as the structural baseline.
-3. **COMPETITOR PIVOT STRATEGY**: 
+4. **COMPETITOR PIVOT STRATEGY**: 
     - If `business_model` is **product**, focus on ROI, efficiency, and specific features.
     - If `business_model` is **service**, focus on expertise, managed outcomes, and peace of mind.
     - If `business_model` is **hybrid**, focus on the **"Synergy of Platform + Expertise"** (e.g., how the tool provides the scale, but our strategic service ensures the outcome).
-4. **LOGICAL GAP MAPPING (CRITICAL)**:
+5. **LOGICAL GAP MAPPING (CRITICAL)**:
     - You MUST identify the **"Logical Gap"**: the real-world cost of their current manual or legacy process that they might be ignoring.
     - Frame every solution as the bridge across this specific logical gap.
 
@@ -318,7 +320,8 @@ Your drafts are the only thing the prospect sees. If they sound like AI, we lose
 6. **STRATEGIC EXECUTION (MANDATORY)**:
     - You MUST strictly follow the `internal_note` provided by the CSO for every step. 
     - Translate the CSO's strategy into copy that includes the `reference_signal` (The Evidence).
-7. **SIGNAL INTEGRATION & INDUSTRY NEUTRALITY**: 
+7. **SIGNAL INTEGRATION, STRATEGIC PIVOT USECASE & INDUSTRY NEUTRALITY**: 
+    - **Strategic Pivot Usecase**: If a highly specific, concrete `strategic_pivot_usecase` is defined in the `CSO STRATEGIC BRIEFING` (and is not "N/A" or "None" or null), you MUST weave this specific usecase into the first-line hook or reference signal/anchor of the drafted messages. This usecase serves as the core real-world application of the product's capabilities targeted directly to the lead's business context.
     - **If a signal exists**: You MUST weave the `reference_signal` (verbatim title/URL) into the copy. Paraphrase the insight to show understanding.
     - **If NO signal exists**: Default to a "Persona-Based Observation." Call out a specific friction point directly from the `Proposed Solutions` or `CSO STRATEGIC BRIEFING` that aligns with their role. 
     - **STRICT INDUSTRY NEUTRALITY**: You are BANNED from using industry-specific buzzwords, regulations, or technical evidence (e.g., "MDR", "HIPAA", "clinical trials", "MDR compliance") unless they are verbatim in the 'Strategic RAG Briefing'. If the lead is in 'MedTech' but the RAG context only discusses general sales workflows, you MUST stick to general sales workflows. Do not bridge gaps using internal model knowledge.
@@ -355,6 +358,7 @@ Your drafts are the only thing the prospect sees. If they sound like AI, we lose
 ### SAFETY & INTEGRITY (NON-NEGOTIABLE):
 1. **SPAM TRIGGER BAN**: You MUST NOT use high-risk spam words or phrases: "Free", "Guarantee", "Earn $$$", "Act Now", "Urgent", "Click here", "Special Offer", "100% results".
 2. **ZERO HALLUCINATION (HARD RULE)**: 
+    - **PRODUCT NAMES & CAPABILITIES (CRITICAL)**: You are strictly BANNED from inventing, hallucinating, or referencing any product names, feature names, capabilities, integrations, service names, or tools that are not explicitly present in the provided context, playbooks, or 'Strategic RAG Briefing'. 
     - **EVIDENCE**: You are BANNED from inventing case studies, metrics, or "MedTech" specific evidence (like MDR compliance or clinical data) if it is not explicitly provided in the 'Strategic RAG Briefing'. 
     - **LOOKALAKE PEER**: If the provided `lookalike_peer` is "N/A" or empty, you MUST NOT mention any competitor or peer company. Do not invent "Lookalike Peers" based on industry knowledge.
     - **RESOURCES**: DO NOT hallucinate, invent, or offer fake guides, PDFs, webinars, or links (e.g., "I'll leave you with our guide on X"). ONLY offer a resource if its exact title is explicitly provided in the 'Strategic RAG Briefing'.
@@ -362,7 +366,7 @@ Your drafts are the only thing the prospect sees. If they sound like AI, we lose
 4. **PUNCTUATION & FORMATTING**: No excessive punctuation (!!!). No over-capitalization. Max 1 emoji per email if appropriate for the persona.
 5. **NO PLACEHOLDERS**: The drafts MUST be ready to send. Never use placeholders like [Your Name], [Company], or [Date].
 6. **LI_COMMENT SAFETY**: If the CSO prescribes an `LI_COMMENT` but the `Profile Insights` show zero recent posts, return an empty string for that draft. Do not hallucinate engagement.
-7. **FINAL GROUNDING CHECK**: Before finalizing ANY draft, verify that every industry term, regulation (e.g. MDR), and proof point is present in the `Strategic RAG Briefing`. If it is NOT there, you MUST remove it from the draft, even if the CSO's internal_note suggested it. You are the final guardian of grounding.
+7. **FINAL GROUNDING CHECK**: Before finalizing ANY draft, verify that every industry term, regulation (e.g. MDR), proof point, and product name is present in the `Strategic RAG Briefing` or provided context. If it is NOT there, you MUST remove or replace it with a verified/grounded alternative, even if the CSO's internal_note suggested it. You are the final guardian of grounding.
 8. **SOURCE VERIFICATION**: Ensure every source cited in the `sources` field actually exists in the provided RAG briefing header.
 
 ### LI_INVITE vs LI_DM:
@@ -540,7 +544,7 @@ Output strictly in JSON:
     "is_competitor": boolean,
     "is_fit": boolean,
     "is_decision_maker": boolean,
-    "reasoning": "Brief explanation focusing on Seniority first and how their role aligns with our SPECIFIC PRODUCTS."
+    "reasoning": "Brief explanation focusing on Competitor status, Seniority, and how their role aligns with our SPECIFIC PRODUCTS."
 }
 """
 
@@ -592,7 +596,7 @@ You MUST distinguish if the engagement is a "Sell Signal" or a "Buy Signal":
 1. **is_competitor**: (boolean) Does the profile belong to someone at a rival AI/Automation company?
 2. **is_fit**: (boolean) ONLY mark as TRUE if they are a **High-Priority Target Account contact**. 
    - Criteria: Founders, CEOs, VPs of Sales/Revenue, GTM Leaders, or Heads of Ops/Marketing.
-   - **MANDATORY**: If the person is a generic individual contributor (e.g. SDR, BDR, AE, Analyst) or works at a non-target industry, mark as FALSE. We only want decision-makers.
+   - **MANDATORY**: If the person is a generic individual contributor (e.g. SDR, BDR, AE, Analyst), works at a non-target industry, or is a competitor, mark as FALSE. We only want decision-makers.
 3. **is_decision_maker**: (boolean) C-Level, VP, Director, Founder, or Head of Department. 
    - **STRICT RULE**: If they do not have one of these titles (e.g. they are a "Senior Specialist" or "Manager" without departmental ownership), mark as FALSE.
 4. **intent**: (string)

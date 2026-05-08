@@ -53,20 +53,27 @@ async def _resolve_rag_isolation(state: Dict[str, Any]) -> tuple[Optional[str], 
         if user_id and (not index_name or not user_linkedin):
             u_id = UUID(str(user_id)) if isinstance(user_id, str) and "-" in str(user_id) else user_id
             if isinstance(u_id, (UUID, str)):
-                 # Try OrganizationSettings first (owner_id)
-                 result = await db.execute(select(OrganizationSettings).where(OrganizationSettings.owner_id == u_id))
-                 settings = result.scalars().first()
+                 # Try to resolve user's organization_id from Profile
+                 res_prof = await db.execute(select(Profile.organization_id).where(Profile.id == u_id))
+                 org_id = res_prof.scalar_one_or_none()
+                 
+                 settings = None
+                 if org_id:
+                     result = await db.execute(select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id))
+                     settings = result.scalars().first()
+                 
+                 if not settings:
+                     result = await db.execute(select(OrganizationSettings).where(OrganizationSettings.owner_id == u_id))
+                     settings = result.scalars().first()
+                     
                  if settings:
                      index_name = index_name or settings.pinecone_index_name
                      if not index_name and is_trial and settings.organization_id:
                          index_name = f"tr-{settings.organization_id}"
                          
-                 # Try Profile to find organization_id (for trial derivation)
-                 if not index_name and is_trial:
-                     res_prof = await db.execute(select(Profile.organization_id).where(Profile.id == u_id))
-                     org_id = res_prof.scalar_one_or_none()
-                     if org_id:
-                         index_name = f"tr-{org_id}"
+                 # Try Profile to find organization_id (for trial derivation fallback)
+                 if not index_name and is_trial and org_id:
+                     index_name = f"tr-{org_id}"
     
     if is_trial and not index_name:
         logger.error(f"CRITICAL RAG ISOLATION FAILURE: Could not resolve index_name. State: user_id={user_id}, user_linkedin={user_linkedin}, state_index={state.get('pinecone_index_name')}")
@@ -217,6 +224,7 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
     qualified_products = []
     combined_anchor_context = ""
     pivot_fit_names = []
+    research_solution_pool = []
     
     if selling_profile and selling_profile.products:
         # Step 1: Strategic Selection (Pivot Priority)
@@ -254,7 +262,7 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
         fitting_pivots = []
         for product in [p for p in selling_profile.products if getattr(p, "is_strategic_pivot", False)]:
             target_roles, target_industries = get_effective_targets(product)
-            
+            logger.info(f"Effective Targets for {product.name} - roles: {target_roles}, industries: {target_industries}")
             # Strict Fit Check for Pivot
             fit_check = await verify_strict_fit(
                 state, 
@@ -267,11 +275,14 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
                 logger.info(f"Confirmed Fit for Pivot: {product.name}. Reason: {fit_check.reasoning}")
                 fitting_pivots.append(product)
                 pivot_fit_names.append(product.name)
+            else:
+                logger.info(f"Rejected Product: {product.name}. Reason: {fit_check.reasoning}")
         
         # Pass 2: Qualified Product Collection
         if fitting_pivots:
             # If we have pivot winners, ONLY research those products.
             qualified_products = fitting_pivots
+            logger.info(f"Pivot winners found: {fitting_pivots}")
         else:
             # Fallback: Check all other products
             for product in [p for p in selling_profile.products if not getattr(p, "is_strategic_pivot", False)]:
@@ -294,6 +305,7 @@ async def strategic_rag_researcher_node(state: Dict[str, Any]) -> Dict[str, Any]
                 
                 qualified_products.append(product)
 
+        logger.info(f"Qualified Products: {qualified_products}")
         # Step 2: Multi-Vector Retrieval for Qualified Products
         research_solution_pool = []
         

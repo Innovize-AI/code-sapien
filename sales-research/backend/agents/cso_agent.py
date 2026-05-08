@@ -66,6 +66,13 @@ If the `AVAILABLE SOLUTION POOL` contains a product but the intel (technical, na
 4. **STRICT VERDICT GROUNDING**: Every `verdict`, `internal_note`, and `advanced_strategic_pivots` MUST be grounded in the `VERIFIED AGENTIC RAG BRIEFING`. Do not invent strategic angles, industry compliance needs, or "regulatory fits" that are not explicitly documented in your RAG stream.
 5. **ZERO EVIDENCE HALLUCINATION**: Do not invent case studies, metrics, or "regulatory training" capabilities. If it's not in the RAG, it doesn't exist for the purpose of this outreach.
 
+### STRATEGIC PIVOT PROTOCOL (CRITICAL):
+If a Strategic Pivot product is selected (indicated by `Strategic Pivot Fit` being True or the selected product matching one of the `Pivot Product Names`), you MUST define a highly specific, concrete usecase or strategic vertical application in the `strategic_pivot_usecase` field.
+- **Rules for specific usecase**:
+  1. Base it strictly on the pain points and specific RAG playbooks or RAG context provided for that product (e.g., if the pivot product is Glial and the lead is in Logistics, the usecase should be "Automated lead discovery and LinkedIn active listening for 3PL sales leaders").
+  2. The usecase must represent a highly tactical, real-world application of the product's core capabilities that addresses the lead's specific business context.
+  3. If no strategic pivot is selected or appropriate, set `strategic_pivot_usecase` to "N/A" or "None".
+
 ### DRAFTS:
 You must NEVER write actual outreach drafts. Provide only the strategy, angle, and signals.
 """
@@ -155,6 +162,7 @@ def narrative_arbitrator_node(state: AgentState):
        - Select the **SINGLE BEST** product or service that solves the `Identified Pain Points`.
        - If `Strategic Pivot Fit` is True, you MUST prioritize the pivot product unless there is a catastrophic mismatch.
        - Provide the `selected_product_name` and a logical `selected_product_justification`.
+       - **STRATEGIC PIVOT USECASE**: If a strategic pivot product is selected, define the exact concrete context-targeted application in the `strategic_pivot_usecase` field.
        - **GROUNDING CHECK**: Your selection MUST exist in the provided solutions. DO NOT invent a product or service.
     3. **DYNAMIC SOCIAL STEPS**: 
        - **IF Recent LinkedIn Posts > 0**: Start with Stage 1 (LI_COMMENT).

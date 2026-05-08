@@ -23,13 +23,27 @@ async def _get_organization_settings(user_id: str = None) -> dict:
     """Helper to fetch settings from database with per-user overrides."""
     async with SessionLocal() as db:
         from db.crud import get_org_settings
+        from sqlalchemy import select
+        from db.models import Profile
         
         logger.info(f"Fetching Org Settings for user_id: {user_id}")
-        # 1. Fetch Global Settings using the robust helper
-        global_settings = await get_org_settings(db, user_id=user_id)
+        
+        # Resolve org_id first if user_id is provided
+        org_id = None
+        if user_id:
+            from uuid import UUID
+            try:
+                u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+                result = await db.execute(select(Profile.organization_id).where(Profile.id == u_id))
+                org_id = result.scalar()
+                logger.info(f"Resolved org_id: {org_id} for user_id: {user_id}")
+            except Exception as e:
+                logger.error(f"Error resolving org_id for user_id {user_id}: {e}")
+
+        # 1. Fetch Global Settings using the robust helper with org_id and user_id
+        global_settings = await get_org_settings(db, user_id=user_id, org_id=org_id)
         
         # 2. Fetch User Settings (if user_id provided)
-        from sqlalchemy import select
         from db.models import UserSettings
         user_settings = None
         if user_id:
@@ -81,18 +95,21 @@ async def _get_organization_settings(user_id: str = None) -> dict:
         # Priority: Settings > Derived (Trial) > None
         index_name = global_settings.pinecone_index_name if global_settings else None
         is_trial = os.getenv("TRIAL_MODE", "false").lower() == "true"
-        if not index_name and is_trial and user_id:
-            from uuid import UUID
-            from db.models import Profile
-            u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
-            # Resolve org_id in one go
-            result = await db.execute(select(Profile.organization_id).where(Profile.id == u_id))
-            org_id = result.scalar()
+        if not index_name and is_trial:
             if org_id:
                 index_name = f"tr-{org_id}"
                 logger.info(f"Derived Trial Index Name from Org ID: {index_name}")
-            else:
-                logger.warning(f"Could not derive index_name: No organization_id found for profile {user_id}")
+            elif user_id:
+                from uuid import UUID
+                u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+                # Resolve org_id in one go
+                result = await db.execute(select(Profile.organization_id).where(Profile.id == u_id))
+                org_id = result.scalar()
+                if org_id:
+                    index_name = f"tr-{org_id}"
+                    logger.info(f"Derived Trial Index Name from Org ID fallback: {index_name}")
+                else:
+                    logger.warning(f"Could not derive index_name: No organization_id found for profile {user_id}")
 
         if is_trial and not index_name:
              logger.error(f"CRITICAL: No pinecone_index_name resolved for user {user_id} in TRIAL_MODE!")
@@ -589,8 +606,22 @@ async def _push_to_hubspot_if_enabled(db, user_id, report, final_state):
     """
     from db.crud import get_org_settings
     from services.hubspot_service import HubspotService
+    from sqlalchemy import select
+    from db.models import Profile
     
-    settings = await get_org_settings(db, user_id)
+    # Resolve org_id first if user_id is provided
+    org_id = None
+    if user_id:
+        from uuid import UUID
+        try:
+            u_id = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+            result = await db.execute(select(Profile.organization_id).where(Profile.id == u_id))
+            org_id = result.scalar()
+            logger.info(f"HubSpot Sync: Resolved org_id {org_id} for user_id {user_id}")
+        except Exception as e:
+            logger.error(f"HubSpot Sync: Error resolving org_id for user_id {user_id}: {e}")
+
+    settings = await get_org_settings(db, user_id=user_id, org_id=org_id)
     if settings and settings.hubspot_access_token and settings.hubspot_sync_enabled:
         try:
             hs = HubspotService(settings.hubspot_access_token)

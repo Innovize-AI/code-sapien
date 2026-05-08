@@ -15,6 +15,7 @@ interface CSOCommandCardProps {
     objection_preemption: string[];
     sources: Array<{ source: string; snippet: string }>;
     strategic_proof_points?: string[];
+    strategic_pivot_usecase?: string;
   };
 }
 
@@ -150,6 +151,21 @@ export function CSOCommandCard({ data }: CSOCommandCardProps) {
               <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-1">Winning Offering</div>
               <p className={cn("text-[13px] font-bold italic leading-relaxed", accent.iconText)}>
                 {data.product_selection_reasoning}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Strategic Pivot Use Case */}
+      {data.strategic_pivot_usecase && data.strategic_pivot_usecase !== "N/A" && data.strategic_pivot_usecase !== "None" && (
+        <div className="pl-6 pr-6 pb-4">
+          <div className="flex items-start gap-3 p-4 rounded-xl border bg-indigo-500/[0.03] border-indigo-500/15 text-indigo-900 dark:text-indigo-100">
+            <Target className="h-3.5 w-3.5 mt-0.5 shrink-0 text-indigo-500" />
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-widest text-indigo-400 dark:text-indigo-500 mb-1">Strategic Pivot Use Case</div>
+              <p className="text-[13px] font-bold italic leading-relaxed text-indigo-700 dark:text-indigo-300">
+                {data.strategic_pivot_usecase}
               </p>
             </div>
           </div>

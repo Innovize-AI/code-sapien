@@ -129,6 +129,10 @@ class MultiOutreachSequence(BaseModel):
 class GlobalCSOBriefing(BaseModel):
     selected_product_name: str = Field(description="The final product or service selected as the primary offering for this lead.")
     selected_product_justification: str = Field(description="Why this specific product is the best fit for the identified pain points.")
+    strategic_pivot_usecase: Optional[str] = Field(
+        None,
+        description="A highly specific, concrete usecase or strategic vertical application (e.g., 'Automated bill of lading parsing' or 'Contract digitization') if a Strategic Pivot product is selected. Set to None/N/A if not a Strategic Pivot."
+    )
     unified_command: UnifiedCommand
     executive_blueprint_summary: str = Field(description="A high-level synthesis of why this account matters.")
     refined_linkedin_message: Optional[str] = Field(None, description="The CSO-optimized LinkedIn message.")

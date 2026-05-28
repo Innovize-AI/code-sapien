@@ -1,0 +1,167 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: glial-research-backend-service-trial
+  annotations:
+    run.googleapis.com/minScale: "1"
+    run.googleapis.com/invoker-iam-disabled: true
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/startup-cpu-boost: "true"
+        run.googleapis.com/cpu-throttling: false
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containerConcurrency: 30
+      timeoutSeconds: 3600
+      containers:
+        - image: us-central1-docker.pkg.dev/innovize-ai/sales-research/glial-research-backend-image:latest
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          env:
+            - name: ENVIRONMENT
+              value: trial
+            - name: TRIAL_MODE
+              value: "true"
+            - name: TRIAL_IDENTIFIED_LIMIT
+              value: "1000"
+            - name: TRIAL_CLASSIFICATION_LIMIT
+              value: "1000"
+            - name: TRIAL_RESEARCH_LIMIT
+              value: "25"
+            - name: DB_SCHEMA
+              value: trial
+            - name: ALLOW_ORIGINS
+              value: "https://trial.glial.innovizeai.com,http://localhost:3000,https://glial-research-frontend-service-trial-512561667165.us-central1.run.app"
+            - name: FRONTEND_URL
+              value: "https://trial.glial.innovizeai.com"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: PYTHONPATH
+              value: "/app"
+            - name: LANGCHAIN_TRACING_V2
+              valueFrom:
+                secretKeyRef:
+                  name: LANGCHAIN_TRACING_V2
+                  key: latest
+            - name: LANGCHAIN_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: LANGCHAIN_ENDPOINT
+                  key: latest
+            - name: LANGCHAIN_PROJECT
+              valueFrom:
+                secretKeyRef:
+                  name: LANGCHAIN_PROJECT
+                  key: latest
+            - name: GOOGLE_DRIVE_FOLDER_ID
+              valueFrom:
+                secretKeyRef:
+                  name: GOOGLE_DRIVE_FOLDER_ID
+                  key: latest
+            - name: DB_USER
+              value: "postgres"
+            - name: N8N_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: N8N_WEBHOOK_URL
+                  key: latest
+            - name: SUPABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: SUPABASE_URL
+                  key: latest
+            - name: LINKEDIN_RAPID_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: LINKEDIN_RAPID_BASE_URL
+                  key: latest
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: OPENAI_API_KEY
+                  key: latest
+            - name: LANGCHAIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: LANGCHAIN_API_KEY
+                  key: latest
+            - name: TAVILY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: TAVILY_API_KEY
+                  key: latest
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: GOOGLE_API_KEY
+                  key: latest
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ANTHROPIC_API_KEY
+                  key: latest
+            - name: CLAUDE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: CLAUDE_API_KEY
+                  key: latest
+            - name: APOLLO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: APOLLO_API_KEY
+                  key: latest
+            - name: RAPID_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: RAPID_API_KEY
+                  key: latest
+            - name: SUPABASE_ANON_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: SUPABASE_ANON_KEY
+                  key: latest
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: SUPABASE_SERVICE_ROLE_KEY
+                  key: latest
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: DB_PASSWORD
+                  key: latest
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: DATABASE_URL
+                  key: latest
+            - name: PINECONE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: PINECONE_API_KEY
+                  key: latest
+            - name: TASK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: TASK_SECRET
+                  key: latest
+            - name: LOCAL_PARALLEL
+              value: "false"
+            - name: PUBSUB_PROJECT_ID
+              value: "innovize-ai"
+            - name: PUBSUB_TOPIC_ID
+              value: "sales-research-discovery"
+            - name: MILLION_VERIFIER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: MILLION_VERIFIER_API_KEY
+                  key: latest

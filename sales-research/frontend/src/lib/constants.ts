@@ -203,3 +203,66 @@ export const REVENUE_OPTIONS = [
     "$500M-$1B",
     "$1B+"
 ];
+
+export const APOLLO_SENIORITY_OPTIONS = [
+    { label: "Owner", value: "owner" },
+    { label: "Founder", value: "founder" },
+    { label: "C-Suite", value: "c_suite" },
+    { label: "Partner", value: "partner" },
+    { label: "VP", value: "vp" },
+    { label: "Head", value: "head" },
+    { label: "Director", value: "director" },
+    { label: "Manager", value: "manager" },
+    { label: "Senior", value: "senior" },
+    { label: "Entry", value: "entry" },
+    { label: "Intern", value: "intern" }
+];
+
+export const APOLLO_EMAIL_STATUS_OPTIONS = [
+    { label: "Verified", value: "verified" },
+    { label: "Likely to Engage", value: "likely_to_engage" },
+    { label: "Unverified", value: "unverified" },
+    { label: "Unavailable", value: "unavailable" }
+];
+
+export const APOLLO_INDUSTRIES = [
+    "accounting", "agriculture", "airlines/aviation", "alternative dispute resolution", 
+    "alternative medicine", "animation", "apparel & fashion", "architecture & planning", 
+    "arts & crafts", "automotive", "aviation & aerospace", "banking", "biotechnology", 
+    "broadcast media", "building materials", "business supplies & equipment", 
+    "capital markets", "chemicals", "civic & social organization", "civil engineering", 
+    "commercial real estate", "computer & network security", "computer games", 
+    "computer hardware", "computer networking", "computer software", "construction", 
+    "consumer electronics", "consumer goods", "consumer services", "cosmetics", 
+    "dairy", "defense & space", "design", "e-learning", "education management", 
+    "electrical/electronic manufacturing", "entertainment", "environmental services", 
+    "events services", "executive office", "facilities services", "farming", 
+    "financial services", "fine art", "fishery", "food & beverages", "food production", 
+    "fund-raising", "furniture", "gambling & casinos", "glass", "ceramics & concrete", 
+    "government administration", "government relations", "graphic design", 
+    "health", "wellness & fitness", "higher education", "hospital & health care", 
+    "hospitality", "human resources", "import & export", "individual & family services", 
+    "industrial automation", "information services", "information technology & services", 
+    "insurance", "international affairs", "international trade & development", 
+    "internet", "investment banking", "investment management", "judiciary", 
+    "law enforcement", "law practice", "legal services", "legislative office", 
+    "leisure", "travel & tourism", "libraries", "logistics & supply chain", 
+    "luxury goods & jewelry", "machinery", "management consulting", "maritime", 
+    "market research", "marketing & advertising", "mechanical or industrial engineering", 
+    "media production", "medical devices", "medical practice", "mental health care", 
+    "military", "mining & metals", "motion pictures & film", "museums & institutions", 
+    "music", "nanotechnology", "newspapers", "nonprofit organization management", 
+    "oil & energy", "online media", "outsourcing/offshoring", "package/freight delivery", 
+    "packaging & containers", "paper & forest products", "performing arts", 
+    "pharmaceuticals", "philanthropy", "photography", "plastics", "political organization", 
+    "primary/secondary education", "printing", "professional training & coaching", 
+    "program development", "public policy", "public relations & communications", 
+    "public safety", "publishing", "railroad manufacture", "ranching", "real estate", 
+    "recreational facilities & services", "religious institutions", "renewables & environment", 
+    "research", "restaurants", "retail", "security & investigations", "semiconductors", 
+    "shipbuilding", "sporting goods", "sports", "staffing & recruiting", 
+    "supermarkets", "telecommunications", "textiles", "think tanks", "tobacco", 
+    "translation & localization", "transportation/trucking/railroad", "utilities", 
+    "venture capital & private equity", "veterinary", "warehousing", "wholesale", 
+    "wine & spirits", "wireless", "writing & editing"
+];

@@ -23,15 +23,19 @@ import {
   Briefcase,
   ExternalLink,
   ChevronRight,
-  Loader2,
   Sparkles,
   Activity,
   FileText,
   MessageSquare,
   Zap,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion
 } from "lucide-react";
+import axios from "axios";
 import { ensureProtocol, cn } from "@/lib/utils";
 import { API_URL } from "@/lib/api";
+import { Spinner } from "@/components/ui/spinner"
 
 interface CompanyDetailModalProps {
   companyId: string | null;
@@ -66,12 +70,13 @@ interface CompanyData {
     headline?: string;
     linkedin_url: string;
     email?: string;
+    email_verification_status?: string;
     is_fit: boolean;
     is_decision_maker: boolean;
     is_buy_signal?: boolean;
     is_strategic_seller?: boolean;
     intent?: string;
-    sentiment?: string;
+    sentiment?: string | number;
     post_topic_depth?: string;
     fit_reasoning?: string;
     interaction_history?: string;
@@ -98,15 +103,66 @@ export function CompanyDetailModal({
   const fetchCompanyDetails = async (id: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/companies/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCompany(data);
-      }
+      const response = await axios.get(`${API_URL}/api/companies/${id}`);
+      setCompany(response.data);
     } catch (error) {
       console.error("Failed to fetch company details:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const renderEmailVerificationBadge = (status?: string) => {
+    if (!status) return null;
+    const s = status.toLowerCase();
+    switch (s) {
+      case "verified":
+      case "ok":
+      case "valid":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1"
+          >
+            <ShieldCheck className="w-2.5 h-2.5" />
+            Verified
+          </Badge>
+        );
+      case "unverified":
+      case "invalid":
+      case "error":
+      case "failed":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-red-600 text-white border-red-700 flex items-center gap-1 font-bold shadow-sm"
+          >
+            <ShieldAlert className="w-2.5 h-2.5" />
+            {s === "invalid" ? "Invalid" : "Error"}
+          </Badge>
+        );
+      case "catch_all":
+      case "catchall":
+      case "risky":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-amber-100 text-amber-700 border-amber-300 flex items-center gap-1 font-bold"
+          >
+            <ShieldAlert className="w-2.5 h-2.5" />
+            Risky
+          </Badge>
+        );
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-gray-50 text-gray-600 border-gray-200 flex items-center gap-1"
+          >
+            <ShieldQuestion className="w-2.5 h-2.5" />
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </Badge>
+        );
     }
   };
 
@@ -125,7 +181,7 @@ export function CompanyDetailModal({
       <SheetContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-full overflow-y-auto p-0 border-l border-primary/10 transition-all duration-300">
         {isLoading ? (
           <div className="flex h-full items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Spinner size="lg" />
           </div>
         ) : company ? (
           <div className="flex flex-col h-full bg-background">
@@ -833,7 +889,6 @@ export function CompanyDetailModal({
                             <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-3">
                               {person.headline || "No headline provided"}
                             </p>
-
                             <div className="flex items-center gap-4">
                               <a
                                 href={person.linkedin_url}
@@ -845,9 +900,12 @@ export function CompanyDetailModal({
                                 LinkedIn Profile
                               </a>
                               {person.email && (
-                                <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                                  <Globe className="w-3.5 h-3.5" />
-                                  {person.email}
+                                <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <Globe className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate">{person.email}</span>
+                                  </div>
+                                  {renderEmailVerificationBadge(person.email_verification_status || "unknown")}
                                 </div>
                               )}
                               {person.latest_report_id && onOpenReport && (

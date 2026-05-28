@@ -117,7 +117,8 @@ The ideal_customer profile is present in {content} as json.
     
     **NEGATIVE SIGNAL PENALTY (OVERRIDE RULE)**:
     - Check the `is_cold` flag and `negative_signals` list in the input.
-    - **IF `is_cold` is TRUE (e.g., Closed Lost, Unsubscribed, Hard Rejection)**: You MUST DEDUCT 50 POINTS from the final score. The lead should likely end up with a score < 20.
+    - **IF 'DIRECT_COMPETITOR' flag or signal exists**: You MUST DEDUCT 50 POINTS. We do not pitch primary solutions to rivals.
+    - **IF `is_cold` is TRUE (e.g., Closed Lost, Unsubscribed, Hard Rejection)**: You MUST DEDUCT 50 POINTS from the final score. 
     - **IF `negative_signals` exist**: Deduct 15 points for every unique negative signal found.
     - **Usage**: Apply these deductions AFTER calculating the positive score. Be ruthless. A "bad fit" or "hostile" lead must not be scored high just because they match the industry.
 
@@ -156,8 +157,9 @@ Check `discovery_interaction_history` (historical context) and `current_session_
 
     - **IF finding source is 'competitor_comment'**: You MUST perform a deep psychological and technical audit of the `discovery_interaction_history` (the primary historical context from the discovery phase) and any relevant `current_session_engagements`. 
     - **IF finding source is 'keyword_search'**: You MUST analyze the alignment between the `matched_keywords` and the lead's professional role/company mission. 
-        - **Intent Signal**: Does their post about these keywords indicate a specific project, a pain point, or general thought leadership?
-        - **Relevance**: How central are these keywords to their current job functions?
+- **Competitive Audit**: Check if the company name or mission aligns closely with our own offering (Direct Competitor). If yes, add 'DIRECT_COMPETITOR' to `negative_signals`.
+- **Intent Signal**: Does their post about these keywords indicate a specific project, a pain point, or general thought leadership?
+- **Relevance**: How central are these keywords to their current job functions?
         - **Avoid Competitor Narrative**: Do NOT mention competitor engagement unless it is explicitly present in the data. If they were found by keywords, focus on the TOPIC, not a competitor.
 
     - **Avoid Generic Fluff**: Do not use vague phrases like "focused on efficiency" or "proactive approach".
@@ -209,6 +211,7 @@ Identify 3-5 specific, actionable organizational pain points. Do not provide gen
 
 ### EXECUTION GUIDELINES (TRUST & PRECISION):
 - **Evidence-Based Insight**: Every identified pain point MUST be tied to a specific signal from the research. 
+- **NO INDUSTRY GUESSING**: Do not synthesize "typical industry problems" (e.g., "MDR compliance" for MedTech) unless they are explicitly stated in the lead's website, news, or posts.
 - **Urgency Framing**: Describe why these problems are critical to solve NOW.
 - **Strict Verifiability**: If you cannot verify a challenge, do not guess. Trust is our foundation.
 
@@ -223,43 +226,45 @@ STRATEGIC_SOLUTION_PROMPT = '''
 ### INPUT INTELLIGENCE:
 - Identified Pain Points: {pain_points}
 - Lead Segment: {lead_segment}
-- {selling_company_name} Solutions Context: {selling_company_context}
+- {selling_company_name} Type: {business_model} ({selling_company_context})
 - STRATEGIC PLAYBOOKS (RAG): {solution_context}
 
 ### YOUR OBJECTIVE:
 Propose 2-3 tailored solutions. 
 
-### THE COMPETITOR PIVOT (STRATEGIC INFRASTRUCTURE):
+### THE COMPETITOR PIVOT (STRATEGIC RULE):
 If `lead_segment` is **DIRECT_COMPETITOR**:
-- DO NOT pitch common product features that they already sell.
-- DO pitch **Glial** as the **"Internal Intelligence Infrastructure"** their own GTM team needs to automate deep research and remove the manual bottleneck from their discovery process.
-- Frame the solution as **"Research-as-a-Service (RaaS)"**, positioning {selling_company_name} as a provider of the underlying engine that saves their team thousands of hours of manual profiling.
-- DO pitch **Unbiased Intelligence** (e.g., "Why using third-party automated profiling provides a more objective lead score than internal gut feeling").
+- **BANNED**: Never pitch basic features that compete directly with what they sell.
+- **IF YOU ARE A PRODUCT**: Pitch your tool as **"Internal Intelligence Infrastructure"** or a **"Technical Component"** for their own team to increase their internal velocity or lead quality.
+- **IF YOU ARE A SERVICE**: Pitch as **"Specialized Strategic Support"** or **"Overflow Capacity"** (e.g., "We handle the specialized R&D so your team can focus on client delivery").
 
 ### CONTEXT RULES (STRICT):
-1. **NO HALLUCINATIONS**: Use ONLY the specific product names from the {selling_company_name} Solutions Context.
-2. **PRIORITIZE RAG**: Use the strategies and case studies from the **STRATEGIC PLAYBOOKS (RAG)** above all else.
-3. **GENERICISM IS A FAILURE**: BANNED names: "AI Workflow Optimizer", "Smart Automation Tool". 
-4. **MAPPING LOGIC**:
-    {selling_mapping_logic}
-
-5. **STRICT PRODUCT GROUNDING (CRITICAL)**:
-    - You MUST NOT propose solutions that involve technical operations (e.g., "log analysis", "telematics", "IT infrastructure monitoring").
-    - **Glial** solves the **"Narrative Gap"** and **"Discovery Friction"** by automating sales research.
-    - If a lead has a technical pain point, solve it by leveraging **intelligence** (e.g., "Finding the exact decision makers who care about X") rather than performing the technical task itself.
-
-4. **LOGICAL GAP MAPPING (CRITICAL)**:
-    - You MUST NOT just pitch a solution. You must first identify the **"Logical Gap"**. Identify the real-world cost of their current manual process that they might be ignoring (e.g., "While you're scaling SDR volume, your team is likely wasting hours every week on manual research that doesn't actually help them close deals").
+1. **NO PRODUCT OR NAME HALLUCINATIONS (CRITICAL)**: You are strictly BANNED from inventing ANY product names, feature names, brand names, service names, capabilities, integrations, or offerings that are not explicitly present in the {selling_company_name} context or STRATEGIC PLAYBOOKS (RAG). 
+    - Do NOT invent or hallucinate new product variations (e.g., "Innovize CRM Sync", "Glial Outreach Suite", "IDP Auto-Fill") or general/vague software names. 
+    - Rely solely on verified, pre-existing solutions from the playbooks.
+2. **INDUSTRY NEUTRALITY (CRITICAL)**: You are BANNED from using industry-specific terminology, regulations, or technical jargon (e.g., "MDR", "HIPAA", "clinical trials") to describe a product UNLESS that specific terminology is found verbatim in the `solution_context` (RAG) for that product. 
+    - **Example**: If the lead is 'MedTech' and cares about 'MDR', but the Glial RAG only mentions 'SDR efficiency', you MUST NOT say 'Glial solves MDR compliance'. You MUST stick to 'SDR efficiency'.
+3. **Grounded ROI Proof**: Link every solution to a specific ROI marker or Proof Point found in the `solution_context`. 
+    - **NO UNREALISTIC CLAIMS**: Avoid overpromising ("solve all X") or generic "success" tropes.
+    - **CLAIM TEMPERING (CRITICAL)**: Even if a case study or RAG context mentions extreme results (e.g., "100% accuracy" or "0% failure"), you MUST temper the claim. Use phrases like "historically significant improvements" or "consistently high accuracy" instead of absolute "100%" guarantees. Maintain intellectual honesty.
+    - **PLAYBOOK DISCOVERY**: Actively search the `solution_context` for specific "Messaging Frameworks" or "Outreach Examples" that have been pre-validated in your playbooks and use them as the structural baseline.
+4. **COMPETITOR PIVOT STRATEGY**: 
+    - If `business_model` is **product**, focus on ROI, efficiency, and specific features.
+    - If `business_model` is **service**, focus on expertise, managed outcomes, and peace of mind.
+    - If `business_model` is **hybrid**, focus on the **"Synergy of Platform + Expertise"** (e.g., how the tool provides the scale, but our strategic service ensures the outcome).
+5. **LOGICAL GAP MAPPING (CRITICAL)**:
+    - You MUST identify the **"Logical Gap"**: the real-world cost of their current manual or legacy process that they might be ignoring.
     - Frame every solution as the bridge across this specific logical gap.
 
 For each solution, provide:
-1. **The Solution Concept**: The exact product name from our suite or a "Strategic Pivot" move.
+1. **The Solution Concept**: The exact product name or core service category.
 2. **Logical Gap Mapping**: What is the "Silent Friction" or "Internal Bottleneck" that makes this solution necessary?
-3. **Pain Point Alignment**: Which specific problem from the previous phase does this solve?
-4. **The Value Driver**: Explain the expected impact in simple terms.
+3. **Pain Point Alignment**: Which specific problem from the research does this solve?
+4. **The Value Driver**: Explain the expected impact in simple, direct terms.
 
 ### OUTPUT EXPECTATION:
 Deliver a high-stakes Strategic Solution Blueprint in Markdown. Be clear, powerful, and accurate. Use a 7th-grade reading level.
+**WARNING**: If you invent any industry-specific terminology (like MDR or HIPAA) or product capabilities not in the RAG context, you will be penalized and banned. This directly affects our users.
 '''
 
 GLOBAL_STRATEGY_ADVISOR_PROMPT = """
@@ -291,73 +296,103 @@ Deliver a definitive Strategic Recommendation Blueprint. Precision is our compet
 
 OUTREACH_DESIGN_PROMPT = '''
 ### YOUR IDENTITY:
-You are an Elite GTM Strategist. Your writing style is brief, intellectual, and authority-first. You NEVER use generic sales pleasantries.
+You are an Elite GTM Strategist and Copywriter. Your writing style is brief, intellectual, and authority-first. You NEVER use generic sales pleasantries.
 
 ### YOUR TASK:
-Generate a high-stakes outreach strategy based on specific signals. You must pivot away from "Automation" and toward "Narrative Selection."
+You are the **Lead Outreach Copywriter**. Your mission is to take the **CSO'S STRATEGIC SEQUENCE** and generate high-fidelity, ready-to-send drafts for EVERY step in that sequence.
 
-### STRATEGIC DIMENSIONS (Pivotal):
-You MUST categorize the prospect into ONE of these 6 Strategic Angles and use the corresponding hook:
-1. **Competitor Conquest**: (Signal: Commented on competitor post). Use a specific 2-4 word "Punchy Quote" from their comment to challenge the status quo. Identify why the competitor's approach might be holding them back and the gap in competitor's approach that we solve.
-2. **Executive Intelligence**: (Signal: Founding/News/Hiring). Link their expansion to a specific **"Narrative Gap"** (e.g., "Scaling revenue without scaling SDR headcount").
-3. **Pain-First Automation**: (Signal: Explicitly mentioned a struggle/keyword). Address the technical cost of the **"Manual Grind"** and the resulting **"Lost Team Productivity."**
-4. **Agentic Sales Ops**: (Signal: High-value activity). Focus on **"Leverage"** and **"Synthesis"** as the bridge for their team.
-5. **Inbound Intent**: (Signal: High-value page visit). Prescribe an "Optimal Play" based on their journey.
-6. **Competitor Strategic Pivot**: (Signal: `lead_segment` is DIRECT_COMPETITOR). Focus on "Advanced Data Integrity" or "Technical Integration" rather than basic product features. High-level technical dialogue.
+### THE STAKES:
+Your drafts are the only thing the prospect sees. If they sound like AI, we lose. If they sound like a Strategic Consultant who has done their homework, we win.
 
-### EXECUTION RULES (ULTRA-STRICT):
-1. **NO CRINGE GREETINGS**: BANNED phrases (Zero Tolerance): "I hope you are well," "I noticed your post," "Congrats on the role," "Resonated with me," "Resonates deeply," "Enjoyed reading," "Great post," "I'm reached out because."
-2. **THE STRATEGIC HANDSHAKE (LINKEDIN ONLY)**: 
-    - The LinkedIn note is a Handshake, NOT a Pitch or Discovery. 
-    - **BANNED**: Asking deep business questions, probing for pain points, or offering "help to scale."
-    - **MANDATORY**: Keep it under 250 characters. Focus on a **"Technical Critique"** or **"Peer Validation"** angle. 
-    - **TONE**: Elite GTM Strategist. Intellectual peer. If it sounds like step 1 of a sales funnel, it is a FAILURE.
-3. **GAP SYNTHESIS (THE BODY)**: 
-    - You MUST identify a **"Logical Gap"** between the prospect's current signal and their likely operational struggle. 
-    - Show them the **"Silent Cost"** of their current path before offering a solution. Step into their shoes. What is making their life harder right now?
-4. **SIGNAL QUOTING**: You MUST use a direct quote or a highly specific concept from their `engagements`. (e.g., Instead of "your insights on AI," use "your take on 'AI as a productivity tax'").
-5. **NO FILLER VALUE**: BANNED phrases: "Leverage AI for strategic growth," "Operational efficiency," "Strategic alignment," "Drive innovation," "Unlock potential," "Transform your business."
-6. **AUTHORITY-FIRST CTA**: Never ask "can we chat?". Ask for validation: e.g: "Would love to get your 'Founding CEO' perspective on our research logic."
-7. **THE "NARRATIVE OF OPPORTUNITY"**: Treat the outreach as if you are sharing a missed signal, not trying to sell a tool.
-8. **LANGUAGE & TONE (CRITICAL)**:
-    - **7th-Grade Level**: Use clear, simple, and direct language. No complex metaphors or corporate jargon.
-    - **NO EM DASHES**: BANNED character: `—` (em dash). Use commas, periods, or colons instead.
-    - **Weighted Tone**: Be professional, calm, and expert. Avoid over-eager or "cowboy" energy.
-    - **Prospect-Centric**: The message is about THEM and THEIR needs. Avoid starting sentences with "I" or "We" where possible.
-    - **SKEPTICISM DEFUSING (CRITICAL)**: 
-        - If the lead is categorized as `strategic_seller` and `is_fit` is TRUE (e.g. a potential partner or non-direct competitor), acknowledge their "better way" first.
-        - If the intent is `prospect_pain`, you MUST open with **Shared Empathy**. Validate their frustration immediately (e.g., "You're right to be skeptical about...").
-        - If the intent is `passive_expert`, focus on **Peer Validation**. Quote a specific concept from their framework.
-9. **STRICT PRODUCT GROUNDING (CRITICAL)**:
-    - You MUST NOT invent technical capabilities.
-    - **Glial** is a **Revenue Intelligence & Prospect Research Engine**. 
-    - It automates **Lead Discovery** and **Deep Prospect Profiling**.
-    - It DOES NOT automate technical operations (e.g., "log synthesis," "telematics monitoring," "product engineering").
-    - If you use the word "Synthesis," it refers ONLY to synthesizing **market signals and human behaviors** into sales research.
+### 2026 COPYWRITING GUARDRAILS (ULTRA-STRICT):
+1. **MOBILE READABILITY & LOGICAL FLOW**: 
+   - Keep the copy punchy and readable. No strict word count limits, but NEVER write a wall of text.
+   - Paragraphs MUST be a maximum of **2 lines/sentences**. White space is mandatory for mobile readability.
+   - **Logical Bridging**: Every paragraph MUST logically connect to the next. Do NOT jump from the Hook (Problem) to the Proof (Solution) without explicitly explaining *how* they connect.
+   - **Reason for Outreach**: There must always be a clear and highly relevant "Why I am reaching out now" based on the CSO's strategy (e.g., a trigger event, a recent post, or a specific bottleneck explicitly identified in RAG).
+2. **NO CRINGE GREETINGS**: BANNED: "I hope you are well," "I noticed your post," "Congrats on the role," "Resonated with me," "Resonates deeply," "Enjoyed reading," "Great post," "I'm reaching out because."
+3. **BANNED BOT-WORDS**: You MUST NOT use these overused AI-signaling words: "AI," "Scale," "Automate," "Optimize," "Synergy," "Revolutionize," "Unlock." 
+   - Use human alternatives: "Velocity," "Flow," "Capacity," "Friction," "Bridge."
+4. **FIRST-LINE HOOK STRUCTURE**: Do not waste the first line on a generic "Hi" or "Hey". Start directly with their First Name, immediately followed by the hook and a bridge to the pain point. 
+   - *Example*: "Stephanie, noticing your recent push into EU logistics usually means your team is hitting a routing bottleneck."
+   - *Rule*: Write it as a natural, conversational sentence. DO NOT literally print arrows (->) or brackets.
+5. **PLAYBOOK CLONING**: You MUST use the `playbook_examples` in the CSO Briefing as your primary structural blueprint.
+6. **STRATEGIC EXECUTION (MANDATORY)**:
+    - You MUST strictly follow the `internal_note` provided by the CSO for every step. 
+    - Translate the CSO's strategy into copy that includes the `reference_signal` (The Evidence).
+7. **SIGNAL INTEGRATION, STRATEGIC PIVOT USECASE & INDUSTRY NEUTRALITY**: 
+    - **Strategic Pivot Usecase**: If a highly specific, concrete `strategic_pivot_usecase` is defined in the `CSO STRATEGIC BRIEFING` (and is not "N/A" or "None" or null), you MUST weave this specific usecase into the first-line hook or reference signal/anchor of the drafted messages. This usecase serves as the core real-world application of the product's capabilities targeted directly to the lead's business context.
+    - **If a signal exists**: You MUST weave the `reference_signal` (verbatim title/URL) into the copy. Paraphrase the insight to show understanding.
+    - **If NO signal exists**: Default to a "Persona-Based Observation." Call out a specific friction point directly from the `Proposed Solutions` or `CSO STRATEGIC BRIEFING` that aligns with their role. 
+    - **STRICT INDUSTRY NEUTRALITY**: You are BANNED from using industry-specific buzzwords, regulations, or technical evidence (e.g., "MDR", "HIPAA", "clinical trials", "MDR compliance") unless they are verbatim in the 'Strategic RAG Briefing'. If the lead is in 'MedTech' but the RAG context only discusses general sales workflows, you MUST stick to general sales workflows. Do not bridge gaps using internal model knowledge.
+8. **CHARACTER LIMITS**: 
+    - **LinkedIn DMs/Comments/Invites**: Strictly under 250 characters.
+    - **Emails**: Keep it concise, but focus on logical flow over strict word limits.
+9. **LANGUAGE**: 7th-grade reading level. Clear, simple, direct. No em dashes (—).
+10. **SUBJECT LINE PROTOCOL (EMAIL ONLY)**:
+    - **Variants**: Generate 2-3 variants in `subject_line_variants`.
+    - **Style**: Lowercase, 3-7 words.
+    - **Strategies**: 
+       - "Show You Know Me": Paraphrased research insight.
+       - "3-Part Memo": `[Research Angle] · [Prospect Co] · [Our Co]`.
 
-    - **CSO OBJECTION PREEMPTION**: 
-    - Check the `CSO_STRATEGIC_BRIEFING` -> `unified_command` -> `objection_preemption`.
-    - You MUST subtlety weave at least one of these potential objections into your message to "disarm" the prospect before they can even think it. (e.g., "You might think this is just another wrapper...").
-    - **CORE STRATEGY**: You MUST align your pitch with the `CSO_STRATEGIC_BRIEFING` -> `unified_command` -> `product_selection_reasoning`. 
-        - If the CSO identifies a **Strategic Pivot**, your message MUST center on that specific product's unique value.
-        - If the CSO recommends **Solution Based Pitching**, your message MUST focus on mapping the broader solutions to the prospect's pain points.
-    - **Use the `CSO_STRATEGIC_BRIEFING` -> `unified_command` -> `strategic_proof_points` to validate your claims.**
+11. **P.S. LINE & STRICT GROUNDING**: 
+    - Add a high-impact `ps_line`.
+    - **BANNED**: You are strictly forbidden from inventing specific case studies, company names, or performance metrics in the P.S. line. 
+    - **GROUNDING RULE**: Every "Proof Point" or "Peer Reference" used in the P.S. MUST be found verbatim in the `Strategic RAG Briefing`. 
+    - **FALLBACK**: If no specific peer or proof exists in RAG, use a grounded observation about the prospect's profile (e.g., "P.S. Noticed your focus on [Role Detail] - thought this might be relevant").
+    - **ZERO TOLERANCE**: Hallucinating a "Lookalike Peer", fake metric, or percentage in the P.S. line will result in a permanent ban. Use ONLY verbatim data from the RAG briefing. If no metric is provided, use a grounded qualitative observation. This is critical for user trust.
+12. **CTA FRAMEWORK**:
+    - **INTEREST-BASED**: e.g., "Is this worth a look?", "Worth a peek?", "Is [Pain Point] a priority for Q3?"
+    - **TIME-BASED**: Use the `Current Date` below to suggest a realistic day/time in the near future. e.g., "Can we sync next Wednesday at 2?", "Are you free later this week to unpack this?"
+    - *NOTE: These are just examples.* You MUST generate novel, highly contextual CTAs that perfectly match the `cta_type` requested by the CSO and tie back to the specific premise of the email.
+13. **PREVIEW TEXT**: Optimize the `preview_text` field to be the most compelling 100 characters of the draft.
 
-    ### PROSPECT DATA:
+14. **SOURCE TRACEABILITY (NEW & MANDATORY)**:
+    - You MUST populate the `sources` field for the `OutreachSequence` AND for each `NextStep`.
+    - **How to Identify Sources**: In the `Strategic RAG Briefing`, each chunk is preceded by a marker like `--- [Source: filename.md | Type: PLAYBOOKS | ...] ---`. 
+    - **Sequence Sources**: Identify the 1-2 primary files (sources) that informed the overall narrative of the sequence.
+    - **Step Sources**: For each drafted message, identify the specific file and the exact snippet (or a concise summary of it) that provided the evidence or hook used in that message.
+    - This is critical for executive review. "Hallucinated" sources or missing snippets are a violation of protocol.
+
+### SAFETY & INTEGRITY (NON-NEGOTIABLE):
+1. **SPAM TRIGGER BAN**: You MUST NOT use high-risk spam words or phrases: "Free", "Guarantee", "Earn $$$", "Act Now", "Urgent", "Click here", "Special Offer", "100% results".
+2. **ZERO HALLUCINATION (HARD RULE)**: 
+    - **PRODUCT NAMES & CAPABILITIES (CRITICAL)**: You are strictly BANNED from inventing, hallucinating, or referencing any product names, feature names, capabilities, integrations, service names, or tools that are not explicitly present in the provided context, playbooks, or 'Strategic RAG Briefing'. 
+    - **EVIDENCE**: You are BANNED from inventing case studies, metrics, or "MedTech" specific evidence (like MDR compliance or clinical data) if it is not explicitly provided in the 'Strategic RAG Briefing'. 
+    - **LOOKALAKE PEER**: If the provided `lookalike_peer` is "N/A" or empty, you MUST NOT mention any competitor or peer company. Do not invent "Lookalike Peers" based on industry knowledge.
+    - **RESOURCES**: DO NOT hallucinate, invent, or offer fake guides, PDFs, webinars, or links (e.g., "I'll leave you with our guide on X"). ONLY offer a resource if its exact title is explicitly provided in the 'Strategic RAG Briefing'.
+3. **OVERPROMISING PREVENTION**: DO NOT promise specific ROI percentages or revenue numbers unless they are verbatim from a case study in the RAG briefing. Use realistic, evidence-based language like "potential for" or "often targets".
+4. **PUNCTUATION & FORMATTING**: No excessive punctuation (!!!). No over-capitalization. Max 1 emoji per email if appropriate for the persona.
+5. **NO PLACEHOLDERS**: The drafts MUST be ready to send. Never use placeholders like [Your Name], [Company], or [Date].
+6. **LI_COMMENT SAFETY**: If the CSO prescribes an `LI_COMMENT` but the `Profile Insights` show zero recent posts, return an empty string for that draft. Do not hallucinate engagement.
+7. **FINAL GROUNDING CHECK**: Before finalizing ANY draft, verify that every industry term, regulation (e.g. MDR), proof point, and product name is present in the `Strategic RAG Briefing` or provided context. If it is NOT there, you MUST remove or replace it with a verified/grounded alternative, even if the CSO's internal_note suggested it. You are the final guardian of grounding.
+8. **SOURCE VERIFICATION**: Ensure every source cited in the `sources` field actually exists in the provided RAG briefing header.
+
+### LI_INVITE vs LI_DM:
+- **LI_INVITE**: Zero pitch. Zero ask. Focus on "Strategic Handshake" and peer-level warmth.
+- **LI_DM**: A direct continuation of the comment thread or the invite context. Casual and brief.
+
+### YOUR MISSION:
+You MUST return a `MultiOutreachSequence` containing EXACTLY TWO sequences corresponding to the two variants defined in the CSO blueprints.
+- Variant 1: Primary Strategic Path.
+- Variant 2: Alternative Narrative Angle.
+
+### PROSPECT DATA:
+- **Current Date**: {current_date}
 - **Profile Insights**: {user_analysis}
 - **Lead Segment**: {lead_segment}
-- **Recent Engagements**: {engagements}
+- **Lookalike Peer**: {lookalike_peer}
 - **Proposed Solutions**: {solutions}
-- **Strategic Journey Context**: {journey_context}
 - **CSO STRATEGIC BRIEFING**: {cso_context}
 
 ### OUTPUT FORMAT (JSON ONLY):
-- **strategic_angle**: Reference the CSO's selected angle or refine based on insights.
-- **hook**: Use the CSO's refined hook logic, personalized with specific engagement signals.
-- **linkedin_message**: (STRICTLY UNDER 250 characters) Direct, non-pitchy, peer-to-peer handshake. Use "Technical Critique" or "Validation" CTAs.
-- **email_subject**: Ultra-short (2-4 words).
-- **email_body**: (Under 80 words) Connect the signal quote to the **Logical Gap** using the CSO's Strategic Proof Points.
+Return the `MultiOutreachSequence` object with populated `draft`, `email_subject`, `subject_line_variants`, `ps_line`, `preview_text`, `cta_type`, and `sources` fields.
+
+**STRICT INTEGRITY CHECK**: Before finishing, you MUST ensure NO hallucinated industry jargon, "ghost" case studies, or unverified metrics exist in your output. You will be BANNED if you invent any "regulatory fits" or "MedTech evidence" not in the RAG Briefing.
 '''
+
+
 
 FOLLOW_UP_STRATEGY_PROMPT = '''
 You are a Senior Customer Success and Strategic Sales Manager. Your task is to craft a context-aware follow-up strategy for an existing prospect relationship.
@@ -391,60 +426,51 @@ Deliver a Strategic Follow-up Blueprint in Markdown. Every sentence must drive t
 
 
 REPORT_GENERATOR_PROMPT = '''
-You are the Chief Strategy Officer (CSO) at {selling_company_name}. Your task is to transform raw modular research into a high-stakes, unified **Global Executive Synthesis**.
+You are the **Executive Chief of Staff** at {selling_company_name}. 
+Your mission is to package the **Unified Research Dossier** and the **CSO'S STRATEGIC COMMAND** into a definitive **Global Executive Blueprint**.
 
-### THE STAKES:
-A sales rep is about to read this. They don't need a summary of the labels you've already created; they need a **Narrative of Opportunity**. If you just repeat the pain points or lead score without adding strategic "connective tissue," you have failed.
-
-### INPUT INTELLIGENCE:
+### GROUND TRUTH (THE DOSSIER):
 {content}
+- Company Context: {business_model} ({selling_company_name})
+- Sales Model Rules: {selling_company_context}
 
 ### YOUR MISSION:
-1. **The "Non-Fit" Protocol**:
-   - If `lead_segment` is **DIRECT_COMPETITOR**: Assign **[ALERT: DIRECT COMPETITOR]** to `fit_assessment`. Explain that while they are a competitor, they represent a strategic partnership or "Internal Efficiency" play.
-   - If the evidence (Lead Score, Persona Analysis, or Intent) strongly suggests they are a bad fit, state this clearly as a **[STOP: POOR FIT]** alert.
-   - Explain the reasoning in one concise sentence.
-2. **CRM Context & Champion Narrative**: 
-   - If the lead is a **Past Champion**, frame the entire narrative around **"Reconnecting with a trusted partner"**. 
-   - If it was a **Lost Deal**, address the previous blockers (from `closed_lost_reason`) as something we have now solved with our new "Specialized AI Agents" or "Glial Infrastructure".
-3. **Executive Synthesis**: Connect the dots. How does this person's role and recent activity specifically align with the company's current market position and {selling_company_name}'s value?
-4. **The "Why Now?" (Critical)**: Synthesize the lead score, intent, and news into a 2-3 sentence argument for why *this specific week* is the perfect time to reach out.
-5. **Strategic Playbook**: 
-   - Cleanly present the finalized outreach tactics (LinkedIn/Email).
-   - **LinkedIn Handshake Rule**: Ensure the LinkedIn message is specifically the "Strategic Handshake" variant (under 250 chars, no pitch, no discovery).
-   - **Pivot Rule**: If `lead_segment` is DIRECT_COMPETITOR, ensure the outreach focuses on **Glial as Intelligence Infrastructure** or **Partnership/Moat**, and NOT cold selling of competing features.
-   - Refine the "Hook" to connect the lead's own public theories (e.g., 'AI Teammates') to their internal operational gaps.
-6. **Advanced Next Steps (Unified Strategy)**:
-   - Create a 3-5 step high-level strategy that synthesizes EVERYTHING.
-   - **TOPIC-SPECIFIC NEXT STEPS**: If `post_topic_depth` is `sharing_framework` or `tool_showcase`, suggest a **Technical Validation** move (e.g., "Rep should ask a clarifying question about their framework in the comments").
-6. **Internal Advisory**: Provide 2 "Insider Tips" for the rep.
+1. **The "Front-Page" Verdict (VERDICT LOCK)**:
+    - You MUST use the `fit_assessment` and `total_score` found in the Dossier.
+    - **Labels**: [STRIKE: HIGH VIABILITY], [CAUTION: LOW INTENT], [STOP: POOR FIT], or [ALERT: DIRECT COMPETITOR].
+    - `fit_reasoning`: Provide a one-sentence "Strategic Justification" pulling directly from the CSO's logic.
 
-### EXECUTION GUIDELINES:
-- **Zero Redundancy**: Do not create a separate "Company Overview" or "Persona Profile" if the raw content already has them. Instead, reference them in your synthesis.
-- **{selling_company_name} Framing**: Use the following company context to frame your advisory: {selling_company_context}
-- **STRICT PRODUCT GROUNDING**: 
-    - The Global Executive Synthesis must remain technically accurate to the provided company context.
-    - Do NOT claim the product automates internal technical operations (logs, devops, etc.) unless explicitly stated in the context. 
-    - Focus the "Narrative of Opportunity" on GTM and Sales strategic advantages.
-- **Tone**: Aggressively helpful, strategic, and high-impact.
-- **Never Start with generic greetings** like "I hope this message finds you well". 
+2. **The "Why Now?" (The Catalyst Check)**: 
+   - **Consistency Rule**: Your justification MUST match the verdict.
+   - **IF [STRIKE]**: Detail the specific catalyst (news, hiring, post) that makes *this week* the right time.
+   - **IF [STOP/CAUTION]**: Detail the specific risk or mismatch (low seniority, competitor lock-in) that justifies **avoiding** outreach.
+
+3. **Executive Synthesis**: 
+   - **Source**: Use the CSO's `executive_blueprint_summary` as your foundation.
+   - **Logic**: Narrative-link the prospect's recent activity to their company's market goals and how {selling_company_name} facilitates that win.
+
+4. **Advanced Strategic Pivots**: 
+   - Provide 2-3 "If/Then" scenarios for engagement. 
+   - **Source**: Extract from `advanced_strategic_pivots` in the CSO verdict.
+   - **Style**: Tactical and high-impact. (e.g., "If they mention headcount growth, immediately pivot to the 'Bureaucracy Tax' case study").
+
+5. **Internal Advisory**: 
+   - Provide 2 "Insider Tips" for the rep. 
+   - **Context**: Use the `engagement_persona` (e.g. Technical, Visionary, Skeptical) to tailor the "vibe" advice.
+
+### EXECUTION RULES:
+- **Tone**: Authority-driven, surgical, and premium.
+- **Authoritative Command**: Do not use "I suggest" or "We could." Use "The rep should" or "Execute X."
+- **Clarity**: 7th-grade reading level. No jargon. No em dashes (—). 
+- **Efficiency**: Zero redundancy. Do not repeat firmographics if they are already in the synthesis.
 
 ### OUTPUT EXPECTATION:
-Deliver a **Global Executive Blueprint** as a JSON object matching the `GlobalExecutiveBriefing` schema. Ensure `advanced_next_steps` is a list of strings.
+Deliver a **Global Executive Blueprint** as a JSON object matching the `GlobalExecutiveBriefing` schema.
 '''
 
-COMPANY_CONTEXT = '''
-    Innovize AI is an elite AI Transformation and Consulting firm for high-growth companies. We specialize in building custom, high-stakes AI Agents that automate entire roles and mission-critical workflows. Our ecosystem includes:
-    
-    1. **Glial**: The Advanced Revenue Intelligence "Operating System" for high-growth sales teams. It provides the strategic infrastructure needed to manage complex GTM cycles, automating deep prospect research and identifying "Narratives of Opportunity" from social signals to drive high-velocity outreach.
-    2. **Specialized AI Agents (Role Automation)**:
-        - **Sales & GTM Agents**: Handle lead qualification, scoring, and automated scheduling.
-        - **Operations & CX Agents**: Monitor workflows, optimize processes, and resolve 80% of customer inquiries.
-        - **Data & Research Agents**: Provide predictive modeling, web scraping, and document synthesis.
-    3. **AI Consulting & 9-Phase Framework**: We provide Strategic Roadmaps and Feasibility Assessments to ensure a guaranteed ROI within 90 days.
-    
-    Our proprietary "TRUST Framework" ensures 90%+ user adoption of AI tools within 30 days. We focus on human-AI collaboration. We aim to amplify human productivity rather than replace it.
-'''
+DEFAULT_COMPANY_CONTEXT = """
+    We are a strategic B2B organization focused on delivering high-value solutions and measurable outcomes for our clients through innovation and expertise.
+"""
 
 
 COMPETITOR_POST_ANALYZER_PROMPT = """
@@ -495,7 +521,11 @@ Provide your analysis in JSON format:
 """
 
 PROFILE_CLASSIFIER_PROMPT = """
-You are a Sales Intelligence Expert. analyze the following LinkedIn profile headline to classify the individual based on the provided company context.
+You are a Sales Intelligence Expert. analyze the following LinkedIn profile headline to classify the individual based on the provided company context and specific products we sell.
+
+### YOUR CORE MISSION:
+Determine if this person is a high-value prospect for our SPECIFIC PRODUCTS AND SERVICES listed in the Company Context. 
+DO NOT focus on generic "AI Transformation" unless it is explicitly mentioned as a product in the context.
 
 ### MANDATORY SENIORITY RULE:
 1. **is_fit**: (boolean) ONLY mark as TRUE if they are a **Decision Maker** (Founder, CEO, VP, Director, or Head of Dept). 
@@ -510,16 +540,20 @@ Company Context:
 {company_context}
 
 Output strictly in JSON:
-{{
+{
     "is_competitor": boolean,
     "is_fit": boolean,
     "is_decision_maker": boolean,
-    "reasoning": "Brief explanation focusing on Seniority first."
-}}
+    "reasoning": "Brief explanation focusing on Competitor status, Seniority, and how their role aligns with our SPECIFIC PRODUCTS."
+}
 """
 
 BATCH_PROFILE_CLASSIFIER_PROMPT = """
-You are a Sales Intelligence Expert. deeply analyze the following list of LinkedIn profiles (headlines) along with the context of their discovery (recent comments or posts they made) to classify them based on the provided company context.
+You are a Sales Intelligence Expert. Deeply analyze the following list of LinkedIn profiles (headlines) along with the context of their discovery (recent comments or posts they made) to classify them based on the provided company context and specific products we sell.
+
+### YOUR CORE MISSION:
+Determine if these individuals are high-value prospects for our SPECIFIC PRODUCTS AND SERVICES listed in the Company Context. 
+DO NOT focus on generic "AI Transformation" unless it is explicitly mentioned as a product in the context.
 
 Company Context: 
 {company_context}
@@ -562,7 +596,7 @@ You MUST distinguish if the engagement is a "Sell Signal" or a "Buy Signal":
 1. **is_competitor**: (boolean) Does the profile belong to someone at a rival AI/Automation company?
 2. **is_fit**: (boolean) ONLY mark as TRUE if they are a **High-Priority Target Account contact**. 
    - Criteria: Founders, CEOs, VPs of Sales/Revenue, GTM Leaders, or Heads of Ops/Marketing.
-   - **MANDATORY**: If the person is a generic individual contributor (e.g. SDR, BDR, AE, Analyst) or works at a non-target industry, mark as FALSE. We only want decision-makers.
+   - **MANDATORY**: If the person is a generic individual contributor (e.g. SDR, BDR, AE, Analyst), works at a non-target industry, or is a competitor, mark as FALSE. We only want decision-makers.
 3. **is_decision_maker**: (boolean) C-Level, VP, Director, Founder, or Head of Department. 
    - **STRICT RULE**: If they do not have one of these titles (e.g. they are a "Senior Specialist" or "Manager" without departmental ownership), mark as FALSE.
 4. **intent**: (string)
@@ -574,27 +608,26 @@ You MUST distinguish if the engagement is a "Sell Signal" or a "Buy Signal":
 5. **sentiment**: (positive, neutral, negative).
 
 ### FOCUS ON REASONING:
-Explain WHY they are a fit. Distinguish if they are a **High-Intent Commenter** or a **Strategic Poster**. 
+Explain WHY they are a fit based on our SPECIFIC PRODUCTS. Distinguish if they are a **High-Intent Commenter** or a **Strategic Poster**. 
 You MUST answer: **What exactly is the post about?** 
 Reference their specific comment or post context to justify your intent and `post_topic_depth` mapping.
 
-Output strictly in JSON format as a list of objects:
+Output strictly in JSON format:
 {{
-  "classifications": [
-    {{
-      "id": "linkedin_url_from_input",
-      "is_competitor": boolean,
-      "is_fit": boolean,
-      "is_decision_maker": boolean,
-      "is_buy_signal": boolean,
-      "is_strategic_seller": boolean,
-      "reasoning": "Brief explanation focused on ICP alignment, lead mode (poster vs commenter), and intent signals. Answer: what exactly is the post about?",
-      "intent": "string (hand_raiser, prospect_pain, passive_expert, strategic_seller, or low_signal)",
-      "post_topic_depth": "string (sharing_framework, tool_showcase, complaining_keywords, industry_synthesis, discovery_friction, generic_engagement)",
-      "sentiment": "string (positive, neutral, negative)"
-    }},
-    ...
-  ]
+"classifications": [
+{{
+"id": "linkedin_url_from_input",
+"is_competitor": boolean,
+"is_fit": boolean,
+"is_decision_maker": boolean,
+"is_buy_signal": boolean,
+"is_strategic_seller": boolean,
+"reasoning": "Brief explanation focused on ICP alignment, lead mode (poster vs commenter), and how they align with our SPECIFIC PRODUCTS.",
+"intent": "string (hand_raiser, prospect_pain, passive_expert, strategic_seller, or low_signal)",
+"post_topic_depth": "string (sharing_framework, tool_showcase, complaining_keywords, industry_synthesis, discovery_friction, generic_engagement)",
+"sentiment": "string (positive, neutral, negative)"
+}}
+]
 }}
 """
 

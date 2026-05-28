@@ -11,6 +11,12 @@ import {
   CheckSquare,
   Square,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Sliders,
+  Lock,
+  Unlock,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,13 +39,25 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { normalizeUrl } from "@/lib/utils";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { useConfig } from "@/context/config-context";
+import {
+  JOB_TITLE_OPTIONS,
+  LINKEDIN_INDUSTRIES,
+  COMPANY_SIZE_OPTIONS,
+  APOLLO_SENIORITY_OPTIONS,
+  APOLLO_EMAIL_STATUS_OPTIONS,
+  APOLLO_INDUSTRIES,
+} from "@/lib/constants";
 import {
   discoverLeads,
+  enrichLeads,
   checkExistingReports,
   discoverCompetitorLeads,
   getCompetitors,
   Competitor,
   API_URL,
+  LeadDiscoveryInput,
 } from "@/lib/api";
 import {
   Card,
@@ -49,14 +67,34 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { LeadStatus } from "@/components/bulk-analysis-modal";
+import { Spinner } from "@/components/ui/spinner"
 
 const findFormSchema = z
   .object({
-    industry: z.string().optional(),
-    job_title: z.string().optional(),
+    industry: z.union([z.string(), z.array(z.string())]).optional(),
+    job_title: z.union([z.string(), z.array(z.string())]).optional(),
+    include_similar_titles: z.boolean().optional(),
     location: z.string().optional(),
     provider: z.enum(["tavily", "apollo", "competitor", "linkedin_keyword"]),
     keywords: z.string().optional(),
+    person_seniorities: z.array(z.string()).optional(),
+    contact_email_status: z.array(z.string()).optional(),
+    organization_ids: z.string().optional(),
+    organization_locations: z.string().optional(),
+    company_size: z.array(z.string()).optional(),
+    revenue_min: z.string().optional(),
+    revenue_max: z.string().optional(),
+    technologies: z.string().optional(),
+    technologies_all: z.string().optional(),
+    technologies_exclude: z.string().optional(),
+    job_postings: z.string().optional(),
+    organization_job_locations: z.string().optional(),
+    organization_num_jobs_min: z.string().optional(),
+    organization_num_jobs_max: z.string().optional(),
+    organization_job_posted_at_min: z.string().optional(),
+    organization_job_posted_at_max: z.string().optional(),
+    organization_domains: z.string().optional(),
+    q_keywords: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.provider === "linkedin_keyword") {
@@ -68,29 +106,44 @@ const findFormSchema = z
         });
       }
     } else if (data.provider !== "competitor") {
-      if (!data.industry || data.industry.trim().length < 2) {
+      const industry = Array.isArray(data.industry) ? data.industry : [data.industry];
+      const jobTitle = Array.isArray(data.job_title) ? data.job_title : [data.job_title];
+      
+      if (!industry.length || !industry[0]?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Industry is required",
           path: ["industry"],
         });
       }
-      if (!data.job_title || data.job_title.trim().length < 2) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Job title is required",
-          path: ["job_title"],
-        });
-      }
     }
   });
 
 type FindFormValues = {
-  industry?: string;
-  job_title?: string;
+  industry?: string | string[];
+  job_title?: string | string[];
+  include_similar_titles?: boolean;
   location?: string;
   provider: "tavily" | "apollo" | "competitor" | "linkedin_keyword";
   keywords?: string;
+  person_seniorities?: string[];
+  contact_email_status?: string[];
+  organization_ids?: string;
+  organization_locations?: string;
+  company_size?: string[];
+  revenue_min?: string;
+  revenue_max?: string;
+  technologies?: string;
+  technologies_all?: string;
+  technologies_exclude?: string;
+  job_postings?: string;
+  organization_job_locations?: string;
+  organization_num_jobs_min?: string;
+  organization_num_jobs_max?: string;
+  organization_job_posted_at_min?: string;
+  organization_job_posted_at_max?: string;
+  organization_domains?: string;
+  q_keywords?: string;
 };
 
 export function DiscoveryForm({
@@ -105,22 +158,23 @@ export function DiscoveryForm({
   ) => void;
   leadsStatus?: LeadStatus[];
 }) {
+  const { trialMode } = useConfig();
   const [keywordInput, setKeywordInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [results, setResults] = useState<
     {
       url: string;
       website: string;
       name?: string;
       comment?: string;
+      is_enriched?: boolean;
       metadata?: any;
       fit_score?: number;
       fit_reasoning?: string;
       source_post_url?: string;
     }[]
   >([]);
-  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
-  const [refreshAll, setRefreshAll] = useState(false);
   const [existingReports, setExistingReports] = useState<Record<string, any>>(
     {},
   );
@@ -131,31 +185,52 @@ export function DiscoveryForm({
   >([]);
   // SSE Listener for Real-Time Updates
   useEffect(() => {
-    const eventSource = new EventSource(
-      `${API_URL}/api/competitor-analysis/events/classification`,
-    );
+    const token = typeof window !== 'undefined' ? localStorage.getItem("accessToken") : null;
+    const sseUrl = `${API_URL}/api/competitor-analysis/events/classification${token ? `?token_query=${token}` : ""}`;
+    
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onerror = (err) => {
+      console.error("SSE Error in DiscoveryForm:", err);
+      eventSource.close();
+    };
 
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === "classification_update" && data.leads) {
           setResults((prevResults) => {
-            // Create a map for faster lookup
-            const updatesMap = new Map<string, any>(
-              data.leads.map((l: any) => [l.linkedin_url, l]),
-            );
+            // Create a map for faster lookup (using normalized URLs)
+            const updatesMap = new Map<string, any>();
+            data.leads.forEach((l: any) => {
+              if (l.linkedin_url) updatesMap.set(normalizeUrl(l.linkedin_url), l);
+              if (l.old_linkedin_url) updatesMap.set(normalizeUrl(l.old_linkedin_url), l);
+            });
 
             return prevResults.map((lead) => {
-              const update = updatesMap.get(lead.url);
+              const leadNorm = normalizeUrl(lead.url);
+              const update = updatesMap.get(leadNorm);
               if (update) {
+                // If the update provides a better URL (e.g. real LI instead of apollo_id), use it
+                const newUrl = (update.linkedin_url && !update.linkedin_url.startsWith('apollo_id:')) 
+                  ? update.linkedin_url 
+                  : lead.url;
+
                 return {
                   ...lead,
+                  url: newUrl,
+                  name: lead.name || update.name,
                   metadata: {
                     ...lead.metadata,
-                    is_fit: update.is_fit,
-                    is_competitor: update.is_competitor,
-                    is_decision_maker: update.is_decision_maker,
-                    fit_reasoning: update.fit_reasoning,
+                    is_fit: update.is_fit !== undefined ? update.is_fit : lead.metadata?.is_fit,
+                    is_competitor: update.is_competitor !== undefined ? update.is_competitor : lead.metadata?.is_competitor,
+                    is_decision_maker: update.is_decision_maker !== undefined ? update.is_decision_maker : lead.metadata?.is_decision_maker,
+                    is_buy_signal: update.is_buy_signal !== undefined ? update.is_buy_signal : lead.metadata?.is_buy_signal,
+                    is_strategic_seller: update.is_strategic_seller !== undefined ? update.is_strategic_seller : lead.metadata?.is_strategic_seller,
+                    fit_reasoning: update.fit_reasoning || lead.metadata?.fit_reasoning,
+                    apollo_id: update.apollo_id || lead.metadata?.apollo_id,
+                    intent: update.intent || lead.metadata?.intent,
+                    sentiment: update.sentiment || lead.metadata?.sentiment
                   },
                 };
               }
@@ -185,31 +260,38 @@ export function DiscoveryForm({
     };
     load();
   }, []);
+  
 
   const findForm = useForm<FindFormValues>({
     resolver: zodResolver(findFormSchema),
     defaultValues: {
-      industry: "",
-      job_title: "",
+      industry: [],
+      job_title: [],
+      include_similar_titles: true,
       location: "",
       provider: "tavily",
       keywords: "",
+      person_seniorities: [],
+      contact_email_status: [],
+      organization_ids: "",
+      organization_locations: "",
+      company_size: [],
+      revenue_min: "",
+      revenue_max: "",
+      technologies: "",
+      technologies_all: "",
+      technologies_exclude: "",
+      job_postings: "",
+      organization_job_locations: "",
+      organization_num_jobs_min: "",
+      organization_num_jobs_max: "",
+      organization_job_posted_at_min: "",
+      organization_job_posted_at_max: "",
+      organization_domains: "",
+      q_keywords: "",
     },
   });
 
-  const toggleUrl = (url: string) => {
-    setSelectedUrls((prev) =>
-      prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url],
-    );
-  };
-
-  const selectAll = () => {
-    if (selectedUrls.length === results.length && results.length > 0) {
-      setSelectedUrls([]);
-    } else {
-      setSelectedUrls(results.map((r) => r.url));
-    }
-  };
 
   // Keyword logic
   const handleAddKeyword = (currentDetails: string | undefined) => {
@@ -252,7 +334,6 @@ export function DiscoveryForm({
     setIsLoading(true);
     setError(null);
     setResults([]);
-    setSelectedUrls([]);
     setExistingReports({}); // Clear existing reports on new search
     try {
       if (values.provider === "competitor") {
@@ -296,8 +377,8 @@ export function DiscoveryForm({
       } else if (values.provider === "linkedin_keyword") {
         // Pass dummy values for required fields
         const payload = {
-          industry: values.industry || "Keyword Search",
-          job_title: values.job_title || "Any",
+          industry: Array.isArray(values.industry) ? values.industry.join(", ") : values.industry || "Keyword Search",
+          job_title: Array.isArray(values.job_title) ? values.job_title.join(", ") : values.job_title || "Any",
           location: values.location,
           provider: values.provider,
           keywords: values.keywords
@@ -343,7 +424,70 @@ export function DiscoveryForm({
           setError(data.error);
         }
       } else {
-        const data = await discoverLeads(values as any);
+        const jobTitles = Array.isArray(values.job_title) ? values.job_title : [values.job_title || ""];
+        const industries = Array.isArray(values.industry) ? values.industry : [values.industry || ""];
+        
+        // Robust construction: only send fields the backend expects
+        const payload: LeadDiscoveryInput = {
+          provider: values.provider,
+          location: values.location || undefined,
+          job_title: values.provider === 'tavily' ? jobTitles.join(" OR ") : jobTitles[0],
+          industry: values.provider === 'tavily' ? industries.join(" OR ") : industries[0],
+          company_size: values.company_size
+        };
+
+        if (values.provider === 'apollo') {
+          payload.person_titles = jobTitles;
+          payload.industry = industries[0];
+          payload.include_similar_titles = values.include_similar_titles;
+          payload.person_seniorities = values.person_seniorities;
+          payload.contact_email_status = values.contact_email_status;
+          payload.organization_num_employees_ranges = values.company_size;
+          payload.revenue_min = values.revenue_min ? parseInt(values.revenue_min) : undefined;
+          payload.revenue_max = values.revenue_max ? parseInt(values.revenue_max) : undefined;
+
+          if (values.organization_ids) {
+            payload.organization_ids = values.organization_ids.split(",").map(id => id.trim()).filter(id => id);
+          }
+          if (values.organization_locations) {
+            payload.organization_locations = values.organization_locations.split(",").map(l => l.trim()).filter(l => l);
+          }
+          if (values.technologies) {
+            payload.currently_using_any_of_technology_uids = values.technologies.split(",").map(t => t.trim()).filter(t => t);
+          }
+          if (values.technologies_all) {
+            payload.currently_using_all_of_technology_uids = values.technologies_all.split(",").map(t => t.trim()).filter(t => t);
+          }
+          if (values.technologies_exclude) {
+            payload.currently_not_using_any_of_technology_uids = values.technologies_exclude.split(",").map(t => t.trim()).filter(t => t);
+          }
+          if (values.job_postings) {
+            payload.q_organization_job_titles = values.job_postings.split(",").map(j => j.trim()).filter(j => j);
+          }
+          if (values.organization_job_locations) {
+            payload.organization_job_locations = values.organization_job_locations.split(",").map(l => l.trim()).filter(l => l);
+          }
+          if (values.organization_num_jobs_min) {
+            payload.organization_num_jobs_range_min = parseInt(values.organization_num_jobs_min);
+          }
+          if (values.organization_num_jobs_max) {
+            payload.organization_num_jobs_range_max = parseInt(values.organization_num_jobs_max);
+          }
+          if (values.organization_job_posted_at_min) {
+            payload.organization_job_posted_at_range_min = values.organization_job_posted_at_min;
+          }
+          if (values.organization_job_posted_at_max) {
+            payload.organization_job_posted_at_range_max = values.organization_job_posted_at_max;
+          }
+          if (values.organization_domains) {
+            payload.organization_domains = values.organization_domains.split(",").map(d => d.trim()).filter(d => d);
+          }
+          if (values.q_keywords) {
+            payload.q_keywords = values.q_keywords;
+          }
+        }
+
+        const data = await discoverLeads(payload);
         if (data.leads) {
           setResults(data.leads);
           const checkLeads = data.leads.map(
@@ -401,10 +545,14 @@ export function DiscoveryForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="tavily">
-                          Web Search (Tavily)
+                        <SelectItem value="tavily" disabled={trialMode}>
+                          Web Search (Tavily) {trialMode && "(NOT IN TRIAL)"}
                         </SelectItem>
-                        <SelectItem value="apollo">Apollo Database</SelectItem>
+                        {!trialMode && (
+                          <SelectItem value="apollo">
+                            Apollo Database
+                          </SelectItem>
+                        )}
                         <SelectItem value="linkedin_keyword">
                           LinkedIn Keywords
                         </SelectItem>
@@ -429,7 +577,13 @@ export function DiscoveryForm({
                       <FormItem>
                         <FormLabel>Industry</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. FinTech" {...field} />
+                          <MultiSelect
+                            options={findForm.watch("provider") === "apollo" ? APOLLO_INDUSTRIES : LINKEDIN_INDUSTRIES}
+                            value={Array.isArray(field.value) ? field.value : []}
+                            onChange={field.onChange}
+                            placeholder="Select industries..."
+                            allowCustom
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -442,18 +596,43 @@ export function DiscoveryForm({
                       <FormItem>
                         <FormLabel>Job Title</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. CTO" {...field} />
+                          <MultiSelect
+                            options={JOB_TITLE_OPTIONS}
+                            value={Array.isArray(field.value) ? field.value : []}
+                            onChange={field.onChange}
+                            placeholder="Select job titles..."
+                            allowCustom
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  {findForm.watch("provider") === "apollo" && (
+                    <FormField
+                      control={findForm.control}
+                      name="include_similar_titles"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2 -mt-1">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value ?? true}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="!mt-0 text-xs font-normal text-muted-foreground cursor-pointer">
+                            Include similar / fuzzy-matched titles
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={findForm.control}
                     name="location"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Location (Optional)</FormLabel>
+                        <FormLabel>{findForm.watch("provider") === "apollo" ? "Person Location" : "Location (Optional)"}</FormLabel>
                         <FormControl>
                           <Input placeholder="e.g. San Francisco" {...field} />
                         </FormControl>
@@ -461,6 +640,290 @@ export function DiscoveryForm({
                       </FormItem>
                     )}
                   />
+
+                  {/* Apollo Advanced Filters */}
+                  {findForm.watch("provider") === "apollo" && (
+                    <div className="space-y-4 pt-2 border-t mt-4">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full flex items-center justify-between text-muted-foreground hover:text-primary transition-colors h-8"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                      >
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
+                          <Sliders className="w-3 h-3" />
+                          Advanced Reach Filters
+                        </div>
+                        {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+
+                      {showAdvanced && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                          <FormField
+                            control={findForm.control}
+                            name="q_keywords"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Lead Keywords / Bio</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. AI enthusiast, Series A founder, sustainability" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Search for keywords in person bio, interests, or profile.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={findForm.control}
+                              name="person_seniorities"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Seniority</FormLabel>
+                                  <FormControl>
+                                    <MultiSelect
+                                      options={APOLLO_SENIORITY_OPTIONS}
+                                      value={field.value || []}
+                                      onChange={field.onChange}
+                                      placeholder="Any seniority"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={findForm.control}
+                              name="contact_email_status"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email Status</FormLabel>
+                                  <FormControl>
+                                    <MultiSelect
+                                      options={APOLLO_EMAIL_STATUS_OPTIONS}
+                                      value={field.value || []}
+                                      onChange={field.onChange}
+                                      placeholder="e.g. Verified"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={findForm.control}
+                            name="company_size"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Headcount</FormLabel>
+                                <FormControl>
+                                  <MultiSelect
+                                    options={COMPANY_SIZE_OPTIONS}
+                                    value={field.value || []}
+                                    onChange={field.onChange}
+                                    placeholder="Any size"
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={findForm.control}
+                              name="revenue_min"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Revenue Min ($)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Min" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={findForm.control}
+                              name="revenue_max"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Revenue Max ($)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Max" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={findForm.control}
+                            name="organization_locations"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Company HQ Location</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. New York, United States (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Filter by company headquarters.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="technologies"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Uses Any Technology</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. salesforce, aws (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Company uses at least one of these.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="technologies_all"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Uses All Technologies</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. hubspot, stripe (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Company must use every one of these.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="technologies_exclude"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Exclude Technologies</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. competitor_tool (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Exclude companies using any of these.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="job_postings"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Hiring For (Job Title Keywords)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. Sales, Python (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Search active job posting titles.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="organization_job_locations"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Hiring In (Locations)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. Austin, Remote (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Companies actively hiring in these locations.</p>
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={findForm.control}
+                              name="organization_num_jobs_min"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Active Jobs Min</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Min" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={findForm.control}
+                              name="organization_num_jobs_max"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Active Jobs Max</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Max" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={findForm.control}
+                              name="organization_job_posted_at_min"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Job Posted After</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={findForm.control}
+                              name="organization_job_posted_at_max"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Job Posted Before</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={findForm.control}
+                            name="organization_domains"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Target Domains</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="google.com, apple.com" {...field} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="organization_ids"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Apollo Company IDs</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="5f3e4b2a..., 6a1c9d3f... (comma separated)" {...field} />
+                                </FormControl>
+                                <p className="text-[10px] text-muted-foreground mt-1">Target specific companies by their Apollo ID.</p>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -625,7 +1088,7 @@ export function DiscoveryForm({
                 }
                 className="w-full"
               >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isLoading && <Spinner size="md" className="mr-2" />}
                 Find Leads
               </Button>
             </form>
@@ -639,66 +1102,18 @@ export function DiscoveryForm({
           <div className="flex items-center gap-4">
             <h3 className="text-lg font-medium">Results</h3>
             {results.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAll}
-                className="h-8 gap-2"
-              >
-                {selectedUrls.length === results.length ? (
-                  <CheckSquare className="w-4 h-4" />
-                ) : (
-                  <Square className="w-4 h-4" />
-                )}
-                <span className="text-xs uppercase tracking-wider font-semibold">
-                  Select All
-                </span>
-              </Button>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              {results.length} found
-            </span>
-            {selectedUrls.length > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-full border mr-2">
-                  <Checkbox
-                    id="refresh-all"
-                    checked={refreshAll}
-                    onCheckedChange={(checked) => setRefreshAll(!!checked)}
-                  />
-                  <label
-                    htmlFor="refresh-all"
-                    className="text-[10px] font-medium cursor-pointer"
-                  >
-                    Re-run All
-                  </label>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (onBulkSelect) {
-                      const selectedLeads = results.filter((r) =>
-                        selectedUrls.includes(r.url),
-                      );
-                      onBulkSelect(selectedLeads, { refresh: refreshAll });
-                      setSelectedUrls([]); // Clear selection to allow new additions immediately
-                      setRefreshAll(false);
-                    }
-                  }}
-                >
-                  Analyze Selected ({selectedUrls.length})
-                </Button>
-              </div>
+              <span className="text-sm text-muted-foreground">
+                {results.length} found
+              </span>
             )}
           </div>
         </div>
         {results.length > 0 ? (
           <div className="grid gap-3">
             {results.map((lead, i) => {
+              const leadNorm = normalizeUrl(lead.url);
               const status = leadsStatus?.find(
-                (s) => s.url === lead.url,
+                (s) => normalizeUrl(s.url) === leadNorm,
               )?.status;
               return (
                 <Card
@@ -706,29 +1121,33 @@ export function DiscoveryForm({
                   className={`overflow-hidden transition-colors ${status === "completed" ? "border-green-500/50 bg-green-50/10" : "hover:border-primary/50"}`}
                 >
                   <CardContent className="p-4 flex items-start gap-4">
-                    <Checkbox
-                      checked={selectedUrls.includes(lead.url)}
-                      onCheckedChange={() => toggleUrl(lead.url)}
-                      className="mt-1"
-                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <a
-                            href={lead.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium truncate text-sm hover:underline hover:text-primary transition-colors"
-                          >
-                            {lead.name || lead.url}
-                          </a>
+                          {lead.is_enriched === false ? (
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              <span className="text-sm font-medium text-muted-foreground truncate italic">
+                                {lead.name || "Unenriched Lead"}
+                              </span>
+                            </div>
+                          ) : (
+                            <a
+                              href={lead.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium truncate text-sm hover:underline hover:text-primary transition-colors"
+                            >
+                              {lead.name || lead.url}
+                            </a>
+                          )}
                           <div className="flex flex-wrap gap-1.5 ml-2">
                             {status === "analyzing" && (
                               <Badge
                                 variant="secondary"
                                 className="text-[9px] h-4 px-1 bg-blue-100 text-blue-700 animate-pulse border-blue-200"
                               >
-                                <Loader2 className="w-2 h-2 mr-1 animate-spin" />
+                                <Spinner size="xs" className="mr-1" />
                                 Researching...
                               </Badge>
                             )}
@@ -743,6 +1162,10 @@ export function DiscoveryForm({
                             {!lead.metadata?.fit_reasoning &&
                               !lead.metadata?.is_fit &&
                               !lead.metadata?.is_competitor &&
+                              !lead.metadata?.is_buy_signal &&
+                              !lead.metadata?.is_strategic_seller &&
+                              !lead.metadata?.intent &&
+                              !lead.metadata?.sentiment &&
                               status !== "analyzing" &&
                               status !== "pending" && (
                                 <Badge
@@ -777,6 +1200,22 @@ export function DiscoveryForm({
                                 Decision Maker
                               </Badge>
                             )}
+                            {lead.metadata?.is_buy_signal && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] h-4 px-1 bg-violet-50 text-violet-700 border-violet-200"
+                              >
+                                Buy Signal
+                              </Badge>
+                            )}
+                            {lead.metadata?.is_strategic_seller && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] h-4 px-1 bg-zinc-50 text-zinc-700 border-zinc-200"
+                              >
+                                Strategic Seller
+                              </Badge>
+                            )}
                             {lead.metadata?.competitor && (
                               <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground shrink-0 border border-muted-foreground/10">
                                 vs {lead.metadata.competitor}
@@ -785,31 +1224,31 @@ export function DiscoveryForm({
                           </div>
                         </div>
 
-                        {status === "completed" && onSelect && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs px-2 ml-2 hover:bg-primary/5 hover:text-primary transition-colors shrink-0"
-                            onClick={() => {
-                              const leadResult = leadsStatus?.find(
-                                (s) => s.url === lead.url,
-                              );
-                              if (leadResult && leadResult.result) {
-                                onSelect({
-                                  ...lead,
-                                  result: leadResult.result,
-                                });
-                              }
-                            }}
-                          >
-                            <ExternalLink className="w-3 h-3 mr-1.5" />
-                            View Report
-                          </Button>
-                        )}
                       </div>
 
-                      <div className="text-xs text-muted-foreground truncate mt-0.5">
-                        {lead.website}
+                      <div className="text-xs font-semibold text-primary truncate mt-0.5">
+                        {lead.comment}
+                      </div>
+
+                      <div className="text-[10px] text-muted-foreground truncate mt-0.5 flex items-center gap-2">
+                        <span>{lead.website}</span>
+                        {lead.metadata?.email_status && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-[8px] h-3.5 px-1 py-0 uppercase tracking-tighter font-bold ${
+                              lead.metadata.email_status === 'verified' ? 'bg-green-50 text-green-700 border-green-200' : 
+                              lead.metadata.email_status === 'extrapolated' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                              'bg-gray-50 text-gray-500 border-gray-200'
+                            }`}
+                          >
+                            {lead.metadata.email_status}
+                          </Badge>
+                        )}
+                        {lead.metadata?.seniority && (
+                          <span className="text-[9px] text-muted-foreground bg-muted/30 px-1 rounded border border-muted/50">
+                            {lead.metadata.seniority}
+                          </span>
+                        )}
                       </div>
 
                       {lead.metadata?.fit_reasoning && (
@@ -879,61 +1318,6 @@ export function DiscoveryForm({
                         </p>
                       )}
                     </div>
-
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      {lead.fit_score !== undefined && (
-                        <div
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            lead.fit_score >= 8
-                              ? "bg-green-100 text-green-700 border-green-200"
-                              : lead.fit_score >= 5
-                                ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                                : "bg-red-100 text-red-700 border-red-200"
-                          }`}
-                        >
-                          Fit: {lead.fit_score}/10
-                        </div>
-                      )}
-
-                      {status === "analyzing" ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          Analyzing
-                        </div>
-                      ) : status === "completed" ||
-                        existingReports[normalizeUrl(lead.url)] ? (
-                        (() => {
-                          const existingData =
-                            existingReports[normalizeUrl(lead.url)]?.data;
-                          const sessionResult = leadsStatus?.find(
-                            (s) => s.url === lead.url,
-                          )?.result;
-                          const finalResult = sessionResult || existingData;
-
-                          return (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-green-200 hover:bg-green-100 bg-green-50/50 text-green-700 font-bold gap-2"
-                              onClick={() =>
-                                onSelect &&
-                                onSelect({ ...lead, result: finalResult })
-                              }
-                            >
-                              View Report
-                            </Button>
-                          );
-                        })()
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onSelect && onSelect(lead)}
-                        >
-                          Analyze
-                        </Button>
-                      )}
-                    </div>
                   </CardContent>
                 </Card>
               );
@@ -943,7 +1327,7 @@ export function DiscoveryForm({
           <div className="h-64 border-2 border-dashed rounded-lg flex items-center justify-center text-muted-foreground p-8 text-center bg-muted/20">
             {isLoading ? (
               <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Spinner size="lg" />
                 <p>Searching for leads...</p>
               </div>
             ) : (

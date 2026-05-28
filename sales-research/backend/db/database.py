@@ -13,7 +13,7 @@ engine = create_async_engine(
     connect_args={
         "statement_cache_size": 0,
         "server_settings": {
-            "search_path": f'"{DB_SCHEMA}"'
+            "search_path": f'"{DB_SCHEMA}", public'
         }
     }
 )
@@ -25,7 +25,7 @@ SessionLocal = sessionmaker(
 )
 
 from sqlalchemy import MetaData
-Base = declarative_base(metadata=MetaData(schema=DB_SCHEMA))
+Base = declarative_base(metadata=MetaData())
 
 async def get_db():
     async with SessionLocal() as session:

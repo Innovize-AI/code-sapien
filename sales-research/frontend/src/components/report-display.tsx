@@ -175,6 +175,7 @@ interface ReportDisplayProps {
         sources: Array<{ source: string; snippet: string }>;
       };
       executive_blueprint_summary: string;
+      strategic_pivot_usecase?: string;
       refined_linkedin_message?: string;
       refined_email_body?: string;
       strategic_proof_points?: string[];
@@ -2193,7 +2194,7 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                           className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-100"
                         >
                           <CSOCommandCard
-                            data={data.cso_strategic_briefing.unified_command}
+                            data={{ ...data.cso_strategic_briefing.unified_command, strategic_pivot_usecase: data.cso_strategic_briefing.strategic_pivot_usecase }}
                           />
                         </div>
                       </div>

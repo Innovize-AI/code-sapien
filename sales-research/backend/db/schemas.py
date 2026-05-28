@@ -114,6 +114,7 @@ class ProductConfig(BaseModel):
 class SellingProfileConfig(BaseModel):
     company_name: str = "Innovize AI"
     description: str = "AI Automation and Sales Intelligence"
+    business_model: str = Field(default="product", description="The core business model: 'product', 'service', or 'hybrid'")
     products: List[ProductConfig] = Field(default_factory=list)
 
 
@@ -168,6 +169,21 @@ class OrganizationSettingsCreate(OrganizationSettingsBase):
     pass
 
 class OrganizationSettings(OrganizationSettingsBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+class OrganizationBase(BaseModel):
+    name: str
+    domain: Optional[str] = None
+
+class OrganizationCreate(OrganizationBase):
+    pass
+
+class Organization(OrganizationBase):
     id: UUID
     created_at: datetime
     updated_at: Optional[datetime]

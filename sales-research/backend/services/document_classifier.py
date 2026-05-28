@@ -8,7 +8,7 @@ from agents.report_agent import get_gemini_model
 from langchain_core.messages import SystemMessage, HumanMessage
 
 class DocumentMetadata(BaseModel):
-    industry: str = Field(description="Primary industry this document pertains to (e.g., SaaS, Finance, Healthcare)")
+    industry: List[str] = Field(description="List of industries this document pertains to (e.g., ['SaaS', 'Finance'])")
     product: str = Field(description="Name of the product or service discussed")
     category: str = Field(description="Type of content: playbook, case-study, or solution-guide")
     target_persona: List[str] = Field(description="Job titles or roles this document is targeting")
@@ -30,10 +30,10 @@ class DocumentClassifier:
         {content[:4000]} # Limit to 4k tokens for classification
         
         ### INSTRUCTIONS:
-        1. Identify the primary industry.
+        1. Identify the industries involved. If multiple industries are listed (e.g., separated by commas, slashes '/', or bullets), split them into individual items in the 'industry' list.
         2. Identify the product name (e.g., Glial, IDP).
         3. Determine if this is a 'playbook' (how-to/strategy), 'case-study' (success story/ROI), or 'solution' (technical specs).
-        4. List target roles (e.g., CTO, VP Sales).
+        4. List target roles (e.g., CTO, VP Sales). Split into individual items.
         5. Map to one of the three namespaces: 'playbooks', 'case-studies', or 'solutions'.
         """
         
@@ -51,7 +51,7 @@ class DocumentClassifier:
             logger.info(f"Error classifying document {filename}: {e}")
             # Fallback
             return DocumentMetadata(
-                industry="General",
+                industry=["General"],
                 product="Unknown",
                 category="unsorted",
                 target_persona=[],

@@ -31,7 +31,6 @@ import {
   Calendar,
   ExternalLink,
   ArrowRight,
-  Loader2,
   Globe,
   User,
   ArrowUpDown,
@@ -46,6 +45,7 @@ import { useBulkAnalysis } from "@/context/bulk-analysis-context";
 import { useAuth } from "@/context/auth-context";
 import { ensureProtocol } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner"
 
 interface HistoryItem {
   id: string;
@@ -126,13 +126,27 @@ export default function HistoryPage() {
         );
       case "unverified":
       case "invalid":
+      case "error":
+      case "failed":
         return (
           <Badge
             variant="outline"
-            className="text-[9px] h-4 px-1.5 bg-red-50 text-red-700 border-red-200 flex items-center gap-1"
+            className="text-[9px] h-4 px-1.5 bg-red-600 text-white border-red-700 flex items-center gap-1 font-bold shadow-sm"
           >
             <ShieldAlert className="w-2.5 h-2.5" />
-            Unverified
+            {s === "invalid" ? "Invalid" : "Error"}
+          </Badge>
+        );
+      case "catch_all":
+      case "catchall":
+      case "risky":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[9px] h-4 px-1.5 bg-amber-100 text-amber-700 border-amber-300 flex items-center gap-1 font-bold"
+          >
+            <ShieldAlert className="w-2.5 h-2.5" />
+            Risky
           </Badge>
         );
       default:
@@ -394,7 +408,7 @@ export default function HistoryPage() {
                           {item.status === "analyzing" ||
                           item.status === "pending" ? (
                             <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <Spinner size="sm" />
                               <span
                                 className="truncate max-w-[150px]"
                                 title={item.currentStep || "Analyzing..."}

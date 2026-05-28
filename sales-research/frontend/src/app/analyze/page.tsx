@@ -1,7 +1,7 @@
 "use client"
 
 import { LeadForm } from "@/components/lead-form"
-import { ReportDisplay } from "@/components/report-display"
+import { ReportDisplayV2 as ReportDisplay } from "@/components/report-display-v2"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useSearchParams } from "next/navigation"
@@ -9,13 +9,40 @@ import { Suspense, useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 
+import { useConfig } from "@/context/config-context"
+import { Lock } from "lucide-react"
+
 function AnalyzeLeadContent() {
+    const { trialMode } = useConfig()
     const searchParams = useSearchParams()
     const urlParam = searchParams.get("url")
     const idParam = searchParams.get("id")
     const [researchData, setResearchData] = useState(null)
     const [defaultUrl, setDefaultUrl] = useState("")
     const [loading, setLoading] = useState(false)
+
+
+    if (trialMode) {
+        return (
+            <Card className="border-amber-500/20 bg-amber-500/5 backdrop-blur-sm">
+                <CardHeader className="text-center py-12">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
+                        <Lock className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <CardTitle>Manual Analysis is Locked</CardTitle>
+                    <CardDescription className="max-w-md mx-auto">
+                        Deep-dive manual analysis is not available in the trial version. 
+                        Please use the Find Leads or Autopilot features to discover and classify prospects.
+                    </CardDescription>
+                    <div className="mt-8 flex justify-center">
+                        <Button variant="outline" className="border-amber-500/50 text-amber-700 hover:bg-amber-500/10">
+                            Contact Support to Enable
+                        </Button>
+                    </div>
+                </CardHeader>
+            </Card>
+        )
+    }
 
     // Update default URL only when param changes to avoid loop
     useEffect(() => {

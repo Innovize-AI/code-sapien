@@ -17,7 +17,12 @@ const getApiUrl = () => {
         return 'https://glial-research-backend-service-staging-512561667165.us-central1.run.app';
     }
 
-    // 3. Default to Production
+    // 3. Trial Check
+    if (hostname.includes('trial')) {
+        return 'https://glial-research-backend-service-trial-512561667165.us-central1.run.app';
+    }
+
+    // 4. Default to Production
     return 'https://glial-research-backend-service-512561667165.us-central1.run.app';
 };
 
@@ -157,16 +162,48 @@ export const generateResearch = async (
 };
 
 export interface LeadDiscoveryInput {
-    industry: string;
-    job_title: string;
+    industry?: string | string[];
+    job_title?: string | string[];
     location?: string;
-    company_size?: string;
+    company_size?: string | string[];
     provider?: 'tavily' | 'apollo' | 'competitor' | 'linkedin_keyword';
     keywords?: string[];
+    // Person filters
+    person_titles?: string[];
+    include_similar_titles?: boolean;
+    person_seniorities?: string[];
+    contact_email_status?: string[];
+    // Organization filters
+    organization_ids?: string[];
+    organization_domains?: string[];
+    organization_locations?: string[];
+    organization_num_employees_ranges?: string[];
+    revenue_min?: number;
+    revenue_max?: number;
+    // Technology filters
+    currently_using_all_of_technology_uids?: string[];
+    currently_using_any_of_technology_uids?: string[];
+    currently_not_using_any_of_technology_uids?: string[];
+    // Job posting filters
+    q_organization_job_titles?: string[];
+    organization_job_locations?: string[];
+    organization_num_jobs_range_min?: number;
+    organization_num_jobs_range_max?: number;
+    organization_job_posted_at_range_min?: string;
+    organization_job_posted_at_range_max?: string;
+    // General
+    q_keywords?: string;
+    page?: number;
+    per_page?: number;
 }
 
 export const discoverLeads = async (data: LeadDiscoveryInput) => {
     const response = await axios.post(`${API_URL}/sales-research/discover`, data);
+    return response.data;
+};
+
+export const enrichLeads = async (person_ids: string[]) => {
+    const response = await axios.post(`${API_URL}/sales-research/enrich`, { person_ids });
     return response.data;
 };
 
@@ -310,11 +347,21 @@ export const saveGlobalICP = async (data: IdealProfileData) => {
     return response.data;
 };
 
+export interface UsageStats {
+    used: number;
+    limit: number;
+    remaining: number;
+}
+
 export interface DashboardStats {
     total_leads: number;
     avg_lead_score: number;
     high_potential_leads: number;
     time_saved_hours: number;
+    trial_mode: boolean;
+    research_usage?: UsageStats;
+    classification_usage?: UsageStats;
+    lead_discovery_usage?: UsageStats;
 }
 
 export const fetchDashboardStats = async (): Promise<DashboardStats | null> => {
@@ -390,6 +437,11 @@ export const saveIntegrations = async (data: IntegrationSettings) => {
     return response.data;
 };
 
+export const getUsageStats = async (): Promise<any> => {
+    const response = await axios.get(`${API_URL}/api/settings/usage`);
+    return response.data;
+};
+
 export const getUserIntegrations = async (): Promise<{ user_linkedin_url: string | null, email_config: string | null, slack_user_id: string | null } | null> => {
     try {
         const response = await axios.get(`${API_URL}/api/settings/user-integrations`);
@@ -409,6 +461,7 @@ export interface ProductConfig {
     description: string;
     is_strategic_pivot?: boolean;
     target_roles?: string[];
+    target_industries?: string[];
     relevant_files?: string[];
     rag_context?: string;
 }
@@ -416,6 +469,7 @@ export interface ProductConfig {
 export interface SellingProfileConfig {
     company_name: string;
     description: string;
+    business_model?: 'product' | 'service' | 'hybrid';
     products: ProductConfig[];
 }
 
@@ -436,7 +490,12 @@ export const saveSellingProfile = async (data: SellingProfileConfig) => {
     return response.data;
 };
 
-export const getOnboardingStatus = async (): Promise<{ complete: boolean }> => {
+export const getGlobalConfig = async (): Promise<{ trial_mode: boolean; environment: string }> => {
+    const response = await axios.get(`${API_URL}/api/config`);
+    return response.data;
+};
+
+export const getOnboardingStatus = async (): Promise<{ complete: boolean; migration_complete: boolean }> => {
     const response = await axios.get(`${API_URL}/api/settings/onboarding-status`);
     return response.data;
 };
@@ -551,6 +610,11 @@ export interface IdentifiedProfile {
     rep_name?: string;
     touchpoint_count: number;
     outreach_status?: string;
+    
+    // New Intelligence Signals
+    intent?: string;
+    sentiment?: number;
+
     company?: {
         id: string;
         name: string;
@@ -573,13 +637,15 @@ export const getIdentifiedProfiles = async (
     sort_by: string = "touchpoint_count",
     sort_order: string = "desc",
     date_start?: string,
-    date_end?: string
-): Promise<{ profiles: IdentifiedProfile[], total: number }> => {
+    date_end?: string,
+    source: string = "all",
+): Promise<{ profiles: IdentifiedProfile[], total: number, tab_counts: Record<string, number> }> => {
     const response = await axios.get(`${API_URL}/api/competitor-analysis/profiles`, {
-        params: { skip, limit, search, status, sort_by, sort_order, date_start, date_end }
+        params: { skip, limit, search, status, sort_by, sort_order, date_start, date_end, source }
     });
     return response.data;
 };
+
 
 export interface Activity {
     id: string;
@@ -617,10 +683,15 @@ export const syncKnowledgeBase = async () => {
 };
 
 export interface KnowledgeFile {
+    id?: string;
     name: string;
-    path: string;
+    description?: string;
+    path?: string;
+    namespace?: string;
+    storage_path?: string;
+    asset_metadata?: Record<string, any>;
     size: number;
-    modified: number;
+    modified: number | string;
 }
 
 export const fetchKnowledgeFiles = async (): Promise<KnowledgeFile[]> => {
@@ -643,6 +714,16 @@ export const fetchStrategy = async () => {
 
 export const configureStrategy = async (config: any) => {
     const response = await axios.post(`${API_URL}/api/knowledge/configure-strategy`, config);
+    return response.data;
+};
+
+export const deleteKnowledgeFile = async (assetId: string) => {
+    const response = await axios.delete(`${API_URL}/api/knowledge/assets/${assetId}`);
+    return response.data;
+};
+
+export const getKnowledgeFileContent = async (assetId: string) => {
+    const response = await axios.get(`${API_URL}/api/knowledge/assets/${assetId}/content`);
     return response.data;
 };
 

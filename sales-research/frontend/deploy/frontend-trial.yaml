@@ -1,0 +1,31 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: glial-research-frontend-service-trial
+  annotations:
+    run.googleapis.com/minScale: "1"
+    run.googleapis.com/invoker-iam-disabled: true
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/startup-cpu-boost: "true"
+        run.googleapis.com/cpu-throttling: false
+    spec:
+      containerConcurrency: 80
+      containers:
+        - image: us-central1-docker.pkg.dev/innovize-ai/sales-research/glial-research-frontend-image:latest
+          ports:
+            - name: http1
+              containerPort: 3000
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          env:
+            - name: ENVIRONMENT
+              value: trial
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://glial-research-backend-service-trial-512561667165.us-central1.run.app"

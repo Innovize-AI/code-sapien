@@ -91,6 +91,16 @@ app.include_router(companies_router, prefix="/api")
 from routes.auth import router as auth_router
 app.include_router(auth_router, prefix="/api/auth")
 
+from routes.trial import router as trial_router
+app.include_router(trial_router, prefix="/api/trial")
+
+@app.get("/api/config")
+async def get_global_config():
+    return {
+        "trial_mode": os.getenv("TRIAL_MODE", "false").lower() == "true",
+        "environment": os.getenv("ENVIRONMENT", "dev")
+    }
+
 @app.on_event("startup")
 async def startup_event():
     if environment == "dev":

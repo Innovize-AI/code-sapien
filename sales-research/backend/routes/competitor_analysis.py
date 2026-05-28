@@ -20,170 +20,161 @@ competitor_router = APIRouter(tags=['Competitor Analysis'], responses={404: {"de
 
 @competitor_router.get("/profiles")
 async def get_profiles(
-    skip: int = 0, 
-    limit: int = 100, 
-    search: str = None, 
+    skip: int = 0,
+    limit: int = 100,
+    search: str = None,
     status: List[str] = Query(["all"]),
+    source: str = "all",
     date_start: str = None,
     date_end: str = None,
     sort_by: str = "touchpoint_count",
     sort_order: str = "desc",
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     """
-    Fetch all identified profiles with rep attribution.
+    Fetch identified profiles with rep attribution, source filtering, and pagination.
     """
     from db.models import IdentifiedProfile, Profile, ResearchReport, Company
+    from sqlalchemy import text as sa_text
+    from db.database import SessionLocal as async_session_factory
     start_time = time.time()
     try:
-        # Subquery for latest reports to avoid duplicates and ensure we get the newest one
-        latest_reports_sub = select(
-            ResearchReport.id,
-            ResearchReport.normalized_linkedin_url,
-            ResearchReport.created_at
-        ).distinct(
-            ResearchReport.normalized_linkedin_url
-        ).order_by(
-            ResearchReport.normalized_linkedin_url,
-            ResearchReport.created_at.desc()
-        ).alias("latest_reports")
+        # --- Shared filter builder ---
+        def build_where_clauses(src, search_filter=None):
+            clauses = []
+            if src == "apollo":
+                clauses.append(IdentifiedProfile.lead_source == "apollo")
+            elif src == "keyword":
+                clauses.append(IdentifiedProfile.lead_source == "keyword")
+            elif src == "competitor":
+                clauses.append(IdentifiedProfile.lead_source == "competitor")
+            if search_filter is not None:
+                clauses.append(search_filter)
+            if status and "all" not in status:
+                if "fit" in status:
+                    clauses.append(IdentifiedProfile.is_fit == True)
+                if "competitor" in status:
+                    clauses.append(IdentifiedProfile.is_competitor == True)
+                if "dm" in status:
+                    clauses.append(IdentifiedProfile.is_decision_maker == True)
+            if date_start:
+                from datetime import datetime
+                clauses.append(IdentifiedProfile.created_at >= datetime.fromisoformat(date_start.replace("Z", "+00:00")))
+            if date_end:
+                from datetime import datetime
+                clauses.append(IdentifiedProfile.created_at <= datetime.fromisoformat(date_end.replace("Z", "+00:00")))
+            if current_user.organization_id:
+                clauses.append(IdentifiedProfile.organization_id == current_user.organization_id)
+            else:
+                clauses.append(IdentifiedProfile.created_by_id == current_user.id)
+                
+            return clauses
 
-        # Base query for profiles
-        query = select(
-            IdentifiedProfile, 
-            Profile.full_name, 
-            latest_reports_sub.c.id.label("report_id"),
-            Company
-        ).outerjoin(
-            Profile, IdentifiedProfile.created_by_id == Profile.id
-        ).outerjoin(
-            Company, IdentifiedProfile.company_id == Company.id
-        ).outerjoin(
-            latest_reports_sub,
-            IdentifiedProfile.normalized_linkedin_url == latest_reports_sub.c.normalized_linkedin_url
-        )
-        
+        search_filter = None
         if search:
             search_filter = or_(
                 IdentifiedProfile.name.ilike(f"%{search}%"),
                 IdentifiedProfile.headline.ilike(f"%{search}%"),
-                IdentifiedProfile.linkedin_url.ilike(f"%{search}%")
+                IdentifiedProfile.linkedin_url.ilike(f"%{search}%"),
             )
-            query = query.where(search_filter)
-            
-        if status and "all" not in status:
-            if "fit" in status:
-                query = query.where(IdentifiedProfile.is_fit == True)
-            if "competitor" in status:
-                query = query.where(IdentifiedProfile.is_competitor == True)
-            if "dm" in status:
-                query = query.where(IdentifiedProfile.is_decision_maker == True)
-            
-        if date_start:
-            from datetime import datetime
-            dt_start = datetime.fromisoformat(date_start.replace("Z", "+00:00"))
-            query = query.where(IdentifiedProfile.created_at >= dt_start)
-            
-        if date_end:
-            from datetime import datetime
-            dt_end = datetime.fromisoformat(date_end.replace("Z", "+00:00"))
-            query = query.where(IdentifiedProfile.created_at <= dt_end)
-            
-        # Dynamic Sorting
-        sort_attr = None
+
+        where_clauses = build_where_clauses(source, search_filter)
+
+        # --- LATERAL join for latest report (uses index, avoids full DISTINCT ON scan) ---
+        lateral_sub = (
+            select(ResearchReport.id.label("report_id"))
+            .where(ResearchReport.normalized_linkedin_url == IdentifiedProfile.normalized_linkedin_url)
+            .order_by(ResearchReport.created_at.desc())
+            .limit(1)
+            .correlate(IdentifiedProfile)
+            .lateral("latest_report")
+        )
+
+        # --- Sorting ---
         if sort_by == "rep_name":
             sort_attr = Profile.full_name
         elif hasattr(IdentifiedProfile, sort_by):
             sort_attr = getattr(IdentifiedProfile, sort_by)
         else:
             sort_attr = IdentifiedProfile.touchpoint_count
+        order_expr = sort_attr.desc() if sort_order == "desc" else sort_attr.asc()
 
-        if sort_order == "desc":
-            query = query.order_by(sort_attr.desc())
-        else:
-            query = query.order_by(sort_attr.asc())
+        # --- Main data query ---
+        data_query = (
+            select(IdentifiedProfile, Profile.full_name, lateral_sub.c.report_id, Company)
+            .outerjoin(Profile, IdentifiedProfile.created_by_id == Profile.id)
+            .outerjoin(Company, IdentifiedProfile.company_id == Company.id)
+            .outerjoin(lateral_sub, sa_text("true"))
+            .where(*where_clauses)
+            .order_by(order_expr)
+            .offset(skip)
+            .limit(limit)
+        )
 
-        query = query.offset(skip).limit(limit)
-        
+        # --- Combined counts query (1 query for total + all 4 tab badges) ---
+        count_base_clauses = build_where_clauses("all", search_filter)
+        counts_query = select(
+            func.count().label("total_all"),
+            func.count().filter(IdentifiedProfile.lead_source == "apollo").label("apollo"),
+            func.count().filter(IdentifiedProfile.lead_source == "keyword").label("keyword"),
+            func.count().filter(IdentifiedProfile.lead_source == "competitor").label("competitor"),
+            # Total for current source tab (for pagination)
+            func.count().filter(
+                *([IdentifiedProfile.lead_source == source] if source != "all" else [sa_text("true")])
+            ).label("current_total"),
+        ).where(*count_base_clauses)
+
         db_start = time.time()
-        result = await db.execute(query)
+        # Run data query and counts query concurrently via two sessions
+        async with async_session_factory() as db2:
+            data_result, counts_result = await asyncio.gather(
+                db.execute(data_query),
+                db2.execute(counts_query),
+            )
         db_end = time.time()
-        logger.debug(f"get_profiles DB execution: {db_end - db_start:.4f}s")
-        
+        logger.debug(f"get_profiles parallel queries: {db_end - db_start:.4f}s")
+
+        counts_row = counts_result.one()
+        tab_counts = {
+            "all": counts_row.total_all,
+            "apollo": counts_row.apollo,
+            "keyword": counts_row.keyword,
+            "competitor": counts_row.competitor,
+        }
+        total = counts_row.current_total
+
+        # --- Map rows to response dicts ---
         enriched_profiles = []
-        rows = result.all()
-        fetch_end = time.time()
-        logger.debug(f"get_profiles Fetch rows: {fetch_end - db_end:.4f}s")
-        
-        for profile, rep_name, report_id, company in rows:
-            # Start with metadata, then overwrite with explicit columns
+        for profile, rep_name, report_id, company in data_result.all():
             try:
                 p_dict = json.loads(profile.profile_metadata or "{}") if isinstance(profile.profile_metadata, str) else (profile.profile_metadata or {})
                 if not isinstance(p_dict, dict): p_dict = {}
-            except Exception as e:
-                logger.error(f"Error parsing profile_metadata for {profile.id}: {e}")
+            except Exception:
                 p_dict = {}
-                
-            # Overwrite with columns (The Truth)
+
             columns_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns}
             for k, v in columns_dict.items():
                 if v is not None or k not in p_dict:
                     p_dict[k] = v
-                    
-            # Convert UUIDs to strings for JSON
-            for k, v in p_dict.items():
+
+            for k, v in list(p_dict.items()):
                 if hasattr(v, 'hex'): p_dict[k] = str(v)
-            
+
             p_dict["rep_name"] = rep_name or "System"
             p_dict["latest_report_id"] = str(report_id) if report_id else None
-            
-            # Include Company data
+
             if company:
-                p_dict["company"] = {
-                    c.name: getattr(company, c.name) for c in company.__table__.columns
-                }
-                # Sanitize company UUIDs
+                p_dict["company"] = {c.name: getattr(company, c.name) for c in company.__table__.columns}
                 for ck, cv in p_dict["company"].items():
                     if hasattr(cv, 'hex'): p_dict["company"][ck] = str(cv)
             else:
                 p_dict["company"] = None
-                
+
             enriched_profiles.append(p_dict)
-            
-        map_end = time.time()
-        logger.debug(f"get_profiles Mapping: {map_end - fetch_end:.4f}s")
-            
-        # Count for pagination
-        count_query = select(func.count(IdentifiedProfile.id))
-        if search:
-            count_query = count_query.where(search_filter)
-        
-        if status and "all" not in status:
-            if "fit" in status:
-                count_query = count_query.where(IdentifiedProfile.is_fit == True)
-            if "competitor" in status:
-                count_query = count_query.where(IdentifiedProfile.is_competitor == True)
-            if "dm" in status:
-                count_query = count_query.where(IdentifiedProfile.is_decision_maker == True)
-                
-        if date_start:
-            from datetime import datetime
-            dt_start = datetime.fromisoformat(date_start.replace("Z", "+00:00"))
-            count_query = count_query.where(IdentifiedProfile.created_at >= dt_start)
-            
-        if date_end:
-            from datetime import datetime
-            dt_end = datetime.fromisoformat(date_end.replace("Z", "+00:00"))
-            count_query = count_query.where(IdentifiedProfile.created_at <= dt_end)
-                
-        total_result = await db.execute(count_query)
-        total = total_result.scalar()
-        
-        count_end = time.time()
-        logger.debug(f"get_profiles Count query: {count_end - map_end:.4f}s")
-        logger.debug(f"get_profiles TOTAL: {count_end - start_time:.4f}s")
-        
-        return {"profiles": enriched_profiles, "total": total}
+
+        logger.debug(f"get_profiles TOTAL: {time.time() - start_time:.4f}s")
+        return {"profiles": enriched_profiles, "total": total, "tab_counts": tab_counts}
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
         return {"error": str(e)}
@@ -192,7 +183,8 @@ async def get_profiles(
 async def trigger_audience_discovery(
     profile_id: str,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     """
     Manually triggers audience discovery (fetching commenters) for a specific profile.
@@ -211,7 +203,8 @@ async def trigger_audience_discovery(
         background_tasks.add_task(
             strategic_seller_discovery_task, 
             seller_url=profile.linkedin_url, 
-            user_id=str(profile.created_by_id) if profile.created_by_id else None
+            user_id=str(current_user.id),
+            org_id=current_user.organization_id
         )
         
         return {
@@ -226,7 +219,11 @@ class CompetitorInput(BaseModel):
     urls: List[str] = []
 
 @competitor_router.post("/analyze")
-async def run_competitor_analysis(input_data: CompetitorInput, db: AsyncSession = Depends(get_db)):
+async def run_competitor_analysis(
+    input_data: CompetitorInput, 
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
     """
     Endpoint to analyze competitor LinkedIn posts.
     """
@@ -244,12 +241,16 @@ async def run_competitor_analysis(input_data: CompetitorInput, db: AsyncSession 
 
 
 @competitor_router.get("/events/classification")
-async def sse_classification(request: Request):
+async def sse_classification(
+    request: Request,
+    current_user: Profile = Depends(get_current_user)
+):
     """
     Server-Sent Events endpoint for classification updates.
     """
     from services.classification_service import event_manager
-    queue = await event_manager.subscribe()
+    org_id = current_user.organization_id
+    queue = await event_manager.subscribe(org_id)
 
     async def event_generator():
         try:
@@ -266,7 +267,7 @@ async def sse_classification(request: Request):
             pass
         finally:
             from services.classification_service import event_manager
-            await event_manager.unsubscribe(queue)
+            await event_manager.unsubscribe(org_id, queue)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -290,6 +291,11 @@ async def discover_leads(
     urls = input_data.urls
     if not urls:
         return {"error": "No URLs provided"}
+
+    # Trial Mode Discovery Limit Check
+    from utils.trial_utils import check_trial_lead_limit
+    if await check_trial_lead_limit(db, org_id=current_user.organization_id, user_id=str(current_user.id)):
+         return {"error": "Lead Discovery limit reached for Trial Mode. Please upgrade to continue finding more leads."}
 
     try:
         all_leads = []
@@ -332,6 +338,11 @@ async def discover_leads(
         # 1. Save Raw Leads Immediately
         if raw_leads_to_save:
             logger.debug(f"Saving {len(raw_leads_to_save)} raw leads to DB...")
+            # Assign attribution before save
+            for l in raw_leads_to_save:
+                l["created_by_id"] = current_user.id
+                l["organization_id"] = current_user.organization_id
+
             await batch_upsert_identified_profiles(db, raw_leads_to_save)
             await db.commit()
             
@@ -351,7 +362,12 @@ async def discover_leads(
             
         # 2. Trigger Background Classification
         from services.classification_service import run_classification_and_update
-        background_tasks.add_task(run_classification_and_update, raw_leads_to_save, user_id=str(current_user.id))
+        background_tasks.add_task(
+            run_classification_and_update, 
+            raw_leads_to_save, 
+            user_id=str(current_user.id),
+            org_id=current_user.organization_id
+        )
         
         logger.debug(f"Returning {len(all_leads)} leads immediately to frontend.")
         return {"leads": all_leads}

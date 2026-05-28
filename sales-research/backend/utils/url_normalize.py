@@ -14,6 +14,10 @@ def normalize_linkedin_url(url: Optional[str]) -> Optional[str]:
     
     url = url.strip()
     
+    # Handle Apollo IDs or other non-URL identifiers
+    if url.startswith('apollo_id:'):
+        return url
+    
     try:
         # Add a scheme if none is present to help urlparse
         if not url.startswith(('http://', 'https://')):

@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Loader2,
-  Save,
+import { Save,
   Plus,
   Trash2,
   ShieldAlert,
@@ -17,6 +15,7 @@ import {
   User,
   Briefcase,
   ArrowLeft,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -65,6 +64,7 @@ import {
   getSellingProfile,
   saveSellingProfile,
   SellingProfileConfig,
+  getUsageStats,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -120,17 +120,23 @@ const keysFormSchema = z.object({
 const sellingProfileSchema = z.object({
   company_name: z.string().min(1, "Company Name is required"),
   description: z.string().min(1, "Description is required"),
+  business_model: z.enum(["product", "service", "hybrid"]).default("product"),
   products: z.array(
     z.object({
       name: z.string().min(1, "Product Name is required"),
       description: z.string().min(1, "Product Description is required"),
       is_strategic_pivot: z.boolean().optional(),
-      target_roles: z.array(z.string()).optional(), // Handled as comma-sep string in UI for simplicity
+      target_roles: z.array(z.string()).optional(),
+      target_industries: z.array(z.string()).optional(),
     }),
   ),
 });
 
+import { useConfig } from "@/context/config-context";
+import { Spinner } from "@/components/ui/spinner"
+
 export default function SettingsPage() {
+  const { trialMode } = useConfig();
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -141,6 +147,7 @@ export default function SettingsPage() {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [newCompetitorUrl, setNewCompetitorUrl] = useState("");
   const [isAddingCompetitor, setIsAddingCompetitor] = useState(false);
+  const [usage, setUsage] = useState<any>(null);
 
   // --- Forms ---
 
@@ -183,6 +190,7 @@ export default function SettingsPage() {
     defaultValues: {
       company_name: "",
       description: "",
+      business_model: "product",
       products: [],
     },
   });
@@ -307,6 +315,7 @@ export default function SettingsPage() {
           const sanitizedSelling = {
             company_name: globalSelling.company_name || "",
             description: globalSelling.description || "",
+            business_model: globalSelling.business_model || "product",
             products: globalSelling.products || [],
           };
           sellingProfileForm.reset(sanitizedSelling);
@@ -314,6 +323,9 @@ export default function SettingsPage() {
         if (competitorsList) {
           setCompetitors(competitorsList);
         }
+        
+        const usageStats = await getUsageStats();
+        setUsage(usageStats);
       } catch (e) {
         console.error("Failed to load settings", e);
         setError("Failed to load settings.");
@@ -430,7 +442,7 @@ export default function SettingsPage() {
   if (isFetching) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -482,6 +494,67 @@ export default function SettingsPage() {
           <AlertTitle>Success</AlertTitle>
           <AlertDescription>{success}</AlertDescription>
         </Alert>
+      )}
+
+      {usage?.trial_mode && (
+        <Card className="mb-6 border-primary/20 bg-primary/5">
+          <CardHeader className="py-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              Trial Usage & Limits
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+             <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Deep Researches</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{usage.research.used}</span>
+                  <span className="text-sm text-muted-foreground">/ {usage.research.limit} used</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all" 
+                    style={{ width: `${Math.min(100, (usage.research.used / usage.research.limit) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-1">
+                  {usage.research.remaining} researches remaining
+                </span>
+             </div>
+              <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Profile Classifications</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{usage.classification.used}</span>
+                  <span className="text-sm text-muted-foreground">/ {usage.classification.limit} leads</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all" 
+                    style={{ width: `${Math.min(100, (usage.classification.used / usage.classification.limit) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-1">
+                  {usage.classification.remaining} classifications remaining
+                </span>
+             </div>
+             <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border md:col-span-2">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Lead Discovery Bank</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{usage.lead_discovery.used}</span>
+                  <span className="text-sm text-muted-foreground">/ {usage.lead_discovery.limit} profiles identified</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-orange-500 transition-all" 
+                    style={{ width: `${Math.min(100, (usage.lead_discovery.used / usage.lead_discovery.limit) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-1">
+                  {usage.lead_discovery.remaining} slots remaining in your discovery bank
+                </span>
+             </div>
+          </CardContent>
+        </Card>
       )}
 
       <Tabs defaultValue="personal" className="w-full space-y-6">
@@ -590,6 +663,12 @@ export default function SettingsPage() {
                     Customize the Ideal Customer Profile for your specific
                     territory or focus.
                   </CardDescription>
+                  <Alert className="mt-4 border-amber-500/20 bg-amber-500/5">
+                    <ShieldAlert className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-700 text-xs font-medium">
+                      Note: Personal overrides will completely bypass organization-wide ICP settings for your account.
+                    </AlertDescription>
+                  </Alert>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -692,7 +771,7 @@ export default function SettingsPage() {
               <div className="flex justify-end">
                 <Button type="submit" disabled={isLoading} size="lg">
                   {isLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Spinner size="md" className="mr-2" />
                   ) : (
                     <Save className="mr-2 h-4 w-4" />
                   )}
@@ -768,6 +847,37 @@ export default function SettingsPage() {
                     />
                   </div>
 
+                  <FormField
+                    control={sellingProfileForm.control}
+                    name="business_model"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Model</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          disabled={!isAdmin}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your model" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="product">Product-Led (Tools, SaaS, HW)</SelectItem>
+                            <SelectItem value="service">Service-Led (Agency, Consulting, Managed)</SelectItem>
+                            <SelectItem value="hybrid">Hybrid (Product + Services)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Determines if the AI pitches technical features or strategic expertise.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <h4 className="text-sm font-semibold">
@@ -783,6 +893,7 @@ export default function SettingsPage() {
                               name: "",
                               description: "",
                               target_roles: [],
+                              target_industries: [],
                             })
                           }
                         >
@@ -850,20 +961,31 @@ export default function SettingsPage() {
                           name={`products.${index}.target_roles`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">
-                                Target Roles
-                              </FormLabel>
-                              <FormControl>
-                                <MultiSelect
-                                  label="Target Roles"
-                                  options={JOB_TITLE_OPTIONS}
-                                  value={field.value || []}
-                                  onChange={field.onChange}
-                                  placeholder="Founder, CTO, VP Sales..."
-                                  allowCustom
-                                  disabled={!isAdmin}
-                                />
-                              </FormControl>
+                              <MultiSelect
+                                label="Target Roles"
+                                options={JOB_TITLE_OPTIONS}
+                                value={field.value || []}
+                                onChange={field.onChange}
+                                placeholder="Founder, CTO, VP Sales..."
+                                allowCustom
+                              />
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={sellingProfileForm.control}
+                          name={`products.${index}.target_industries`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <MultiSelect
+                                label="Target Industries"
+                                options={LINKEDIN_INDUSTRIES}
+                                value={field.value || []}
+                                onChange={field.onChange}
+                                placeholder="Logistics, Software, Healthcare..."
+                                allowCustom
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -900,7 +1022,7 @@ export default function SettingsPage() {
                         variant="outline"
                       >
                         {isLoading ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Spinner size="md" className="mr-2" />
                         ) : (
                           <Save className="mr-2 h-4 w-4" />
                         )}
@@ -1098,82 +1220,8 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Global Keys */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Core API Keys</CardTitle>
-              <CardDescription>
-                Organization-wide keys for data providers.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...globalKeysForm}>
-                <form
-                  onSubmit={globalKeysForm.handleSubmit(handleSaveGlobalKeys)}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={globalKeysForm.control}
-                    name="tavily_api_key"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Tavily API Key</FormLabel>
-                          {!isAdmin && (
-                            <Badge variant="outline" className="text-xs h-5">
-                              <Lock className="w-2 h-2 mr-1" /> Admin Only
-                            </Badge>
-                          )}
-                        </div>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            {...field}
-                            disabled={!isAdmin}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={globalKeysForm.control}
-                    name="apollo_api_key"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Apollo API Key</FormLabel>
-                          {!isAdmin && (
-                            <Badge variant="outline" className="text-xs h-5">
-                              <Lock className="w-2 h-2 mr-1" /> Admin Only
-                            </Badge>
-                          )}
-                        </div>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            {...field}
-                            disabled={!isAdmin}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <div className="flex justify-end pt-2">
-                    {isAdmin && (
-                      <Button
-                        type="submit"
-                        disabled={isLoading}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Update Keys
-                      </Button>
-                    )}
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+          {/* Global Keys hidden as per request */}
+
         </TabsContent>
       </Tabs>
     </div>

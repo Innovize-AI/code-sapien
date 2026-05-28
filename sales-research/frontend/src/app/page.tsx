@@ -16,8 +16,7 @@ import {
   BarChart3,
   Users,
   Zap,
-  Loader2,
-} from "lucide-react";
+  } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -31,24 +30,45 @@ import {
 } from "@/lib/api";
 import { ActivityBoard } from "@/components/dashboard/activity-board";
 import { AnalyticsCharts } from "@/components/dashboard/analytics-charts";
+import { useAuth } from "@/context/auth-context";
+import { Spinner } from "@/components/ui/spinner"
 
 export default function Home() {
   const router = useRouter();
+  const { user, isOnboarded, isMigrated, loading: authLoading, checkOnboarding } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
   const [recentReports, setRecentReports] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!isOnboarded); // Initial state depends on cache
 
   useEffect(() => {
+    // Wait for auth to initialize and ensure we have a user
+    if (authLoading || !user) return;
+
     const loadDashboardData = async () => {
       try {
-        // Check onboarding status first
-        const status = await getOnboardingStatus();
-        if (!status.complete) {
-          router.push("/onboarding");
-          return;
+        if (!isOnboarded) {
+          // Cache says NOT onboarded → block and eagerly verify before rendering.
+          setIsLoading(true);
+          const complete = await checkOnboarding();
+          if (!complete) {
+            router.push("/onboarding");
+            return;
+          }
+        } else {
+          // Cache says onboarded → render dashboard immediately (no loading delay),
+          // then re-validate in the background. Only redirect if the server disagrees.
+          checkOnboarding().then((complete) => {
+            if (!complete) {
+              router.push("/onboarding");
+            }
+          });
         }
 
+        if (!user) return;
+
+        // Fetch dashboard data
+        setIsLoading(true);
         const [statsData, historyData, analyticsData] = await Promise.all([
           fetchDashboardStats(),
           fetchHistory(),
@@ -65,29 +85,53 @@ export default function Home() {
           )
           .slice(0, 5);
         setRecentReports(sortedHistory);
+        setIsLoading(false);
       } catch (e) {
         console.error("Failed to load dashboard data", e);
-      } finally {
         setIsLoading(false);
       }
     };
 
     loadDashboardData();
-  }, [router]);
+  }, [router, authLoading, user]);
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex h-full items-center justify-center min-h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Spinner size="lg" />
+          <p className="text-sm text-muted-foreground animate-pulse">
+            {!isMigrated ? "Provisioning your knowledge base..." : "Initializing your workspace..."}
+          </p>
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-8">
+        {!isMigrated && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-center justify-between animate-in slide-in-from-top duration-500">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-full">
+                <Spinner size="md" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-primary">Provisioning Knowledge Base...</p>
+                <p className="text-xs text-muted-foreground">We're setting up your organization space and indexing data. You can start using the platform, but some records may still be syncing.</p>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs"
+              onClick={() => checkOnboarding()}
+            >
+              Refresh Status
+            </Button>
+          </div>
+        )}
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -108,19 +152,84 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Trial Usage Alert */}
+        {stats?.trial_mode && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader className="py-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="w-5 h-5 text-primary" />
+                Trial Usage & Limits
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+               {/* Research Usage */}
+               <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Deep Researches</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold">{stats.research_usage?.used}</span>
+                    <span className="text-xs text-muted-foreground">/ {stats.research_usage?.limit} used</span>
+                  </div>
+                  <div className="w-full h-1 bg-muted rounded-full mt-2 overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all" 
+                      style={{ width: `${Math.min(100, ((stats.research_usage?.used || 0) / (stats.research_usage?.limit || 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {stats.research_usage?.remaining} remaining
+                  </span>
+               </div>
+
+               {/* Classification Usage */}
+               <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Classifications</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold">{stats.classification_usage?.used}</span>
+                    <span className="text-xs text-muted-foreground">/ {stats.classification_usage?.limit} used</span>
+                  </div>
+                  <div className="w-full h-1 bg-muted rounded-full mt-2 overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 transition-all" 
+                      style={{ width: `${Math.min(100, ((stats.classification_usage?.used || 0) / (stats.classification_usage?.limit || 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {stats.classification_usage?.remaining} remaining
+                  </span>
+               </div>
+
+               {/* Discovery Usage */}
+               <div className="flex flex-col gap-1 p-3 rounded-lg bg-card border">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Lead Discovery Bank</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold">{stats.lead_discovery_usage?.used}</span>
+                    <span className="text-xs text-muted-foreground">/ {stats.lead_discovery_usage?.limit} used</span>
+                  </div>
+                  <div className="w-full h-1 bg-muted rounded-full mt-2 overflow-hidden">
+                    <div 
+                      className="h-full bg-orange-500 transition-all" 
+                      style={{ width: `${Math.min(100, ((stats.lead_discovery_usage?.used || 0) / (stats.lead_discovery_usage?.limit || 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {stats.lead_discovery_usage?.remaining} slots remaining
+                  </span>
+               </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Row */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Total Leads Found"
+            title="Total Leads Researched"
             value={stats?.total_leads.toLocaleString() || "0"}
             icon={Users}
-          // trend={{ value: 12, isPositive: true }} // Trend needs historical data diff
           />
           <StatCard
             title="Avg. Lead Score"
             value={stats?.avg_lead_score.toString() || "0"}
             icon={BarChart3}
-          // trend={{ value: 4, isPositive: true }}
           />
           <StatCard
             title="High Potential Leads"

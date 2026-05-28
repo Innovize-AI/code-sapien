@@ -1,9 +1,12 @@
+from services.classification_service import run_classification_and_update
 import json
+import os
 import logging
 import uuid
 from typing import Optional, List
 from fastapi import APIRouter, Query, Depends, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import save_report, get_db, SessionLocal, get_report_by_email_or_linkedin, batch_upsert_identified_profiles, _report_to_dict, _safe_deserialize
@@ -11,13 +14,14 @@ from db.schemas import ResearchReportCreate
 from utils import add_https_if_missing
 from workflow.state import IdealProfile, InputLeadData
 from workflow.graph import get_graph, NODE_STATUS_MAPPING
-from prompts.sales_prompts import COMPANY_CONTEXT
-from .lead_discovery import LeadDiscoveryInput, find_leads_tavily, find_leads_apollo
+from prompts.sales_prompts import DEFAULT_COMPANY_CONTEXT
+from .lead_discovery import LeadDiscoveryInput, find_leads_tavily, find_leads_apollo, enrich_and_save_leads
 from utils.activity_helper import log_activity_and_notify
 from pydantic import BaseModel
 from dependencies import get_current_user
 from db.models import Profile
-
+from dotenv import load_dotenv
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 sales_router = APIRouter(tags=['Glial Revenue Intelligence'], responses={404: {"description": "Not found"}},)
@@ -35,6 +39,9 @@ from services.research_service import run_single_research, _run_research_gen, _p
 class CheckReportsInput(BaseModel):
     leads: List[dict] # [{linkedin_url: str, email: str}]
 
+class EnrichInput(BaseModel):
+    person_ids: List[str]
+
 @sales_router.post("/check-existing")
 async def check_existing_reports(
     input_data: CheckReportsInput,
@@ -46,7 +53,7 @@ async def check_existing_reports(
         return results
 
     # Optimize with batch query
-    from sqlalchemy import select, or_
+    from sqlalchemy import or_
     from db.models import ResearchReport
     
     conditions = []
@@ -72,6 +79,11 @@ async def check_existing_reports(
         return results
         
     stmt = select(ResearchReport).where(or_(*query_conditions))
+    if current_user.organization_id:
+        stmt = stmt.where(ResearchReport.organization_id == current_user.organization_id)
+    else:
+        stmt = stmt.where(ResearchReport.created_by_id == current_user.id)
+        
     db_results = await db.execute(stmt)
     existing_reports = db_results.scalars().all()
     
@@ -126,17 +138,82 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
     """
     try:
         # Fetch keys from DB
-        from sqlalchemy import select
-        from db.models import OrganizationSettings
-        
-        result = await db.execute(select(OrganizationSettings).limit(1))
-        settings = result.scalars().first()
+        from db.crud import get_org_settings
+        settings = await get_org_settings(db, org_id=current_user.organization_id, user_id=str(current_user.id))
         
         tavily_key = settings.tavily_api_key if settings else None
         apollo_key = settings.apollo_api_key if settings else None
         
-        if input_data.provider == "apollo":
-            leads = find_leads_apollo(input_data, api_key=apollo_key)
+        # Trial Mode Discovery Limit Check
+        from utils.trial_utils import check_trial_lead_limit
+        if await check_trial_lead_limit(db, org_id=current_user.organization_id, user_id=str(current_user.id)):
+             return {"error": "Lead Discovery limit reached for Trial Mode. Please contact support to continue finding more leads."}
+        
+        if input_data.provider in ["apollo", "tavily"]:
+            if os.getenv("TRIAL_MODE", "false").lower() == "true":
+                provider_name = "Apollo" if input_data.provider == "apollo" else "Web Search (Tavily)"
+                return {"error": f"{provider_name} is not available in Trial Mode. Please use LinkedIn Keywords or Competitor Comments."}
+            leads = await find_leads_apollo(input_data, api_key=apollo_key, db=db, user_id=str(current_user.id))
+            # Persist enriched Apollo leads to identified profiles
+            raw_leads_to_save = []
+            for lead in leads:
+                url = lead.get("url", "")
+                if not url:
+                    continue
+                meta = lead.get("metadata") or {}
+                raw_leads_to_save.append({
+                    "linkedin_url": url,
+                    "name": lead.get("name"),
+                    "headline": lead.get("comment"),
+                    "comment": lead.get("comment"),
+                    "source_post": "Apollo Search",
+                    "source_post_url": "https://app.apollo.io/people",
+                    "competitor": "Apollo",
+                    "email": meta.get("email"),
+                    "email_verification_status": meta.get("email_status"),
+                    "website": lead.get("website"),
+                    "is_fit": False,
+                    "is_competitor": False,
+                    "is_decision_maker": False,
+                    "fit_reasoning": "",
+                    "profile_metadata": {
+                        **meta,
+                        "is_enriched": lead.get("is_enriched", False),
+                    },
+                    "lead_source": "apollo"
+                })
+
+            if raw_leads_to_save:
+                await batch_upsert_identified_profiles(
+                    db, 
+                    raw_leads_to_save, 
+                    user_id=str(current_user.id),
+                    org_id=current_user.organization_id
+                )
+                await db.commit()
+                
+                # NEW: Trigger enrichment in the background for the top 25
+                # This offloads the slow waterfall process while returning results instantly.
+                to_enrich_ids = [l["metadata"]["apollo_id"] for l in leads if l["metadata"].get("apollo_id")][:25]
+                if to_enrich_ids:
+                    from .lead_discovery import enrich_and_save_leads
+                    background_tasks.add_task(
+                        enrich_and_save_leads, 
+                        db=db, 
+                        person_ids=to_enrich_ids, 
+                        user_id=str(current_user.id),
+                        org_id=current_user.organization_id,
+                        source_post="Apollo Discovery",
+                        competitor="Apollo"
+                    )
+                else:
+                    # Fallback to just classification if no enrichment batch identified
+                    background_tasks.add_task(
+                        run_classification_and_update, 
+                        raw_leads_to_save, 
+                        user_id=str(current_user.id),
+                        org_id=current_user.organization_id
+                    )
         elif input_data.provider == "linkedin_keyword":
             if not input_data.keywords:
                 return {"error": "Keywords are required for this provider."}
@@ -164,13 +241,20 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
                     "is_fit": False,
                     "is_competitor": False,
                     "is_decision_maker": False,
-                    "fit_reasoning": ""
+                    "fit_reasoning": "",
+                    "lead_source": "keyword"
                 })
+
                 leads.append(l)
 
             # Upsert and trigger background task
             if raw_leads_to_save:
-                 await batch_upsert_identified_profiles(db, raw_leads_to_save)
+                 await batch_upsert_identified_profiles(
+                     db, 
+                     raw_leads_to_save, 
+                     user_id=str(current_user.id),
+                     org_id=current_user.organization_id
+                 )
                  await db.commit()
                  
                  # Log Activity: Keyword Discovery
@@ -185,15 +269,55 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
                      title=f"Keyword Discovery: {len(raw_leads_to_save)} leads",
                      description=f"Found new leads matching keywords: {', '.join(input_data.keywords)}",
                      metadata={"keywords": input_data.keywords, "count": len(raw_leads_to_save)},
+                     user_id=str(current_user.id),
+                     org_id=current_user.organization_id,
                      idempotency_key=idempotency_key
                  )
                  
-                 from services.classification_service import run_classification_and_update
-                 background_tasks.add_task(run_classification_and_update, raw_leads_to_save, user_id=str(current_user.id))
+                 background_tasks.add_task(
+                     run_classification_and_update, 
+                     raw_leads_to_save, 
+                     user_id=str(current_user.id),
+                     org_id=current_user.organization_id
+                 )
         else:
             leads = find_leads_tavily(input_data, api_key=tavily_key)
         return {"leads": leads}
     except Exception as e:
+        return {"error": str(e)}
+
+@sales_router.post("/enrich")
+async def enrich_leads(input_data: EnrichInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db), current_user: Profile = Depends(get_current_user)):
+    """
+    Endpoint to enrich Apollo leads by their person IDs.
+    """
+    from routes.lead_discovery import enrich_and_save_leads
+    try:
+        from db.crud import get_org_settings
+        settings = await get_org_settings(db, org_id=current_user.organization_id, user_id=str(current_user.id))
+        apollo_key = (settings.apollo_api_key if settings else None) or os.getenv("APOLLO_API_KEY")
+        
+        if not apollo_key:
+            return {"error": "Apollo API Key is missing in Organization Settings."}
+
+        # Use the centralized enrichment pipeline
+        # This function handles waterfall, company upsert, and profile updates.
+        enriched_leads = await enrich_and_save_leads(
+            db=db,
+            person_ids=input_data.person_ids,
+            user_id=str(current_user.id),
+            source_post="Manual Enrichment",
+            competitor="Apollo"
+        )
+        
+        if enriched_leads:
+            # Trigger classification for the newly enriched data to update Fit/Buyer status
+            from services.classification_service import run_classification_and_update
+            background_tasks.add_task(run_classification_and_update, enriched_leads, user_id=str(current_user.id))
+            
+        return {"status": "success", "count": len(enriched_leads), "leads": enriched_leads}
+    except Exception as e:
+        logger.error(f"Error during enrichment route: {e}")
         return {"error": str(e)}
 
 @sales_router.post("/")
@@ -243,19 +367,25 @@ async def run_research(
                 message = NODE_STATUS_MAPPING.get(node_name, f"Processing {node_name}...")
                 yield f"data: {json.dumps({'status': message})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'status': 'Error', 'message': str(e)})}\n\n"
+            error_msg = getattr(e, 'detail', str(e))
+            yield f"data: {json.dumps({'status': 'Error', 'message': error_msg})}\n\n"
             return
 
         # Persist results to DB
         saved_report = None
         try:
-            saved_report = await _persist_results(db, linkedin_url, website, final_state, options)
+            saved_report = await _persist_results(db, linkedin_url, website, final_state, options, user_id=str(current_user.id))
         except Exception as e:
             logger.error(f"Failed to save report: {e}")
 
         result_payload = _prepare_state_for_json(final_state)
         if saved_report:
             result_payload["id"] = str(saved_report.id)
+            try:
+                from services.research_service import _push_to_hubspot_if_enabled
+                await _push_to_hubspot_if_enabled(db, str(current_user.id), saved_report, final_state)
+            except Exception as hs_err:
+                logger.error(f"HubSpot auto-push error: {hs_err}")
 
         yield f"data: {json.dumps({'status': 'Done', 'result': result_payload})}\n\n"
 
@@ -292,7 +422,8 @@ async def run_bulk_research(
         for i, res in enumerate(results):
             lead_url = input_data.leads[i].url
             if isinstance(res, Exception):
-                processed_results.append({"linkedin_url": lead_url, "error": str(res)})
+                error_msg = getattr(res, 'detail', str(res))
+                processed_results.append({"linkedin_url": lead_url, "error": error_msg})
             elif not res:
                 processed_results.append({"linkedin_url": lead_url, "error": "Task failed silently without returning a result."})
             else:

@@ -87,6 +87,8 @@ async def tasks_heartbeat(
     tasks_to_dispatch = [] # List of (task_type, payload, fallback_func, fallback_args)
     
     # 1. Collect Autopilot Rules
+    from utils.trial_utils import check_trial_lead_limit
+    is_trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     result = await db.execute(select(AutopilotRule).where(AutopilotRule.is_active == True))
     rules = result.scalars().all()
     
@@ -96,6 +98,17 @@ async def tasks_heartbeat(
             last_run = last_run.replace(tzinfo=timezone.utc)
             
         if now >= (last_run + timedelta(hours=rule.interval_hours)):
+            # Skip Apollo rules in Trial Mode
+            if is_trial_mode and rule.type == "apollo_config":
+                logger.info(f"Skipping Apollo rule {rule.id} in Trial Mode.")
+                continue
+
+            # NEW: Global Trial Lead Limit Check
+            if is_trial_mode:
+                if await check_trial_lead_limit(db, org_id=rule.organization_id, user_id=rule.created_by_id):
+                    logger.info(f"Skipping rule {rule.id} (org {rule.organization_id}) - Trial Limit Reached.")
+                    continue
+
             payload = {"rule_id": str(rule.id), "rule_type": rule.type}
             fallback_func = task_service.keyword_discovery_rule_task if rule.type == "keyword" else task_service.apollo_discovery_rule_task
             tasks_to_dispatch.append(("autopilot_rule", payload, fallback_func, (str(rule.id),)))
@@ -114,12 +127,34 @@ async def tasks_heartbeat(
             if task.name == "competitor_update":
                 comp_result = await db.execute(select(Competitor))
                 for comp in comp_result.scalars().all():
+                    # Trial Mode Check for Competitor Discovery
+                    if is_trial_mode:
+                        if await check_trial_lead_limit(db, org_id=comp.organization_id, user_id=comp.created_by_id):
+                            continue
+                            
                     tasks_to_dispatch.append(("competitor_sync", {"competitor_id": str(comp.id)}, task_service.update_single_competitor_task, (str(comp.id),)))
-                task.last_run_at = now
+            elif task.name == "hubspot_sync":
+                # Skip for trial mode as requested
+                if os.getenv("TRIAL_MODE", "false").lower() == "true":
+                    logger.info("Skipping HubSpot CRM Sync in Trial Mode.")
+                    continue
+
+                # Multi-tenant scalability: Dispatch one task per organization
+                from db.models import OrganizationSettings
+                org_result = await db.execute(
+                    select(OrganizationSettings.id).where(
+                        OrganizationSettings.hubspot_access_token.isnot(None),
+                        OrganizationSettings.hubspot_sync_enabled == True
+                    )
+                )
+                for sid in org_result.scalars().all():
+                    tasks_to_dispatch.append(("hubspot_sync_org", {"settings_id": str(sid)}, None, ()))
             else:
-                fallback_func = task_service.hubspot_sync_task if task.name == "hubspot_sync" else None
-                tasks_to_dispatch.append(("global_task", {"task_name": task.name}, fallback_func, ()))
-                task.last_run_at = now
+                # Generic global task
+                tasks_to_dispatch.append(("global_task", {"task_name": task.name}, None, ()))
+            
+            # Update last run for the scheduled task record
+            task.last_run_at = now
 
     # 3. Sequential Background Dispatch
     async def dispatch_one(t_type, t_payload, f_func, f_args):
@@ -135,13 +170,23 @@ async def tasks_heartbeat(
         return f"{t_type}_skipped"
 
     async def run_dispatch_loop(dispatch_list, db_session):
+        import random
         results = []
+        is_trial = os.getenv("TRIAL_MODE", "false").lower() == "true"
         for i, t in enumerate(dispatch_list):
             res = await dispatch_one(*t)
             results.append(res)
             if i < len(dispatch_list) - 1:
-                logger.info(f"Background Waiting {HEARTBEAT_DELAY}s before next task dispatch...")
-                await asyncio.sleep(HEARTBEAT_DELAY)
+                # Add significantly more jitter/delay for trial mode
+                if is_trial:
+                    jitter = random.uniform(2.0, 5.0)
+                    wait_time = max(10, HEARTBEAT_DELAY * 2) + jitter
+                else:
+                    jitter = random.uniform(0.5, 2.0)
+                    wait_time = HEARTBEAT_DELAY + jitter
+                    
+                logger.info(f"Background Waiting {wait_time:.1f}s before next task dispatch...")
+                await asyncio.sleep(wait_time)
         logger.info(f"Heartbeat background dispatch complete. Total: {len(results)}")
 
     if tasks_to_dispatch:
@@ -157,46 +202,62 @@ async def tasks_heartbeat(
         "total_to_dispatch": len(tasks_to_dispatch)
     }
 
+# Concurrency Control: Limit how many rules run simultaneously on this worker instance
+MAX_CONCURRENT_TASKS = int(os.getenv("MAX_CONCURRENT_TASKS", "5"))
+concurrency_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+
 @tasks_router.post("/tasks/worker")
 async def tasks_worker(request: Request):
     """
     Endpoint triggered by Pub/Sub Push Subscription.
     Processes the message and performs the actual discovery work.
+    If the worker is busy, returns 429 to trigger Pub/Sub exponential backoff.
     """
-    try:
-        envelope = await request.json()
-        if not envelope or "message" not in envelope:
-            raise HTTPException(status_code=400, detail="Invalid Pub/Sub message format")
-        
-        payload_base64 = envelope["message"]["data"]
-        payload_json = base64.b64decode(payload_base64).decode("utf-8")
-        data = json.loads(payload_json)
-        
-        task_type = data.get("type")
-        logger.info(f"Worker received task: {task_type}")
+    # Check if we have capacity; if not, return 429 to let Pub/Sub handle the queueing/retry.
+    # This prevents the HTTP request from timing out while waiting for the semaphore.
+    if concurrency_semaphore.locked():
+        logger.warning("Worker busy (semaphore full). Returning 429 for Pub/Sub retry.")
+        raise HTTPException(status_code=429, detail="Worker busy")
 
-        if task_type == "autopilot_rule":
-            rule_id = data.get("rule_id")
-            rule_type = data.get("rule_type")
-            if rule_type == "keyword":
-                await task_service.keyword_discovery_rule_task(rule_id)
-            elif rule_type == "apollo_config":
-                await task_service.apollo_discovery_rule_task(rule_id)
-        
-        elif task_type == "competitor_sync":
-            competitor_id = data.get("competitor_id")
-            await task_service.update_single_competitor_task(competitor_id)
+    async with concurrency_semaphore:
+        try:
+            envelope = await request.json()
+            if not envelope or "message" not in envelope:
+                raise HTTPException(status_code=400, detail="Invalid Pub/Sub message format")
             
-        elif task_type == "global_task":
-            task_name = data.get("task_name")
-            if task_name == "hubspot_sync":
-                await task_service.hubspot_sync_task()
-        
-        return {"status": "success"}
-    except Exception as e:
-        logger.error(f"Worker task failed: {e}")
-        # Returning 500 triggers Pub/Sub retry
-        raise HTTPException(status_code=500, detail=str(e))
+            payload_base64 = envelope["message"]["data"]
+            payload_json = base64.b64decode(payload_base64).decode("utf-8")
+            data = json.loads(payload_json)
+            
+            task_type = data.get("type")
+            logger.info(f"Worker received task: {task_type}")
+
+            if task_type == "autopilot_rule":
+                rule_id = data.get("rule_id")
+                rule_type = data.get("rule_type")
+                if rule_type == "keyword":
+                    await task_service.keyword_discovery_rule_task(rule_id)
+                elif rule_type == "apollo_config":
+                    await task_service.apollo_discovery_rule_task(rule_id)
+            
+            elif task_type == "competitor_sync":
+                competitor_id = data.get("competitor_id")
+                await task_service.update_single_competitor_task(competitor_id)
+                
+            elif task_type == "hubspot_sync_org":
+                settings_id = data.get("settings_id")
+                await task_service.sync_single_organization_hubspot(settings_id)
+                
+            elif task_type == "global_task":
+                task_name = data.get("task_name")
+                if task_name == "hubspot_sync":
+                    await task_service.hubspot_sync_task()
+            
+            return {"status": "success"}
+        except Exception as e:
+            logger.error(f"Worker task failed: {e}")
+            # Returning 500 triggers Pub/Sub retry
+            raise HTTPException(status_code=500, detail=str(e))
 
 @tasks_router.post("/tasks/trigger/{task_name}")
 async def trigger_task(task_name: str, db: AsyncSession = Depends(get_db), _=Depends(verify_task_secret)):

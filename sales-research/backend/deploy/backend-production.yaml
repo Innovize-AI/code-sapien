@@ -4,7 +4,6 @@ metadata:
   name: glial-research-backend-service
   annotations:
     run.googleapis.com/minScale: "0"
-    run.googleapis.com/cpu-throttling: false
     run.googleapis.com/invoker-iam-disabled: true
 spec:
   template:
@@ -152,3 +151,8 @@ spec:
               value: "innovize-ai"
             - name: PUBSUB_TOPIC_ID
               value: "sales-research-discovery"
+            - name: MILLION_VERIFIER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: MILLION_VERIFIER_API_KEY
+                  key: latest

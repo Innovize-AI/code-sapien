@@ -4,17 +4,56 @@ import requests
 import json
 import os
 import time
+import re
+import datetime
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage
 from workflow.state import AgentState
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
-from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, COMPANY_CONTEXT
+from prompts.sales_prompts import LINKEDIN_ANALYZER_PROMPT, AI_LEAD_EVALUATOR_PROMPT, PROFILE_CLASSIFIER_PROMPT, BATCH_PROFILE_CLASSIFIER_PROMPT, DEFAULT_COMPANY_CONTEXT
 from models.gemini_models import get_gemini_model
 from models.structured_output import LinkedInAnalysis
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_classifications(response) -> list:
+    """Robustly pull the classifications list out of whatever the LLM returns.
+
+    Gemini's structured output can come back as a Pydantic model, a clean dict,
+    a dict with whitespace/quote-polluted keys (e.g. '\n"classifications'),
+    or a raw JSON string — handle all four cases.
+    """
+    if not response:
+        return []
+
+    logger.info(f"classifications: {response.classifications}")
+    # Pydantic model
+    if hasattr(response, "classifications"):
+        return response.classifications or []
+
+    # Dict — may have malformed keys like '\n"classifications'
+    if isinstance(response, dict):
+        if "classifications" in response:
+            return response["classifications"] or []
+        for key, value in response.items():
+            if key.strip().strip('"') == "classifications":
+                return value or []
+        return []
+
+    # Raw string — strip markdown fences and parse
+    if isinstance(response, str):
+        try:
+            text = re.sub(r"```(?:json)?\s*", "", response).strip().rstrip("`").strip()
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return parsed.get("classifications", [])
+        except Exception:
+            pass
+
+    return []
 
 load_dotenv()
 
@@ -43,7 +82,7 @@ class ProfileClassification(BaseModel):
 
 # Using LinkedInAnalysis from models.structured_output
 
-def batch_classify_profiles(profiles: List[Dict]):
+def batch_classify_profiles(profiles: List[Dict], company_context: str | None = None):
     """
     Classifies a batch of profiles using LLM based on headline and company context.
     Expects profiles list of dicts: [{'id': 'url', 'headline': '...'}, ...]
@@ -52,7 +91,6 @@ def batch_classify_profiles(profiles: List[Dict]):
         return {}
         
     try:
-        # Reverting to gpt-4o-mini as gpt-4.1-mini is not a valid model
         llm = get_gemini_model(temperature=0, model="gemini-3-flash-preview")
         structured_llm = llm.with_structured_output(BatchProfileClassification)
         
@@ -60,7 +98,7 @@ def batch_classify_profiles(profiles: List[Dict]):
         profiles_text = json.dumps(profiles, indent=2)
         
         prompt = BATCH_PROFILE_CLASSIFIER_PROMPT.format(
-            company_context=COMPANY_CONTEXT,
+            company_context=company_context or DEFAULT_COMPANY_CONTEXT,
             profiles_data=profiles_text
         )
         
@@ -70,27 +108,46 @@ def batch_classify_profiles(profiles: List[Dict]):
         ])
         
         results_map = {}
-        if response and response.classifications:
-            for res in response.classifications:
-                results_map[res.id] = {
-                    "is_fit": res.is_fit,
-                    "is_competitor": res.is_competitor,
-                    "is_decision_maker": res.is_decision_maker,
-                    "is_buy_signal": res.is_buy_signal,
-                    "is_strategic_seller": res.is_strategic_seller,
-                    "reasoning": res.reasoning,
-                    "intent": res.intent,
-                    "post_topic_depth": res.post_topic_depth,
-                    "sentiment": res.sentiment
+
+        for res in _extract_classifications(response):
+            # Handle res as either a Pydantic model or a dict
+            if hasattr(res, "id"):
+                r_id = res.id
+                r_data = {
+                    "is_fit": getattr(res, "is_fit", False),
+                    "is_competitor": getattr(res, "is_competitor", False),
+                    "is_decision_maker": getattr(res, "is_decision_maker", False),
+                    "is_buy_signal": getattr(res, "is_buy_signal", False),
+                    "is_strategic_seller": getattr(res, "is_strategic_seller", False),
+                    "reasoning": getattr(res, "reasoning", ""),
+                    "intent": getattr(res, "intent", None),
+                    "post_topic_depth": getattr(res, "post_topic_depth", None),
+                    "sentiment": getattr(res, "sentiment", None)
                 }
+            else:
+                r_id = res.get("id")
+                r_data = {
+                    "is_fit": res.get("is_fit", False),
+                    "is_competitor": res.get("is_competitor", False),
+                    "is_decision_maker": res.get("is_decision_maker", False),
+                    "is_buy_signal": res.get("is_buy_signal", False),
+                    "is_strategic_seller": res.get("is_strategic_seller", False),
+                    "reasoning": res.get("reasoning", ""),
+                    "intent": res.get("intent"),
+                    "post_topic_depth": res.get("post_topic_depth"),
+                    "sentiment": res.get("sentiment")
+                }
+            
+            if r_id:
+                results_map[r_id] = r_data
                 
         return results_map
 
     except Exception as e:
-        logger.error(f"Error in batch classification: {e}")
+        logger.error(f"Error in batch classification: {type(e).__name__}: {e}")
         return {}
 
-def classify_profile(name: str, headline: str):
+def classify_profile(name: str, headline: str, company_context: str | None = None):
     """
     Classifies a profile using LLM based on headline and company context.
     Uses structured output for reliable JSON parsing.
@@ -105,7 +162,7 @@ def classify_profile(name: str, headline: str):
         prompt = PROFILE_CLASSIFIER_PROMPT.format(
             name=name, 
             headline=headline,
-            company_context=COMPANY_CONTEXT
+            company_context=company_context or DEFAULT_COMPANY_CONTEXT
         )
         
         response = structured_llm.invoke([
@@ -408,20 +465,23 @@ async def get_linkedin_company_data(state: AgentState):
         "company_website": enriched_data.get("website"),
 
         # Lead email surfaced to top-level for quick access
-        "email_id": enriched_data.get("email"),
+        "email_id": enriched_data.get("person_email"),
+        "email_verification_status": enriched_data.get("email_verification_status"),
         "company_linkedin_url": enriched_data.get("company_linkedin_url"),
 
     }
 
+
 async def enrich_company_waterfall(
     person_url: str = None, 
+    person_id: str = None,
     company_url: str = None, 
     existing_stats: dict = None,
     million_verifier_enabled: bool = False
 ):
     """
     Centralized enrichment coordinator:
-    1. Apollo Match (via person_url)
+    1. Apollo Match (via person_url or person_id)
     2. LinkedIn Details (via company_url) - Only if Apollo falls short
     """
     apollo_data = {}
@@ -430,13 +490,14 @@ async def enrich_company_waterfall(
     hiring = []
 
     # 1. Primary: Apollo match by person profile
-    if person_url:
-        logger.debug(f"CENTRAL WATERFALL: Trialing Apollo for {person_url}")
+    if person_url or person_id:
+        logger.debug(f"CENTRAL WATERFALL: Trialing Apollo for {person_url or person_id}")
         apollo_data = await get_apollo_company_data(
-            person_url,
+            linkedin_url=person_url,
+            apollo_id=person_id,
             million_verifier_enabled=million_verifier_enabled
         )
-
+    print("Apollo data", apollo_data)
     # 2. Check if we need LinkedIn fallback
     # Skip if Apollo was successful AND provided core stats
     core_found = apollo_data.get("employee_count")
@@ -452,6 +513,8 @@ async def enrich_company_waterfall(
             if "basic_info" in company_res:
                  linkedin_data["basic_info"] = company_res["basic_info"]
 
+    is_person_lookup = bool(person_url or person_id)
+    
     # 3. Merge Strategy
     stats = {**linkedin_data}
     if apollo_data:
@@ -464,6 +527,18 @@ async def enrich_company_waterfall(
             "website": apollo_data.get("website") or stats.get("website"),
             "headcount_growth": apollo_data.get("headcount_growth"),
         })
+        if is_person_lookup:
+            stats.update({
+                "person_name": apollo_data.get("person_name"),
+                "first_name": apollo_data.get("first_name"),
+                "last_name": apollo_data.get("last_name"),
+                "headline": apollo_data.get("headline"),
+                "linkedin_url": apollo_data.get("linkedin_url"),
+                "person_email": apollo_data.get("person_email"),
+                "city": apollo_data.get("city"),
+                "state": apollo_data.get("state"),
+                "photo_url": apollo_data.get("photo_url"),
+            })
 
     # Backup from existing injections
     if existing_stats:
@@ -492,11 +567,11 @@ async def enrich_company_waterfall(
         "apollo_id": str(apollo_data.get("apollo_id")) if apollo_data.get("apollo_id") else None,
         "headquarters": apollo_data.get("headquarters"),
         "domain": apollo_data.get("domain") or (stats.get("website").replace("http://", "").replace("https://", "").split("/")[0] if stats.get("website") else None),
-        "apollo_id": str(apollo_data.get("apollo_id")) if apollo_data.get("apollo_id") else None,
     }
 
-    return {
+    result = {
         "name": stats.get("name") or apollo_data.get("company_name") or basic.get("name") or "Unknown Company",
+        "company_name": apollo_data.get("company_name") or stats.get("name") or basic.get("name"),
         "description": apollo_data.get("description") or basic.get("description") or apollo_data.get("company_name"),
         "industries": apollo_data.get("industries") or basic.get("industries", []) or ([apollo_data.get("industry")] if apollo_data.get("industry") else []),
         "news": news[:5],
@@ -504,26 +579,112 @@ async def enrich_company_waterfall(
         "website": stats.get("website"),
         "person_email": apollo_data.get("person_email"),
         "email_verification_status": apollo_data.get("email_verification_status"),
-        "linkedin_url": apollo_data.get("company_linkedin_url"),
+        "linkedin_url": apollo_data.get("linkedin_url") if is_person_lookup else apollo_data.get("company_linkedin_url") or stats.get("linkedin_url"),
+        "company_linkedin_url": apollo_data.get("company_linkedin_url") or stats.get("linkedin_url"),
         "domain": apollo_data.get("domain") or (stats.get("website").replace("http://", "").replace("https://", "").split("/")[0] if stats.get("website") else None),
-
-        # Compatibility
         "company_stats": company_stats,
-        
-        # Flattened fields for table sync
         **company_stats
     }
 
+    if is_person_lookup:
+        result.update({
+            "person_name": apollo_data.get("person_name"),
+            "headline": apollo_data.get("headline"),
+            "first_name": apollo_data.get("first_name"),
+            "last_name": apollo_data.get("last_name"),
+            "photo_url": apollo_data.get("photo_url"),
+            "city": apollo_data.get("city"),
+            "state": apollo_data.get("state"),
+            "country": apollo_data.get("country"),
+        })
+
+    return result
+
+
+def is_recent_post(post: dict) -> bool:
+    """
+    Checks if a LinkedIn post is recent (within ~30 days).
+    Prioritizes structured date/timestamp for precision, fallbacks to relative strings.
+    """
+    posted_at_data = post.get("posted_at")
+    if not posted_at_data:
+        return False
+    
+    # 1. Try Precise Date String (e.g. "2025-07-30 22:02:04")
+    if isinstance(posted_at_data, dict) and posted_at_data.get("date"):
+        try:
+            # Parse the date string
+            post_date = datetime.datetime.strptime(posted_at_data["date"], "%Y-%m-%d %H:%M:%S")
+            now = datetime.datetime.now()
+            # Check if within 30 days
+            if (now - post_date).days <= 30:
+                return True
+            return False
+        except Exception as e:
+            logger.debug(f"Failed to parse post date string: {e}")
+
+    # 2. Try Timestamp (milliseconds)
+    if isinstance(posted_at_data, dict) and posted_at_data.get("timestamp"):
+        try:
+            ts = posted_at_data["timestamp"] / 1000.0
+            post_date = datetime.datetime.fromtimestamp(ts)
+            now = datetime.datetime.now()
+            if (now - post_date).days <= 30:
+                return True
+            return False
+        except Exception as e:
+            logger.debug(f"Failed to parse post timestamp: {e}")
+
+    # 3. Fallback to Relative String (e.g. "2 weeks ago" or dict.relative)
+    relative_str = ""
+    if isinstance(posted_at_data, dict):
+        relative_str = posted_at_data.get("relative") or posted_at_data.get("text") or ""
+    elif isinstance(posted_at_data, str):
+        relative_str = posted_at_data
+        
+    if not relative_str:
+        return False
+        
+    relative_str = relative_str.lower()
+    
+    # Simple logic for relative strings
+    if "second" in relative_str or "minute" in relative_str or "hour" in relative_str or "day" in relative_str or "week" in relative_str:
+        return True
+        
+    if "month" in relative_str:
+        # "1 month ago" is fine, "2 months ago" is not
+        match = re.search(r'\d+', relative_str)
+        if match:
+            num = int(match.group())
+            return num <= 1
+        return "months" not in relative_str # "month ago" is fine, "months ago" usually > 1
+        
+    return False
+
 def linkedin_profile_analyzer(state: AgentState):
     """Analyzes a profile using LLM based on headline and company context."""
-    user_profile = state.get("user_profile_details", {})
-    recent_posts = user_profile.get("recent_posts", []) if isinstance(user_profile, dict) else []
+    user_profile_raw = state.get("user_profile_details", {})
+    # Ensure we work with a copy to avoid side effects
+    user_profile = user_profile_raw.copy() if isinstance(user_profile_raw, dict) else {}
+    
+    raw_posts = user_profile.get("recent_posts", []) if isinstance(user_profile, dict) else []
+    
+    # Filter for recency (last 30 days)
+    recent_posts = [p for p in raw_posts if is_recent_post(p)]
+    
+    # CRITICAL: Strip raw/stale posts from the profile object so Gemini doesn't "find" them
+    if "recent_posts" in user_profile:
+        del user_profile["recent_posts"]
+    
+    if raw_posts and not recent_posts:
+        logger.info(f"Filtered out {len(raw_posts)} stale posts (> 1 month old).")
 
     content = {
         "profile": user_profile,
         "recent_posts": recent_posts,
         "engagements": state.get("post_engagements", []),
         "company_name": state.get("company_name", {}),
+        "lead_segment": state.get("lead_segment", "POTENTIAL_CLIENT"),
         "company_description": state.get("company_description", {}),
         "company_industries": state.get("company_industries", []),
         "company_stats": state.get("company_stats", {}),
@@ -556,130 +717,189 @@ def linkedin_profile_analyzer(state: AgentState):
         logger.error(f"Error in linkedin_profile_analyzer: {e}")
         return {"user_profile_analysis": "Error generating structured analysis."}
 
+async def _map_apollo_response_to_enrichment(res: dict, million_verifier_enabled: bool = False) -> dict:
+    """
+    Internal helper to map Apollo API response (person + org) to standard enrichment dict.
+    Ensures person data is captured even if organization data is missing.
+    """
+    person = res.get("person", {})
+    if not person:
+        return {}
+        
+    org = person.get("organization", {}) or {}
+    
+    # --- Revenue ---
+    raw_rev = org.get("annual_revenue") or org.get("organization_revenue")
+    rev_str = org.get("annual_revenue_printed") or org.get("organization_revenue_printed")
+    if not rev_str and raw_rev:
+        if raw_rev >= 1_000_000_000:
+            rev_str = f"{raw_rev / 1_000_000_000:.1f}B"
+        elif raw_rev >= 1_000_000:
+            rev_str = f"{raw_rev / 1_000_000:.1f}M"
+        else:
+            rev_str = str(raw_rev)
+
+    # --- Technologies ---
+    technologies = [
+        {"uid": t.get("uid"), "name": t.get("name"), "category": t.get("category")}
+        for t in (org.get("current_technologies") or [])
+    ]
+    technology_names = org.get("technology_names") or [t["name"] for t in technologies]
+
+    # --- Funding Events ---
+    funding_events = [
+        {
+            "date": e.get("date"),
+            "type": e.get("type"),
+            "amount": e.get("amount"),
+            "currency": e.get("currency"),
+            "investors": e.get("investors"),
+            "news_url": e.get("news_url")
+        }
+        for e in (org.get("funding_events") or [])
+    ]
+
+    # --- Headcount Growth ---
+    headcount_growth = {
+        "6_month": org.get("organization_headcount_six_month_growth"),
+        "12_month": org.get("organization_headcount_twelve_month_growth"),
+        "24_month": org.get("organization_headcount_twenty_four_month_growth"),
+    }
+
+    # Prepare company_stats (only if org exists, otherwise empty but present)
+    company_stats = {}
+    if org:
+        company_stats = {
+            "revenue_estimate": rev_str,
+            "employee_count": org.get("estimated_num_employees") or org.get("num_employees"),
+            "market_cap": org.get("market_cap"),
+            "total_funding": org.get("total_funding_printed"),
+            "total_funding_raw": org.get("total_funding"),
+            "industry": org.get("primary_industry") or org.get("industry"),
+            "industries": org.get("industries") or [],
+            "technologies": technologies,
+            "technology_names": technology_names,
+            "funding_events": funding_events,
+            "latest_funding_stage": org.get("latest_funding_stage"),
+            "latest_funding_date": org.get("latest_funding_round_date"),
+            "headcount_growth": headcount_growth,
+            "follower_count": org.get("num_followers") or org.get("linkedin_follower_count"),
+            "employee_count_range": org.get("employee_count_range"),
+            "headquarters": f"{org.get('city', '')}, {org.get('state', '')}, {org.get('country', '')}".strip(", "),
+            "apollo_id": org.get("id"),
+            "domain": org.get("domain")
+        }
+
+    result = {
+        "person_name": person.get("name"),
+        "company_name": org.get("name") or org.get("company_name"),
+        "first_name": person.get("first_name"),
+        "last_name": person.get("last_name"),
+        "person_email": person.get("email"),
+        "linkedin_url": person.get("linkedin_url"),
+        "headline": person.get("headline") or person.get("title"),
+        "photo_url": person.get("photo_url"),
+        "city": person.get("city"),
+        "state": person.get("state"),
+        "country": person.get("country"),
+        "apollo_person_id": person.get("id"),
+        "apollo_organization_id": org.get("id"),
+        "description": org.get("short_description"),
+        "industries": org.get("industries") or ([org.get("industry")] if org.get("industry") else []),
+        "website": org.get("website_url"),
+        "domain": org.get("domain"),
+        "company_linkedin_url": org.get("linkedin_url"),
+        "company_stats": company_stats,
+        **company_stats
+    }
+
+    # --- Million Verifier Integration ---
+    if result.get("person_email") and million_verifier_enabled:
+        try:
+            from utils.email_verifier import verify_email
+            mv_key = os.getenv("MILLION_VERIFIER_API_KEY")
+            if mv_key:
+                logger.info(f"MILLION VERIFIER: Verifying email {result['person_email']}...")
+                verification_status = await verify_email(result["person_email"], mv_key)
+                result["email_verification_status"] = verification_status
+            else:
+                result["email_verification_status"] = None
+        except Exception as e:
+            logger.error(f"Error during email verification: {e}")
+            result["email_verification_status"] = None
+    else:
+        result["email_verification_status"] = None
+
+    return result
+
+    # --- Million Verifier Integration ---
+    if result.get("person_email") and million_verifier_enabled:
+        try:
+            from utils.email_verifier import verify_email
+            mv_key = os.getenv("MILLION_VERIFIER_API_KEY")
+            if mv_key:
+                logger.info(f"MILLION VERIFIER: Verifying email {result['person_email']}...")
+                verification_status = await verify_email(result["person_email"], mv_key)
+                result["email_verification_status"] = verification_status
+            else:
+                result["email_verification_status"] = None
+        except Exception as e:
+            logger.error(f"Error during email verification: {e}")
+            result["email_verification_status"] = None
+    else:
+        result["email_verification_status"] = None
+
+    return result
+
 async def get_apollo_company_data(
-    linkedin_url: str,
+    linkedin_url: str = None,
+    apollo_id: str = None,
     million_verifier_enabled: bool = False
 ):
     """
-    Enrichment using Apollo People Match API.
-    Extracts company stats, technologies, funding events,
-    headcount growth, keywords and lead details.
+    Enrichment using Apollo People Match or Bulk Match API.
     """
     api_key = os.getenv("APOLLO_API_KEY", "").strip()
     if not api_key:
         logger.warning("APOLLO_API_KEY not found in environment.")
         return {}
     
-    # Masked log for diagnosis of 401
-    masked = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 8 else "***"
-    logger.debug(f"DEBUG: Apollo API Call with key: {masked} (Len: {len(api_key)})")
-
-    url = "https://api.apollo.io/v1/people/match"
-    headers = {
-        "Cache-Control": "no-cache",
-        "Content-Type": "application/json",
-        "x-api-key": api_key
-    }
-    
-    data = {"linkedin_url": linkedin_url, "reveal_personal_emails": True}
-    
     import httpx
     try:
+        if apollo_id:
+            logger.debug(f"DEBUG: Apollo Enrichment by ID: {apollo_id}")
+            url = "https://api.apollo.io/v1/people/match"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Api-Key": api_key
+            }
+            payload = {
+                "id": apollo_id,
+                "reveal_personal_emails": True
+            }
+        else:
+            logger.debug(f"DEBUG: Apollo Enrichment by URL: {linkedin_url}")
+            url = "https://api.apollo.io/v1/people/match"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Api-Key": api_key
+            }
+            payload = {
+                "linkedin_url": linkedin_url,
+                "reveal_personal_emails": True
+            }
+
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=data, timeout=10.0)
+            response = await client.post(url, headers=headers, json=payload, timeout=15.0)
             if response.status_code != 200:
                 logger.error(f"Apollo API Error: {response.status_code} - {response.text}")
                 return {}
 
             res = response.json()
-            person = res.get("person", {})
-            org = person.get("organization", {})
             
-            if org:
-                # --- Revenue ---
-                raw_rev = org.get("annual_revenue") or org.get("organization_revenue")
-                rev_str = org.get("annual_revenue_printed") or org.get("organization_revenue_printed")
-                if not rev_str and raw_rev:
-                    if raw_rev >= 1_000_000_000:
-                        rev_str = f"{raw_rev / 1_000_000_000:.1f}B"
-                    elif raw_rev >= 1_000_000:
-                        rev_str = f"{raw_rev / 1_000_000:.1f}M"
-                    else:
-                        rev_str = str(raw_rev)
+            # both endpoints now return {"person": {...}} structure when successful
+            return await _map_apollo_response_to_enrichment(res, million_verifier_enabled)
 
-                # --- Technologies ---
-                # Full list with uid + name + category
-                technologies = [
-                    {"uid": t.get("uid"), "name": t.get("name"), "category": t.get("category")}
-                    for t in (org.get("current_technologies") or [])
-                ]
-                technology_names = org.get("technology_names") or [t["name"] for t in technologies]
-
-                # --- Funding Events ---
-                funding_events = [
-                    {
-                        "date": e.get("date"),
-                        "type": e.get("type"),
-                        "amount": e.get("amount"),
-                        "currency": e.get("currency"),
-                        "investors": e.get("investors"),
-                        "news_url": e.get("news_url")
-                    }
-                    for e in (org.get("funding_events") or [])
-                ]
-
-                # --- Headcount Growth (Hiring Signal) ---
-                headcount_growth = {
-                    "6_month": org.get("organization_headcount_six_month_growth"),
-                    "12_month": org.get("organization_headcount_twelve_month_growth"),
-                    "24_month": org.get("organization_headcount_twenty_four_month_growth"),
-                }
-
-                result = {
-                    # Core stats
-                    "revenue_estimate": rev_str,
-                    "employee_count": org.get("estimated_num_employees") or org.get("num_employees"),
-                    "market_cap": org.get("market_cap"),
-                    "total_funding": org.get("total_funding_printed"),
-                    "total_funding_raw": org.get("total_funding"),
-                    "apollo_id": org.get("id"),
-                    "industry": org.get("primary_industry") or org.get("industry"),
-                    "industries": org.get("industries") or [],
-                    "secondary_industries": org.get("secondary_industries") or [],
-                    "website": org.get("website_url"),
-                    "domain": org.get("domain"),
-                    "company_linkedin_url": org.get("linkedin_url"),
-                    "company_name": org.get("name"),
-                    "description": org.get("short_description"),
-                    # Tech stack
-                    "technologies": technologies,
-                    "technology_names": technology_names,
-                    # Funding
-                    "funding_events": funding_events,
-                    "latest_funding_stage": org.get("latest_funding_stage"),
-                    "latest_funding_date": org.get("latest_funding_round_date"),
-                    # Hiring signals
-                    "headcount_growth": headcount_growth,
-                    "follower_count": org.get("num_followers") or org.get("linkedin_follower_count"),
-                    "employee_count_range": org.get("employee_count_range"),
-                    "headquarters": f"{org.get('city', '')}, {org.get('state', '')}, {org.get('country', '')}".strip(", "),
-                    # Lead person_email + context
-                    "person_email": person.get("email"),
-                }
-
-                # --- Million Verifier Integration ---
-                if result.get("person_email") and million_verifier_enabled:
-                    from utils.email_verifier import verify_email
-                    api_key = os.getenv("MILLION_VERIFIER_API_KEY")
-                    logger.info(f"MILLION VERIFIER: Verifying email {result['person_email']}...")
-                    verification_status = await verify_email(result["person_email"], api_key)
-                    print(f"Verification Status: {verification_status}")
-                    result["email_verification_status"] = verification_status
-                else:
-                    result["email_verification_status"] = None
-
-                return result
-            return {}
     except Exception as e:
         logger.error(f"Error calling Apollo API: {e}")
         
@@ -920,7 +1140,7 @@ def discover_leads_from_competitor(competitor_url: str):
         raise e
 
 
-async def batch_classify_profiles_async(profiles: List[Dict]):
+async def batch_classify_profiles_async(profiles: List[Dict], company_context: str | None = None):
     """
     Async version: Classifies a batch of profiles using LLM based on headline and company context.
     Expects profiles list of dicts: [{'id': 'url', 'headline': '...'}, ...]
@@ -934,12 +1154,12 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
         
         # Format profiles for prompt
         profiles_text = json.dumps(profiles, indent=2)
-        
+        logger.info(f"Profiles text: {profiles_text}")
         prompt = BATCH_PROFILE_CLASSIFIER_PROMPT.format(
-            company_context=COMPANY_CONTEXT,
+            company_context=company_context or DEFAULT_COMPANY_CONTEXT,
             profiles_data=profiles_text
         )
-        
+        logger.info(f"Prompt: {prompt}")
         # Native async call
         response = await structured_llm.ainvoke([
             SystemMessage(content="You are a helpful assistant."),
@@ -947,24 +1167,43 @@ async def batch_classify_profiles_async(profiles: List[Dict]):
         ])
         
         results_map = {}
-        if response and response.classifications:
-            for item in response.classifications:
-                results_map[item.id] = {
-                    "is_fit": item.is_fit,
-                    "is_competitor": item.is_competitor,
-                    "is_decision_maker": item.is_decision_maker,
-                    "is_buy_signal": item.is_buy_signal,
-                    "is_strategic_seller": item.is_strategic_seller,
-                    "reasoning": item.reasoning,
-                    "intent": item.intent,
-                    "post_topic_depth": item.post_topic_depth,
-                    "sentiment": item.sentiment
+
+        for item in _extract_classifications(response):
+            # Handle item as either a Pydantic model or a dict
+            if hasattr(item, "id"):
+                r_id = item.id
+                r_data = {
+                    "is_fit": getattr(item, "is_fit", False),
+                    "is_competitor": getattr(item, "is_competitor", False),
+                    "is_decision_maker": getattr(item, "is_decision_maker", False),
+                    "is_buy_signal": getattr(item, "is_buy_signal", False),
+                    "is_strategic_seller": getattr(item, "is_strategic_seller", False),
+                    "reasoning": getattr(item, "reasoning", ""),
+                    "intent": getattr(item, "intent", None),
+                    "post_topic_depth": getattr(item, "post_topic_depth", None),
+                    "sentiment": getattr(item, "sentiment", None)
                 }
+            else:
+                r_id = item.get("id")
+                r_data = {
+                    "is_fit": item.get("is_fit", False),
+                    "is_competitor": item.get("is_competitor", False),
+                    "is_decision_maker": item.get("is_decision_maker", False),
+                    "is_buy_signal": item.get("is_buy_signal", False),
+                    "is_strategic_seller": item.get("is_strategic_seller", False),
+                    "reasoning": item.get("reasoning", ""),
+                    "intent": item.get("intent"),
+                    "post_topic_depth": item.get("post_topic_depth"),
+                    "sentiment": item.get("sentiment")
+                }
+            
+            if r_id:
+                results_map[r_id] = r_data
                 
         return results_map
 
     except Exception as e:
-        logger.error(f"Error in async batch classification: {e}")
+        logger.error(f"Error in async batch classification: {type(e).__name__}: {e}")
         return {}
 
 async def get_posts_by_keyword(keywords: List[str]):

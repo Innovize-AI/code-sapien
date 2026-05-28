@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { BarChart3, Search, Loader2 } from "lucide-react"
+import { BarChart3, Search, } from "lucide-react"
 import { generateResearch } from "@/lib/api"
 import { useBulkAnalysis } from "@/context/bulk-analysis-context"
 import {
@@ -13,8 +13,12 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet"
 import { LeadForm } from "@/components/lead-form"
-import { ReportDisplay } from "@/components/report-display"
+import { ReportDisplayV2 as ReportDisplay } from "@/components/report-display-v2"
 import { Button } from "@/components/ui/button"
+
+import { useConfig } from "@/context/config-context"
+import { Lock } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 export function AnalysisSidePanel({
     trigger,
@@ -31,6 +35,7 @@ export function AnalysisSidePanel({
     open?: boolean,
     onOpenChange?: (open: boolean) => void
 }) {
+    const { trialMode } = useConfig()
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
     const [researchData, setResearchData] = useState<any>(initialData || null)
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -86,12 +91,6 @@ export function AnalysisSidePanel({
             if (setOpen) {
                 setOpen(val)
             }
-            if (!val) {
-                // Reset data when closed if needed, or keep it. 
-                // Creating a new analysis resets it via "New Search" button.
-                // But if we close, we might want to clear if we depend on external state?
-                // For now, let's keep it simple.
-            }
         }}>
             {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
             <SheetContent side="right" className="sm:max-w-xl w-full h-full overflow-y-auto p-0">
@@ -106,7 +105,21 @@ export function AnalysisSidePanel({
                         </SheetDescription>
                     </SheetHeader>
 
-                    {!researchData ? (
+                    {trialMode ? (
+                        <div className="h-[400px] flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-amber-50/20 p-8 text-center animate-in fade-in-50">
+                            <div className="bg-white p-4 rounded-full shadow-sm mb-4 border border-amber-100">
+                                <Lock className="w-8 h-8 text-amber-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-amber-900">Manual Analysis is Locked</h3>
+                            <p className="text-amber-800/70 max-w-sm mt-2 text-sm">
+                                Deep-dive manual analysis is not available in the trial version. 
+                                Please use Find Leads or Autopilot to discover prospects.
+                            </p>
+                            <Button variant="outline" className="mt-8 border-amber-500/50 text-amber-700 hover:bg-amber-500/10">
+                                Contact Support to Enable
+                            </Button>
+                        </div>
+                    ) : !researchData ? (
                         <LeadForm
                             onSuccess={(data) => setResearchData(data)}
                             defaultUrl={initialUrl}
@@ -126,7 +139,7 @@ export function AnalysisSidePanel({
                                 </Button>
                                 {isRefreshing && (
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
-                                        <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                                        <Spinner size="sm" />
                                         {refreshStatus}
                                     </div>
                                 )}

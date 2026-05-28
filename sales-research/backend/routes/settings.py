@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
 from typing import Optional
 import json
 import logging
@@ -9,9 +9,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 from db.database import get_db
-from db.models import OrganizationSettings, Profile
+from db.models import OrganizationSettings, Profile, ResearchReport, IdentifiedProfile
 from db.schemas import OrganizationSettingsCreate, OrganizationSettings as OrganizationSettingsSchema, IdealProfileData, IntegrationSettings, SellingProfileConfig
 from dependencies import get_current_user, require_admin
+import os
+from services.knowledge_service import KnowledgeService
+from sqlalchemy import func, or_, desc
+from db.crud import get_org_settings
+from utils.trial_utils import get_trial_limits
 
 settings_router = APIRouter(tags=['Settings'])
 
@@ -32,8 +37,7 @@ async def get_personal_icp(
         except:
             pass
 
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
+    settings = await get_org_settings(db, user_id=str(current_user.id), org_id=current_user.organization_id)
     
     if not settings or not settings.icp_json:
         return None
@@ -52,8 +56,10 @@ async def get_global_icp(
     """
     Get the Global Organization ICP.
     """
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
+    print("current user org id", current_user.organization_id)
+    print("current user id", current_user.id)
+    
+    settings = await get_org_settings(db, user_id=str(current_user.id), org_id=current_user.organization_id)
     
     if not settings or not settings.icp_json:
         return None
@@ -97,9 +103,8 @@ async def save_personal_icp(
         logger.info(f"Skipping update for completely empty ICP data for user {current_user.id}")
         return icp_data
     
-    # 1. Fetch Global ICP to compare
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    global_settings = result.scalars().first()
+    # 1. Fetch ICP to compare (User-aware)
+    global_settings = await get_org_settings(db, user_id=str(current_user.id), org_id=current_user.organization_id)
     
     is_redundant = False
     if global_settings and global_settings.icp_json:
@@ -128,14 +133,13 @@ async def save_global_icp(
     """
     Save Global Organization ICP. Admin only.
     """
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
+    settings = await get_org_settings(db, user_id=str(admin_user.id), org_id=admin_user.organization_id)
     icp_json_str = icp_data.json()
     
-    if settings:
+    if settings and (settings.organization_id == admin_user.organization_id or settings.owner_id == admin_user.id):
         settings.icp_json = icp_json_str
     else:
-        settings = OrganizationSettings(icp_json=icp_json_str)
+        settings = OrganizationSettings(icp_json=icp_json_str, owner_id=admin_user.id, organization_id=admin_user.organization_id)
         db.add(settings)
     
     await db.commit()
@@ -182,8 +186,7 @@ async def get_integrations(
     db: AsyncSession = Depends(get_db),
     admin_user: Profile = Depends(require_admin)
 ):
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalar_one_or_none()
+    settings = await get_org_settings(db, user_id=str(admin_user.id), org_id=admin_user.organization_id)
     
     if not settings:
         return IntegrationSettings()
@@ -228,10 +231,29 @@ async def save_integrations(
     db: AsyncSession = Depends(get_db),
     admin_user: Profile = Depends(require_admin)
 ):
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalar_one_or_none()
+    settings = await get_org_settings(db, user_id=str(admin_user.id), org_id=admin_user.organization_id)
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     
-    if settings:
+    if trial_mode:
+        # Strictly block premium integrations
+        data.hubspot_access_token = None
+        data.hubspot_sync_enabled = False
+        data.tavily_api_key = None
+        data.apollo_api_key = None
+        data.kit_api_key = None
+        data.kit_api_secret = None
+        data.million_verifier_api_key = None
+        data.million_verifier_enabled = False
+        
+        # Only allow Slack in integrations_config
+        try:
+            config = json.loads(data.integrations_config or "{}")
+            new_config = {"slack": config.get("slack", {"enabled": False})}
+            data.integrations_config = json.dumps(new_config)
+        except:
+            data.integrations_config = json.dumps({"slack": {"enabled": False}})
+
+    if settings and (settings.organization_id == admin_user.organization_id or settings.owner_id == admin_user.id):
         settings.tavily_api_key = data.tavily_api_key
         settings.apollo_api_key = data.apollo_api_key
         settings.user_linkedin_url = data.user_linkedin_url
@@ -260,6 +282,8 @@ async def save_integrations(
         settings.integrations_config = json.dumps(int_config)
     else:
         settings = OrganizationSettings(
+            owner_id=admin_user.id,
+            organization_id=admin_user.organization_id,
             tavily_api_key=data.tavily_api_key, 
             apollo_api_key=data.apollo_api_key,
             email_config=data.email_config,
@@ -283,23 +307,125 @@ async def save_integrations(
     return data
 
 @settings_router.get("/settings/onboarding-status")
-async def get_onboarding_status(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
-    return {"complete": bool(settings.onboarding_complete) if settings else False}
+async def get_onboarding_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    settings = await get_org_settings(db, user_id=str(current_user.id), org_id=current_user.organization_id)
+    
+    # Check migration status from profile metadata
+    import json
+    user_meta = json.loads(current_user.profile_metadata or "{}") if isinstance(current_user.profile_metadata, str) else (current_user.profile_metadata or {})
+    is_migrated = user_meta.get("migration_complete", False)
+    
+    return {
+        "complete": bool(settings.onboarding_complete) if settings else False,
+        "migration_complete": is_migrated
+    }
 
 @settings_router.post("/settings/onboarding-complete")
-async def set_onboarding_complete(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
-    if settings:
+async def set_onboarding_complete(
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    settings = await get_org_settings(db, user_id=str(current_user.id), org_id=current_user.organization_id)
+    if settings and (settings.organization_id == current_user.organization_id or settings.owner_id == current_user.id):
         settings.onboarding_complete = 1
     else:
-        # Create global settings if they don't exist
-        settings = OrganizationSettings(onboarding_complete=1)
+        # Create user settings if they don't exist
+        settings = OrganizationSettings(
+            onboarding_complete=1, 
+            owner_id=current_user.id,
+            organization_id=current_user.organization_id
+        )
         db.add(settings)
     await db.commit()
     return {"status": "success"}
+
+@settings_router.post("/settings/onboarding-reset")
+async def reset_onboarding(
+    db: AsyncSession = Depends(get_db),
+    admin_user: Profile = Depends(require_admin)
+):
+    """
+    Dev/admin utility: reset onboarding_complete to 0 so the onboarding flow
+    is shown again. Use this instead of manually editing Supabase.
+    The correct column is `onboarding_complete` in `organization_settings` — NOT `onboarding_step`.
+    """
+    settings = await get_org_settings(db, user_id=str(admin_user.id), org_id=admin_user.organization_id)
+    if settings:
+        settings.onboarding_complete = 0
+        await db.commit()
+    return {"status": "reset", "onboarding_complete": 0}
+
+@settings_router.get("/settings/usage")
+async def get_usage_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    """
+    Get the current usage statistics for the user (Research & Classification).
+    Useful for displaying trial limits.
+    """
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+    limits = get_trial_limits()
+    research_limit = limits["research_limit"]
+    classification_limit = limits["classification_limit"]
+    identified_limit = limits["identified_limit"]
+
+    # Count Researches
+    res_count_query = select(func.count(ResearchReport.id))
+    if current_user.organization_id:
+        res_count_query = res_count_query.where(ResearchReport.organization_id == current_user.organization_id)
+    else:
+        res_count_query = res_count_query.where(ResearchReport.created_by_id == current_user.id)
+        
+    res_result = await db.execute(res_count_query)
+    research_used = res_result.scalar() or 0
+
+    # Count Classifications: Only count profiles that are actually useful (Fit OR Intent found)
+    class_count_query = select(func.count(IdentifiedProfile.id)).where(
+        or_(
+            IdentifiedProfile.is_fit == True,
+            IdentifiedProfile.intent.isnot(None)
+        )
+    )
+    if current_user.organization_id:
+        class_count_query = class_count_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+    else:
+        class_count_query = class_count_query.where(IdentifiedProfile.created_by_id == current_user.id)
+        
+    class_result = await db.execute(class_count_query)
+    classification_used = class_result.scalar() or 0
+
+    # Count Identified Profiles (Total)
+    id_count_query = select(func.count(IdentifiedProfile.id))
+    if current_user.organization_id:
+        id_count_query = id_count_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+    else:
+        id_count_query = id_count_query.where(IdentifiedProfile.created_by_id == current_user.id)
+    
+    id_result = await db.execute(id_count_query)
+    identified_used = id_result.scalar() or 0
+
+    return {
+        "trial_mode": trial_mode,
+        "research": {
+            "used": research_used,
+            "limit": research_limit,
+            "remaining": max(0, research_limit - research_used)
+        },
+        "classification": {
+            "used": classification_used,
+            "limit": classification_limit,
+            "remaining": max(0, classification_limit - classification_used)
+        },
+        "lead_discovery": {
+            "used": identified_used,
+            "limit": identified_limit,
+            "remaining": max(0, identified_limit - identified_used)
+        }
+    }
 @settings_router.get("/settings/selling-profile", response_model=Optional[SellingProfileConfig])
 async def get_selling_profile(
     db: AsyncSession = Depends(get_db),
@@ -311,14 +437,13 @@ async def get_selling_profile(
     from db.models import OrganizationSettings
     from db.schemas import SellingProfileConfig
     
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
+    settings = await get_org_settings(db, user_id=str(current_user.id), org_id=current_user.organization_id)
     
     if not settings or not settings.selling_profile_json:
         # Return default if not set
         return SellingProfileConfig(
-            company_name="Innovize AI",
-            description="Specialized AI Transformation",
+            company_name="Your Company Name",
+            description="Enterprise Solutions Provider",
             products=[]
         )
         
@@ -340,16 +465,55 @@ async def save_selling_profile(
     """
     from db.models import OrganizationSettings
     
-    result = await db.execute(select(OrganizationSettings).limit(1))
-    settings = result.scalars().first()
+    settings = await get_org_settings(db, user_id=str(admin_user.id), org_id=admin_user.organization_id)
     
     json_str = profile_data.json()
     
-    if settings:
+    if settings and (settings.organization_id == admin_user.organization_id or settings.owner_id == admin_user.id):
         settings.selling_profile_json = json_str
     else:
-        settings = OrganizationSettings(selling_profile_json=json_str)
+        settings = OrganizationSettings(
+            selling_profile_json=json_str, 
+            owner_id=admin_user.id,
+            organization_id=admin_user.organization_id
+        )
         db.add(settings)
         
     await db.commit()
     return profile_data
+
+@settings_router.post("/settings/provision-index")
+async def provision_org_index(
+    db: AsyncSession = Depends(get_db),
+    admin_user: Profile = Depends(require_admin)
+):
+    """
+    Provision a new, isolated Pinecone index for this organization.
+    Only one index is created per organization.
+    """
+    settings = await get_org_settings(db, user_id=str(admin_user.id), org_id=admin_user.organization_id)
+    
+    if not settings:
+        settings = OrganizationSettings(
+            owner_id=admin_user.id,
+            organization_id=admin_user.organization_id
+        )
+        db.add(settings)
+        await db.flush() # Get the ID for naming
+    
+    if settings.pinecone_index_name:
+        return {"status": "already_exists", "index_name": settings.pinecone_index_name}
+    
+    # Generate a unique name (max 45 chars)
+    index_name = f"tr-{settings.id}"
+    
+    # Provision via KnowledgeService
+    ks = KnowledgeService()
+    success = await ks.create_trial_index(index_name)
+    
+    if success:
+        settings.pinecone_index_name = index_name
+        await db.commit()
+        return {"status": "provisioning_started", "index_name": index_name}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to provision Pinecone index")

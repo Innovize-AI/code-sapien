@@ -14,32 +14,56 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  isOnboarded: boolean;
+  isMigrated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  checkOnboarding: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("user");
+        return stored ? JSON.parse(stored) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [isOnboarded, setIsOnboarded] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("onboarding_complete") === "true";
+    }
+    return false;
+  });
+  const [isMigrated, setIsMigrated] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("migration_complete") === "true";
+    }
+    return false;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      // If we have a token, we consider the initial state "loaded" from cache
+      return !localStorage.getItem("accessToken");
+    }
+    return true;
+  });
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    // Check local storage for existing session
+    // This now just handles secondary sync if needed
     const token = localStorage.getItem("accessToken");
-    const storedUser = localStorage.getItem("user");
-
-    if (token && storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse user", e);
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("user");
-      }
+    if (!token && user) {
+        setUser(null);
+        setIsOnboarded(false);
     }
     setLoading(false);
   }, []);
@@ -64,10 +88,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const checkOnboarding = async () => {
+    try {
+      const { getOnboardingStatus } = await import("@/lib/api");
+      const status = await getOnboardingStatus();
+      if (status.complete) {
+        localStorage.setItem("onboarding_complete", "true");
+        setIsOnboarded(true);
+      } else {
+        localStorage.removeItem("onboarding_complete");
+        setIsOnboarded(false);
+      }
+      
+      if (status.migration_complete) {
+        localStorage.setItem("migration_complete", "true");
+        setIsMigrated(true);
+      } else {
+        localStorage.removeItem("migration_complete");
+        setIsMigrated(false);
+      }
+
+      return status.complete;
+    } catch (e) {
+      console.error("Failed to check onboarding status", e);
+      return false;
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("user");
+    localStorage.removeItem("onboarding_complete");
+    localStorage.removeItem("migration_complete");
     setUser(null);
+    setIsOnboarded(false);
+    setIsMigrated(false);
     router.push("/login");
   };
 
@@ -80,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, loading, pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, isOnboarded, isMigrated, loading, login, logout, checkOnboarding }}>
       {children}
     </AuthContext.Provider>
   );

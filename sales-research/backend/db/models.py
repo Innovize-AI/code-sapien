@@ -1,13 +1,25 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, text, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, text, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import datetime
 from db.database import Base
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    name = Column(Text, nullable=False)
+    domain = Column(String, unique=True, index=True, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))
 
 class ResearchReport(Base):
     __tablename__ = "research_reports"
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     
     # Input Data
     linkedin_url = Column(Text, nullable=True)
@@ -100,6 +112,9 @@ class LeadSubmission(Base):
     email_history = Column(Text, nullable=True)    # JSON array
     intent_analysis = Column(Text, nullable=True)  # JSON object
     extra_metadata = Column(Text, nullable=True)   # JSON object
+    
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
 
 class OrganizationSettings(Base):
@@ -109,8 +124,8 @@ class OrganizationSettings(Base):
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))
     
-    # For now, we assume single tenant or global settings. 
-    # In future, add user_id or org_id here.
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    owner_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     
     # Store ICP as JSON
     icp_json = Column(Text, nullable=True) # Storing JSON string for flexibility
@@ -148,6 +163,9 @@ class OrganizationSettings(Base):
     hubspot_sync_enabled = Column(Boolean, server_default=text("false"), nullable=False)
     # learned_constraints = Column(Text, nullable=True) # JSON list of negative constraints
 
+    # Pinecone Multi-Indexing
+    pinecone_index_name = Column(String, nullable=True)
+
 class CRMContext(Base):
     __tablename__ = "crm_context"
 
@@ -177,6 +195,8 @@ class CompetitorAnalysis(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    
     competitor_urls = Column(Text, nullable=False) # Store comma-separated or JSON list
     analysis_report = Column(Text, nullable=False)
 
@@ -188,6 +208,8 @@ class Competitor(Base):
     
     name = Column(String, nullable=True)
     linkedin_url = Column(Text, nullable=False, unique=True)
+    
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     created_by_id = Column(UUID(as_uuid=True), nullable=True)
 
 class IdentifiedProfile(Base):
@@ -195,6 +217,8 @@ class IdentifiedProfile(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     
     name = Column(String, nullable=True)
     headline = Column(Text, nullable=True)
@@ -220,6 +244,7 @@ class IdentifiedProfile(Base):
     interaction_history = Column(Text, nullable=True) # Hierarchical: [ { competitor, posts: [ {url, title, comments: []} ] } ]
     
     # Status/Metadata
+    lead_source = Column(String(50), nullable=True, index=True)  # 'apollo' | 'keyword' | 'competitor'
     last_interaction_at = Column(DateTime(timezone=True), server_default=text("now()"))
     touchpoint_count = Column(Integer, default=0, server_default=text("0"))
     profile_metadata = Column(Text, nullable=True)         # JSON for flexibility
@@ -232,6 +257,8 @@ class Activity(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     
     type = Column(String, nullable=False) # 'meeting', 'email', 'comment', 'analysis', 'high_potential'
     title = Column(String, nullable=False)
@@ -287,9 +314,11 @@ class Profile(Base):
     __tablename__ = "profiles"
 
     id = Column(UUID(as_uuid=True), primary_key=True) # Corresponds to Supabase auth.users.id
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     email = Column(String, unique=True, nullable=False)
     role = Column(String, default="user", nullable=False)
     full_name = Column(String, nullable=True)
+    profile_metadata = Column(Text, nullable=True) # JSON store for migration and other flags
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
 
 class UserSettings(Base):
@@ -297,6 +326,7 @@ class UserSettings(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     user_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))
 
@@ -341,3 +371,20 @@ class ScheduledTask(Base):
     last_run_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=text("now()"))
+
+class KnowledgeAsset(Base):
+    __tablename__ = "knowledge_assets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    created_by_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    
+    filename = Column(Text, nullable=False)
+    storage_path = Column(Text, nullable=False)
+    namespace = Column(String, nullable=False) # 'playbooks', 'case-studies', 'solutions'
+    file_size = Column(Integer, nullable=True)
+    
+    # Metadata for filtering/categorization
+    asset_metadata = Column(Text, nullable=True) # JSON string

@@ -4,9 +4,10 @@ import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, Users, Search, ExternalLink } from "lucide-react"
+import { Users, Search, ExternalLink } from "lucide-react"
 import { getCompetitors, discoverCompetitorLeads, CompetitorLead, Competitor } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
+import { Spinner } from "@/components/ui/spinner"
 
 export default function CompetitorLeadsPage() {
     const [competitors, setCompetitors] = useState<Competitor[]>([])
@@ -61,7 +62,7 @@ export default function CompetitorLeadsPage() {
         return (
             <DashboardLayout>
                 <div className="flex items-center justify-center h-full">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <Spinner size="lg" />
                 </div>
             </DashboardLayout>
         )
@@ -85,7 +86,7 @@ export default function CompetitorLeadsPage() {
                         Monitoring {competitors.length} competitors
                     </div>
                     <Button onClick={handleDiscover} disabled={isLoading || competitors.length === 0}>
-                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                        {isLoading ? <Spinner size="md" className="mr-2" /> : <Search className="mr-2 h-4 w-4" />}
                         Generate Leads
                     </Button>
                 </div>

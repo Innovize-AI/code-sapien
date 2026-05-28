@@ -15,6 +15,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Zap,
   Search,
@@ -25,9 +26,9 @@ import {
   Users,
   Briefcase,
   Activity,
-  RefreshCcw,
   Trash2,
   User,
+  Lock,
 } from "lucide-react";
 import {
   fetchActivities,
@@ -48,9 +49,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { MultiSelect } from "@/components/ui/multi-select";
+import {
+  JOB_TITLE_OPTIONS,
+  COMPANY_SIZE_OPTIONS,
+  APOLLO_SENIORITY_OPTIONS,
+  APOLLO_EMAIL_STATUS_OPTIONS,
+  LINKEDIN_INDUSTRIES
+} from "@/lib/constants";
+
+import { useConfig } from "@/context/config-context";
+import { cn } from "@/lib/utils";
 
 export default function AutopilotPage() {
   const { user } = useAuth();
+  const { trialMode } = useConfig();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,9 +74,18 @@ export default function AutopilotPage() {
   const [apolloRules, setApolloRules] = useState<AutopilotRule[]>([]);
   const [apolloInput, setApolloInput] = useState({
     industry: "",
-    job_title: "",
+    job_title: [] as string[],
     location: "",
-    company_size: "",
+    company_size: [] as string[],
+    // Advanced Filters
+    person_seniorities: [] as string[],
+    contact_email_status: [] as string[],
+    organization_domains: "",
+    organization_locations: "",
+    revenue_min: "",
+    revenue_max: "",
+    technologies: "",
+    job_postings: ""
   });
   const [lastRuns, setLastRuns] = useState<any[]>([]);
 
@@ -212,29 +234,54 @@ export default function AutopilotPage() {
   };
 
   const handleAddApolloRule = async () => {
-    if (!apolloInput.job_title && !apolloInput.industry) {
+    if (!apolloInput.job_title.length && !apolloInput.industry) {
       toast({
         title: "Missing Info",
-        description: "Please enter at least a Job Title or Industry.",
+        description: "Please enter at least Job Titles or Industry.",
         variant: "destructive",
       });
       return;
     }
     setSaving(true);
     try {
+      // Format payload for backend ingestion
+      const payload = {
+        industry: apolloInput.industry,
+        person_titles: apolloInput.job_title, // backend expects person_titles as list
+        location: apolloInput.location,
+        organization_num_employees_ranges: apolloInput.company_size,
+        person_seniorities: apolloInput.person_seniorities,
+        contact_email_status: apolloInput.contact_email_status,
+        organization_domains: apolloInput.organization_domains ? apolloInput.organization_domains.split(",").map(d => d.trim()) : undefined,
+        organization_locations: apolloInput.organization_locations ? apolloInput.organization_locations.split(",").map(l => l.trim()) : undefined,
+        revenue_min: apolloInput.revenue_min ? parseInt(apolloInput.revenue_min) : undefined,
+        revenue_max: apolloInput.revenue_max ? parseInt(apolloInput.revenue_max) : undefined,
+        currently_using_any_of_technology_uids: apolloInput.technologies ? apolloInput.technologies.split(",").map(t => t.trim()) : undefined,
+        q_organization_job_titles: apolloInput.job_postings ? apolloInput.job_postings.split(",").map(t => t.trim()) : undefined,
+      };
+
       await addAutopilotRule({
         type: "apollo_config",
-        value: JSON.stringify(apolloInput),
+        value: JSON.stringify(payload),
       });
+
       setApolloInput({
         industry: "",
-        job_title: "",
+        job_title: [],
         location: "",
-        company_size: "",
+        company_size: [],
+        person_seniorities: [],
+        contact_email_status: [],
+        organization_domains: "",
+        organization_locations: "",
+        revenue_min: "",
+        revenue_max: "",
+        technologies: "",
+        job_postings: ""
       });
       const rules = await getAutopilotRules("apollo_config");
       setApolloRules(rules);
-      toast({ title: "Success", description: "Apollo search rule added." });
+      toast({ title: "Success", description: "Apollo discovery rule created." });
     } catch (error) {
       toast({
         title: "Error",
@@ -272,7 +319,7 @@ export default function AutopilotPage() {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-[50vh]">
-          <RefreshCcw className="w-8 h-8 animate-spin text-primary" />
+          <Spinner size="lg" />
         </div>
       </DashboardLayout>
     );
@@ -288,16 +335,21 @@ export default function AutopilotPage() {
               Lead Discovery Autopilot
             </h1>
             <p className="text-muted-foreground mt-2">
-              Set up automated rules to find high-intent leads every 24 hours.
-              Track who added what for better team coordination.
+              Set up automated rules to find high-intent leads from LinkedIn and Apollo every 24 hours.
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">
-            <Tabs defaultValue="linkedin" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+            <Tabs defaultValue={trialMode ? "linkedin" : "apollo"} className="w-full">
+              <TabsList className={cn("grid w-full", trialMode ? "grid-cols-2" : "grid-cols-3")}>
+                {!trialMode && (
+                  <TabsTrigger value="apollo" className="gap-2 relative">
+                    <Search className="w-4 h-4" />
+                    Apollo Search
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="linkedin" className="gap-2">
                   <Globe className="w-4 h-4" />
                   LinkedIn Keywords
@@ -306,11 +358,215 @@ export default function AutopilotPage() {
                   <Users className="w-4 h-4" />
                   Competitors
                 </TabsTrigger>
-                <TabsTrigger value="apollo" className="gap-2">
-                  <Search className="w-4 h-4" />
-                  Apollo Search
-                </TabsTrigger>
               </TabsList>
+              {!trialMode && (
+                <TabsContent value="apollo" className="mt-6">
+                  <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle>Apollo Search Configuration</CardTitle>
+                      <CardDescription>
+                        Configure advanced Apollo filters. We'll find matching profiles and add them to your pipeline automatically.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Person Filters */}
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Person Filters</Label>
+                          <div className="space-y-2">
+                            <Label>Job Titles</Label>
+                            <MultiSelect
+                              options={JOB_TITLE_OPTIONS}
+                              onChange={(vals) => setApolloInput(prev => ({ ...prev, job_title: vals }))}
+                              value={apolloInput.job_title}
+                              placeholder="Any job title"
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Seniority</Label>
+                            <MultiSelect
+                              options={APOLLO_SENIORITY_OPTIONS}
+                              onChange={(vals) => setApolloInput(prev => ({ ...prev, person_seniorities: vals }))}
+                              value={apolloInput.person_seniorities}
+                              placeholder="Any seniority"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Email Status</Label>
+                            <MultiSelect
+                              options={APOLLO_EMAIL_STATUS_OPTIONS}
+                              onChange={(vals) => setApolloInput(prev => ({ ...prev, contact_email_status: vals }))}
+                              value={apolloInput.contact_email_status}
+                              placeholder="e.g. Verified"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Organization Filters */}
+                      <div className="space-y-4">
+                         <div className="space-y-2">
+                          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Organization Filters</Label>
+                          <div className="space-y-2">
+                            <Label>Company Size</Label>
+                            <MultiSelect
+                              options={COMPANY_SIZE_OPTIONS}
+                              onChange={(vals) => setApolloInput(prev => ({ ...prev, company_size: vals }))}
+                              value={apolloInput.company_size}
+                              placeholder="Any headcount"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-2">
+                              <Label>Revenue Min ($)</Label>
+                              <Input 
+                                type="number" 
+                                placeholder="Min" 
+                                value={apolloInput.revenue_min}
+                                onChange={(e) => setApolloInput(prev => ({ ...prev, revenue_min: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Revenue Max ($)</Label>
+                              <Input 
+                                type="number" 
+                                placeholder="Max" 
+                                value={apolloInput.revenue_max}
+                                onChange={(e) => setApolloInput(prev => ({ ...prev, revenue_max: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Tech Stack (comma-sep)</Label>
+                            <Input 
+                              placeholder="e.g. salesforce, hubspot" 
+                              value={apolloInput.technologies}
+                              onChange={(e) => setApolloInput(prev => ({ ...prev, technologies: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <Label>Locations (comma-sep)</Label>
+                          <Input 
+                            placeholder="e.g. California, London" 
+                            value={apolloInput.location}
+                            onChange={(e) => setApolloInput(prev => ({ ...prev, location: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Target Domains (comma-sep)</Label>
+                          <Input 
+                            placeholder="e.g. apple.com, google.com" 
+                            value={apolloInput.organization_domains}
+                            onChange={(e) => setApolloInput(prev => ({ ...prev, organization_domains: e.target.value }))}
+                          />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Job Posting Search (comma-sep roles they are hiring for)</Label>
+                      <Input 
+                        placeholder="e.g. 'Software Engineer', 'Hiring Manager'" 
+                        value={apolloInput.job_postings}
+                        onChange={(e) => setApolloInput(prev => ({ ...prev, job_postings: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-3 pt-6 border-t">
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <List className="w-3 h-3" />
+                        Active Apollo Rules
+                      </Label>
+
+                      {apolloRules.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic p-4 text-center border-2 border-dashed rounded-lg">
+                          No Apollo rules defined yet.
+                        </p>
+                      ) : (
+                        <div className="grid gap-2">
+                          {apolloRules.map((rule) => {
+                            const initials = rule.creator_name
+                              ? rule.creator_name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .toUpperCase()
+                              : "U";
+                            const config = JSON.parse(rule.value);
+                            const titles = Array.isArray(config.person_titles) ? config.person_titles.join(", ") : config.job_title;
+                            const seniorities = Array.isArray(config.person_seniorities) ? config.person_seniorities.join(", ") : "";
+                            const headcount = Array.isArray(config.organization_num_employees_ranges) ? config.organization_num_employees_ranges.join(", ") : config.company_size;
+                            
+                            return (
+                              <div
+                                key={rule.id}
+                                className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/10 group"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20">
+                                    {initials}
+                                  </div>
+                                  <div className="flex flex-col text-xs">
+                                    <span className="font-semibold">
+                                      {titles || "Any Role"} {seniorities ? `(${seniorities})` : ""}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      {config.industry ? `${config.industry} • ` : ""}
+                                      {config.location || "Anywhere"} •{" "}
+                                      {headcount || "Any Size"}
+                                    </span>
+                                    {config.organization_domains && Array.isArray(config.organization_domains) && (
+                                      <span className="text-[10px] text-primary/70">
+                                        Domains: {config.organization_domains.join(", ")}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-muted-foreground/60 mt-1">
+                                      Added by {rule.creator_name}
+                                    </span>
+                                  </div>
+                                </div>
+                                {(user?.role === "admin" ||
+                                  user?.id === rule.created_by_id) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+                                    onClick={() =>
+                                      handleRemoveApolloRule(rule.id)
+                                    }
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardFooter className="bg-muted/30 p-4">
+                    <Button 
+                      className="w-full" 
+                      onClick={handleAddApolloRule}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <Spinner size="md" className="mr-2" />
+                      ) : (
+                        <Zap className="w-4 h-4 mr-2" />
+                      )}
+                      Create Apollo Discovery Rule
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </TabsContent>
+            )}
 
               <TabsContent value="linkedin" className="mt-6">
                 <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
@@ -516,163 +772,6 @@ export default function AutopilotPage() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="apollo" className="mt-6">
-                <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
-                  <CardHeader>
-                    <CardTitle>Apollo Lead Gen</CardTitle>
-                    <CardDescription>
-                      Configure filters to automatically pull targeted profiles
-                      from Apollo into your research queue.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          <Briefcase className="w-4 h-4 text-primary" />
-                          Job Titles
-                        </Label>
-                        <Input
-                          placeholder="e.g. VP of Sales, CTO"
-                          value={apolloInput.job_title}
-                          onChange={(e) =>
-                            setApolloInput({
-                              ...apolloInput,
-                              job_title: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          <Globe className="w-4 h-4 text-primary" />
-                          Industry
-                        </Label>
-                        <Input
-                          placeholder="e.g. SaaS, FinTech"
-                          value={apolloInput.industry}
-                          onChange={(e) =>
-                            setApolloInput({
-                              ...apolloInput,
-                              industry: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          <Globe className="w-4 h-4 text-primary" />
-                          Location
-                        </Label>
-                        <Input
-                          placeholder="e.g. United States, London"
-                          value={apolloInput.location}
-                          onChange={(e) =>
-                            setApolloInput({
-                              ...apolloInput,
-                              location: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-primary" />
-                          Company Size
-                        </Label>
-                        <Input
-                          placeholder="e.g. 50-200"
-                          value={apolloInput.company_size}
-                          onChange={(e) =>
-                            setApolloInput({
-                              ...apolloInput,
-                              company_size: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={handleAddApolloRule}
-                      className="w-full"
-                      variant="secondary"
-                      disabled={saving}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Apollo Discovery Rule
-                    </Button>
-
-                    <div className="space-y-3 pt-4 border-t">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                        <List className="w-3 h-3" />
-                        Active Apollo Rules
-                      </Label>
-
-                      {apolloRules.length === 0 ? (
-                        <p className="text-xs text-muted-foreground italic p-4 text-center border-2 border-dashed rounded-lg">
-                          No Apollo rules defined yet.
-                        </p>
-                      ) : (
-                        <div className="grid gap-2">
-                          {apolloRules.map((rule) => {
-                            const initials = rule.creator_name
-                              ? rule.creator_name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
-                                  .toUpperCase()
-                              : "U";
-                            const config = JSON.parse(rule.value);
-                            return (
-                              <div
-                                key={rule.id}
-                                className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/10 group"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20">
-                                    {initials}
-                                  </div>
-                                  <div className="flex flex-col text-xs">
-                                    <span className="font-semibold">
-                                      {config.job_title || "Any Role"} in{" "}
-                                      {config.industry || "Any Industry"}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                      {config.location || "Anywhere"} •{" "}
-                                      {config.company_size || "Any Size"}
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground/60 mt-1">
-                                      Added by {rule.creator_name}
-                                    </span>
-                                  </div>
-                                </div>
-                                {(user?.role === "admin" ||
-                                  user?.id === rule.created_by_id) && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
-                                    onClick={() =>
-                                      handleRemoveApolloRule(rule.id)
-                                    }
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-primary/5 text-xs text-muted-foreground py-3 border-t">
-                    Apollo discovery will fetch up to 10 new leads per day
-                    matching these criteria.
-                  </CardFooter>
-                </Card>
-              </TabsContent>
             </Tabs>
           </div>
 

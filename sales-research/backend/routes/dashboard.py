@@ -6,17 +6,29 @@ from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, timedelta
 
 from db.database import get_db
-from db.models import ResearchReport, IdentifiedProfile
+from db.models import ResearchReport, IdentifiedProfile, Profile
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
+import os
+from dependencies import get_current_user
+from utils.trial_utils import get_trial_limits
 
 dashboard_router = APIRouter(tags=['Dashboard'])
+
+class UsageStats(BaseModel):
+    used: int
+    limit: int
+    remaining: int
 
 class DashboardStats(BaseModel):
     total_leads: int
     avg_lead_score: float
     high_potential_leads: int
     time_saved_hours: float
+    trial_mode: bool = False
+    research_usage: Optional[UsageStats] = None
+    classification_usage: Optional[UsageStats] = None
+    lead_discovery_usage: Optional[UsageStats] = None
 
 class AnalyticsDataPoint(BaseModel):
     date: str
@@ -33,41 +45,118 @@ class DashboardAnalytics(BaseModel):
     keyword_breakdown: List[BreakdownItem]
 
 @dashboard_router.get("/dashboard/stats", response_model=DashboardStats)
-async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
+async def get_dashboard_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
     """
     Get aggregated statistics for the dashboard.
+    Isolated to the current user in Trial Mode.
     """
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
+
     # Total Leads
     total_leads_query = select(func.count(ResearchReport.id))
+    # Average Lead Score
+    avg_score_query = select(func.avg(ResearchReport.lead_score))
+    # High Potential Leads (Score > 70)
+    high_potential_query = select(func.count(ResearchReport.id)).where(ResearchReport.lead_score > 70)
+
+    if current_user.organization_id:
+        total_leads_query = total_leads_query.where(ResearchReport.organization_id == current_user.organization_id)
+        avg_score_query = avg_score_query.where(ResearchReport.organization_id == current_user.organization_id)
+        high_potential_query = high_potential_query.where(ResearchReport.organization_id == current_user.organization_id)
+    else:
+        total_leads_query = total_leads_query.where(ResearchReport.created_by_id == current_user.id)
+        avg_score_query = avg_score_query.where(ResearchReport.created_by_id == current_user.id)
+        high_potential_query = high_potential_query.where(ResearchReport.created_by_id == current_user.id)
+
     total_leads_result = await db.execute(total_leads_query)
     total_leads = total_leads_result.scalar() or 0
 
     # Average Lead Score
-    avg_score_query = select(func.avg(ResearchReport.lead_score))
     avg_score_result = await db.execute(avg_score_query)
     avg_score = avg_score_result.scalar() or 0.0
 
-    # High Potential Leads (Score > 70)
-    high_potential_query = select(func.count(ResearchReport.id)).where(ResearchReport.lead_score > 70)
     high_potential_result = await db.execute(high_potential_query)
     high_potential_leads = high_potential_result.scalar() or 0
 
-    # Estimated Time Saved (assume 30 mins per lead)
-    # 30 mins = 0.5 hours
+    # Estimated Time Saved
     time_saved_hours = total_leads * 0.5
+
+    # Usage Calculations
+    research_usage = None
+    classification_usage = None
+    lead_discovery_usage = None
+
+    if trial_mode:
+        limits = get_trial_limits()
+        res_limit = limits["research_limit"]
+        class_limit = limits["classification_limit"]
+        id_limit = limits["identified_limit"]
+
+        # Classification count: Only count profiles that are actually useful (Fit OR Intent found)
+        class_query = select(func.count(IdentifiedProfile.id)).where(
+            or_(
+                IdentifiedProfile.is_fit == True,
+                IdentifiedProfile.intent.isnot(None)
+            )
+        )
+        if current_user.organization_id:
+            class_query = class_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+        else:
+            class_query = class_query.where(IdentifiedProfile.created_by_id == current_user.id)
+
+        class_res = await db.execute(class_query)
+        class_used = class_res.scalar() or 0
+
+        # Identified Profiles count
+        id_query = select(func.count(IdentifiedProfile.id))
+        if current_user.organization_id:
+            id_query = id_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+        else:
+            id_query = id_query.where(IdentifiedProfile.created_by_id == current_user.id)
+        
+        id_res = await db.execute(id_query)
+        id_used = id_res.scalar() or 0
+
+        research_usage = UsageStats(
+            used=total_leads,
+            limit=res_limit,
+            remaining=max(0, res_limit - total_leads)
+        )
+        classification_usage = UsageStats(
+            used=class_used,
+            limit=class_limit,
+            remaining=max(0, class_limit - class_used)
+        )
+        lead_discovery_usage = UsageStats(
+            used=id_used,
+            limit=id_limit,
+            remaining=max(0, id_limit - id_used)
+        )
 
     return DashboardStats(
         total_leads=total_leads,
         avg_lead_score=round(float(avg_score), 1),
         high_potential_leads=high_potential_leads,
-        time_saved_hours=time_saved_hours
+        time_saved_hours=time_saved_hours,
+        trial_mode=trial_mode,
+        research_usage=research_usage,
+        classification_usage=classification_usage,
+        lead_discovery_usage=lead_discovery_usage
     )
 
 @dashboard_router.get("/dashboard/analytics", response_model=DashboardAnalytics)
-async def get_dashboard_analytics(db: AsyncSession = Depends(get_db)):
+async def get_dashboard_analytics(
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
     """
     Get experimental analytics data for charts.
+    Isolated to the current user in Trial Mode.
     """
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
 
     # 1. Daily Trends
@@ -77,13 +166,8 @@ async def get_dashboard_analytics(db: AsyncSession = Depends(get_db)):
         .group_by(cast(IdentifiedProfile.created_at, DATE))
         .order_by(cast(IdentifiedProfile.created_at, DATE))
     )
-    trends_result = await db.execute(trends_query)
-    daily_trends = [AnalyticsDataPoint(date=str(r[0]), count=r[1]) for r in trends_result.all()]
 
     # 2. Lead Quality
-    # Hot: is_fit=True AND intent in ['interested', 'pain_point']
-    # Qualified: is_fit=True AND intent NOT in ['interested', 'pain_point']
-    # Unfit: is_fit=False
     hot_query = select(func.count(IdentifiedProfile.id)).where(
         IdentifiedProfile.is_fit == True,
         IdentifiedProfile.intent.in_(['interested', 'pain_point'])
@@ -93,6 +177,20 @@ async def get_dashboard_analytics(db: AsyncSession = Depends(get_db)):
         or_(IdentifiedProfile.intent == None, ~IdentifiedProfile.intent.in_(['interested', 'pain_point']))
     )
     unfit_query = select(func.count(IdentifiedProfile.id)).where(IdentifiedProfile.is_fit == False)
+
+    if current_user.organization_id:
+        trends_query = trends_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+        hot_query = hot_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+        qualified_query = qualified_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+        unfit_query = unfit_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
+    else:
+        trends_query = trends_query.where(IdentifiedProfile.created_by_id == current_user.id)
+        hot_query = hot_query.where(IdentifiedProfile.created_by_id == current_user.id)
+        qualified_query = qualified_query.where(IdentifiedProfile.created_by_id == current_user.id)
+        unfit_query = unfit_query.where(IdentifiedProfile.created_by_id == current_user.id)
+
+    trends_result = await db.execute(trends_query)
+    daily_trends = [AnalyticsDataPoint(date=str(r[0]), count=r[1]) for r in trends_result.all()]
 
     hot_res = await db.execute(hot_query)
     qual_res = await db.execute(qualified_query)
@@ -105,11 +203,6 @@ async def get_dashboard_analytics(db: AsyncSession = Depends(get_db)):
     }
 
     # 3. Competitor & Keyword Breakdown
-    # We use jsonb_array_elements to flatten source_posts
-    # source_posts is a JSON string of list of dicts: [{"competitor": "...", ...}]
-    
-
-    # Unnest source_posts JSONB array into rows, then extract the "competitor" key
     posts_func = func.jsonb_array_elements(
         cast(func.coalesce(IdentifiedProfile.source_posts, '[]'), JSONB)
     ).table_valued("value").lateral("post")
@@ -120,15 +213,23 @@ async def get_dashboard_analytics(db: AsyncSession = Depends(get_db)):
             func.count(IdentifiedProfile.id.distinct())
         )
         .join(posts_func, true())
-        .group_by(text("competitor_name"))
+    )
+
+    if current_user.organization_id:
+        comp_select = comp_select.where(IdentifiedProfile.organization_id == current_user.organization_id)
+    else:
+        comp_select = comp_select.where(IdentifiedProfile.created_by_id == current_user.id)
+
+    comp_select = (
+        comp_select.group_by(text("competitor_name"))
         .order_by(desc(func.count(IdentifiedProfile.id.distinct())))
     )
 
     comp_result = await db.execute(comp_select)
-    
+
     competitor_breakdown = []
     keyword_breakdown = []
-    
+
     for name, count in comp_result.all():
         if not name: continue
         if name.startswith("Keyword: "):

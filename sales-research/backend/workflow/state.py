@@ -38,14 +38,17 @@ class IdealProfile(BaseModel):
 class Product(BaseModel):
     name: str
     description: str
-    target_pain_points: List[str]
+    target_pain_points: List[str] = []
     is_strategic_pivot: bool = False
     target_roles: List[str] = []
+    target_industries: List[str] = []
+    attached_playbooks: List[str] = []
+    attached_case_studies: List[str] = []
     rag_context: Optional[str] = None
 
 
 class SellingCompanyProfile(BaseModel):
-    name: str
+    company_name: str
     description: str
     products: List[Product]
 
@@ -121,14 +124,17 @@ class AgentState(TypedDict):
     strategic_rag_briefing: Annotated[str, reduce_last]
     lead_segment: Annotated[str, reduce_last] # new field
     strategic_solutions: Annotated[Union[dict, str], reduce_last]
-    personalized_outreach: Annotated[List[dict], reduce_last]
-
     follow_up_strategy: Annotated[Union[dict, str], reduce_last]
     viability_analysis: Annotated[str, reduce_last]
     cso_strategic_briefing: Annotated[dict, reduce_last]
     signal_leverage_score: Annotated[int, reduce_last]
     is_strategic_pivot_fit: Annotated[bool, reduce_last]
-    pivot_product_name: Annotated[str, reduce_last]
-    campaign_outreach_variants: Annotated[List[dict], reduce_last]
-
+    pivot_product_names: Annotated[List[str], reduce_last]
+    research_solution_pool: Annotated[List[dict], reduce_last]
+    final_outreach_sequences: Annotated[List[dict], reduce_last]
+    personalized_outreach: Annotated[List[dict], reduce_last]
+    
+    # Identification & Isolation
+    user_id: Optional[str]
+    pinecone_index_name: Optional[str]
 

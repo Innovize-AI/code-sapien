@@ -20,6 +20,14 @@ profiles:
       cloudrun:
         projectid: innovize-ai
         region: us-central1
+  - name: trial
+    manifests:
+      rawYaml:
+        - deploy/frontend-trial.yaml
+    deploy:
+      cloudrun:
+        projectid: innovize-ai
+        region: us-central1
   - name: production
     manifests:
       rawYaml:

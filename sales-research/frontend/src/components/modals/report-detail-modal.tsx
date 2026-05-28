@@ -1,15 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { ReportDisplay } from "@/components/report-display";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { ReportDisplayV2 } from "@/components/report-display-v2";
 import { fetchReport } from "@/lib/api";
-import { Loader2, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner"
 
 interface ReportDetailModalProps {
   reportId: string | null;
@@ -48,26 +44,27 @@ export function ReportDetailModal({
   }, [reportId, isOpen]);
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-full p-0 flex flex-col overflow-hidden">
-        <SheetHeader className="p-6 border-b bg-background sticky top-0 z-20">
-          <SheetTitle className="text-xl font-bold flex items-center gap-2">
-            Research Report
-          </SheetTitle>
-        </SheetHeader>
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()} modal={false}>
+      <SheetContent 
+        hideOverlay
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        className="w-[calc(100vw-var(--sidebar-width,0px))] max-w-none sm:max-w-none p-0 flex flex-col overflow-hidden border-l shadow-2xl transition-[width] duration-300"
 
-        <div className="flex-1 overflow-y-auto bg-muted/5 scrollbar-thin">
+      >
+
+
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+              <Spinner size="lg" className="mb-4" />
               <p className="text-muted-foreground animate-pulse font-medium">
                 Fetching comprehensive research...
               </p>
             </div>
           ) : data ? (
-            <div className="p-0">
-              <ReportDisplay data={data} />
-            </div>
+            <ReportDisplayV2 data={data} />
           ) : (
             <div className="flex h-full flex-col items-center justify-center p-12 text-center text-muted-foreground border-2 border-dashed m-6 rounded-3xl opacity-60">
               <Search className="w-10 h-10 mb-4 opacity-20" />

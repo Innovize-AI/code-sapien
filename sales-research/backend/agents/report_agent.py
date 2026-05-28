@@ -161,6 +161,7 @@ def sales_research_report_generator(state: AgentState):
     selling_profile = state.get("selling_company_profile")
     selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
     selling_company_context = f"{selling_company_name} specializes in {selling_profile.description if selling_profile else 'AI automation'}."
+    business_model = getattr(selling_profile, 'business_model', 'product') if selling_profile else 'product'
     lead_segment = state.get("lead_segment", "POTENTIAL_CLIENT")
 
     messages = [
@@ -168,6 +169,7 @@ def sales_research_report_generator(state: AgentState):
             content=input_content,
             selling_company_name=selling_company_name,
             selling_company_context=selling_company_context,
+            business_model=business_model,
             lead_segment=lead_segment
         )),
         HumanMessage(content=f"Synthesize the research for this prospect. LEAD SEGMENT: {lead_segment}")
@@ -180,7 +182,7 @@ def sales_research_report_generator(state: AgentState):
     return {
         "sales_research_report": {
             **response.model_dump(),
-            "campaign_variants": state.get("campaign_outreach_variants", []),
+            "outreach_sequences": state.get("final_outreach_sequences", []),
             "strategic_playbook": {
                 **response.strategic_playbook.model_dump(),
                 "strategic_proof_points": cso_briefing.get("strategic_proof_points", [])

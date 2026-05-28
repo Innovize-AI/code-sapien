@@ -31,14 +31,19 @@ def scrape_webpages(state: AgentState) -> dict:
     if not website:
         return {"scraped_website_content": "Could not scrape empty website"}
 
-    loader = WebBaseLoader(website)
-    docs = loader.load()
-    scraped_content = "\n\n".join([doc.page_content for doc in docs])
-    
-    return {"scraped_website_content": scraped_content}
+    try:
+        loader = WebBaseLoader(website)
+        docs = loader.load()
+        scraped_content = "\n\n".join([doc.page_content for doc in docs])
+        return {"scraped_website_content": scraped_content}
+    except Exception as e:
+        logger.warning(f"Failed to scrape website {website}: {e}")
+        return {"scraped_website_content": "Website could not be reached or scraped."}
 
-def website_analyzer(state: AgentState):
-    """Analyzes scraped website content using Structured Output."""
+async def website_analyzer(state: AgentState):
+    """Analyzes scraped website content using Structured Output and normalizes industry."""
+    from utils.industry_mapper import normalize_industry
+
     selling_profile = state.get("selling_company_profile")
     if selling_profile:
         products_summary = "\n".join([f"- {p.name}: {p.description}" for p in selling_profile.products])
@@ -57,12 +62,19 @@ def website_analyzer(state: AgentState):
     try:
         model = get_gemini_model(model="gemini-3-flash-preview", temperature=0)
         structured_llm = model.with_structured_output(WebsiteAnalysis)
-        response = structured_llm.invoke(messages)
+        response = await structured_llm.ainvoke(messages)
         
         if not response:
             return {"website_analysis": {}, "lead_segment": "UNKNOWN"}
             
         analysis_data = response.model_dump()
+        
+        # Normalize the extracted industry using our standard categories
+        raw_industry = analysis_data.get("industry")
+        if raw_industry:
+            normalized_industry = await normalize_industry(raw_industry)
+            analysis_data["industry"] = normalized_industry
+            
         return {
             "website_analysis": analysis_data,
             "lead_segment": analysis_data.get("lead_segment", "UNKNOWN")
@@ -70,3 +82,4 @@ def website_analyzer(state: AgentState):
     except Exception as e:
         logger.error(f"Error in website_analyzer: {e}")
         return {"website_analysis": {}}
+

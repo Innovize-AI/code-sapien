@@ -1,6 +1,8 @@
+from db.models import Profile
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_history, get_report, get_db, _report_to_dict
+from dependencies import get_current_user
 import json
 import logging
 
@@ -16,12 +18,14 @@ async def read_history(
     status: str = "all", # Filter by rep
     sort_by: str = "created_at",
     sort_order: str = "desc",
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
 ):
     from db.models import ResearchReport, Profile, IdentifiedProfile
     from sqlalchemy import select, func, or_
-    import time
+    import time, os
 
+    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     start_time = time.time()
     
     try:
@@ -55,6 +59,11 @@ async def read_history(
         if status and status != "all":
             # Assuming status is the rep_id (UUID)
             query = query.where(ResearchReport.created_by_id == status)
+
+        if current_user.organization_id:
+            query = query.where(ResearchReport.organization_id == current_user.organization_id)
+        else:
+            query = query.where(ResearchReport.created_by_id == current_user.id)
         
         # Dynamic Sorting
         sort_attr = None
@@ -79,6 +88,10 @@ async def read_history(
             count_query = count_query.where(search_filter)
         if status and status != "all":
             count_query = count_query.where(ResearchReport.created_by_id == status)
+        if current_user.organization_id:
+            count_query = count_query.where(ResearchReport.organization_id == current_user.organization_id)
+        else:
+            count_query = count_query.where(ResearchReport.created_by_id == current_user.id)
             
         count_result = await db.execute(count_query)
         total = count_result.scalar()
@@ -108,7 +121,7 @@ async def read_history(
         raise HTTPException(status_code=500, detail=str(e))
 
 @history_router.get("/history/{report_id}")
-async def read_report_item(report_id: str, db: AsyncSession = Depends(get_db)):
+async def read_report_item(report_id: str, db: AsyncSession = Depends(get_db), current_user: Profile = Depends(get_current_user)):
     import time
     from db.models import IdentifiedProfile
     from sqlalchemy import select
@@ -118,13 +131,23 @@ async def read_report_item(report_id: str, db: AsyncSession = Depends(get_db)):
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     
+    if report.organization_id != current_user.organization_id and str(report.created_by_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Unauthorized access to this report.")
+    
     email_fallback = None
-    if not report.email_id and report.linkedin_url:
-        stmt = select(IdentifiedProfile.email).where(IdentifiedProfile.linkedin_url == report.linkedin_url)
+    verification_status = None
+    if report.linkedin_url:
+        stmt = select(IdentifiedProfile.email, IdentifiedProfile.email_verification_status).where(IdentifiedProfile.linkedin_url == report.linkedin_url)
         res = await db.execute(stmt)
-        email_fallback = res.scalar_one_or_none()
+        profile_data = res.first()
+        if profile_data:
+            email_fallback = profile_data[0]
+            verification_status = profile_data[1]
 
+    # Attach transiently for _report_to_dict
+    setattr(report, "email_verification_status", verification_status)
     result = _report_to_dict(report, email_fallback=email_fallback)
+
     duration = time.time() - start_time
     logger.debug(f"read_report_item({report_id}) took {duration:.4f}s")
     return result

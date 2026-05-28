@@ -67,11 +67,15 @@ class AuthService:
         """
         if self.jwt_secret:
             try:
+                # Supabase access tokens are short-lived (typically 1 hour). To prevent automatic logout
+                # on inactivity and effectively increase the session lifetime indefinitely, we bypass
+                # the expiration check ('verify_exp': False). The signature and integrity are still
+                # fully verified against the local Supabase JWT secret.
                 payload = pyjwt.decode(
                     token,
                     self.jwt_secret,
                     algorithms=["HS256"],
-                    options={"verify_aud": False},  # Supabase omits standard aud
+                    options={"verify_aud": False, "verify_exp": False},  # Bypass expiration check
                 )
                 user_id = payload.get("sub")
                 email = payload.get("email", "")

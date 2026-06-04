@@ -30,6 +30,17 @@ def discovery_router(state: AgentState):
         
     return "pain_point_discovery"
 
+def validation_router(state: AgentState):
+    """Routes back to outreach_designer if validation failed, otherwise proceeds to report."""
+    feedback = state.get("outreach_validation_feedback")
+    attempts = state.get("outreach_attempts") or 0
+    if feedback and attempts < 3:
+        logger.info(f"Outreach failed validation (attempt {attempts}/3). Re-routing to outreach_designer.")
+        return "outreach_designer"
+    if feedback:
+        logger.warning(f"Outreach failed validation but reached max attempts ({attempts}). Proceeding.")
+    return "report_generator"
+
 def strategy_router(state: AgentState):
     """
     Decides between first-touch outreach and context-aware follow-up.
@@ -44,6 +55,8 @@ def strategy_router(state: AgentState):
     
     logger.info("Routing to First-touch Outreach Designer")
     return "outreach_designer"
+
+
 
 def strategic_merger(state: AgentState):
     """Synchronization node for parallel strategic branches."""
@@ -165,7 +178,7 @@ def get_graph():
     from agents.lead_scoring_agent import lead_data_extractor, lead_scorer
     from agents.report_agent import sales_research_report_generator
     from agents.intent_agent import email_history_fetcher_node, email_intent_analyzer_node
-    from agents.strategy_agent import pain_point_node, outreach_node, strategic_solution_synthesizer_node
+    from agents.strategy_agent import pain_point_node, outreach_node, strategic_solution_synthesizer_node, outreach_validator_node
     from agents.recommender_agent import strategic_recommender_node
     from agents.follow_up_agent import follow_up_strategy_node
     from agents.cso_agent import narrative_arbitrator_node
@@ -198,6 +211,7 @@ def get_graph():
     builder.add_node("strategic_rag_researcher", strategic_rag_researcher_node)
     builder.add_node("strategic_solution_synthesizer", strategic_solution_synthesizer_node)
     builder.add_node("outreach_designer", outreach_node)
+    builder.add_node("outreach_validator", outreach_validator_node)
     builder.add_node("follow_up_designer", follow_up_strategy_node)
     builder.add_node("strategic_recommender", strategic_recommender_node)
     builder.add_node("strategic_merger", strategic_merger, defer= True)
@@ -263,7 +277,11 @@ def get_graph():
     })
 
     # Convergence to Report
-    builder.add_edge("outreach_designer", "report_generator")
+    builder.add_edge("outreach_designer", "outreach_validator")
+    builder.add_conditional_edges("outreach_validator", validation_router, {
+        "outreach_designer": "outreach_designer",
+        "report_generator": "report_generator"
+    })
     builder.add_edge("follow_up_designer", "report_generator")
 
     builder.add_edge("report_generator", END)
@@ -297,6 +315,7 @@ NODE_STATUS_MAPPING = {
     "pain_point_discovery": "Identifying specific business pain points...",
     "strategic_rag_researcher": "Agentic RAG: Retrieving & verifying strategic playbooks...",
     "outreach_designer": "Designing personalized outreach strategy...",
+    "outreach_validator": "Validating outreach quality and deliverability...",
     "follow_up_designer": "Crafting context-aware follow-up strategy...",
     "strategic_recommender": "Determining buyer journey stage & strategy...",
     "crm_lookup": "Matching lead with HubSpot CRM context...",

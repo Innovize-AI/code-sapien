@@ -23,8 +23,17 @@ class LeadDiscoveryInput(BaseModel):
     job_title: Optional[Union[str, List[str]]] = Field(None, description="Target job title (Legacy)")
     location: Optional[Union[str, List[str]]] = Field(None, description="Target location (Legacy)")
     company_size: Optional[Union[str, List[str]]] = Field(None, description="Target company size (Legacy)")
-    provider: Optional[str] = Field("tavily", description="Search provider: 'tavily', 'apollo', or 'linkedin_keyword'")
+    provider: Optional[str] = Field("tavily", description="Search provider: 'tavily', 'apollo', 'linkedin_keyword', or 'linkedin_job'")
     keywords: Optional[Union[str, List[str]]] = Field(None, description="Keywords for LinkedIn post search")
+
+    # LinkedIn Job Specific Filters
+    sort: Optional[str] = Field(None, description="Sort order: 'relevant', 'recent'")
+    date_posted: Optional[str] = Field(None, description="Job post date range: 'month', 'week', 'day'")
+    easy_apply: Optional[bool] = Field(None, description="Show only Easy Apply jobs")
+    remote: Optional[str] = Field(None, description="Workplace type: 'onsite', 'remote', 'hybrid'")
+    experience: Optional[str] = Field(None, description="Experience level filter")
+    job_type: Optional[str] = Field(None, description="Job type filter")
+    company_id: Optional[str] = Field(None, description="Filter jobs by specific company ID")
 
     # Advanced Apollo Filters
     person_titles: Optional[Union[str, List[str]]] = Field(None)

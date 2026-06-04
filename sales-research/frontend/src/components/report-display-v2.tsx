@@ -101,8 +101,12 @@ interface ReportDisplayV2Props {
       refined_email_body?: string;
       strategic_proof_points?: string[];
       advanced_strategic_pivots?: string[];
+      selected_product_name?: string;
+      selected_product_justification?: string;
+      lookalike_peer?: string;
       _edit_depths?: Record<string, number>;
     };
+    strategic_rag_briefing?: string;
     [key: string]: any;
   } | null;
   onRerun?: () => void;
@@ -985,7 +989,29 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-primary/10 text-primary"><Target className="h-4 w-4" /></div>
                 <div>
-                  <h2 className="text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">Outreach Playbook</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">Outreach Playbook</h2>
+                    {(data?.strategic_rag_briefing || data?.extra_metadata?.strategic_rag_briefing) && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help p-0.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                              <Info className="h-3.5 w-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-md max-h-[400px] overflow-y-auto p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg">
+                            <div className="space-y-2 text-left">
+                              <h4 className="text-xs font-black uppercase tracking-wider text-primary border-b pb-1">Pinecone RAG Intelligence</h4>
+                              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Retrieved Playbooks & Narrative Context</p>
+                              <div className="text-[11px] text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap font-sans leading-relaxed mt-2 bg-zinc-50 dark:bg-zinc-900 p-2.5 rounded border border-zinc-100 dark:border-zinc-800">
+                                {data.strategic_rag_briefing || data.extra_metadata?.strategic_rag_briefing}
+                              </div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
                   <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
                     {isSequence ? "Multi-touch Sequence" : "Campaign Drafts"}
                   </p>
@@ -1623,7 +1649,14 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                 {activeIntelSection === "cso-verdict" && briefing && (
                   <div className="space-y-6">
                     <div className="cursor-pointer" onClick={() => setIsProofOpen(true)}>
-                      <CSOCommandCard data={{ ...briefing.unified_command, strategic_pivot_usecase: briefing.strategic_pivot_usecase }} />
+                      <CSOCommandCard data={{ 
+                        ...briefing.unified_command, 
+                        strategic_pivot_usecase: briefing.strategic_pivot_usecase,
+                        selected_product_name: briefing.selected_product_name,
+                        selected_product_justification: briefing.selected_product_justification,
+                        strategic_proof_points: briefing.strategic_proof_points,
+                        lookalike_peer: briefing.lookalike_peer
+                      }} />
                     </div>
                     {briefing.executive_blueprint_summary && (
                       <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 space-y-2">
@@ -1812,6 +1845,133 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
                 <div className={cn("text-2xl font-black leading-none", stat.color)}>{stat.value}</div>
               </div>
             ))}
+          </div>
+
+          {/* Intent Signals Waterfall & Strategic Angles */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <span className="text-sm font-black uppercase tracking-tight flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" /> Intent Signals Waterfall & Strategic Angles
+              </span>
+              <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black uppercase tracking-wider">
+                Ranked by priority
+              </Badge>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-[12px] text-zinc-500 leading-relaxed dark:text-zinc-400">
+                Our multi-tiered waterfall scans prospect and company channels to identify high-intent triggers. Standard buying angles are dynamically generated based on active signals.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {[
+                  {
+                    title: "Direct Inbound",
+                    score: "90-100",
+                    active: !!(data.extra_metadata?.demo_requested || data.extra_metadata?.download_marketing_material),
+                    activeLabel: data.extra_metadata?.demo_requested ? "Demo Requested" : "Asset Downloaded",
+                    placeholder: "Web demo request or asset download",
+                    desc: "Prospect took explicit action on our owned assets, indicating immediate purchasing intent.",
+                    angle: "Direct offer addressing their stated interest with automated meeting links.",
+                    color: "amber",
+                    icon: <Zap className="h-4 w-4 text-amber-500" />,
+                  },
+                  {
+                    title: "Active Hiring",
+                    score: "85",
+                    active: !!(data.hiring_data && data.hiring_data.length > 0),
+                    activeLabel: `${data.hiring_data?.length || 0} Jobs Open`,
+                    placeholder: "Active hiring on key roles",
+                    desc: "Active company recruitment in operational or back-office roles matching our templates.",
+                    angle: `Hiring ${data.hiring_data?.[0]?.role || "operations"} - position our templates to absorb operational overhead.`,
+                    color: "purple",
+                    icon: <TrendingUp className="h-4 w-4 text-purple-500" />,
+                  },
+                  {
+                    title: "Competitor Intercept",
+                    score: "75",
+                    active: !!(data.post_engagements?.some((e: any) => e.target?.toLowerCase() !== "self" && e.target?.toLowerCase() !== "our" && e.target?.toLowerCase() !== "")),
+                    activeLabel: "Competitor Comment",
+                    placeholder: "Interactions on competitor pages",
+                    desc: "Prospect left a comment on a direct competitor's page, asking questions or discussing software.",
+                    angle: "Direct interception presenting automated alternatives to competitor friction points.",
+                    color: "blue",
+                    icon: <MessageSquareQuote className="h-4 w-4 text-blue-500" />,
+                  },
+                  {
+                    title: "Topic/Keyword Match",
+                    score: "75",
+                    active: prospectPosts.length > 0,
+                    activeLabel: `${prospectPosts.length} Recent Posts`,
+                    placeholder: "LinkedIn keyword posting/chat",
+                    desc: "Prospect is actively posting or commenting on relevant industry keywords and topics.",
+                    angle: "Contextual hook framing our automation platform around their specific topic discussions.",
+                    color: "rose",
+                    icon: <Linkedin className="h-4 w-4 text-rose-500" />,
+                  },
+                  {
+                    title: "General ICP Fit",
+                    score: "30",
+                    active: !(data.sales_research_report?.is_fit === false || data.sales_research_report?.icp_fit === false),
+                    activeLabel: "ICP Confirmed",
+                    placeholder: "Standard profile fit match",
+                    desc: "Corporate parameters (size, sector) and persona seniority map to our sweet spot.",
+                    angle: "Standard persona-based value prop customized for their specific role and industry vertical.",
+                    color: "emerald",
+                    icon: <Target className="h-4 w-4 text-emerald-500" />,
+                  },
+                ].map((tier, idx) => {
+                  const borderClass = tier.active
+                    ? tier.color === "amber" ? "border-amber-500/30 bg-amber-500/[0.03] dark:bg-amber-500/[0.05]"
+                      : tier.color === "purple" ? "border-purple-500/30 bg-purple-500/[0.03] dark:bg-purple-500/[0.05]"
+                      : tier.color === "blue" ? "border-blue-500/30 bg-blue-500/[0.03] dark:bg-blue-500/[0.05]"
+                      : tier.color === "rose" ? "border-rose-500/30 bg-rose-500/[0.03] dark:bg-rose-500/[0.05]"
+                      : "border-emerald-500/30 bg-emerald-500/[0.03] dark:bg-emerald-500/[0.05]"
+                    : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 opacity-60";
+                  
+                  return (
+                    <div key={idx} className={cn("p-4 rounded-xl border flex flex-col justify-between space-y-3 transition-all", borderClass)}>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-wider">Tier {idx + 1}</span>
+                          <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500">Score {tier.score}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {tier.icon}
+                          <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{tier.title}</span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-snug">{tier.desc}</p>
+                      </div>
+                      
+                      <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                        {tier.active ? (
+                          <div className="space-y-1">
+                            <Badge variant="outline" className={cn("text-[9px] font-black uppercase tracking-wide border-none px-1.5 h-4.5",
+                              tier.color === "amber" ? "text-amber-500 bg-amber-500/10"
+                              : tier.color === "purple" ? "text-purple-500 bg-purple-500/10"
+                              : tier.color === "blue" ? "text-blue-500 bg-blue-500/10"
+                              : tier.color === "rose" ? "text-rose-500 bg-rose-500/10"
+                              : "text-emerald-500 bg-emerald-500/10"
+                            )}>
+                              {tier.activeLabel}
+                            </Badge>
+                            <div className="text-[10px] font-bold text-zinc-800 dark:text-zinc-300 italic leading-snug">
+                              "{tier.angle}"
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest">Not Detected</span>
+                            <div className="text-[9px] text-zinc-400 dark:text-zinc-600 leading-snug">
+                              {tier.placeholder}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Contact Readiness */}

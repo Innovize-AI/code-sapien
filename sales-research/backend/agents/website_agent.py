@@ -19,7 +19,7 @@ class WebsiteAnalysis(BaseModel):
     core_offerings: List[str] = Field(description="List of primary products or services.")
     existing_ai_solutions: Optional[str] = Field(None, description="Details of any AI they already use or offer.")
     competitor_summary: Optional[str] = Field(None, description="Summary of key competitors they are positioning against.")
-    is_competitor: bool = Field(description="Strict boolean: Does this company offer products that compete with Innovize AI (Glial, IDP, or Agentic KB)?")
+    is_competitor: bool = Field(description="Strict boolean: Does this company offer products that compete with our selling company or our specific product offerings?")
     lead_segment: str = Field(description="Categorization: 'DIRECT_COMPETITOR', 'ADJACENT_PARTNER','POTENTIAL_CLIENT' or 'UNKNOWN'.")
     industry_pain_points: List[str] = Field(description="Generic or specific industry problems they solve.")
     competitive_advantage: str = Field(description="Unique selling points or competitive edges identified.")

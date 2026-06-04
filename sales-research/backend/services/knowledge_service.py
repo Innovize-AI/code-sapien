@@ -480,8 +480,10 @@ class KnowledgeService:
  
         all_candidate_docs = []
  
-        org_id = index_name.replace("tr-", "") if index_name and index_name.startswith("tr-") else "unknown"
+        active_index = index_name or self.index_name
+        org_id = active_index.replace("tr-", "") if active_index and active_index.startswith("tr-") else "unknown"
         prefixed_filenames = [f"org_{org_id}_{f}" if not f.startswith("org_") else f for f in filenames]
+
         
         logger.info(f"Searching prefixed filenames: {prefixed_filenames} with selective_filters: {selective_filters}")
  

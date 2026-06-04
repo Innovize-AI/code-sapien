@@ -51,6 +51,7 @@ import {
 } from "@/lib/constants";
 import {
   discoverLeads,
+  discoverJobLeads,
   enrichLeads,
   checkExistingReports,
   discoverCompetitorLeads,
@@ -75,7 +76,7 @@ const findFormSchema = z
     job_title: z.union([z.string(), z.array(z.string())]).optional(),
     include_similar_titles: z.boolean().optional(),
     location: z.string().optional(),
-    provider: z.enum(["tavily", "apollo", "competitor", "linkedin_keyword"]),
+    provider: z.enum(["tavily", "apollo", "competitor", "linkedin_keyword", "linkedin_job"]),
     keywords: z.string().optional(),
     person_seniorities: z.array(z.string()).optional(),
     contact_email_status: z.array(z.string()).optional(),
@@ -95,6 +96,14 @@ const findFormSchema = z
     organization_job_posted_at_max: z.string().optional(),
     organization_domains: z.string().optional(),
     q_keywords: z.string().optional(),
+    // Job specific filters
+    sort: z.string().optional(),
+    date_posted: z.string().optional(),
+    easy_apply: z.boolean().optional(),
+    remote: z.string().optional(),
+    experience: z.string().optional(),
+    job_type: z.string().optional(),
+    company_id: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.provider === "linkedin_keyword") {
@@ -102,6 +111,14 @@ const findFormSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Keywords are required (comma separated)",
+          path: ["keywords"],
+        });
+      }
+    } else if (data.provider === "linkedin_job") {
+      if (!data.keywords || data.keywords.trim().length < 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Keywords or target job title are required",
           path: ["keywords"],
         });
       }
@@ -124,7 +141,7 @@ type FindFormValues = {
   job_title?: string | string[];
   include_similar_titles?: boolean;
   location?: string;
-  provider: "tavily" | "apollo" | "competitor" | "linkedin_keyword";
+  provider: "tavily" | "apollo" | "competitor" | "linkedin_keyword" | "linkedin_job";
   keywords?: string;
   person_seniorities?: string[];
   contact_email_status?: string[];
@@ -144,6 +161,13 @@ type FindFormValues = {
   organization_job_posted_at_max?: string;
   organization_domains?: string;
   q_keywords?: string;
+  sort?: string;
+  date_posted?: string;
+  easy_apply?: boolean;
+  remote?: string;
+  experience?: string;
+  job_type?: string;
+  company_id?: string;
 };
 
 export function DiscoveryForm({
@@ -162,6 +186,7 @@ export function DiscoveryForm({
   const [keywordInput, setKeywordInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showJobAdvanced, setShowJobAdvanced] = useState(false);
   const [results, setResults] = useState<
     {
       url: string;
@@ -289,6 +314,13 @@ export function DiscoveryForm({
       organization_job_posted_at_max: "",
       organization_domains: "",
       q_keywords: "",
+      sort: "relevant",
+      date_posted: "",
+      easy_apply: false,
+      remote: "",
+      experience: "",
+      job_type: "",
+      company_id: "",
     },
   });
 
@@ -419,6 +451,59 @@ export function DiscoveryForm({
 
           if (data.leads.length === 0) {
             setError("No leads found matching keywords.");
+          }
+        } else if (data.error) {
+          setError(data.error);
+        }
+      } else if (values.provider === "linkedin_job") {
+        const payload: LeadDiscoveryInput = {
+          provider: "linkedin_job",
+          keywords: values.keywords
+            ? values.keywords
+                .split(",")
+                .map((k) => k.trim())
+                .filter((k) => k)
+            : [],
+          location: values.location || undefined,
+          sort: values.sort || undefined,
+          date_posted: values.date_posted || undefined,
+          easy_apply: values.easy_apply || undefined,
+          remote: values.remote || undefined,
+          experience: values.experience || undefined,
+          job_type: values.job_type || undefined,
+          company_id: values.company_id || undefined,
+        };
+        const data = await discoverJobLeads(payload);
+
+        if (data.leads) {
+          const mappedLeads = data.leads.map((l: any) => ({
+            name: l.name,
+            url: l.linkedin_url || l.url,
+            website: l.website || "",
+            comment: l.comment,
+            source_post_url: l.source_post_url,
+            metadata: {
+              headline: l.headline,
+              is_fit: l.is_fit,
+              is_competitor: l.is_competitor,
+              is_decision_maker: l.is_decision_maker,
+              fit_reasoning: l.fit_reasoning,
+              competitor: l.competitor,
+              source_post: l.source_post,
+            },
+          }));
+          setResults(mappedLeads);
+          const checkLeads = mappedLeads.map(
+            (l: { url: string; website: string }) => ({
+              linkedin_url: normalizeUrl(l.url),
+              website: l.website,
+            }),
+          );
+          const existing = await checkExistingReports(checkLeads);
+          setExistingReports(existing);
+
+          if (data.leads.length === 0) {
+            setError("No leads found matching job criteria.");
           }
         } else if (data.error) {
           setError(data.error);
@@ -555,6 +640,9 @@ export function DiscoveryForm({
                         )}
                         <SelectItem value="linkedin_keyword">
                           LinkedIn Keywords
+                        </SelectItem>
+                        <SelectItem value="linkedin_job" disabled>
+                          LinkedIn Jobs (Offline)
                         </SelectItem>
                         <SelectItem value="competitor">
                           Competitor Comments
@@ -997,6 +1085,286 @@ export function DiscoveryForm({
                     );
                   }}
                 />
+              )}
+
+              {findForm.watch("provider") === "linkedin_job" && (
+                <>
+                  <FormField
+                    control={findForm.control}
+                    name="keywords"
+                    render={({ field }) => {
+                      const strings = field.value
+                        ? field.value.split(",").filter((k: string) => k.trim())
+                        : [];
+                      return (
+                        <FormItem>
+                          <FormLabel>Job Title / Keywords</FormLabel>
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-white focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                              {strings.map((k: string, i: number) => (
+                                <Badge
+                                  key={i}
+                                  variant="secondary"
+                                  className="gap-1 pr-1 flex items-center"
+                                >
+                                  {k}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveKeyword(k, field.value || "")
+                                    }
+                                    className="hover:bg-muted rounded-full p-0.5"
+                                  >
+                                    <span className="sr-only">Remove</span>
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="12"
+                                      height="12"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="w-3 h-3"
+                                    >
+                                      <path d="M18 6 6 18" />
+                                      <path d="m6 6 12 12" />
+                                    </svg>
+                                  </button>
+                                </Badge>
+                              ))}
+                              <input
+                                className="flex-1 outline-none bg-transparent text-sm min-w-[200px]"
+                                placeholder={
+                                  strings.length === 0
+                                    ? "Type job title (e.g. Logistics) and press Enter..."
+                                    : ""
+                                }
+                                value={keywordInput}
+                                onChange={(e) => setKeywordInput(e.target.value)}
+                                onKeyDown={(e) =>
+                                  handleKeywordKeyDown(e, field.value || "")
+                                }
+                                onBlur={() => handleAddKeyword(field.value || "")}
+                              />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                              Press Enter to add multiple job keywords/titles.
+                            </p>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  <FormField
+                    control={findForm.control}
+                    name="location"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. United States" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="space-y-4 pt-2 border-t mt-4">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full flex items-center justify-between text-muted-foreground hover:text-primary transition-colors h-8 px-2"
+                      onClick={() => setShowJobAdvanced(!showJobAdvanced)}
+                    >
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
+                        <Sliders className="w-3 h-3" />
+                        Advanced Job Filters
+                      </div>
+                      {showJobAdvanced ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </Button>
+
+                    {showJobAdvanced && (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={findForm.control}
+                            name="sort"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Sort By</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Relevant" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="relevant">Relevant</SelectItem>
+                                    <SelectItem value="recent">Recent</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="date_posted"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Date Posted</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Anytime" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="day">Past 24 Hours</SelectItem>
+                                    <SelectItem value="week">Past Week</SelectItem>
+                                    <SelectItem value="month">Past Month</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={findForm.control}
+                            name="remote"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Workplace Type</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Any" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="onsite">On-site</SelectItem>
+                                    <SelectItem value="remote">Remote</SelectItem>
+                                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="experience"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Experience Level</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Any" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="internship">Internship</SelectItem>
+                                    <SelectItem value="entry_level">Entry Level</SelectItem>
+                                    <SelectItem value="associate">Associate</SelectItem>
+                                    <SelectItem value="mid_senior">Mid-Senior</SelectItem>
+                                    <SelectItem value="director">Director</SelectItem>
+                                    <SelectItem value="executive">Executive</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={findForm.control}
+                            name="job_type"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Job Type</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Any" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="full_time">Full-time</SelectItem>
+                                    <SelectItem value="part_time">Part-time</SelectItem>
+                                    <SelectItem value="contract">Contract</SelectItem>
+                                    <SelectItem value="temporary">Temporary</SelectItem>
+                                    <SelectItem value="volunteer">Volunteer</SelectItem>
+                                    <SelectItem value="internship">Internship</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={findForm.control}
+                            name="company_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>LinkedIn Company ID</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. 10667" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={findForm.control}
+                          name="easy_apply"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center gap-2 -mt-1 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value ?? false}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="!mt-0 text-xs font-normal text-muted-foreground cursor-pointer">
+                                Show only Easy Apply jobs
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
               {findForm.watch("provider") === "competitor" && (

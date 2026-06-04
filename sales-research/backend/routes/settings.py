@@ -205,7 +205,6 @@ async def get_integrations(
         mv_enabled = mv_config.get("enabled", False)
     else:
         mv_enabled = bool(mv_config)
-
     return IntegrationSettings(
         tavily_api_key=settings.tavily_api_key,
         apollo_api_key=settings.apollo_api_key,
@@ -287,7 +286,9 @@ async def save_integrations(
             tavily_api_key=data.tavily_api_key, 
             apollo_api_key=data.apollo_api_key,
             email_config=data.email_config,
-            integrations_config=json.dumps({"million_verifier": {"enabled": data.million_verifier_enabled}}),
+            integrations_config=json.dumps({
+                "million_verifier": {"enabled": data.million_verifier_enabled},
+            }),
             kit_api_key=data.kit_api_key,
             kit_api_secret=data.kit_api_secret,
             user_linkedin_url=data.user_linkedin_url,

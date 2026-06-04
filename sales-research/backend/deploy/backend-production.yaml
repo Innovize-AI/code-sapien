@@ -28,6 +28,8 @@ spec:
           env:
             - name: ENVIRONMENT
               value: production
+            - name: IS_INNOVIZEAI
+              value: "true"
             - name: DB_SCHEMA
               value: public
             - name: ALLOW_ORIGINS

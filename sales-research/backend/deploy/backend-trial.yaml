@@ -29,6 +29,8 @@ spec:
           env:
             - name: ENVIRONMENT
               value: trial
+            - name: IS_INNOVIZEAI
+              value: "false"
             - name: TRIAL_MODE
               value: "true"
             - name: TRIAL_IDENTIFIED_LIMIT

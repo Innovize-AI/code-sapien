@@ -49,6 +49,8 @@ async def get_profiles(
                 clauses.append(IdentifiedProfile.lead_source == "keyword")
             elif src == "competitor":
                 clauses.append(IdentifiedProfile.lead_source == "competitor")
+            elif src == "job":
+                clauses.append(IdentifiedProfile.lead_source.in_(["linkedin_job", "job"]))
             if search_filter is not None:
                 clauses.append(search_filter)
             if status and "all" not in status:
@@ -112,16 +114,20 @@ async def get_profiles(
             .limit(limit)
         )
 
-        # --- Combined counts query (1 query for total + all 4 tab badges) ---
+        # --- Combined counts query (1 query for total + all 5 tab badges) ---
         count_base_clauses = build_where_clauses("all", search_filter)
         counts_query = select(
             func.count().label("total_all"),
             func.count().filter(IdentifiedProfile.lead_source == "apollo").label("apollo"),
             func.count().filter(IdentifiedProfile.lead_source == "keyword").label("keyword"),
             func.count().filter(IdentifiedProfile.lead_source == "competitor").label("competitor"),
+            func.count().filter(IdentifiedProfile.lead_source.in_(["linkedin_job", "job"])).label("job"),
             # Total for current source tab (for pagination)
             func.count().filter(
-                *([IdentifiedProfile.lead_source == source] if source != "all" else [sa_text("true")])
+                *(
+                    [IdentifiedProfile.lead_source.in_(["linkedin_job", "job"])] if source == "job" else
+                    ([IdentifiedProfile.lead_source == source] if source != "all" else [sa_text("true")])
+                )
             ).label("current_total"),
         ).where(*count_base_clauses)
 
@@ -141,6 +147,7 @@ async def get_profiles(
             "apollo": counts_row.apollo,
             "keyword": counts_row.keyword,
             "competitor": counts_row.competitor,
+            "job": counts_row.job,
         }
         total = counts_row.current_total
 

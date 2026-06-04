@@ -123,6 +123,7 @@ celerybeat.pid
 .env
 .venv
 .uvenv
+.venv-win
 env/
 venv/
 ENV/
@@ -171,3 +172,4 @@ content-generation/
 node_modules/
 qdrant_storage/
 google-drive-slack-agent/
+code-sapien-instantly/

@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-CSO_SYSTEM_PROMPT = """
+CSO_BASE_SYSTEM_PROMPT = """
 You are the Chief Strategy Officer (Narrative Arbitrator). 
 Your mission is to synthesize multiple streams of intelligence into a SINGLE prescriptive command. Use the `VERIFIED AGENTIC RAG BRIEFING` as your ground truth for product capabilities and evidence.
 
@@ -36,6 +36,7 @@ You MUST adhere to these themes, but you MUST contextually customize the final `
 3. **TIER 3 (Score 66-100): HIGH-PRIORITY STRIKE.**
    - **Theme**: High Viability. Use the **RAG Playbook Examples** immediately.
    - **Command Guidelines**: Prescribe a specific product hook identified in research.
+   - **Hiring Signals**: If active job postings or hiring data are present and match our solution set, prioritize generating a Tier 3 "Strike Now" verdict that explicitly leverages the specific open role, hiring managers, and active operational hiring pain as a timely outreach trigger.
 
 ZERO TOLERANCE: Never issue a "Strike Now" theme if the score is below 65. Contextualize every command—never repeat the same sentence twice.
 
@@ -66,16 +67,49 @@ If the `AVAILABLE SOLUTION POOL` contains a product but the intel (technical, na
 4. **STRICT VERDICT GROUNDING**: Every `verdict`, `internal_note`, and `advanced_strategic_pivots` MUST be grounded in the `VERIFIED AGENTIC RAG BRIEFING`. Do not invent strategic angles, industry compliance needs, or "regulatory fits" that are not explicitly documented in your RAG stream.
 5. **ZERO EVIDENCE HALLUCINATION**: Do not invent case studies, metrics, or "regulatory training" capabilities. If it's not in the RAG, it doesn't exist for the purpose of this outreach.
 
+### ACTIVE HIRING TARGETING PROTOCOL (NON-NEGOTIABLE):
+If `Active Hiring Data / Job Postings` are present and contain active roles or descriptions:
+1. **Systematic Role-to-Product Mapping**: You MUST analyze the job roles/titles being hired for and their associated duties from the hiring data. Match these active roles and manual tasks directly to the most appropriate products or capabilities documented in the `AVAILABLE SOLUTION POOL` and verified playbooks.
+2. **Dynamic Custom Workflow Generation**: If the open role represents a manual, operational bottleneck that does not perfectly fit any standard product in the pool, you MUST dynamically design and name a specific, professional, and context-tailored automated workflow targeting that exact role (e.g. naming it "Automated [Role Name] Workflow" or "AI [Department/Task] Pipeline"). Never use a generic fallback.
+3. **Outreach Alignment**: Instruct the Outreach Agent in the `internal_note` to pitch this selected product or dynamically designed workflow as a direct solution to their hiring pain—allowing them to automate the repetitive aspects of that open position, scale operations, and bypass the recruitment/onboarding bottleneck.
+
 ### STRATEGIC PIVOT PROTOCOL (CRITICAL):
 If a Strategic Pivot product is selected (indicated by `Strategic Pivot Fit` being True or the selected product matching one of the `Pivot Product Names`), you MUST define a highly specific, concrete usecase or strategic vertical application in the `strategic_pivot_usecase` field.
 - **Rules for specific usecase**:
   1. Base it strictly on the pain points and specific RAG playbooks or RAG context provided for that product (e.g., if the pivot product is Glial and the lead is in Logistics, the usecase should be "Automated lead discovery and LinkedIn active listening for 3PL sales leaders").
-  2. The usecase must represent a highly tactical, real-world application of the product's core capabilities that addresses the lead's specific business context.
-  3. If no strategic pivot is selected or appropriate, set `strategic_pivot_usecase` to "N/A" or "None".
+  2. The usecase must represent a highly tactical, real-world application of the product's actual capabilities (e.g., "Automating accounts payable invoice ingestion into NetSuite", "Automated RFQ parsing to draft proposal PDFs", or "Consolidating data pipelines to eliminate manual weekly spreadsheet reporting") that addresses the lead's specific business context.
+  3. **STRICT PRODUCT GROUNDING**: You are ABSOLUTELY BANNED from inventing fake services, custom diagnostic frameworks, auditing methodologies, or specialized assessments (e.g., "technical diagnostic mapping that audits TMS process data") that the selling company does not actually offer. The usecase MUST map directly to actual features or offerings documented in the selected product's playbook/RAG context.
+  4. If no strategic pivot is selected or appropriate, set `strategic_pivot_usecase` to "N/A" or "None".
+
+### COLLABORATIVE DISCOVERY & SIMPLICITY PROTOCOLS (MANDATORY):
+1. **ELIMINATE ACADEMIC & HIGH-LEVEL BUZZWORDS**:
+   - You are ABSOLUTELY BANNED from suggesting hyper-intellectual, academic, or high-level strategic buzzwords (e.g., "closing the perception gap through custom digital infrastructure frameworks", "resolving systemic alignment through integrated technical paradigms").
+   - Every `internal_note`, `strategic_pivot_usecase`, and prescribed strategy must focus on **grounded, everyday operations and back-office manual workflows** (e.g., "reconciling signed delivery receipts," "converting raw logs/CSVs into client summaries," "triaging shared email inboxes").
+2. **THE COLLABORATIVE DISCOVERY PLAY**:
+   - Instead of instructing the Outreach Agent to pitch a single highly speculative, locked-in custom technical solution (which might not exist or might miss their exact tech stack), you MUST prescribe a **Collaborative Discovery** strategy in the `internal_note`.
+   - The strategy must guide the Outreach Agent to present **2 or 3 of our broader, vetted template capabilities** (e.g., Automated Reporting, Back-Office Document Parsing, or Inbox Triage) as clear, practical options, and offer a short collaborative call to map out their specific manual bottlenecks together.
 
 ### DRAFTS:
 You must NEVER write actual outreach drafts. Provide only the strategy, angle, and signals.
 """
+
+INNOVIZEAI_PROMPT_SECTION = """
+### STRICT PRODUCT SELECTION BANS & PROTOCOLS (NON-NEGOTIABLE)- Specific for InnovizeAI:
+1. **NEVER SAY "AI TRANSFORMATION" OR "AI TRANSFORMATION SERVICES"**:
+   - You are ABSOLUTELY FORBIDDEN from outputting "AI Transformation" or "AI Transformation Services" as the `selected_product_name`.
+2. **USE SPECIFIC PLAYBOOK USE CASES**:
+   - If the qualified product fits the "AI Transformation Services" offering, you MUST match the prospect's specific pain points and signals against the following 5 specialized use cases from the internal playbook:
+     * `Invoice Processing Automation` (for Accounts Payable / finance pains)
+     * `RFQ and Quote Automation` (for bidding, estimating, sales proposal bottleneck pains)
+     * `Inbox Automation` (for customer service, shared inbox, high email volume triage pains)
+     * `Document Processing Automation` (for back-office transcription, manual data entry, PDF/BOL parsing pains)
+     * `Reporting Automation` (for manual weekly spreadsheet preparation, reporting backlog, Excel consolidation pains)
+   - Select the single most relevant usecase as the `selected_product_name`.
+3. **FALLBACK TO CUSTOM WORKFLOW CREATION**:
+   - If the prospect's signal indicates a clear operational pain point that does NOT map to any of the above 5 use cases, you MUST dynamically build and design a specific new workflow name tailored directly to their pain (e.g., "Automated Customer Onboarding Pipeline" or "Forensic Claims Processing Workflow") and use that as the `selected_product_name`.
+   - Never fallback to a generic product name. Every selected product must sound tailored, real, and professional.
+"""
+
 
 def narrative_arbitrator_node(state: AgentState):
     """
@@ -94,6 +128,35 @@ def narrative_arbitrator_node(state: AgentState):
         except:
             logger.warning("CSO Agent: Could not parse research_solution_pool string as JSON")
             solution_pool = []
+            
+    # Normalize dict-like solution_pool or list of strings
+    if isinstance(solution_pool, dict):
+        try:
+            sorted_keys = sorted(solution_pool.keys(), key=lambda x: int(x) if str(x).isdigit() else x)
+            solution_pool = [solution_pool[k] for k in sorted_keys]
+        except:
+            solution_pool = list(solution_pool.values())
+            
+    normalized_pool = []
+    if isinstance(solution_pool, list):
+        for p in solution_pool:
+            if isinstance(p, str):
+                try:
+                    p = json.loads(p)
+                except:
+                    pass
+            if isinstance(p, dict):
+                normalized_pool.append(p)
+    solution_pool = normalized_pool
+            
+    # Active Hiring/Job posting data (New)
+    hiring_data = state.get("hiring_data", [])
+    if isinstance(hiring_data, str):
+        try:
+            hiring_data = json.loads(hiring_data)
+        except:
+            logger.warning("CSO Agent: Could not parse hiring_data string as JSON")
+            hiring_data = []
     
     # Pivot Context
     is_strategic_pivot_fit = state.get("is_strategic_pivot_fit", False)
@@ -107,7 +170,7 @@ def narrative_arbitrator_node(state: AgentState):
     from agents.linkedin_agent import is_recent_post
     recent_posts = [p for p in raw_posts if is_recent_post(p)]
     recent_posts_count = len(recent_posts)
-
+ 
     analysis_str = json.dumps(lead_score)
     penalty = lead_score.get("negative_penalty", 0)
     penalty_reason = lead_score.get("penalty_reason", "")
@@ -147,14 +210,15 @@ def narrative_arbitrator_node(state: AgentState):
     {alert_section}
     - Strategic Pivot Fit: {is_strategic_pivot_fit}
     - Pivot Product Names: {pivot_product_names}
+    - Active Hiring Data / Job Postings: {json.dumps(hiring_data)}
     - Identified Pain Points: {json.dumps(pain_points)}
     - STRATEGIC RECOMMENDATION (CRM & JOURNEY): {state.get('strategic_recommendation')}
     - INTENT ANALYSIS (EMAIL/SENTIMENT): {state.get('intent_analysis')}
     - SYNTHESIZED STRATEGIC SOLUTIONS: {json.dumps(state.get('strategic_solutions', []))}
-
+ 
     AVAILABLE SOLUTION POOL (Surgically Researched):
     {pool_str if pool_str else "No qualified solutions found."}
-
+ 
     YOUR MISSION (Surgical Strategy & Executive Selection):
     1. **INTENT & JOURNEY SYNC**: Align with the `STRATEGIC RECOMMENDATION`.
     2. **PRODUCT SELECTION (CRITICAL)**: 
@@ -176,11 +240,20 @@ def narrative_arbitrator_node(state: AgentState):
        - Stage 6: BREAK_UP_EMAIL (trigger: if_no_reply)
     5. **MULTI-VARIANT SELECTION**: Generate EXACTLY TWO distinct `OutreachBlueprint` variants.
     """
-
+ 
+    selling_profile = state.get("selling_company_profile")
+    selling_company_name = getattr(selling_profile, "company_name", "Innovize AI") if selling_profile else "Innovize AI"
+    is_innovize = (selling_company_name.lower() == "innovize ai") or (os.getenv("IS_INNOVIZEAI", "false").lower() == "true")
+    
+    system_prompt = CSO_BASE_SYSTEM_PROMPT
+    if is_innovize:
+        system_prompt += "\n\n" + INNOVIZEAI_PROMPT_SECTION
+        
     messages = [
-        SystemMessage(content=CSO_SYSTEM_PROMPT),
+        SystemMessage(content=system_prompt),
         HumanMessage(content=synthesis_input)
     ]
+
 
     try:
         model = get_gemini_model(model="gemini-3-flash-preview", temperature=0).with_structured_output(GlobalCSOBriefing)
@@ -192,19 +265,33 @@ def narrative_arbitrator_node(state: AgentState):
         # Find the selected product's intel from the pool to pass downstream
         winning_intel = ""
         selected_name = response.selected_product_name
+        
+        # Check direct matches first
         for p in solution_pool:
-            # Defensive check for second loop
             if not isinstance(p, dict):
                 continue
-                
-            if p.get('product_name', '').lower() in selected_name.lower() or selected_name.lower() in p.get('product_name', '').lower():
+            p_name = p.get('product_name', '')
+            if p_name.lower() in selected_name.lower() or selected_name.lower() in p_name.lower():
                 sources = p.get('attached_playbooks', []) + p.get('attached_case_studies', [])
-                winning_intel = f"PRODUCT: {p['product_name']}\n\nTECHNICAL:\n{p['technical_intel']}\n\nNARRATIVE/MESSAGING:\n{p['narrative_intel']}\n\nCOLLATERAL/PROOF:\n{p['collateral_intel']}\n\nOBJECTIONS:\n{p['objections']}\n\nSOURCES/PLAYBOOKS:\n{', '.join(sources) if sources else 'N/A'}"
+                winning_intel = f"PRODUCT: {p_name}\n\nTECHNICAL:\n{p.get('technical_intel', 'N/A')}\n\nNARRATIVE/MESSAGING:\n{p.get('narrative_intel', 'N/A')}\n\nCOLLATERAL/PROOF:\n{p.get('collateral_intel', 'N/A')}\n\nOBJECTIONS:\n{p.get('objections', 'N/A')}\n\nSOURCES/PLAYBOOKS:\n{', '.join(sources) if sources else 'N/A'}"
                 break
+                
+        # If no direct match (due to specific usecase/custom workflow selection), map to AI Transformation Services
+        if not winning_intel:
+            for p in solution_pool:
+                if not isinstance(p, dict):
+                    continue
+                p_name = p.get('product_name', '')
+                if "ai transformation" in p_name.lower() or "transformation services" in p_name.lower():
+                    sources = p.get('attached_playbooks', []) + p.get('attached_case_studies', [])
+                    winning_intel = f"PRODUCT: {selected_name} (tailored from {p_name})\n\nTECHNICAL:\n{p.get('technical_intel', 'N/A')}\n\nNARRATIVE/MESSAGING:\n{p.get('narrative_intel', 'N/A')}\n\nCOLLATERAL/PROOF:\n{p.get('collateral_intel', 'N/A')}\n\nOBJECTIONS:\n{p.get('objections', 'N/A')}\n\nSOURCES/PLAYBOOKS:\n{', '.join(sources) if sources else 'N/A'}"
+                    break
         
-        # If no exact match, use a fallback of the first one if only one exists
+        # Fallback to the first available solution if still not mapped
         if not winning_intel and solution_pool:
-            winning_intel = f"SELECTED PRODUCT: {selected_name}\n(Context mapping fallback applied)"
+            p = solution_pool[0]
+            sources = p.get('attached_playbooks', []) + p.get('attached_case_studies', [])
+            winning_intel = f"PRODUCT: {selected_name} (context fallback)\n\nTECHNICAL:\n{p.get('technical_intel', 'N/A')}\n\nNARRATIVE/MESSAGING:\n{p.get('narrative_intel', 'N/A')}\n\nCOLLATERAL/PROOF:\n{p.get('collateral_intel', 'N/A')}\n\nOBJECTIONS:\n{p.get('objections', 'N/A')}\n\nSOURCES/PLAYBOOKS:\n{', '.join(sources) if sources else 'N/A'}"
 
         return {
             "cso_strategic_briefing": response.model_dump(),

@@ -199,6 +199,7 @@ def _calculate_json_modification_percentage(original: dict, updated: dict) -> in
 
 def _report_to_dict(report, email_fallback=None):
     """Helper to convert ResearchReport model to final_state dictionary."""
+    extra = _safe_json_load(report.extra_metadata, {})
     return {
         "id": str(report.id),
         "linkedin_url": report.linkedin_url,
@@ -219,7 +220,8 @@ def _report_to_dict(report, email_fallback=None):
         "lead_score": report.lead_score,
         "email_history": _safe_json_load(report.email_history, []),
         "intent_analysis": _safe_json_load(report.intent_analysis, {}),
-        "extra_metadata": _safe_json_load(report.extra_metadata, {}),
+        "extra_metadata": extra,
+        "strategic_rag_briefing": extra.get("strategic_rag_briefing", ""),
         
         # Modular Nodules
         "viability_analysis": _safe_deserialize(report.viability_analysis),
@@ -308,14 +310,16 @@ async def batch_upsert_identified_profiles(db: AsyncSession, leads: list[dict], 
         url = normalize_linkedin_url(url)
         
         if url not in batch_map:
-            # Derive lead_source from competitor field
-            competitor = l.get("competitor", "")
-            if competitor == "Apollo":
-                lead_source = "apollo"
-            elif competitor and (competitor == "Keyword Search" or competitor == "Keyword" or competitor.startswith("Keyword:")):
-                lead_source = "keyword"
-            else:
-                lead_source = "competitor"
+            # Preserve explicit lead_source or derive from competitor field
+            lead_source = l.get("lead_source")
+            if not lead_source:
+                competitor = l.get("competitor", "")
+                if competitor == "Apollo":
+                    lead_source = "apollo"
+                elif competitor and (competitor == "Keyword Search" or competitor == "Keyword" or competitor.startswith("Keyword:")):
+                    lead_source = "keyword"
+                else:
+                    lead_source = "competitor"
 
             batch_map[url] = {
                 "name": l.get("name"),

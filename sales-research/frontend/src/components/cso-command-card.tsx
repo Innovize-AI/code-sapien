@@ -16,22 +16,28 @@ interface CSOCommandCardProps {
     sources: Array<{ source: string; snippet: string }>;
     strategic_proof_points?: string[];
     strategic_pivot_usecase?: string;
+    selected_product_name?: string;
+    selected_product_justification?: string;
+    lookalike_peer?: string;
   };
 }
 
 export function CSOCommandCard({ data }: CSOCommandCardProps) {
   if (!data) return null;
 
+  const verdictStr = data.verdict || "";
+  const timingAdviceStr = data.timing_advice || "";
+
   const isNegative =
-    data.verdict.toLowerCase().includes("monitor") ||
-    data.verdict.toLowerCase().includes("deprioritize") ||
-    data.verdict.toLowerCase().includes("poor fit") ||
-    data.verdict.toLowerCase().includes("disqualif");
+    verdictStr.toLowerCase().includes("monitor") ||
+    verdictStr.toLowerCase().includes("deprioritize") ||
+    verdictStr.toLowerCase().includes("poor fit") ||
+    verdictStr.toLowerCase().includes("disqualif");
 
   const isGreenLight =
-    data.timing_advice.toLowerCase().includes("green") ||
-    data.timing_advice.toLowerCase().includes("ideal") ||
-    data.timing_advice.toLowerCase().includes("proceed");
+    timingAdviceStr.toLowerCase().includes("green") ||
+    timingAdviceStr.toLowerCase().includes("ideal") ||
+    timingAdviceStr.toLowerCase().includes("proceed");
 
   const accent = isNegative
     ? {
@@ -126,7 +132,7 @@ export function CSOCommandCard({ data }: CSOCommandCardProps) {
 
           {/* Source count */}
           <div className="px-2 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{data.sources.length} sources</span>
+            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{(data.sources || []).length} sources</span>
           </div>
         </div>
       </div>
@@ -143,16 +149,38 @@ export function CSOCommandCard({ data }: CSOCommandCardProps) {
       </div>
 
       {/* Product Selection */}
-      {data.product_selection_reasoning && (
+      {(data.selected_product_name || data.product_selection_reasoning || data.selected_product_justification) && (
         <div className="pl-6 pr-6 pb-4">
           <div className={cn("flex items-start gap-3 p-4 rounded-xl border", accent.verdictBg, accent.verdictBorder)}>
             <Zap className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", accent.iconText)} />
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-1">Winning Offering</div>
-              <p className={cn("text-[13px] font-bold italic leading-relaxed", accent.iconText)}>
-                {data.product_selection_reasoning}
-              </p>
+            <div className="space-y-1 w-full">
+              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Winning Offering</div>
+              {data.selected_product_name && (
+                <div className="text-[14px] font-black text-zinc-800 dark:text-zinc-200">
+                  {data.selected_product_name}
+                </div>
+              )}
+              {data.selected_product_justification && (
+                <p className="text-[12px] font-medium text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  {data.selected_product_justification}
+                </p>
+              )}
+              {data.product_selection_reasoning && (
+                <p className={cn("text-[13px] font-bold italic leading-relaxed pt-0.5", accent.iconText)}>
+                  {data.product_selection_reasoning}
+                </p>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lookalike Peer Social Proof */}
+      {data.lookalike_peer && data.lookalike_peer !== "N/A" && (
+        <div className="pl-6 pr-6 pb-4">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Lookalike Peer Proof:</span>
+            <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black">{data.lookalike_peer}</Badge>
           </div>
         </div>
       )}
@@ -197,7 +225,7 @@ export function CSOCommandCard({ data }: CSOCommandCardProps) {
             </span>
           </div>
           <ul className="space-y-2">
-            {data.objection_preemption.slice(0, 5).map((obj, i) => (
+            {(data.objection_preemption || []).slice(0, 5).map((obj, i) => (
               <li key={i} className="flex items-start gap-2.5">
                 <div className={cn("mt-1.5 h-1.5 w-1.5 rounded-full shrink-0", accent.dot)} />
                 <span className="text-[12px] font-medium text-zinc-600 dark:text-zinc-400 leading-relaxed">{obj}</span>

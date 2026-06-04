@@ -166,17 +166,25 @@ export interface LeadDiscoveryInput {
     job_title?: string | string[];
     location?: string;
     company_size?: string | string[];
-    provider?: 'tavily' | 'apollo' | 'competitor' | 'linkedin_keyword';
+    provider?: 'tavily' | 'apollo' | 'competitor' | 'linkedin_keyword' | 'linkedin_job';
     keywords?: string[];
+    // LinkedIn Job Specific Filters
+    sort?: string;
+    date_posted?: string;
+    easy_apply?: boolean;
+    remote?: string;
+    experience?: string;
+    job_type?: string;
+    company_id?: string;
     // Person filters
     person_titles?: string[];
     include_similar_titles?: boolean;
     person_seniorities?: string[];
-    contact_email_status?: string[];
-    // Organization filters
-    organization_ids?: string[];
-    organization_domains?: string[];
+    person_locations?: string[];
     organization_locations?: string[];
+    organization_domains?: string[];
+    organization_ids?: string[];
+    contact_email_status?: string[];
     organization_num_employees_ranges?: string[];
     revenue_min?: number;
     revenue_max?: number;
@@ -199,6 +207,11 @@ export interface LeadDiscoveryInput {
 
 export const discoverLeads = async (data: LeadDiscoveryInput) => {
     const response = await axios.post(`${API_URL}/sales-research/discover`, data);
+    return response.data;
+};
+
+export const discoverJobLeads = async (data: LeadDiscoveryInput) => {
+    const response = await axios.post(`${API_URL}/sales-research/discover/job`, data);
     return response.data;
 };
 
@@ -739,3 +752,4 @@ export const uploadKnowledgeFile = async (file: File, namespace: string) => {
     });
     return response.data;
 };
+

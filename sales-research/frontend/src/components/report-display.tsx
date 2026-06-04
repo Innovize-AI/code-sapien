@@ -133,6 +133,7 @@ interface ReportDisplayProps {
         }
       | any;
     meeting_notes?: string;
+    strategic_rag_briefing?: string;
     // LinkedIn Subgraph
     post_engagements?: Array<{
       type: string;
@@ -179,6 +180,9 @@ interface ReportDisplayProps {
       refined_linkedin_message?: string;
       refined_email_body?: string;
       strategic_proof_points?: string[];
+      selected_product_name?: string;
+      selected_product_justification?: string;
+      lookalike_peer?: string;
       _edit_depths?: Record<string, number>;
     };
     [key: string]: any;
@@ -2194,7 +2198,14 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                           className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-100"
                         >
                           <CSOCommandCard
-                            data={{ ...data.cso_strategic_briefing.unified_command, strategic_pivot_usecase: data.cso_strategic_briefing.strategic_pivot_usecase }}
+                            data={{ 
+                              ...data.cso_strategic_briefing.unified_command, 
+                              strategic_pivot_usecase: data.cso_strategic_briefing.strategic_pivot_usecase,
+                              selected_product_name: data.cso_strategic_briefing.selected_product_name,
+                              selected_product_justification: data.cso_strategic_briefing.selected_product_justification,
+                              strategic_proof_points: data.cso_strategic_briefing.strategic_proof_points,
+                              lookalike_peer: data.cso_strategic_briefing.lookalike_peer
+                            }}
                           />
                         </div>
                       </div>
@@ -2314,11 +2325,33 @@ export function ReportDisplay({ data, onRerun }: ReportDisplayProps) {
                             <Target className="h-6 w-6" />
                           </div>
                           <div>
-                            <h3 className="text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tight italic leading-none">
-                              {section.id === "synthesis"
-                                ? "Integrated Outreach Suite"
-                                : "Recommended Playbook"}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tight italic leading-none">
+                                {section.id === "synthesis"
+                                  ? "Integrated Outreach Suite"
+                                  : "Recommended Playbook"}
+                              </h3>
+                              {((data as any)?.strategic_rag_briefing || (data as any)?.extra_metadata?.strategic_rag_briefing) && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="cursor-help p-0.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                                        <Info className="h-4 w-4" />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-md max-h-[400px] overflow-y-auto p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg">
+                                      <div className="space-y-2 text-left">
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-primary border-b pb-1">Pinecone RAG Intelligence</h4>
+                                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Retrieved Playbooks & Narrative Context</p>
+                                        <div className="text-[11px] text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap font-sans leading-relaxed mt-2 bg-zinc-50 dark:bg-zinc-900 p-2.5 rounded border border-zinc-100 dark:border-zinc-800">
+                                          {(data as any).strategic_rag_briefing || (data as any).extra_metadata.strategic_rag_briefing}
+                                        </div>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
                             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1.5 flex items-center gap-2">
                               <Zap className="h-3 w-3 text-amber-500" />{" "}
                               Multi-Variant Execution Drafts

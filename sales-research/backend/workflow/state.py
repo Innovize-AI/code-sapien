@@ -24,7 +24,9 @@ def reduce_last(left: any, right: any):
     if isinstance(right, list):
         if not right:
             return left
-        return right[-1]
+        # If it is a list of lists, it represents parallel updates gathered by Langgraph
+        if len(right) > 0 and isinstance(right[0], list):
+            return right[-1]
     return right
 
 from pydantic import BaseModel, Field
@@ -133,6 +135,10 @@ class AgentState(TypedDict):
     research_solution_pool: Annotated[List[dict], reduce_last]
     final_outreach_sequences: Annotated[List[dict], reduce_last]
     personalized_outreach: Annotated[List[dict], reduce_last]
+    
+    # Validation / Judge Fields
+    outreach_validation_feedback: Annotated[Optional[Union[str, dict, list]], reduce_last]
+    outreach_attempts: Annotated[Optional[int], reduce_last]
     
     # Identification & Isolation
     user_id: Optional[str]

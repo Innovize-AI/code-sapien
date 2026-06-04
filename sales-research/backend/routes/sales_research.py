@@ -280,11 +280,110 @@ async def discover_leads(input_data: LeadDiscoveryInput, background_tasks: Backg
                      user_id=str(current_user.id),
                      org_id=current_user.organization_id
                  )
+        elif input_data.provider == "linkedin_job":
+            if not input_data.keywords and not input_data.job_title:
+                return {"error": "Keywords or target job title are required for LinkedIn job discovery."}
+                
+            from agents.linkedin_agent import discover_leads_from_jobs
+            # Convert keywords list to string if passed as list
+            kw_param = input_data.keywords
+            if isinstance(kw_param, list):
+                kw_param = " ".join(kw_param)
+            elif not kw_param:
+                kw_param = input_data.job_title
+                if isinstance(kw_param, list):
+                    kw_param = " ".join(kw_param)
+                    
+            leads_data = await discover_leads_from_jobs(
+                keywords=kw_param,
+                location=input_data.location,
+                sort=input_data.sort,
+                date_posted=input_data.date_posted,
+                easy_apply=input_data.easy_apply,
+                remote=input_data.remote,
+                experience=input_data.experience,
+                job_type=input_data.job_type,
+                company_id=input_data.company_id,
+                apollo_api_key=apollo_key
+            )
+            
+            logger.info(f"LinkedIn job leads fetched: {leads_data}")
+
+            leads = []
+            raw_leads_to_save = []
+            jobs_fetched = []
+            
+            for l in leads_data:
+                # Extract any raw jobs for the background task
+                jobs_fetched.extend(l.get("profile_metadata", {}).get("hiring_jobs", []))
+                
+                raw_leads_to_save.append({
+                    "linkedin_url": l["linkedin_url"],
+                    "name": l["name"],
+                    "headline": l.get("headline"),
+                    "comment": l.get("comment", ""),
+                    "source_post": l.get("source_post", "LinkedIn Job Search"),
+                    "source_post_url": l.get("source_post_url", ""),
+                    "competitor": l.get("competitor", "LinkedIn Jobs"),
+                    "website": l.get("website", ""),
+                    "email": l.get("email"),
+                    "email_verification_status": l.get("email_verification_status"),
+                    "is_fit": False,
+                    "is_competitor": False,
+                    "is_decision_maker": False,
+                    "fit_reasoning": l.get("fit_reasoning", "Locating corporate decision makers & executing AI evaluation in the background..."),
+                    "lead_source": "linkedin_job",
+                    "profile_metadata": l.get("profile_metadata", {})
+                })
+                leads.append(l)
+                
+            if raw_leads_to_save:
+                await batch_upsert_identified_profiles(
+                    db, 
+                    raw_leads_to_save, 
+                    user_id=str(current_user.id),
+                    org_id=current_user.organization_id
+                )
+                await db.commit()
+                
+                # Log Activity: Job-based Lead Discovery
+                import hashlib
+                kw_str = kw_param or ""
+                user_ref = str(current_user.id) if current_user else "system"
+                idempotency_key = f"manual_discovery_job:{hashlib.md5(f'{kw_str}:{user_ref}'.encode()).hexdigest()}"
+                
+                await log_activity_and_notify(
+                    db,
+                    type="comment",
+                    title=f"LinkedIn Job Discovery: {len(raw_leads_to_save)} leads",
+                    description=f"Found new leads based on active hiring posts matching: {kw_str}",
+                    metadata={"keywords": kw_str, "count": len(raw_leads_to_save)},
+                    user_id=str(current_user.id),
+                    org_id=current_user.organization_id,
+                    idempotency_key=idempotency_key
+                )
+                
+                from services.classification_service import enrich_linkedin_job_leads_task
+                background_tasks.add_task(
+                    enrich_linkedin_job_leads_task, 
+                    jobs=jobs_fetched, 
+                    user_id=str(current_user.id),
+                    org_id=current_user.organization_id,
+                    apollo_api_key=apollo_key
+                )
         else:
             leads = find_leads_tavily(input_data, api_key=tavily_key)
         return {"leads": leads}
     except Exception as e:
         return {"error": str(e)}
+
+@sales_router.post("/discover/job")
+async def discover_leads_job(input_data: LeadDiscoveryInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db), current_user: Profile = Depends(get_current_user)):
+    """
+    Endpoint to discover new leads based on LinkedIn Job searches specifically.
+    """
+    input_data.provider = "linkedin_job"
+    return await discover_leads(input_data, background_tasks, db, current_user)
 
 @sales_router.post("/enrich")
 async def enrich_leads(input_data: EnrichInput, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db), current_user: Profile = Depends(get_current_user)):

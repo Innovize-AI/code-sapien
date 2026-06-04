@@ -388,3 +388,92 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
             "type": "classification_error",
             "message": str(e)
         }, org_id=org_id)
+
+async def enrich_linkedin_job_leads_task(
+    jobs: List[dict],
+    user_id: str,
+    org_id: str,
+    apollo_api_key: str | None = None
+):
+    """
+    Background worker for LinkedIn Job lead discovery.
+    1. Groups jobs by company name.
+    2. Runs enrich_job_leads_background_pipeline to resolve domains and batch-query Apollo for decision-makers.
+    3. Triggers run_classification_and_update on the decision-maker profiles.
+    4. Deletes the temporary starter company cards from the DB.
+    """
+    try:
+        logger.info(f"Background Job Enrichment Task started for {len(jobs)} jobs.")
+        
+        # 1. Group jobs by company name
+        grouped_jobs = {}
+        for job in jobs:
+            cname = job.get("company_name")
+            if cname and cname != "Target Company":
+                if cname not in grouped_jobs:
+                    grouped_jobs[cname] = []
+                grouped_jobs[cname].append(job)
+                
+        if not grouped_jobs:
+            logger.info("No valid companies found in jobs list for background enrichment.")
+            return
+
+        # 2. Run Apollo and domain-resolution background pipeline
+        from agents.linkedin_agent import enrich_job_leads_background_pipeline
+        decision_maker_leads = await enrich_job_leads_background_pipeline(
+            grouped_jobs=grouped_jobs,
+            apollo_api_key=apollo_api_key,
+            user_id=user_id,
+            org_id=org_id
+        )
+        
+        if not decision_maker_leads:
+            logger.info("No decision makers found for hiring companies.")
+            return
+            
+        logger.info(f"Found {len(decision_maker_leads)} decision-maker leads. Triggering immediate waterfall enrichment.")
+        
+        # 3. Trigger full Apollo enrichment via our existing pipeline
+        to_enrich_ids = [l.get("profile_metadata", {}).get("apollo_id") for l in decision_maker_leads if l.get("profile_metadata", {}).get("apollo_id")]
+        
+        if to_enrich_ids:
+            from routes.lead_discovery import enrich_and_save_leads
+            async with SessionLocal() as db_session:
+                await enrich_and_save_leads(
+                    db=db_session,
+                    person_ids=to_enrich_ids,
+                    user_id=user_id,
+                    org_id=org_id,
+                    source_post=f"Hiring: {jobs[0].get('title')}" if jobs else "LinkedIn Job Discovery",
+                    competitor="LinkedIn Jobs"
+                )
+        
+        # 4. Clean up temporary starter company cards from the database
+        company_urls = [job.get("company_url") for job in jobs if job.get("company_url")]
+        company_names = [job.get("company_name") for job in jobs if job.get("company_name")]
+        
+        from sqlalchemy import delete, or_
+        async with SessionLocal() as db:
+            async with db.begin():
+                # Delete starter company profiles where lead_source is 'linkedin_job' and website is empty (starter cards have website = "")
+                stmt = delete(IdentifiedProfile).where(
+                    IdentifiedProfile.lead_source == "linkedin_job",
+                    IdentifiedProfile.website == "",
+                    IdentifiedProfile.is_fit == False,
+                    IdentifiedProfile.is_decision_maker == False
+                )
+                
+                # Match the specific names/urls of companies we processed
+                conditions = []
+                if company_urls:
+                    conditions.append(IdentifiedProfile.linkedin_url.in_(company_urls))
+                if company_names:
+                    conditions.append(IdentifiedProfile.name.in_(company_names))
+                    
+                if conditions:
+                    stmt = stmt.where(or_(*conditions))
+                    res = await db.execute(stmt)
+                    logger.info(f"Cleaned up temporary starter company cards from the database: {res.rowcount} rows deleted.")
+                    
+    except Exception as e:
+        logger.error(f"Error in enrich_linkedin_job_leads_task background worker: {e}", exc_info=True)

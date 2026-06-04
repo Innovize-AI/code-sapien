@@ -19,6 +19,7 @@ def signal_waterfall_node(state: AgentState):
         return getattr(obj, key, default)
 
     discovery_source = get_val(input_data, "discovery_source")
+    lead_source = get_val(input_data, "lead_source")
     
     # Priority 1: Direct Marketing Signals
     if get_val(input_data, "demo_requested"):
@@ -27,12 +28,14 @@ def signal_waterfall_node(state: AgentState):
     if get_val(input_data, "download_marketing_material"):
         return {"signal_leverage_score": 90}
 
-    # Priority 2: Interaction Sources
-    if discovery_source == 'competitor_comment':
+    # Priority 2: Hiring Signals (linkedin_job discovery or active hiring data)
+    hiring_data = state.get("hiring_data") or get_val(input_data, "hiring_data") or get_val(input_data, "profile_metadata", {}).get("hiring_jobs")
+    if discovery_source == 'linkedin_job' or lead_source == 'linkedin_job' or hiring_data:
         return {"signal_leverage_score": 85}
+
+    # Priority 3: Interaction Sources (Competitor Comment / Keyword Search scaled to 75)
+    if discovery_source in ['competitor_comment', 'keyword_search'] or lead_source in ['competitor_comment', 'keyword_search', 'keyword']:
+        return {"signal_leverage_score": 75}
     
-    if discovery_source == 'keyword_search':
-        return {"signal_leverage_score": 60}
-    
-    # Priority 3: ICP Fit
+    # Priority 4: ICP Fit
     return {"signal_leverage_score": 30}

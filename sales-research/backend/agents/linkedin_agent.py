@@ -490,6 +490,10 @@ async def enrich_company_waterfall(
     hiring = []
 
     # 1. Primary: Apollo match by person profile
+    if person_url and person_url.startswith("apollo_id:"):
+        person_id = person_url.split(":")[-1]
+        person_url = None
+
     if person_url or person_id:
         logger.debug(f"CENTRAL WATERFALL: Trialing Apollo for {person_url or person_id}")
         apollo_data = await get_apollo_company_data(
@@ -497,21 +501,44 @@ async def enrich_company_waterfall(
             apollo_id=person_id,
             million_verifier_enabled=million_verifier_enabled
         )
-    print("Apollo data", apollo_data)
+    logger.debug(f"Apollo data: {apollo_data}")
     # 2. Check if we need LinkedIn fallback
     # Skip if Apollo was successful AND provided core stats
     core_found = apollo_data.get("employee_count")
     
-    if company_url and not core_found:
-        logger.debug(f"CENTRAL WATERFALL: Falling back to LinkedIn for {company_url}")
-        company_res = get_company_details(company_url)
+    # Proactively resolve company_url if not passed but present in Apollo data
+    if not company_url and apollo_data.get("company_linkedin_url"):
+        company_url = apollo_data.get("company_linkedin_url")
+        
+    if company_url:
+        company_identifier = company_url.rstrip('/').split('/')[-1]
+        logger.debug(f"CENTRAL WATERFALL: Fetching LinkedIn details for {company_identifier}")
+        company_res = get_company_details(company_identifier)
         if company_res:
-            linkedin_data = company_res.get("stats", {})
+            # We always want updates and jobs
             news = company_res.get("updates", [])
             hiring = company_res.get("jobs", [])
-            # Also capture basic info if we can
-            if "basic_info" in company_res:
-                 linkedin_data["basic_info"] = company_res["basic_info"]
+            
+            # If Apollo fell short, we also capture core stats
+            if not core_found:
+                linkedin_data = company_res.get("stats", {})
+                if "basic_info" in company_res:
+                     linkedin_data["basic_info"] = company_res["basic_info"]
+                     
+            # Extract company_id to fetch active jobs from jobs/search endpoint
+            comp_id = None
+            if "basic_info" in company_res and isinstance(company_res["basic_info"], dict):
+                comp_id = company_res["basic_info"].get("id") or company_res["basic_info"].get("company_id")
+            if not comp_id:
+                comp_id = company_res.get("id") or company_res.get("company_id")
+                
+            if comp_id:
+                logger.info(f"CENTRAL WATERFALL: Resolved company_id {comp_id}, querying active jobs.")
+                searched_jobs = get_linkedin_jobs(company_id=str(comp_id))
+                if searched_jobs:
+                    hiring = searched_jobs
+            else:
+                logger.warning(f"CENTRAL WATERFALL: Could not resolve company_id for {company_identifier} to fetch jobs.")
 
     is_person_lookup = bool(person_url or person_id)
     
@@ -1358,4 +1385,552 @@ async def discover_leads_from_keywords(keywords: List[str]):
             continue
             
     logger.debug(f"Extracted {len(leads)} unique leads from keyword search posts.")
+    return leads
+
+
+def get_linkedin_jobs(
+    keywords: str = None,
+    location: str = None,
+    company_id: str = None,
+    sort: str = None,
+    page_number: int = 1,
+    date_posted: str = None,
+    easy_apply: bool = None,
+    remote: str = None,
+    experience: str = None,
+    job_type: str = None
+):
+    """
+    Fetches active job listings from /jobs/search using the RapidAPI client.
+    """
+    api_key = os.getenv("RAPID_API_KEY")
+    linkedin_base_url = os.getenv("LINKEDIN_RAPID_BASE_URL")
+    
+    if not linkedin_base_url:
+        linkedin_base_url = "https://linkedin-scraper-api-real-time-fast-affordable.p.rapidapi.com"
+        
+    url = f"{linkedin_base_url.rstrip('/')}/jobs/search"
+    
+    querystring = {}
+    if keywords:
+        querystring["keywords"] = keywords
+    if location:
+        querystring["location"] = location
+    if company_id:
+        querystring["company_id"] = str(company_id)
+    if sort:
+        querystring["sort"] = sort
+    if page_number:
+        querystring["page_number"] = str(page_number)
+    if date_posted:
+        querystring["date_posted"] = date_posted
+    if easy_apply is not None:
+        querystring["easy_apply"] = "true" if easy_apply else "false"
+    if remote:
+        querystring["remote"] = remote
+    if experience:
+        querystring["experience"] = experience
+    if job_type:
+        querystring["job_type"] = job_type
+
+    # Ensure keywords is present as required by the API
+    if not querystring.get("keywords") and company_id:
+        querystring["keywords"] = "engineer"
+        
+    headers = {
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": "linkedin-scraper-api-real-time-fast-affordable.p.rapidapi.com"
+    }
+
+    try:
+        logger.info(f"Querying LinkedIn Jobs API: {url} with params {querystring}")
+        response = requests.get(url, headers=headers, params=querystring, timeout=15)
+        res_data = response.json()
+        
+        if isinstance(res_data, dict) and "message" in res_data:
+             if "exceeded the MONTHLY quota" in res_data["message"]:
+                logger.warning(f"LinkedIn Jobs API Rate Limit: {res_data['message']}")
+                return []
+                
+        jobs_list = res_data.get("data", res_data) if isinstance(res_data, dict) else res_data
+        if not isinstance(jobs_list, list):
+            if isinstance(jobs_list, dict) and "jobs" in jobs_list:
+                jobs_list = jobs_list["jobs"]
+            else:
+                jobs_list = []
+                
+        standardized_jobs = []
+        for job in jobs_list:
+            if not isinstance(job, dict):
+                continue
+            
+            # Extract company details, supporting both object and direct string/URL values
+            company_val = job.get("company")
+            if isinstance(company_val, dict):
+                company_name = company_val.get("name")
+                company_url = company_val.get("url")
+            else:
+                company_name = company_val or job.get("company_name")
+                company_url = job.get("company_url")
+            
+            standardized_jobs.append({
+                "title": job.get("job_title") or job.get("title") or "Unknown Position",
+                "company_name": company_name or "Target Company",
+                "company_url": company_url,
+                "company_urn": job.get("company_urn"),
+                "job_id": job.get("job_id"),
+                "location": job.get("location") or "Remote / Onsite",
+                "salary": job.get("salary"),
+                "posted_at_epoch": job.get("posted_at_epoch"),
+                "skills": job.get("skills") or [],
+                "benefits": job.get("benefits") or [],
+                "is_easy_apply": job.get("is_easy_apply"),
+                "is_promoted": job.get("is_promoted"),
+                "applicant_count": job.get("applicant_count"),
+                "description": job.get("description") or job.get("job_description") or "",
+                "created_at_epoch": job.get("created_at_epoch"),
+                "geo_id": job.get("geo_id"),
+                "navigation_subtitle": job.get("navigation_subtitle"),
+                "is_verified": job.get("is_verified"),
+                "job_insights": job.get("job_insights") or [],
+                "apply_url": job.get("apply_url"),
+                "posted_time": job.get("posted_at") or job.get("created_at") or job.get("date_posted") or "Active",
+                "url": job.get("job_url") or job.get("apply_url") or job.get("job_posting_url") or job.get("url") or "",
+                "remote": job.get("work_type") or job.get("remote") or "onsite"
+            })
+        return standardized_jobs
+    except Exception as e:
+        logger.error(f"Error fetching jobs from RapidAPI: {e}")
+        return []
+        
+def get_linkedin_job_details(job_id: str) -> dict:
+    """
+    Fetches complete details for a specific job, including the full job description.
+    """
+    api_key = os.getenv("RAPID_API_KEY")
+    linkedin_base_url = os.getenv("LINKEDIN_RAPID_BASE_URL")
+    
+    if not linkedin_base_url:
+        linkedin_base_url = "https://linkedin-scraper-api-real-time-fast-affordable.p.rapidapi.com"
+        
+    url = f"{linkedin_base_url.rstrip('/')}/jobs/details"
+    querystring = {"job_id": str(job_id)}
+    
+    headers = {
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": "linkedin-scraper-api-real-time-fast-affordable.p.rapidapi.com"
+    }
+    
+    try:
+        logger.info(f"Querying LinkedIn Job Details API: {url} with job_id {job_id}")
+        response = requests.get(url, headers=headers, params=querystring, timeout=15)
+        res_data = response.json()
+        
+        if isinstance(res_data, dict) and "message" in res_data:
+             if "exceeded the MONTHLY quota" in res_data["message"]:
+                logger.warning(f"LinkedIn Job Details API Rate Limit: {res_data['message']}")
+                return {}
+                
+        data = res_data.get("data", res_data) if isinstance(res_data, dict) else {}
+        if not data:
+            return {}
+            
+        return {
+            "description": data.get("description") or data.get("job_description") or "",
+            "skills": data.get("skills") or [],
+            "apply_url": data.get("apply_url") or data.get("job_url") or "",
+            "salary": data.get("salary") or "",
+            "benefits": data.get("benefits") or []
+        }
+    except Exception as e:
+        logger.error(f"Error fetching job details for ID {job_id}: {e}")
+        return {}
+
+async def discover_leads_from_jobs(
+    keywords: str = None,
+    location: str = None,
+    sort: str = None,
+    date_posted: str = None,
+    easy_apply: bool = None,
+    remote: str = None,
+    experience: str = None,
+    job_type: str = None,
+    company_id: str = None,
+    apollo_api_key: str = None
+) -> List[dict]:
+    """
+    Finds hiring companies using get_linkedin_jobs and immediately returns 
+    starter company cards for background enrichment.
+    """
+    logger.info(f"Hiring Lead Discovery initiated with keyword: {keywords}")
+    jobs = get_linkedin_jobs(
+        keywords=keywords,
+        location=location,
+        sort=sort,
+        date_posted=date_posted,
+        easy_apply=easy_apply,
+        remote=remote,
+        experience=experience,
+        job_type=job_type,
+        company_id=company_id
+    )
+    
+    if not jobs:
+        logger.info("No active jobs found for lead discovery.")
+        return []
+        
+    # Group jobs by company name to avoid duplicate company cards
+    grouped_jobs = {}
+    for job in jobs:
+        cname = job.get("company_name")
+        if cname and cname != "Target Company":
+            if cname not in grouped_jobs:
+                grouped_jobs[cname] = []
+            grouped_jobs[cname].append(job)
+            
+    if not grouped_jobs:
+        logger.info("No companies with valid names found in job listings.")
+        return []
+
+    # Construct instant starter company leads
+    leads = []
+    for cname, company_jobs in grouped_jobs.items():
+        primary_job = company_jobs[0]
+        job_titles = [j.get("title") for j in company_jobs]
+        desc_snippet = primary_job.get("description", "")[:150] + "..." if len(primary_job.get("description", "")) > 150 else primary_job.get("description", "")
+        
+        hiring_comment = f"Active hiring signals detected at company '{cname}':\n- hiring for: {', '.join(job_titles[:3])}\n- Job snippet: {desc_snippet}"
+        
+        leads.append({
+            "name": cname,
+            "headline": f"Hiring: {primary_job.get('title')} in {primary_job.get('location')}",
+            "linkedin_url": primary_job.get("company_url") or f"https://www.linkedin.com/company/{cname.lower().replace(' ', '')}",
+            "comment": hiring_comment,
+            "source_post": f"Hiring: {primary_job.get('title')}",
+            "source_post_url": primary_job.get("url") or "",
+            "competitor": "LinkedIn Jobs",
+            "website": "", # To be enriched in the background
+            "email": None,
+            "email_verification_status": None,
+            "is_fit": False,
+            "is_competitor": False,
+            "is_decision_maker": False,
+            "fit_reasoning": "Locating corporate decision makers & executing AI evaluation in the background...",
+            "lead_source": "linkedin_job",
+            "profile_metadata": {
+                "company_name": cname,
+                "job_title": primary_job.get("title"),
+                "is_hiring_company": True,
+                "status": "enriching",
+                "hiring_jobs": company_jobs
+            }
+        })
+        
+    logger.info(f"Instant discovery returned {len(leads)} starter company leads.")
+    return leads
+
+async def enrich_job_leads_background_pipeline(
+    grouped_jobs: dict,
+    apollo_api_key: str = None,
+    user_id: str = None,
+    org_id: str = None
+) -> List[dict]:
+    """
+    Takes grouped jobs, resolves corporate website domains, 
+    queries Apollo in batches for decision makers, and maps them back.
+    """
+    if not grouped_jobs:
+        return []
+
+    final_api_key = apollo_api_key or os.getenv("APOLLO_API_KEY")
+    if not final_api_key:
+        logger.warning("Apollo API Key is missing. Cannot search for decision-makers.")
+        return []
+
+    # Default target roles for strategic outreach
+    target_titles = [
+        "CTO", "Chief Technology Officer", "VP of Engineering", 
+        "Director of Engineering", "Head of Engineering",
+        "VP of Operations", "Operations Director", "COO", "Chief Operating Officer",
+        "Billing Manager", "Finance Director", "VP of HR", "HR Director",
+        "Recruiting Manager", "Recruiter", "Co-Founder", "Founder", "CEO"
+    ]
+    
+    # Dynamically fetch target titles from global/user ICP if available
+    try:
+        from db.database import SessionLocal
+        from db.crud import get_active_icp
+        async with SessionLocal() as db_session:
+            icp_data = await get_active_icp(db_session, user_id=user_id, org_id=org_id)
+            if icp_data and icp_data.get("job_title"):
+                title_val = icp_data.get("job_title")
+                if isinstance(title_val, list):
+                    target_titles = [t.strip() for t in title_val if t.strip()]
+                elif isinstance(title_val, str):
+                    if "," in title_val:
+                        target_titles = [t.strip() for t in title_val.split(",") if t.strip()]
+                    elif ";" in title_val:
+                        target_titles = [t.strip() for t in title_val.split(";") if t.strip()]
+                    else:
+                        target_titles = [title_val.strip()]
+                logger.info(f"Dynamically loaded target titles from ICP: {target_titles}")
+    except Exception as e:
+        logger.warning(f"Failed to fetch dynamic ICP target titles: {e}. Using defaults.")
+
+    fallback_titles = ["CEO", "Founder", "Owner", "President", "VP", "Director", "Manager"]
+    
+    headers = {
+        "Cache-Control": "no-cache",
+        "Content-Type": "application/json",
+        "X-Api-Key": final_api_key
+    }
+    
+    search_url = "https://api.apollo.io/api/v1/mixed_people/api_search"
+    companies_list = list(grouped_jobs.keys())
+    logger.info(f"Companies list: {companies_list}")
+    # website domain resolution for all unique companies concurrently (with semaphore throttling)
+    logger.info(f"Resolving domains for {len(companies_list)} hiring companies in background task.")
+    loop = asyncio.get_event_loop()
+    
+    company_domains = {}
+    
+    def get_person_domain(p):
+        # 1. Try organization name match (Highly reliable as we matched the queried companies list)
+        org_name = p.get("organization", {}).get("name") or p.get("organization_name")
+        if org_name:
+            org_name_lower = org_name.lower().strip()
+            for original_name, dom in company_domains.items():
+                orig_name_lower = original_name.lower().strip()
+                if orig_name_lower == org_name_lower or orig_name_lower in org_name_lower or org_name_lower in orig_name_lower:
+                    if dom:
+                        return dom.lower().strip()
+
+        # 2. Try email domain
+        email = p.get("email")
+        if email and "@" in email:
+            return email.split("@")[-1].lower().strip()
+
+        # 3. Try organization website
+        website = p.get("organization", {}).get("website")
+        if website:
+            dom = website.split("//")[-1].split("/")[0].replace("www.", "").lower().strip()
+            if dom:
+                return dom
+
+        # 4. Fallback to existing fields
+        return p.get("organization_domain") or p.get("organization", {}).get("primary_domain")
+
+    sem = asyncio.Semaphore(5)
+
+    async def resolve_company_domain(cname: str) -> str:
+        async with sem:
+            jobs = grouped_jobs.get(cname, [])
+            if not jobs:
+                return ""
+            
+            company_url = jobs[0].get("company_url")
+            if company_url:
+                cleaned = company_url.rstrip('/')
+                parts = cleaned.split('/')
+                identifier = parts[-1]
+                if identifier in ("life", "about", "jobs") and len(parts) > 1:
+                    identifier = parts[-2]
+
+                logger.info(f"Company identifier: {identifier}") 
+                if identifier:
+                    try:
+                        logger.info(f"Resolving website domain for '{cname}' via LinkedIn identifier '{identifier}'")
+                        company_res = await loop.run_in_executor(
+                            None,
+                            lambda: get_company_details(identifier)
+                        )
+                        logger.info(f"Company details: {company_res}")
+                        if company_res:
+                            website_url = (
+                                company_res.get("website") or 
+                                company_res.get("basic_info", {}).get("website") or 
+                                company_res.get("stats", {}).get("website") or
+                                company_res.get("basic_info", {}).get("websiteUrl") or
+                                company_res.get("websiteUrl")
+                            )
+                            logger.info(f"Website URL: {website_url}")
+                            if website_url:
+                                domain = website_url.lower().strip()
+                                if domain.startswith("http://"):
+                                    domain = domain[7:]
+                                elif domain.startswith("https://"):
+                                    domain = domain[8:]
+                                if domain.startswith("www."):
+                                    domain = domain[4:]
+                                domain = domain.split('/')[0]
+                                logger.info(f"Resolved domain '{domain}' for '{cname}'")
+                                return domain
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch details for '{cname}' via get_company_details: {e}")
+            
+            # Resilient fallback: guess the domain from the company name
+            guessed = cname.lower().strip()
+            guessed = "".join(ch for ch in guessed if ch.isalnum() or ch.isspace())
+            guessed = guessed.replace(" ", "")
+            if not guessed:
+                guessed = "unknown"
+            domain = f"{guessed}.com"
+            logger.info(f"Using guessed fallback domain '{domain}' for company '{cname}'")
+            return domain
+
+    # Concurrently resolve domains
+    domain_tasks = [resolve_company_domain(cname) for cname in companies_list]
+    domain_results = await asyncio.gather(*domain_tasks)
+    
+    for cname, dom in zip(companies_list, domain_results):
+        company_domains[cname] = dom
+        
+    domains_list = list(set(filter(None, company_domains.values())))
+    logger.info(f"Resolved {len(domains_list)} unique domains for Apollo search: {domains_list}")
+    
+    people = []
+    
+    if domains_list:
+        # Phase 1: Batch search for high-priority targeted titles using domains in q_organization_domains_list
+        payload = {
+            "q_organization_domains_list": domains_list,
+            "person_titles": target_titles,
+            "page": 1,
+            "per_page": 100
+        }
+        
+        try:
+            logger.info(f"Querying Apollo in batch for targeted decision-makers at {len(domains_list)} company domains.")
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(search_url, headers=headers, json=payload)
+            )
+            if response.status_code == 200:
+                people = response.json().get("people", [])
+            else:
+                logger.warning(f"Apollo domain batch query failed with status {response.status_code}: {response.text}")
+        except Exception as e:
+            logger.error(f"Error executing primary Apollo domain batch search: {e}")
+            
+        logger.info(f"People found in primary search: {people}")
+        # Group resolved people by domain to find missing companies
+        resolved_domains = set()
+        for person in people:
+            dom = get_person_domain(person)
+            if dom:
+                resolved_domains.add(dom.lower())
+                
+        # Phase 2: Identify missing company domains and query fallback roles for them in a secondary batch
+        missing_domains = [dom for dom in domains_list if dom.lower() not in resolved_domains]
+        if missing_domains:
+            logger.info(f"No targeted decision-makers found for {len(missing_domains)} domains. Querying fallback roles.")
+            fallback_payload = {
+                "q_organization_domains_list": missing_domains,
+                "person_titles": fallback_titles,
+                "page": 1,
+                "per_page": 100
+            }
+            try:
+                fallback_response = await loop.run_in_executor(
+                    None,
+                    lambda: requests.post(search_url, headers=headers, json=fallback_payload, timeout=15)
+                )
+                if fallback_response.status_code == 200:
+                    fallback_people = fallback_response.json().get("people", [])
+                    people.extend(fallback_people)
+                else:
+                    logger.warning(f"Apollo fallback domain batch query failed with status {fallback_response.status_code}")
+            except Exception as e:
+                logger.error(f"Error executing fallback Apollo domain batch search: {e}")
+
+    # Phase 3: Process all retrieved people and construct lead list
+    leads = []
+    processed_emails = set()
+    
+    for person in people:
+        email = person.get("email")
+        # De-duplicate leads by email to prevent duplicate cards
+        if email:
+            if email in processed_emails:
+                continue
+            processed_emails.add(email)
+            
+        name = person.get("name") or f"{person.get('first_name', '')} {person.get('last_name', '')}".strip() or "Unknown"
+        title = person.get("title") or "Executive"
+        lurl = person.get("linkedin_url")
+        if not lurl:
+            lurl = f"apollo_id:{person.get('id')}"
+            
+        cname_apollo = person.get("organization", {}).get("name") or person.get("organization_name") or "Unknown Company"
+        domain_apollo = get_person_domain(person)
+        
+        # Match back to original job company
+        company_jobs = []
+        matched_original_name = cname_apollo
+        
+        # First try to match by domain (highly accurate)
+        if domain_apollo:
+            lower_domain = domain_apollo.lower().strip()
+            for original_name, resolved_domain in company_domains.items():
+                if resolved_domain and resolved_domain.lower().strip() == lower_domain:
+                    company_jobs = grouped_jobs[original_name]
+                    matched_original_name = original_name
+                    break
+                    
+        # Fallback to name-based substring matching if domain match not found
+        if not company_jobs:
+            lower_cname_apollo = cname_apollo.lower()
+            for original_name in companies_list:
+                if original_name.lower() == lower_cname_apollo or original_name.lower() in lower_cname_apollo or lower_cname_apollo in original_name.lower():
+                    company_jobs = grouped_jobs[original_name]
+                    matched_original_name = original_name
+                    break
+                    
+        if not company_jobs:
+            continue
+            
+        # Extract active jobs summary
+        job_summaries = []
+        for job in company_jobs[:3]:
+            desc_snippet = job.get("description", "")[:120] + "..." if len(job.get("description", "")) > 120 else job.get("description", "")
+            job_summaries.append(f"'{job.get('title')}' in {job.get('location')} (Snippet: {desc_snippet})")
+        
+        hiring_comment = f"Active hiring signals detected at company '{matched_original_name}':\n- " + "\n- ".join(job_summaries)
+        
+        # Determine the company's starter card URL to be used as old_linkedin_url for SSE replacement mapping
+        starter_company_url = company_jobs[0].get("company_url") or f"https://www.linkedin.com/company/{matched_original_name.lower().replace(' ', '')}"
+        
+        leads.append({
+            "name": name,
+            "headline": f"{title} at {matched_original_name}",
+            "linkedin_url": lurl,
+            "old_linkedin_url": starter_company_url, # Key field for frontend SSE mapping!
+            "comment": hiring_comment,
+            "source_post": f"Hiring: {company_jobs[0].get('title')}",
+            "source_post_url": company_jobs[0].get("url") or "",
+            "competitor": "LinkedIn Jobs",
+            "website": person.get("organization", {}).get("website") or person.get("organization_domain") or company_domains.get(matched_original_name) or "",
+            "email": email,
+            "email_verification_status": person.get("email_status"),
+            "is_fit": False,
+            "is_competitor": False,
+            "is_decision_maker": False,
+            "fit_reasoning": "",
+            "lead_source": "linkedin_job",
+            "profile_metadata": {
+                "apollo_id": person.get("id"),
+                "company_name": matched_original_name,
+                "job_title": title,
+                "email": email,
+                "email_status": person.get("email_status"),
+                "state": person.get("state"),
+                "city": person.get("city"),
+                "photo_url": person.get("photo_url"),
+                "employee_count": person.get("organization", {}).get("estimated_num_employees"),
+                "domain": person.get("organization", {}).get("primary_domain") or person.get("organization_domain"),
+                "hiring_jobs": company_jobs
+            }
+        })
+        
+    logger.info(f"Background Apollo Job Enrichment completed. Found {len(leads)} decision-maker leads.")
     return leads

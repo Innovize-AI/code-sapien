@@ -196,7 +196,8 @@ async def _persist_results(db, linkedin_url, website, final_state, options, user
             **(final_state.get("extra_research_context") or {}),
             "discovery_source": options.discovery_source if options else None,
             "discovery_context": options.discovery_context if options else None,
-            "lead_extracted_data": final_state.get("lead_extracted_data").model_dump() if hasattr(final_state.get("lead_extracted_data"), 'model_dump') else (final_state.get("lead_extracted_data") or {})
+            "lead_extracted_data": final_state.get("lead_extracted_data").model_dump() if hasattr(final_state.get("lead_extracted_data"), 'model_dump') else (final_state.get("lead_extracted_data") or {}),
+            "strategic_rag_briefing": final_state.get("strategic_rag_briefing", "")
         }),
         
         # Modular Nodules
@@ -450,6 +451,15 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
                             "comments": unique_comments,
                             "source_posts": sources
                         }
+                    elif profile.lead_source == "linkedin_job":
+                        options.discovery_source = "linkedin_job"
+                        options.discovery_context = {
+                            "fit_reasoning": profile.fit_reasoning,
+                            "intent": profile.intent,
+                            "profile_metadata": profile.profile_metadata,
+                            "comments": unique_comments,
+                            "source_posts": sources
+                        }
                     elif sources:
                         # Intelligently detect if it's a keyword search even if sources exist
                         # (Because keyword discovered leads also save their source posts)
@@ -556,6 +566,7 @@ async def _run_research_gen(linkedin_url, website, options: InputLeadData, email
         "extra_research_context": options.extra_metadata if options else existing_state.get("extra_metadata"),
         "million_verifier_enabled": million_verifier_enabled,
         "pinecone_index_name": org_settings.get("pinecone_index_name"),
+        "strategic_rag_briefing": existing_state.get("strategic_rag_briefing", ""),
         
         "user_profile_details": existing_state.get("user_profile_details", {}),
         "scraped_website_content": existing_state.get("scraped_website_content", ""),

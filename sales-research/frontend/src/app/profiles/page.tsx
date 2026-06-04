@@ -16,6 +16,7 @@ import { ExternalLink,
   UserCheck,
   Globe,
   Users,
+  Briefcase,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -113,7 +114,7 @@ export default function ProfilesPage() {
 
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
-  const [tabCounts, setTabCounts] = useState<Record<string, number>>({ all: 0, apollo: 0, keyword: 0, competitor: 0 });
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>({ all: 0, apollo: 0, keyword: 0, competitor: 0, job: 0 });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -791,8 +792,15 @@ export default function ProfilesPage() {
                     {tabCounts.keyword ?? 0}
                   </Badge>
                 </TabsTrigger>
+                <TabsTrigger value="job" className="gap-2">
+                  <Briefcase className="w-4 h-4" />
+                  Job Search
+                  <Badge variant="secondary" className="ml-1 px-1 py-0 h-4 min-w-4 text-[10px]">
+                    {tabCounts.job ?? 0}
+                  </Badge>
+                </TabsTrigger>
               </TabsList>
-              {["all","apollo","competitor","keyword"].filter(tab => tab !== "apollo" || !trialMode).map(tab => (
+              {["all","apollo","competitor","keyword","job"].filter(tab => tab !== "apollo" || !trialMode).map(tab => (
                 <TabsContent key={tab} value={tab}>
                   {viewMode === "grid" ? (
                     <ProfileGridV2

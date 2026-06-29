@@ -587,44 +587,57 @@ Profiles to Analyze:
     - **Thought Leadership (Poster)**: If they are posting high-value content but not expressing a specific need yet, mark as 'low_intent' or 'curious' but 'is_fit' if they match the ICP.
 
 ### SIGNAL CATEGORIZATION (post_topic_depth):
-You MUST determine the EXACT nature of the post or comment:
+**CRITICAL: Only apply `post_topic_depth` analysis when `discovery_source` is `"keyword"`. For all other sources set `post_topic_depth` to `"generic_engagement"` regardless of the headline.**
 - `sharing_framework`: Sharing a technical/strategic framework or SOP.
 - `tool_showcase`: Showing a specific tool or automation they built.
 - `complaining_keywords`: Explicitly complaining about specific tools or industry keywords (e.g., "AI hype", "manual CRM entry").
 - `industry_synthesis`: Connecting multiple trends or signals into a strategic view.
 - `discovery_friction`: Specifically mentioning struggle with finding leads or data.
 - `generic_engagement`: Liking or short positive comments without specific depth.
+**MANDATORY: When `post_topic_depth` is `"generic_engagement"`, `intent` MUST be `"low_signal"` and `is_buy_signal` MUST be `false`. A strong headline never overrides a weak or absent comment.**
 
 ### THE SELLER VS BUYER HEURISTIC (CRITICAL):
 You MUST distinguish if the engagement is a "Sell Signal" or a "Buy Signal":
-1. **STRATEGIC SELLER (Low Lead Intent)**: 
-    - Person is a solo consultant, agency owner, or employee at a competitor.
-    - **Self-Serving Trashing**: They are complaining about a keyword/tool to promote their own "better way".
-    - **Framework Bait**: Sharing a framework to attract their own leads.
+1. **STRATEGIC SELLER / AI SELLER (Disqualified)**:
+    - Person is a solo consultant, agency owner, or employee at a competitor or AI services firm.
+    - **AI Seller Test**: If their company sells AI, automation, data, or digital transformation services — they are a seller, not a buyer. Mark `is_competitor=true`, `is_fit=false`.
+    - **Self-Serving Trashing**: Complaining about a tool to promote their own solution.
+    - **Framework Bait**: Sharing a framework to attract their own clients.
     - Mark `intent` as `strategic_seller`.
-2. **BUY SIGNAL (High/Med Lead Intent)**: 
-    - Person is a practitioner (VP Sales, Head of Ops) at a target company.
-    - **Genuine Friction**: Complaint about a technical bottleneck they face. Mark `intent` as `prospect_pain`.
-    - **Expert Sharing**: Sharing an internal framework they actually use. Mark `intent` as `passive_expert`.
+2. **BUY SIGNAL (High/Med Lead Intent)**:
+    - Person is an operations/sales/marketing practitioner **at a non-AI-services company** who uses technology but doesn't build or sell it.
+    - **Genuine Friction**: Complaint about a manual bottleneck they personally face. Mark `intent` as `prospect_pain`.
+    - **Expert Sharing**: Sharing an internal process or framework they actually use. Mark `intent` as `passive_expert`.
 
 ### CLASSIFICATION CRITERIA (STRICT):
-1. **is_competitor**: (boolean) Does the profile belong to someone at a rival AI/Automation company?
-2. **is_fit**: (boolean) ONLY mark as TRUE if they are a **High-Priority Target Account contact**. 
-   - Criteria: Founders, CEOs, VPs of Sales/Revenue, GTM Leaders, or Heads of Ops/Marketing.
-   - **MANDATORY**: If the person is a generic individual contributor (e.g. SDR, BDR, AE, Analyst), works at a non-target industry, or is a competitor, mark as FALSE. We only want decision-makers.
-3. **is_decision_maker**: (boolean) C-Level, VP, Director, Founder, or Head of Department. 
+1. **is_competitor**: (boolean) Mark TRUE if the person works at a company whose **primary business** is selling AI, automation, ML, data transformation, digital transformation consulting, or software development services to other companies. This includes:
+   - Direct AI/Sales Intelligence rivals (Clay, Apollo, ZoomInfo, etc.)
+   - AI/ML consulting firms, digital transformation agencies, data engineering shops
+   - Companies where the headline says things like "We help companies automate X" or "AI solutions for Y"
+   - Freelance AI consultants or automation agencies
+   **Key test**: Does their company SELL AI/automation services? If yes → `is_competitor=true`.
+2. **is_fit**: (boolean) ONLY mark as TRUE if they are a **High-Priority Target Account contact** — meaning they **BUY and USE** technology, not sell it.
+   - Criteria: Founders, CEOs, VPs of Sales/Revenue, GTM Leaders, or Heads of Ops/Marketing **at companies whose core business is NOT AI/tech consulting**.
+   - **MANDATORY disqualifiers — mark `is_fit=FALSE` if ANY of these apply**:
+     - The company's primary business is selling AI, automation, data, or digital transformation services.
+     - The person's title includes "AI Leader", "ML Engineer", "Data Scientist", "AI Transformation", "Digital Transformation" at a company that sells those services.
+     - They are a generic individual contributor (SDR, BDR, AE, Analyst).
+     - They are at a competitor or AI services firm.
+   - **We sell TO operations leaders who struggle with manual work. We do NOT sell to people who are already building AI for a living.**
+3. **is_decision_maker**: (boolean) C-Level, VP, Director, Founder, or Head of Department.
    - **STRICT RULE**: If they do not have one of these titles (e.g. they are a "Senior Specialist" or "Manager" without departmental ownership), mark as FALSE.
 4. **intent**: (string)
-    - `hand_raiser`: Explicitly asking for price, demo, or more info (e.g., "How do I get this?", "DM me").
+    - `hand_raiser`: Explicitly asking for price, demo, or more info in the comment itself (e.g., "How do I get this?", "DM me", "send me more info"). ONLY valid if the comment text contains such language — a relevant headline alone is NOT sufficient.
     - `prospect_pain`: Practitioner expressing frustration with current tools or manual work.
     - `passive_expert`: Practitioner sharing relevant expertise or frameworks (Authority Signal).
     - `strategic_seller`: Consultant/Competitor trashing keywords or sharing frameworks for self-promotion.
-    - `low_signal`: Generic positive engagement (likes, "great post") or irrelevant profiles.
-5. **sentiment**: (positive, neutral, negative).
+    - `low_signal`: Generic positive engagement (likes, "great post", single words, Skills endorsements) or irrelevant profiles.
+5. **is_buy_signal**: (boolean) TRUE only when the comment itself contains explicit purchase-intent language (pricing ask, demo request, "how do I get this", "I need this"). A relevant headline or job title alone does NOT make this true. Default to false.
+6. **sentiment**: (positive, neutral, negative).
 
 ### FOCUS ON REASONING:
-Explain WHY they are a fit based on our SPECIFIC PRODUCTS. Distinguish if they are a **High-Intent Commenter** or a **Strategic Poster**. 
-You MUST answer: **What exactly is the post about?** 
+Explain WHY they are a fit based on our SPECIFIC PRODUCTS. Distinguish if they are a **High-Intent Commenter** or a **Strategic Poster**.
+You MUST answer: **What exactly is the post about?**
 Reference their specific comment or post context to justify your intent and `post_topic_depth` mapping.
 
 Output strictly in JSON format:

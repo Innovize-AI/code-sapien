@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Body, BackgroundTasks, Request, Query
 import time
 import logging
 from sqlalchemy import select, func, or_, desc
+from sqlalchemy.orm import defer as sa_defer
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Optional
 import asyncio
@@ -13,6 +14,10 @@ from db.database import SessionLocal
 from db.models import Profile
 from utils.activity_helper import log_activity_and_notify
 from dependencies import get_current_user
+
+# Large TOAST columns not needed for the list view — deferring them removes them
+# from the SQL SELECT entirely, which is the primary cause of Disk IO exhaustion.
+_PROFILE_LIST_DEFER = {"source_posts", "interaction_history", "comment_history"}
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +108,15 @@ async def get_profiles(
         order_expr = sort_attr.desc() if sort_order == "desc" else sort_attr.asc()
 
         # --- Main data query ---
+        # Defer TOAST blobs — they are excluded from the SQL SELECT, cutting Disk IO
+        # dramatically on large result sets. The detail view loads them via /profiles/{id}.
+        _defer_opts = [
+            sa_defer(getattr(IdentifiedProfile, col))
+            for col in _PROFILE_LIST_DEFER
+        ]
         data_query = (
             select(IdentifiedProfile, Profile.full_name, lateral_sub.c.report_id, Company)
+            .options(*_defer_opts)
             .outerjoin(Profile, IdentifiedProfile.created_by_id == Profile.id)
             .outerjoin(Company, IdentifiedProfile.company_id == Company.id)
             .outerjoin(lateral_sub, sa_text("true"))
@@ -160,7 +172,11 @@ async def get_profiles(
             except Exception:
                 p_dict = {}
 
-            columns_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns}
+            columns_dict = {
+                c.name: getattr(profile, c.name)
+                for c in profile.__table__.columns
+                if c.name not in _PROFILE_LIST_DEFER
+            }
             for k, v in columns_dict.items():
                 if v is not None or k not in p_dict:
                     p_dict[k] = v

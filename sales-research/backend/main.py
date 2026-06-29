@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import asyncio
 import logging
 import os, sys
 
@@ -101,8 +102,39 @@ async def get_global_config():
         "environment": os.getenv("ENVIRONMENT", "dev")
     }
 
+async def _warmup_db():
+    """
+    Pre-open pool connections and seed the Postgres query planner cache.
+    Fires the most common aggregate queries in parallel so the first real
+    user request never pays the TCP-connect + planner cost.
+    """
+    from db.database import SessionLocal
+    from db.models import ResearchReport, IdentifiedProfile, Profile
+    from sqlalchemy import select, func
+
+    async def _ping(idx: int):
+        try:
+            async with SessionLocal() as s:
+                # These are the hottest queries across stats / history / usage / analytics
+                await s.execute(select(func.count()).select_from(ResearchReport))
+                await s.execute(select(func.count()).select_from(IdentifiedProfile))
+                if idx == 0:
+                    # Seed the profiles planner path too (used by get_current_user)
+                    await s.execute(select(func.count()).select_from(Profile))
+        except Exception as e:
+            logging.warning("DB warm-up connection %d failed: %s", idx, e)
+
+    # Open 5 connections in parallel — enough to saturate the most common burst
+    await asyncio.gather(*[_ping(i) for i in range(5)])
+    logging.info("DB warm-up complete — pool pre-seeded, planner cache warmed.")
+
+
 @app.on_event("startup")
 async def startup_event():
+    # Warm up DB connections and query planner in the background so the
+    # server is ready to serve without blocking on the first user request.
+    asyncio.create_task(_warmup_db())
+
     if environment == "dev":
         try:
             from scheduler import start_scheduler

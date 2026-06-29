@@ -1,10 +1,14 @@
+import asyncio
+
 from db.models import Profile
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_history, get_report, get_db, _report_to_dict
+from db.database import SessionLocal
 from dependencies import get_current_user
 import json
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -12,10 +16,10 @@ history_router = APIRouter()
 
 @history_router.get("/history")
 async def read_history(
-    skip: int = 0, 
-    limit: int = 50, 
+    skip: int = 0,
+    limit: int = 50,
     search: str = None,
-    status: str = "all", # Filter by rep
+    status: str = "all",
     sort_by: str = "created_at",
     sort_order: str = "desc",
     db: AsyncSession = Depends(get_db),
@@ -23,13 +27,32 @@ async def read_history(
 ):
     from db.models import ResearchReport, Profile, IdentifiedProfile
     from sqlalchemy import select, func, or_
-    import time, os
+    import os
 
-    trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     start_time = time.time()
-    
+
     try:
-        # Fetch history with joined profiles for rep attribution and interaction stats
+        # Build shared scope predicates
+        scope_filters = []
+        if current_user.organization_id:
+            scope_filters.append(ResearchReport.organization_id == current_user.organization_id)
+        else:
+            scope_filters.append(ResearchReport.created_by_id == current_user.id)
+
+        search_filter = None
+        if search:
+            search_filter = or_(
+                ResearchReport.fullname.ilike(f"%{search}%"),
+                ResearchReport.company_name.ilike(f"%{search}%"),
+                ResearchReport.website.ilike(f"%{search}%"),
+                ResearchReport.linkedin_url.ilike(f"%{search}%")
+            )
+
+        rep_filter = None
+        if status and status != "all":
+            rep_filter = ResearchReport.created_by_id == status
+
+        # Main list query — exclude interaction_history (large TOAST blob, only needed in detail view)
         query = (
             select(
                 ResearchReport.id,
@@ -41,31 +64,16 @@ async def read_history(
                 ResearchReport.lead_score,
                 Profile.full_name.label("rep_name"),
                 IdentifiedProfile.touchpoint_count,
-                IdentifiedProfile.interaction_history
             )
             .outerjoin(Profile, ResearchReport.created_by_id == Profile.id)
             .outerjoin(IdentifiedProfile, ResearchReport.linkedin_url == IdentifiedProfile.linkedin_url)
+            .where(*scope_filters)
         )
-        
-        if search:
-            search_filter = or_(
-                ResearchReport.fullname.ilike(f"%{search}%"),
-                ResearchReport.company_name.ilike(f"%{search}%"),
-                ResearchReport.website.ilike(f"%{search}%"),
-                ResearchReport.linkedin_url.ilike(f"%{search}%")
-            )
+        if search_filter is not None:
             query = query.where(search_filter)
-            
-        if status and status != "all":
-            # Assuming status is the rep_id (UUID)
-            query = query.where(ResearchReport.created_by_id == status)
+        if rep_filter is not None:
+            query = query.where(rep_filter)
 
-        if current_user.organization_id:
-            query = query.where(ResearchReport.organization_id == current_user.organization_id)
-        else:
-            query = query.where(ResearchReport.created_by_id == current_user.id)
-        
-        # Dynamic Sorting
         sort_attr = None
         if sort_by == "rep_name":
             sort_attr = Profile.full_name
@@ -74,34 +82,32 @@ async def read_history(
         else:
             sort_attr = ResearchReport.created_at
 
-        if sort_order == "desc":
-            query = query.order_by(sort_attr.desc())
-        else:
-            query = query.order_by(sort_attr.asc())
-
+        query = query.order_by(sort_attr.desc() if sort_order == "desc" else sort_attr.asc())
         query = query.offset(skip).limit(limit)
-        result = await db.execute(query)
-        
-        # Count total for pagination
-        count_query = select(func.count()).select_from(ResearchReport)
-        if search:
+
+        # Count query — run in parallel with main query on separate session
+        count_query = select(func.count()).select_from(ResearchReport).where(*scope_filters)
+        if search_filter is not None:
             count_query = count_query.where(search_filter)
-        if status and status != "all":
-            count_query = count_query.where(ResearchReport.created_by_id == status)
-        if current_user.organization_id:
-            count_query = count_query.where(ResearchReport.organization_id == current_user.organization_id)
-        else:
-            count_query = count_query.where(ResearchReport.created_by_id == current_user.id)
-            
-        count_result = await db.execute(count_query)
-        total = count_result.scalar()
-        
+        if rep_filter is not None:
+            count_query = count_query.where(rep_filter)
+
+        async def _count():
+            async with SessionLocal() as s:
+                r = await s.execute(count_query)
+                return r.scalar()
+
+        result, total = await asyncio.gather(
+            db.execute(query),
+            _count(),
+        )
+
         duration = time.time() - start_time
-        logger.debug(f"read_history took {duration:.4f}s")
-        
+        logger.info("read_history: %.0fms", duration * 1000)
+
         history_data = []
         for row in result.all():
-            item = {
+            history_data.append({
                 "id": str(row.id),
                 "created_at": row.created_at.isoformat() if row.created_at else None,
                 "linkedin_url": row.linkedin_url,
@@ -111,10 +117,8 @@ async def read_history(
                 "lead_score": row.lead_score,
                 "rep_name": row.rep_name or "System",
                 "touchpoint_count": row.touchpoint_count or 0,
-                "interaction_history": row.interaction_history
-            }
-            history_data.append(item)
-            
+            })
+
         return {"items": history_data, "total": total}
     except Exception as e:
         logger.error(f"Error in read_history: {e}", exc_info=True)

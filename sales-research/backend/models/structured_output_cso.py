@@ -6,7 +6,15 @@ class KnowledgeSource(BaseModel):
     snippet: str = Field(description="Specific text snippet retrieved from the knowledge base.")
 
 class UnifiedCommand(BaseModel):
-    verdict: str = Field(description="A single, prescriptive one-sentence command for the sales rep.")
+    verdict: str = Field(description=(
+        "A single, prescriptive one-sentence command for the sales rep. "
+        "Format depends on tier:\n"
+        "- TIER 1 (score ≤40): 'Stop work — [specific disqualifying data point from research]. [Optional revisit condition].'\n"
+        "- TIER 2 (score 41-65): 'Monitor — [exact missing signal]. [Specific trigger to revisit].'\n"
+        "- TIER 3 (score ≥66): Prescriptive strike command citing the specific product and signal.\n"
+        "BANNED for Tier 1/2: any phrase suggesting an outreach sequence, validation sequence, curiosity-based approach, or action steps. "
+        "Always cite a concrete data point (e.g., job title, company size, a specific post date/content, score value) — never paraphrase vaguely."
+    ))
     framework_selected: str = Field(description="The messaging framework used (e.g., AIDA, PAS, BAB).")
     framework_reasoning: str = Field(description="Why this specific framework (AIDA, PAS, BAB) was chosen for this lead's persona.")
     timing_advice: str = Field(description="Strategic advice on when to strike (e.g., 'Green Light', 'Hold for 48h', 'Avoid').")

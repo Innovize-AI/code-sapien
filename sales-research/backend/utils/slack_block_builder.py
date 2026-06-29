@@ -2,12 +2,12 @@ import os
 from typing import List, Dict, Any
 
 def build_hot_lead_blocks(
-    name: str, 
-    headline: str, 
-    linkedin_url: str, 
-    comment: str, 
-    competitor: str, 
-    intent: str, 
+    name: str,
+    headline: str,
+    linkedin_url: str,
+    comment: str,
+    competitor: str,
+    intent: str,
     sentiment: str,
     reasoning: str,
     source: str = "Competitor Comment",
@@ -22,8 +22,11 @@ def build_hot_lead_blocks(
     is_buy_signal: bool = False,
     is_strategic_seller: bool = False,
     email: str = None,
+    email_verification_status: str = None,
     post_topic_depth: str = None,
-    is_decision_maker: bool = False
+    is_decision_maker: bool = False,
+    discovery_source: str = "other",
+    signal_reason: str = None,
 ) -> List[Dict[str, Any]]:
 
     """
@@ -61,7 +64,20 @@ def build_hot_lead_blocks(
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*{name}* ({headline or 'No headline'})" + (f"\n📧 {email}" if email else "") + f"\n<{linkedin_url}|View LinkedIn Profile>"
+                "text": (
+                    f"*{name}* ({headline or 'No headline'})"
+                    + (
+                        "\n📧 " + email + " " + {
+                            "ok": "✅ _verified_",
+                            "catch_all": "⚠️ _catch-all_",
+                            "invalid": "❌ _invalid_",
+                            "error": "❓ _unknown_",
+                            "unknown": "❓ _unknown_",
+                        }.get(email_verification_status or "", "")
+                        if email else ""
+                    )
+                    + f"\n<{linkedin_url}|View LinkedIn Profile>"
+                )
             }
         }
     ]
@@ -79,21 +95,36 @@ def build_hot_lead_blocks(
             "elements": signal_elements
         })
 
+    is_keyword = discovery_source == "keyword"
+    competitor_clean = (competitor or "").replace("Keyword:", "").strip()
+
     fields = [
-        {"type": "mrkdwn", "text": f"*Intent:* {intent.capitalize()}"},
+        {"type": "mrkdwn", "text": f"*Intent:* {intent.replace('_', ' ').title()}"},
         {"type": "mrkdwn", "text": f"*Sentiment:* {sentiment.capitalize()}"},
-        {"type": "mrkdwn", "text": f"*Competitor:* {competitor or 'Unknown'}"},
-        {"type": "mrkdwn", "text": f"*Source:* {source}"}
     ]
-    if post_topic_depth:
-        fields.append({"type": "mrkdwn", "text": f"*Topic Depth:* {post_topic_depth.replace('_', ' ').title()}"})
+
+    if is_keyword:
+        fields.append({"type": "mrkdwn", "text": f"*Keyword:* {competitor_clean}"})
+        if post_topic_depth and post_topic_depth != "generic_engagement":
+            fields.append({"type": "mrkdwn", "text": f"*Topic Depth:* {post_topic_depth.replace('_', ' ').title()}"})
+    elif competitor and competitor not in ("Apollo", "LinkedIn Jobs"):
+        fields.append({"type": "mrkdwn", "text": f"*Competitor:* {competitor}"})
+    elif competitor in ("Apollo", "LinkedIn Jobs"):
+        fields.append({"type": "mrkdwn", "text": f"*Discovered via:* {competitor}"})
+
     if is_decision_maker:
-        fields.append({"type": "mrkdwn", "text": f"*Role Level:* Decision Maker 🎯"})
+        fields.append({"type": "mrkdwn", "text": "*Role Level:* Decision Maker 🎯"})
 
     blocks.append({
         "type": "section",
         "fields": fields
     })
+
+    if signal_reason:
+        blocks.append({
+            "type": "context",
+            "elements": [{"type": "mrkdwn", "text": f"💡 *Why this lead:* {signal_reason}"}]
+        })
 
     # Add Company Info
     if company_name:
@@ -182,6 +213,175 @@ def build_hot_lead_blocks(
     })
 
     return blocks
+
+def build_lead_digest_blocks(
+    leads: list,
+    rep_name: str = None,
+    source_label: str = None,
+) -> List[Dict[str, Any]]:
+    """
+    Builds a single grouped Slack digest for a batch of qualified leads.
+    Each lead dict: tier ("hot"|"hand_raiser"|"pain_point"|"qualified"),
+    name, linkedin_url, headline, email, email_verification_status,
+    company_name, employee_count, company_industries, intent, sentiment,
+    competitor, signal_reason, post_link, comment, reasoning, is_buy_signal,
+    post_topic_depth.
+    """
+    from datetime import datetime
+    now = datetime.now()
+    date_str = now.strftime("%a, %b ") + str(now.day)
+
+    hot         = [l for l in leads if l.get("tier") == "hot"]
+    hand_raisers = [l for l in leads if l.get("tier") == "hand_raiser"]
+    pain_points  = [l for l in leads if l.get("tier") == "pain_point"]
+    qualified    = [l for l in leads if l.get("tier") == "qualified"]
+
+    summary_parts = []
+    if hot:          summary_parts.append(f"🔥 {len(hot)} hot")
+    if hand_raisers: summary_parts.append(f"🙋 {len(hand_raisers)} hand raiser{'s' if len(hand_raisers) > 1 else ''}")
+    if pain_points:  summary_parts.append(f"🚨 {len(pain_points)} pain point{'s' if len(pain_points) > 1 else ''}")
+    if qualified:    summary_parts.append(f"👀 {len(qualified)} qualified")
+    meta_text = "  ·  ".join(summary_parts)
+    if rep_name:
+        meta_text += f"  |  Assigned to: {rep_name}"
+
+    header_text = "📋 Lead Intelligence Digest"
+    if source_label:
+        header_text += f" — {source_label}"
+    header_text += f" — {date_str}"
+
+    blocks: List[Dict[str, Any]] = [
+        {"type": "header", "text": {"type": "plain_text", "text": header_text, "emoji": True}},
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": meta_text}]},
+        {"type": "divider"},
+    ]
+
+    email_badges = {"ok": "✅", "catch_all": "⚠️", "invalid": "❌", "error": "❓", "unknown": "❓"}
+
+    def add_tier(tier_leads: list, tier_emoji: str, tier_label: str):
+        if not tier_leads:
+            return
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f"{tier_emoji} *{tier_label}* ({len(tier_leads)})"}
+        })
+        for lead in tier_leads:
+            name             = lead.get("name") or "Unknown"
+            headline         = lead.get("headline") or ""
+            url              = lead.get("linkedin_url") or ""
+            email            = lead.get("email")
+            email_status     = lead.get("email_verification_status")
+            company_name     = lead.get("company_name")
+            employee_count   = lead.get("employee_count")
+            company_industries = lead.get("company_industries") or []
+            intent           = lead.get("intent") or ""
+            sentiment        = lead.get("sentiment") or ""
+            competitor       = lead.get("competitor") or ""
+            signal_reason    = lead.get("signal_reason") or ""
+            post_link        = lead.get("post_link")
+            comment          = lead.get("comment") or ""
+            reasoning        = lead.get("reasoning") or ""
+            is_buy_signal    = lead.get("is_buy_signal", False)
+            post_topic_depth = lead.get("post_topic_depth") or ""
+
+            is_keyword = str(competitor).startswith("Keyword:")
+            competitor_clean = competitor.replace("Keyword:", "").strip()
+
+            # ── Line 1: name + headline ─────────────────────────────────
+            line1 = f"*{name}*"
+            if headline:
+                truncated = headline[:85] + ("..." if len(headline) > 85 else "")
+                line1 += f"  |  _{truncated}_"
+
+            lines = [line1]
+
+            # ── Email badge ─────────────────────────────────────────────
+            if email:
+                badge = email_badges.get(email_status or "", "")
+                lines.append(f"📧 {email} {badge}".strip())
+
+            # ── Company + meta row ──────────────────────────────────────
+            detail_parts = []
+            if company_name:
+                co = f"🏢 {company_name}"
+                if employee_count:
+                    co += f" ({employee_count} emp)"
+                if company_industries:
+                    co += f"  ·  {', '.join(company_industries[:2])}"
+                detail_parts.append(co)
+            if intent:
+                intent_label = intent.replace("_", " ").title()
+                if is_buy_signal:
+                    intent_label = f"⚡ {intent_label} (Buy Signal)"
+                detail_parts.append(intent_label)
+            if sentiment:
+                detail_parts.append(f"Sentiment: {sentiment.capitalize()}")
+            if is_keyword and competitor_clean:
+                detail_parts.append(f"Keyword: _{competitor_clean}_")
+            elif competitor and competitor not in ("Apollo", "LinkedIn Jobs"):
+                detail_parts.append(f"via {competitor}")
+            elif competitor in ("Apollo", "LinkedIn Jobs"):
+                detail_parts.append(f"via {competitor}")
+            if post_topic_depth and post_topic_depth != "generic_engagement":
+                detail_parts.append(f"Depth: {post_topic_depth.replace('_', ' ').title()}")
+            if detail_parts:
+                lines.append("  ·  ".join(detail_parts))
+
+            if signal_reason:
+                lines.append(f"💡 *Why this lead:* {signal_reason}")
+
+            lines.append(f"<{url}|View LinkedIn Profile>" if url else "No LinkedIn URL")
+
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "\n".join(lines)}
+            })
+
+            # ── Context block: comment snippet + AI reasoning ───────────
+            context_elements = []
+            if comment:
+                snippet = comment[:200].replace("\n", " ") + ("..." if len(comment) > 200 else "")
+                context_elements.append({"type": "mrkdwn", "text": f"💬 _{snippet}_"})
+            if reasoning:
+                r_clean = reasoning.replace("\n", " ")
+                context_elements.append({"type": "mrkdwn", "text": f"🤖 *AI:* {r_clean}"})
+            if context_elements:
+                blocks.append({"type": "context", "elements": context_elements})
+
+            # ── Action buttons ──────────────────────────────────────────
+            action_elements = [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Analyze Lead"},
+                    "style": "primary",
+                    "action_id": "analyze_lead",
+                    "value": url or "unknown",
+                }
+            ]
+            if post_link:
+                action_elements.append({
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "View Post"},
+                    "url": post_link,
+                })
+            action_elements.append({
+                "type": "button",
+                "text": {"type": "plain_text", "text": "Ignore"},
+                "action_id": "ignore_lead",
+                "value": url or "unknown",
+            })
+            blocks.append({"type": "actions", "elements": action_elements})
+
+        blocks.append({"type": "divider"})
+
+    add_tier(hot,          "🔥", "HOT LEADS")
+    add_tier(hand_raisers, "🙋", "HAND RAISERS")
+    add_tier(pain_points,  "🚨", "PAIN POINTS")
+    add_tier(qualified,    "👀", "QUALIFIED LEADS")
+
+    # Slack enforces a 50-block limit per message
+    return blocks[:50]
+
 
 def build_generic_activity_blocks(title: str, description: str, metadata: dict = None, rep_name: str = None) -> List[Dict[str, Any]]:
     """

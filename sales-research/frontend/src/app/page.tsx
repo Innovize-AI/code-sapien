@@ -39,63 +39,40 @@ export default function Home() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
   const [recentReports, setRecentReports] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(!isOnboarded); // Initial state depends on cache
+  // Only block render for the onboarding check — all data sections load independently
+  const [onboardingChecked, setOnboardingChecked] = useState(isOnboarded);
 
   useEffect(() => {
-    // Wait for auth to initialize and ensure we have a user
     if (authLoading || !user) return;
 
-    const loadDashboardData = async () => {
-      try {
-        if (!isOnboarded) {
-          // Cache says NOT onboarded → block and eagerly verify before rendering.
-          setIsLoading(true);
-          const complete = await checkOnboarding();
-          if (!complete) {
-            router.push("/onboarding");
-            return;
-          }
-        } else {
-          // Cache says onboarded → render dashboard immediately (no loading delay),
-          // then re-validate in the background. Only redirect if the server disagrees.
-          checkOnboarding().then((complete) => {
-            if (!complete) {
-              router.push("/onboarding");
-            }
-          });
-        }
-
-        if (!user) return;
-
-        // Fetch dashboard data
-        setIsLoading(true);
-        const [statsData, historyData, analyticsData] = await Promise.all([
-          fetchDashboardStats(),
-          fetchHistory(),
-          fetchDashboardAnalytics(),
-        ]);
-        setStats(statsData);
-        setAnalytics(analyticsData);
-        // Sort by date desc and take top 5
-        const sortedHistory = (historyData?.items || [])
-          .sort(
-            (a: any, b: any) =>
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime(),
-          )
-          .slice(0, 5);
-        setRecentReports(sortedHistory);
-        setIsLoading(false);
-      } catch (e) {
-        console.error("Failed to load dashboard data", e);
-        setIsLoading(false);
+    const init = async () => {
+      if (!isOnboarded) {
+        const complete = await checkOnboarding();
+        if (!complete) { router.push("/onboarding"); return; }
+      } else {
+        checkOnboarding().then((complete) => { if (!complete) router.push("/onboarding"); });
       }
+      setOnboardingChecked(true);
+
+      // Each section fires independently — page renders as each one resolves
+      fetchDashboardStats().then(setStats).catch(console.error);
+
+      fetchDashboardAnalytics("30d").then(setAnalytics).catch(console.error);
+
+      fetchHistory()
+        .then((h) => {
+          const sorted = (h?.items || [])
+            .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 5);
+          setRecentReports(sorted);
+        })
+        .catch(console.error);
     };
 
-    loadDashboardData();
+    init();
   }, [router, authLoading, user]);
 
-  if (isLoading) {
+  if (!onboardingChecked) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -246,7 +223,7 @@ export default function Home() {
         </div>
 
         {/* Analytics Section */}
-        {analytics && <AnalyticsCharts data={analytics} />}
+        {analytics && <AnalyticsCharts initialData={analytics} />}
 
         {/* Main Content Grid */}
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">

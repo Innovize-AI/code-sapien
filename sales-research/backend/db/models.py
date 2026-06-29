@@ -19,8 +19,8 @@ class ResearchReport(Base):
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     
     organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-    created_by_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-    
+    created_by_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # rep who triggered the research
+
     # Input Data
     linkedin_url = Column(Text, nullable=True)
     normalized_linkedin_url = Column(Text, nullable=True, index=True)
@@ -63,7 +63,6 @@ class ResearchReport(Base):
     project_urgency = Column(Integer, nullable=True)
     
     # Ownership & Context
-    created_by_id = Column(UUID(as_uuid=True), nullable=True) # Tagging the rep
     icp_context = Column(Text, nullable=True) # Snapshotted ICP used for this report
 
     # Outreach Tracking

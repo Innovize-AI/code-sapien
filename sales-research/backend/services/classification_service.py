@@ -2,16 +2,48 @@ import asyncio
 import json
 import logging
 import os
-from typing import List
+import re
+from typing import List, Optional
 from sqlalchemy import select, update
 
 logger = logging.getLogger(__name__)
+
+
+def _headcount_in_icp(employee_count: Optional[int], icp_data: Optional[dict]) -> bool:
+    """
+    Returns True if employee_count falls within any range defined in icp_data.company_size.
+    Returns True (pass-through) when icp_data has no company_size or employee_count is unknown.
+    """
+    if not icp_data or not employee_count:
+        return True  # can't filter without data — let Apollo decide via revalidation
+
+    raw = icp_data.get("company_size")
+    if not raw:
+        return True
+
+    sizes = raw if isinstance(raw, list) else [raw]
+    for size in sizes:
+        size = str(size).strip()
+        if "+" in size:
+            min_val = int(re.sub(r"[^\d]", "", size.split("+")[0]) or 0)
+            if employee_count >= min_val:
+                return True
+        elif "-" in size:
+            parts = re.split(r"[-–]", size)
+            try:
+                min_val = int(re.sub(r"[^\d]", "", parts[0]))
+                max_val = int(re.sub(r"[^\d]", "", parts[1]))
+                if min_val <= employee_count <= max_val:
+                    return True
+            except (ValueError, IndexError):
+                continue
+    return False
 
 from db.database import SessionLocal
 from db.models import IdentifiedProfile, OrganizationSettings, Company
 from db.crud import batch_upsert_identified_profiles, upsert_company, get_active_icp
 from utils.activity_helper import log_activity_and_notify
-from agents.linkedin_agent import batch_classify_profiles_async, enrich_company_waterfall
+from agents.linkedin_agent import batch_classify_profiles_async, enrich_company_waterfall, get_company_details
 from agents.lead_scoring_agent import revalidate_lead_fit_async
 from utils.sse_manager import event_manager
 from utils.trial_utils import check_trial_classification_limit
@@ -95,6 +127,7 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                 continue
             n_url = normalize_linkedin_url(l_url)
             if n_url not in unique_profiles_map:
+                competitor_val = lead.get("competitor") or ""
                 unique_profiles_map[n_url] = {
                     "id": n_url,
                     "headline": lead.get("headline", ""),
@@ -102,7 +135,8 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                     "source_post": lead.get("source_post", ""),
                     "name": lead.get("name"),
                     "source_post_url": lead.get("source_post_url"),
-                    "competitor": lead.get("competitor")
+                    "competitor": competitor_val,
+                    "discovery_source": "keyword" if str(competitor_val).startswith("Keyword:") else "other"
                 }
         
         unique_profiles_list = list(unique_profiles_map.values())
@@ -154,6 +188,7 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
         batch_size = 100
         leads_to_process = list(unique_profiles_map.values())
         new_profiles_list = [p for p in leads_to_process if p["id"] not in existing_urls]
+        digest_leads = []  # Accumulated across all batches for a single grouped Slack digest
         
         for i in range(0, len(leads_to_process), batch_size):
             batch = leads_to_process[i : i + batch_size]
@@ -256,8 +291,10 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                     has_high_intent = lu.get("intent") in ["prospect_pain", "pain_point", "demo_interest"]
                     has_high_friction_topic = lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]
                     is_hot_candidate = lu.get("is_fit") and lu.get("is_decision_maker") and (lu.get("is_buy_signal") or has_high_intent or has_high_friction_topic)
-                    
+                    is_slack_candidate = lu.get("is_fit") and lu.get("is_decision_maker")
+
                     if is_hot_candidate:
+                        # Full enrichment: Apollo People Match → email + company data + ICP revalidation
                         try:
                             enriched = await enrich_company_waterfall(
                                 person_url=lu.get("linkedin_url"),
@@ -269,32 +306,30 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                                         company_data_for_upsert = enriched.copy()
                                         person_email = company_data_for_upsert.pop("person_email", None)
                                         email_status = company_data_for_upsert.pop("email_verification_status", None)
-                                        
+
                                         if person_email: lu["email"] = person_email
                                         if email_status: lu["email_verification_status"] = email_status
-                                        
+
                                         profile_stmt = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url == lu.get("linkedin_url"))
                                         db_profile = (await session.execute(profile_stmt)).scalar_one_or_none()
-                                        
-                                        update_vals = {}
+
                                         if db_profile:
                                             lu["id"] = str(db_profile.id)
                                             if person_email: db_profile.email = person_email
                                             if email_status: db_profile.email_verification_status = email_status
-                                            
+
                                             if enriched.get("person_name"):
                                                 db_profile.name = enriched["person_name"]
                                                 lu["name"] = enriched["person_name"]
                                             if enriched.get("headline"):
                                                 db_profile.headline = enriched["headline"]
                                                 lu["headline"] = enriched["headline"]
-                                            
-                                            # Metadata sync
+
                                             try:
                                                 current_meta = json.loads(db_profile.profile_metadata or "{}")
                                             except:
                                                 current_meta = {}
-                                            
+
                                             current_meta.update({
                                                 "person_email": person_email,
                                                 "is_enriched": True,
@@ -303,7 +338,6 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                                             db_profile.profile_metadata = json.dumps(current_meta)
                                             lu["profile_metadata"] = current_meta
 
-                                        # Company Upsert
                                         if enriched.get("linkedin_url") or enriched.get("domain"):
                                             company = await upsert_company(
                                                 session, company_data_for_upsert,
@@ -312,8 +346,7 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                                             )
                                             lu["company_id"] = str(company.id)
                                             if db_profile: db_profile.company_id = company.id
-                                            
-                                        # Re-validation
+
                                         new_fit, new_reasoning = await revalidate_lead_fit_async(lu, enriched, icp_data)
                                         lu["is_fit"] = new_fit
                                         lu["fit_reasoning"] = new_reasoning
@@ -322,34 +355,176 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                                             db_profile.fit_reasoning = new_reasoning
 
                         except Exception as ee:
-                            logger.error(f"Error enriching {lu.get('name')}: {ee}")
+                            logger.error(f"Error in hot enrichment for {lu.get('name')}: {ee}")
+
+                    elif is_slack_candidate:
+                        # Lightweight headcount-only path: LinkedIn RapidAPI → Apollo fallback → ICP revalidation
+                        try:
+                            employee_count = lu.get("employee_count")
+                            company_linkedin_url = lu.get("company_linkedin_url")
+
+                            # 1. Try LinkedIn company page (no Apollo credit)
+                            if not employee_count and company_linkedin_url:
+                                identifier = company_linkedin_url.rstrip("/").split("/")[-1]
+                                company_res = await asyncio.to_thread(get_company_details, identifier)
+                                if company_res:
+                                    employee_count = (company_res.get("stats") or {}).get("employee_count")
+                                if employee_count:
+                                    lu["employee_count"] = employee_count
+                                    logger.info(f"Headcount resolved via LinkedIn for {lu.get('name')}: {employee_count}")
+
+                            # 2. Apollo — only run if headcount passes ICP or is still unknown
+                            fallback_email = None
+                            fallback_email_status = None
+                            headcount_known = employee_count is not None
+                            headcount_passes_icp = _headcount_in_icp(employee_count, icp_data)
+
+                            if not headcount_known or headcount_passes_icp:
+                                # headcount unknown → Apollo is last resort for both headcount + email
+                                # headcount passes ICP → Apollo only for email (cheap, already paying)
+                                fallback = await enrich_company_waterfall(
+                                    person_url=lu.get("linkedin_url"),
+                                    million_verifier_enabled=million_verifier_enabled
+                                )
+                                if fallback:
+                                    if not employee_count:
+                                        employee_count = fallback.get("employee_count")
+                                        if employee_count:
+                                            lu["employee_count"] = employee_count
+                                    if fallback.get("company_name"):
+                                        lu["company_name"] = fallback["company_name"]
+                                    if fallback.get("industries"):
+                                        lu["company_industries"] = fallback["industries"]
+                                    fallback_email = fallback.get("person_email")
+                                    fallback_email_status = fallback.get("email_verification_status")
+                                    if fallback_email:
+                                        lu["email"] = fallback_email
+                                    if fallback_email_status:
+                                        lu["email_verification_status"] = fallback_email_status
+                            else:
+                                logger.info(f"Skipping Apollo for {lu.get('name')} — headcount {employee_count} outside ICP range")
+
+                            # 3. ICP revalidation + persist email if resolved
+                            company_metrics = {"employee_count": lu.get("employee_count"), "industries": lu.get("company_industries")}
+                            async with SessionLocal() as session:
+                                async with session.begin():
+                                    profile_stmt = select(IdentifiedProfile).where(IdentifiedProfile.linkedin_url == lu.get("linkedin_url"))
+                                    db_profile = (await session.execute(profile_stmt)).scalar_one_or_none()
+                                    new_fit, new_reasoning = await revalidate_lead_fit_async(lu, company_metrics, icp_data)
+                                    lu["is_fit"] = new_fit
+                                    lu["fit_reasoning"] = new_reasoning
+                                    if db_profile:
+                                        db_profile.is_fit = new_fit
+                                        db_profile.fit_reasoning = new_reasoning
+                                        if fallback_email:
+                                            db_profile.email = fallback_email
+                                        if fallback_email_status:
+                                            db_profile.email_verification_status = fallback_email_status
+
+                        except Exception as ee:
+                            logger.error(f"Error in headcount check for {lu.get('name')}: {ee}")
                             
                     # FINAL CLASSIFICATION for Slack
+                    import hashlib
                     has_high_intent = lu.get("intent") in ["prospect_pain", "pain_point"]
                     is_hot = lu.get("is_fit") and lu.get("is_decision_maker") and (lu.get("is_buy_signal") or has_high_intent or (lu.get("post_topic_depth") in ["discovery_friction", "complaining_keywords"]))
 
-                    if lu.get("is_fit"):
-                        import hashlib
+                    if lu.get("is_fit") and lu.get("is_decision_maker"):
                         lead_url = lu.get("linkedin_url")
                         current_comment = (lu.get("comment") or "").strip()
-                        raw_key = f"{lead_url}:{current_comment}"
-                        idempotency_key = f"lead_interaction:{hashlib.md5(raw_key.encode()).hexdigest()}"
+                        idempotency_key = f"lead_interaction:{hashlib.md5(f'{lead_url}:{current_comment}'.encode()).hexdigest()}"
 
-                        if is_hot: title_prefix = "🔥 Hot Lead"
-                        elif lu.get("intent") == "hand_raiser": title_prefix = "🙋 Hand Raiser"
-                        elif lu.get("intent") == "pain_point": title_prefix = "🚨 Pain Point"
-                        else: title_prefix = "👀 Qualified Lead"
+                        competitor_val = lu.get("competitor") or ""
+                        is_keyword_lead = str(competitor_val).startswith("Keyword:")
+
+                        if is_hot:
+                            title_prefix = "🔥 Hot Lead"
+                        elif lu.get("intent") == "hand_raiser":
+                            title_prefix = "🙋 Hand Raiser"
+                        elif lu.get("intent") in ("pain_point", "prospect_pain"):
+                            title_prefix = "🚨 Pain Point"
+                        else:
+                            title_prefix = "👀 Qualified Lead"
+
+                        # Build a human-readable signal reason for the Slack notification
+                        if is_hot:
+                            if lu.get("is_buy_signal"):
+                                signal_reason = "Explicit buying signal detected in their comment"
+                            elif lu.get("intent") in ("prospect_pain", "pain_point"):
+                                signal_reason = "Expressed genuine frustration with current tools or process"
+                            elif lu.get("post_topic_depth") == "discovery_friction":
+                                signal_reason = "Mentioned struggle with lead discovery or data quality"
+                            elif lu.get("post_topic_depth") == "complaining_keywords":
+                                signal_reason = "Complained about specific industry tools or keywords"
+                            else:
+                                signal_reason = "Strong ICP match with high-intent signals"
+                        elif lu.get("intent") == "hand_raiser":
+                            signal_reason = "Explicitly asked for more information or a demo"
+                        elif lu.get("intent") in ("pain_point", "prospect_pain"):
+                            signal_reason = "Expressed pain with current solution or process"
+                        elif lu.get("intent") == "passive_expert":
+                            signal_reason = "Sharing relevant expertise — authority signal"
+                        else:
+                            signal_reason = "Decision maker at ICP company — no active signal yet"
+
+                        # Build title context based on discovery source
+                        if is_keyword_lead:
+                            keyword = competitor_val.replace("Keyword:", "").strip()
+                            title_context = f"found via keyword '{keyword}'"
+                        elif competitor_val == "Apollo":
+                            title_context = "found via Apollo Discovery"
+                        elif competitor_val == "LinkedIn Jobs":
+                            title_context = "found via LinkedIn Jobs"
+                        elif competitor_val:
+                            title_context = f"spotted on {competitor_val}"
+                        else:
+                            title_context = "discovered"
+
+                        lu["signal_reason"] = signal_reason
+                        lu["discovery_source"] = "keyword" if is_keyword_lead else "other"
+
+                        # Determine tier for the digest grouping
+                        if is_hot:
+                            lead_tier = "hot"
+                        elif lu.get("intent") == "hand_raiser":
+                            lead_tier = "hand_raiser"
+                        elif lu.get("intent") in ("pain_point", "prospect_pain"):
+                            lead_tier = "pain_point"
+                        else:
+                            lead_tier = "qualified"
+
+                        digest_leads.append({
+                            "tier":                      lead_tier,
+                            "name":                      lu.get("name"),
+                            "headline":                  lu.get("headline"),
+                            "linkedin_url":              lu.get("linkedin_url"),
+                            "email":                     lu.get("email"),
+                            "email_verification_status": lu.get("email_verification_status"),
+                            "company_name":              lu.get("company_name"),
+                            "employee_count":            lu.get("employee_count"),
+                            "company_industries":        lu.get("company_industries"),
+                            "intent":                    lu.get("intent"),
+                            "sentiment":                 lu.get("sentiment"),
+                            "competitor":                lu.get("competitor"),
+                            "signal_reason":             signal_reason,
+                            "post_link":                 lu.get("source_post_url"),
+                            "comment":                   lu.get("comment"),
+                            "reasoning":                 lu.get("fit_reasoning"),
+                            "is_buy_signal":             lu.get("is_buy_signal", False),
+                            "post_topic_depth":          lu.get("post_topic_depth"),
+                        })
 
                         async with SessionLocal() as session:
                             await log_activity_and_notify(
                                 session,
                                 type="high_potential" if is_hot else "comment",
-                                title=f"{title_prefix}: {lu.get('name') or 'Someone'} linked to {lu.get('competitor') or 'competitor'}",
+                                title=f"{title_prefix}: {lu.get('name') or 'Someone'} {title_context}",
                                 description=f"Intent: {lu.get('intent')} | Sentiment: {lu.get('sentiment')}\nComment: {lu.get('comment')}",
                                 metadata=lu,
                                 user_id=user_id,
                                 org_id=org_id,
-                                idempotency_key=idempotency_key
+                                idempotency_key=idempotency_key,
+                                send_slack=False,  # Slack sent as grouped digest after all batches
                             )
 
                 # Final broadcast: Merge company data into lu before broadcasting
@@ -381,6 +556,66 @@ async def run_classification_and_update(raw_leads: List[dict], user_id: str | No
                 }, org_id=org_id)
             else:
                  logger.debug(f"Batch {i//batch_size + 1} empty.")
+
+        # ── Send grouped Slack digest for all leads that qualified this run ──────
+        if digest_leads:
+            try:
+                from db.crud import get_org_settings
+                from db.models import Profile
+                from utils.slack_block_builder import build_lead_digest_blocks
+                from utils.slack import send_slack_notification
+
+                async with SessionLocal() as session:
+                    settings = await get_org_settings(session, user_id=user_id, org_id=org_id)
+                    if settings and settings.slack_webhook_url:
+                        slack_enabled = True
+                        if settings.integrations_config:
+                            try:
+                                cfg = json.loads(settings.integrations_config)
+                                if cfg.get("slack") and not cfg["slack"].get("enabled", True):
+                                    slack_enabled = False
+                            except Exception:
+                                pass
+
+                        if slack_enabled:
+                            rep_name = None
+                            if user_id:
+                                result = await session.execute(select(Profile).where(Profile.id == user_id))
+                                profile = result.scalars().first()
+                                if profile:
+                                    rep_name = profile.email.split("@")[0].replace(".", " ").title()
+
+                            # Derive source label from the leads themselves
+                            keywords = {
+                                l["competitor"].replace("Keyword:", "").strip()
+                                for l in digest_leads
+                                if str(l.get("competitor", "")).startswith("Keyword:")
+                            }
+                            competitor_names = {
+                                l["competitor"] for l in digest_leads
+                                if l.get("competitor") and not str(l["competitor"]).startswith("Keyword:")
+                                and l["competitor"] not in ("Apollo", "LinkedIn Jobs")
+                            }
+                            if keywords and not competitor_names:
+                                source_label = f"'{', '.join(sorted(keywords))}'"
+                            elif competitor_names and not keywords:
+                                source_label = f"Competitor: {', '.join(sorted(competitor_names))}"
+                            else:
+                                source_label = None
+
+                            blocks = build_lead_digest_blocks(
+                                digest_leads, rep_name=rep_name, source_label=source_label
+                            )
+                            total = len(digest_leads)
+                            hot_count = sum(1 for l in digest_leads if l["tier"] == "hot")
+                            fallback = (
+                                f"📋 {total} lead{'s' if total > 1 else ''} qualified"
+                                + (f" ({hot_count} hot)" if hot_count else "")
+                            )
+                            await send_slack_notification(settings.slack_webhook_url, fallback, blocks=blocks)
+                            logger.info(f"Digest sent: {total} leads ({hot_count} hot) to Slack")
+            except Exception as digest_err:
+                logger.error(f"Error sending digest to Slack: {digest_err}", exc_info=True)
 
     except Exception as e:
         logger.error(f"CRITICAL Error in classification: {e}", exc_info=True)

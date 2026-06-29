@@ -8,14 +8,15 @@ from utils.slack import send_slack_notification
 from utils.slack_block_builder import build_hot_lead_blocks, build_generic_activity_blocks, build_research_completed_blocks
 
 async def log_activity_and_notify(
-    db: AsyncSession, 
-    type: str, 
-    title: str, 
-    description: str = None, 
+    db: AsyncSession,
+    type: str,
+    title: str,
+    description: str = None,
     metadata: dict = None,
     user_id: str = None,
     org_id: str = None,
-    idempotency_key: str = None
+    idempotency_key: str = None,
+    send_slack: bool = True,
 ):
     """
     Logs an activity to the database and sends a Slack notification if configured.
@@ -77,27 +78,28 @@ async def log_activity_and_notify(
         else:
             logger.info("DEBUG: Slack notification skipped because it is disabled in integrations config.")
 
+    if webhook_url and not send_slack:
+        logger.info(f"DEBUG: Slack suppressed (send_slack=False) for '{title}' — will be included in digest.")
+        await db.commit()
+        return
+
     if webhook_url:
         blocks = None
-        
+
         # Build specific blocks based on type/metadata
         if type == "high_potential" or (metadata and metadata.get("is_fit")) or (type == "comment" and metadata and metadata.get("linkedin_url")):
-            # Determine source text
-            source_text = "Competitor Comment"
-            competitor_val = metadata.get("competitor", "")
-            if competitor_val and competitor_val.startswith("Keyword:"):
-                 source_text = competitor_val
+            competitor_val = metadata.get("competitor", "") or ""
+            discovery_source = metadata.get("discovery_source") or ("keyword" if str(competitor_val).startswith("Keyword:") else "other")
 
             blocks = build_hot_lead_blocks(
                 name=metadata.get("name", "Unknown"),
                 headline=metadata.get("headline", ""),
                 linkedin_url=metadata.get("linkedin_url", ""),
                 comment=metadata.get("comment", ""),
-                competitor=metadata.get("competitor", ""),
+                competitor=competitor_val,
                 intent=intent or "curious",
                 sentiment=sentiment or "neutral",
                 reasoning=metadata.get("fit_reasoning", ""),
-                source=source_text,
                 post_link=metadata.get("source_post_url"),
                 rep_name=rep_name,
                 title=title,
@@ -109,8 +111,11 @@ async def log_activity_and_notify(
                 is_buy_signal=metadata.get("is_buy_signal", False),
                 is_strategic_seller=metadata.get("is_strategic_seller", False),
                 email=metadata.get("email"),
+                email_verification_status=metadata.get("email_verification_status"),
                 post_topic_depth=metadata.get("post_topic_depth"),
-                is_decision_maker=metadata.get("is_decision_maker", False)
+                is_decision_maker=metadata.get("is_decision_maker", False),
+                discovery_source=discovery_source,
+                signal_reason=metadata.get("signal_reason"),
             )
         elif type == "analysis" and metadata and metadata.get("report_id"):
             blocks = build_research_completed_blocks(

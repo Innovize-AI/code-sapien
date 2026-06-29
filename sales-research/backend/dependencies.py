@@ -17,7 +17,7 @@ _PROVISIONING_LOCKS = set()
 # Keyed on user_id (str). Stores (profile, cached_at) pairs.
 # Evicted after _PROFILE_CACHE_TTL seconds or on explicit invalidation.
 _PROFILE_CACHE: dict[str, tuple["Profile", float]] = {}
-_PROFILE_CACHE_TTL = 60  # seconds
+_PROFILE_CACHE_TTL = 300  # seconds — invalidated explicitly on writes, so 5min is safe
 
 
 def _get_cached_profile(user_id: str):
@@ -58,21 +58,28 @@ async def get_current_user(
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
 
+    import logging as _logging
+    _dep_log = _logging.getLogger("dependencies")
+    _dep_t0 = time.monotonic()
+
     user_response = auth_service.get_user(token)
-    
+    _dep_log.info("get_current_user: jwt=%.0fms", (time.monotonic() - _dep_t0) * 1000)
+
     if not user_response or not user_response.user:
         raise HTTPException(status_code=401, detail="Invalid token")
-        
+
     user_id = user_response.user.id
 
-    # --- Fast path: return cached profile for already-provisioned users ------
+    # --- Fast path: any returning user with an org already set ---------------
+    # Covers both trial (migration_complete) and non-trial users.
+    # Only skip cache if org_id is missing (new signup) or not yet linked.
     cached = _get_cached_profile(user_id)
-    if cached is not None:
-        import json
-        _meta = json.loads(cached.profile_metadata or "{}") if isinstance(cached.profile_metadata, str) else (cached.profile_metadata or {})
-        if _meta.get("migration_complete"):
-            return cached
+    if cached is not None and cached.organization_id:
+        _dep_log.info("get_current_user: profile cache hit in %.0fms", (time.monotonic() - _dep_t0) * 1000)
+        return cached
     # -------------------------------------------------------------------------
+
+    _dep_log.info("get_current_user: profile cache miss, running db queries")
 
     # Check Profile
     result = await db.execute(select(Profile).where(Profile.id == user_id))
@@ -174,14 +181,14 @@ async def get_current_user(
     user_meta = json.loads(profile.profile_metadata or "{}") if isinstance(profile.profile_metadata, str) else (profile.profile_metadata or {})
     is_migrated = user_meta.get("migration_complete", False)
     is_provisioning = user_meta.get("provisioning_started", False)
-    
-    # If already migrated, cache and return immediately
-    if is_migrated:
+
+    # Cache as soon as org is linked — provisioning state doesn't affect auth.
+    # The 60s TTL is fine; the background task invalidates on completion anyway.
+    if profile.organization_id:
         _cache_profile(profile)
-        return profile
-        
+
     user_id_str = str(profile.id)
-    if is_provisioning or user_id_str in _PROVISIONING_LOCKS:
+    if is_migrated or is_provisioning or user_id_str in _PROVISIONING_LOCKS:
         return profile
         
     # Mark as provisioning immediately to prevent parallel tasks

@@ -1316,75 +1316,169 @@ async def get_posts_by_keyword(keywords: List[str]):
         logger.error(f"Error in get_posts_by_keyword: {e}")
         return []
 
+async def _fetch_post_comments(post_urn: str, headers: dict, linkedin_base_url: str) -> list:
+    """Fetch top-level comments for a single post URN. Returns list of comment dicts."""
+    try:
+        url = f"{linkedin_base_url.rstrip('/')}/post/comments"
+        resp = await asyncio.to_thread(
+            requests.get, url,
+            headers=headers,
+            params={"post_url": post_urn, "page_number": 1},
+            timeout=20
+        )
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+        return data.get("data", {}).get("comments", []) or data.get("comments", [])
+    except Exception as e:
+        logger.debug(f"Could not fetch comments for {post_urn}: {e}")
+        return []
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 async def discover_leads_from_keywords(keywords: List[str]):
     """
     High-level function to discover leads via keyword search.
     1. Fetches posts matching keywords.
     2. Extracts the AUTHOR of each post as a lead.
+    3. Also fetches commenters on each post — they often have higher intent
+       than the author (expressing agreement, pain, or a specific reaction).
     """
+    api_key = os.getenv("RAPID_API_KEY")
+    linkedin_base_url = os.getenv("LINKEDIN_RAPID_BASE_URL", "")
+    headers = {
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": linkedin_base_url.replace("https://", "").split("/")[0]
+    }
+
     posts = await get_posts_by_keyword(keywords)
-    logger.debug(f"Processing {len(posts)} posts for leads extraction...")
-    
+    logger.debug(f"Processing {len(posts)} posts for leads extraction (authors + commenters)...")
+
     leads = []
     seen_urls = set()
-    
-    for post in posts:
+
+    def _extract_post_meta(post):
+        post_id = post.get("id") or post.get("urn")
+        if isinstance(post_id, dict):
+            post_id = post_id.get("activity_urn")
+        elif isinstance(post_id, str) and ":" in post_id:
+            post_id = post_id.split(":")[-1]
+        source_url = post.get("post_url") or post.get("url")
+        if not source_url and post_id:
+            source_url = f"https://www.linkedin.com/feed/update/urn:li:activity:{post_id}"
+        urn = post.get("urn")
+        if isinstance(urn, dict):
+            urn = urn.get("activity_urn", "")
+        return post_id, source_url, urn or ""
+
+    def _add_lead(linkedin_url, name, headline, comment_text, source_post_text, source_post_url, keyword):
+        url = linkedin_url.split("?")[0].strip().strip("/")
+        if not url or url in seen_urls:
+            return
+        seen_urls.add(url)
+        leads.append({
+            "name": name or "Unknown",
+            "headline": headline or "",
+            "linkedin_url": url,
+            "comment": comment_text,
+            "source_post": source_post_text[:100] + "..." if len(source_post_text) > 100 else source_post_text,
+            "source_post_url": source_post_url or "",
+            "competitor": f"Keyword: {keyword}",
+            "is_fit": False,
+            "is_competitor": False,
+            "is_decision_maker": False,
+            "fit_reasoning": "",
+        })
+
+    # Fetch comments for all posts in parallel (cap at 20 posts to limit API calls)
+    posts_to_fetch = posts[:20]
+    comment_tasks = []
+    for post in posts_to_fetch:
+        _, _, urn = _extract_post_meta(post)
+        if urn:
+            comment_tasks.append(_fetch_post_comments(urn, headers, linkedin_base_url))
+        else:
+            async def _empty():
+                return []
+            comment_tasks.append(_empty())
+
+    all_comments = await asyncio.gather(*comment_tasks, return_exceptions=True)
+
+    for post, post_comments in zip(posts_to_fetch, all_comments):
         try:
+            post_text = post.get("text", "")
+            matched_keyword = post.get("matched_keyword", "Keyword Search")
+            _, source_post_url, _ = _extract_post_meta(post)
+
+            # 1. Post author
+            author = post.get("author", {})
+            if author:
+                author_url = author.get("profile_url") or author.get("url")
+                if not author_url and author.get("username"):
+                    author_url = f"https://www.linkedin.com/in/{author['username']}"
+                if author_url:
+                    _add_lead(
+                        author_url,
+                        author.get("name"),
+                        author.get("headline") or author.get("subtitle") or author.get("description", ""),
+                        f"Posted about keywords: {post_text[:200]}...",
+                        post_text,
+                        source_post_url,
+                        matched_keyword,
+                    )
+
+            # 2. Commenters
+            if isinstance(post_comments, list):
+                for comment in post_comments[:15]:  # cap per post
+                    c_author = comment.get("author") or comment.get("commenter") or {}
+                    c_url = c_author.get("profile_url") or c_author.get("url")
+                    if not c_url and c_author.get("username"):
+                        c_url = f"https://www.linkedin.com/in/{c_author['username']}"
+                    if not c_url:
+                        continue
+                    c_text = comment.get("text") or comment.get("comment") or ""
+                    if not c_text.strip():
+                        continue
+                    _add_lead(
+                        c_url,
+                        c_author.get("name"),
+                        c_author.get("headline") or c_author.get("subtitle") or c_author.get("description", ""),
+                        c_text,           # raw commenter text — NOT prefixed with "Posted about keywords:"
+                        post_text,        # the post they commented on
+                        source_post_url,
+                        matched_keyword,
+                    )
+
+        except Exception as e:
+            logger.error(f"Error extracting leads from post: {e}")
+            continue
+
+    # Include any posts beyond the first 20 as author-only leads
+    for post in posts[20:]:
+        try:
+            post_text = post.get("text", "")
+            matched_keyword = post.get("matched_keyword", "Keyword Search")
+            _, source_post_url, _ = _extract_post_meta(post)
             author = post.get("author", {})
             if not author:
                 continue
-                
-            linkedin_url = author.get("profile_url") or author.get("url")
-            if not linkedin_url and author.get("username"):
-                linkedin_url = f"https://www.linkedin.com/in/{author.get('username')}"
-                
-            if not linkedin_url:
-                continue
-            
-            # Normalize
-            linkedin_url = linkedin_url.split("?")[0].strip().strip("/")
-            
-            if linkedin_url in seen_urls:
-                continue
-                
-            seen_urls.add(linkedin_url)
-            
-            headline = author.get("headline") or author.get("subtitle") or author.get("description") or ""
-            post_text = post.get("text", "")
-            
-            # Post URL
-            post_id = post.get("id") or post.get("urn")
-            if isinstance(post_id, dict): post_id = post_id.get("activity_urn")
-            elif isinstance(post_id, str) and ":" in post_id: post_id = post_id.split(":")[-1]
-            
-            source_post_url = post.get("post_url") or post.get("url")
-            if not source_post_url and post_id:
-                 source_post_url = f"https://www.linkedin.com/feed/update/urn:li:activity:{post_id}"
-
-            # Get matched keyword
-            matched_keyword = post.get("matched_keyword", "Keyword Search")
-            competitor_source = f"Keyword: {matched_keyword}"
-
-            leads.append({
-                "name": author.get("name") or "Unknown",
-                "headline": headline,
-                "linkedin_url": linkedin_url,
-                "comment": f"Posted about keywords: {post_text[:200]}...", # Storing post text as 'comment' context
-                "source_post": post_text[:100] + "...",
-                "source_post_url": source_post_url or "",
-                "competitor": competitor_source, # Marker with keyword
-                "is_fit": False,
-                "is_competitor": False,
-                "is_decision_maker": False,
-                "fit_reasoning": ""
-            })
-            
-        except Exception as e:
-            logger.error(f"Error extracting lead from post: {e}")
+            author_url = author.get("profile_url") or author.get("url")
+            if not author_url and author.get("username"):
+                author_url = f"https://www.linkedin.com/in/{author['username']}"
+            if author_url:
+                _add_lead(
+                    author_url,
+                    author.get("name"),
+                    author.get("headline") or author.get("subtitle") or author.get("description", ""),
+                    f"Posted about keywords: {post_text[:200]}...",
+                    post_text,
+                    source_post_url,
+                    matched_keyword,
+                )
+        except Exception:
             continue
-            
-    logger.debug(f"Extracted {len(leads)} unique leads from keyword search posts.")
+
+    logger.info(f"Keyword discovery: {len(leads)} unique leads ({len(posts)} posts, authors + commenters).")
     return leads
 
 

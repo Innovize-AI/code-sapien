@@ -178,6 +178,8 @@ def map_apollo_person(person: dict, is_enriched: bool = True) -> dict:
     country = person.get("country")
     location = f"{city}, {country}" if city and country else (city or country or "N/A")
 
+    company_linkedin_url = org.get("linkedin_url")
+
     return {
         "url": final_url,
         "website": website,
@@ -186,6 +188,7 @@ def map_apollo_person(person: dict, is_enriched: bool = True) -> dict:
         "is_enriched": is_enriched,
         "email": person.get("email"),
         "company_name": org_name,
+        "company_linkedin_url": company_linkedin_url,
         "industry": org.get("industry") or org.get("primary_industry"),
         "employee_count": org.get("estimated_num_employees") or org.get("num_employees"),
         "revenue_estimate": org.get("annual_revenue_printed") or org.get("organization_revenue_printed"),
@@ -197,6 +200,7 @@ def map_apollo_person(person: dict, is_enriched: bool = True) -> dict:
             "seniority": person.get("seniority"),
             "apollo_id": pid,
             "company_name": org_name,
+            "company_linkedin_url": company_linkedin_url,
             "apollo_org_id": apollo_org_id,
             "industry": org.get("industry"),
             "city": city,

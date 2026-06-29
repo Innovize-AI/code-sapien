@@ -274,13 +274,16 @@ async def apollo_discovery_rule_task(rule_id: str):
                     "website": l.get("website", ""),
                     "created_by_id": rule.created_by_id,
                     "organization_id": rule.organization_id,
-                    "competitor": "Apollo", # Tag for filtering in the dashboard
+                    "competitor": "Apollo",
                     "is_fit": False,
                     "is_competitor": False,
                     "is_decision_maker": False,
                     "fit_reasoning": "",
                     "source_post": "Apollo Discovery Rule",
-                    "source_post_url": "https://apollo.io"
+                    "source_post_url": "https://apollo.io",
+                    "company_linkedin_url": l.get("company_linkedin_url"),
+                    "employee_count": l.get("employee_count"),
+                    "company_name": l.get("company_name"),
                 })
             
             if all_raw_leads:

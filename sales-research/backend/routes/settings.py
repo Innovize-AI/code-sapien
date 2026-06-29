@@ -1,10 +1,12 @@
 
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy import select, func, text, or_
 from typing import Optional
 import json
 import logging
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +16,28 @@ from db.schemas import OrganizationSettingsCreate, OrganizationSettings as Organ
 from dependencies import get_current_user, require_admin
 import os
 from services.knowledge_service import KnowledgeService
-from sqlalchemy import func, or_, desc
+from sqlalchemy import desc
 from db.crud import get_org_settings
 from utils.trial_utils import get_trial_limits
 
 settings_router = APIRouter(tags=['Settings'])
+
+_USAGE_CACHE:      dict[str, tuple[dict, datetime]] = {}
+_ONBOARDING_CACHE: dict[str, tuple[dict, datetime]] = {}
+_USAGE_TTL       = timedelta(minutes=5)
+_ONBOARDING_TTL  = timedelta(minutes=2)
+
+def _usage_cache_get(key: str):
+    entry = _USAGE_CACHE.get(key)
+    if entry and datetime.utcnow() - entry[1] < _USAGE_TTL:
+        return entry[0]
+    return None
+
+def _onboarding_cache_get(key: str):
+    entry = _ONBOARDING_CACHE.get(key)
+    if entry and datetime.utcnow() - entry[1] < _ONBOARDING_TTL:
+        return entry[0]
+    return None
 
 @settings_router.get("/settings/personal-icp", response_model=Optional[IdealProfileData])
 async def get_personal_icp(
@@ -312,17 +331,35 @@ async def get_onboarding_status(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
-    settings = await get_org_settings(db, user_id=str(current_user.id), org_id=current_user.organization_id)
-    
-    # Check migration status from profile metadata
     import json
+    cache_key = str(current_user.organization_id or current_user.id)
     user_meta = json.loads(current_user.profile_metadata or "{}") if isinstance(current_user.profile_metadata, str) else (current_user.profile_metadata or {})
     is_migrated = user_meta.get("migration_complete", False)
-    
-    return {
-        "complete": bool(settings.onboarding_complete) if settings else False,
-        "migration_complete": is_migrated
-    }
+
+    # Only cache once onboarding is fully complete — before that, status changes frequently
+    if is_migrated:
+        if cached := _onboarding_cache_get(cache_key):
+            return cached
+
+    # Fetch only the onboarding_complete column — not the full settings row
+    onboarding_q = select(OrganizationSettings.onboarding_complete).where(
+        or_(
+            OrganizationSettings.organization_id == current_user.organization_id,
+            OrganizationSettings.owner_id == current_user.id,
+        )
+    ).order_by(
+        desc(OrganizationSettings.organization_id),
+        desc(OrganizationSettings.owner_id),
+    ).limit(1)
+
+    row = (await db.execute(onboarding_q)).first()
+    onboarding_complete = bool(row[0]) if row else False
+
+    result = {"complete": onboarding_complete, "migration_complete": is_migrated}
+
+    if is_migrated:
+        _ONBOARDING_CACHE[cache_key] = (result, datetime.utcnow())
+    return result
 
 @settings_router.post("/settings/onboarding-complete")
 async def set_onboarding_complete(
@@ -364,69 +401,61 @@ async def get_usage_stats(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
-    """
-    Get the current usage statistics for the user (Research & Classification).
-    Useful for displaying trial limits.
-    """
+    cache_key = str(current_user.organization_id or current_user.id)
+    if cached := _usage_cache_get(cache_key):
+        return cached
+
+    from db.database import SessionLocal
+
     trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     limits = get_trial_limits()
-    research_limit = limits["research_limit"]
-    classification_limit = limits["classification_limit"]
-    identified_limit = limits["identified_limit"]
 
-    # Count Researches
-    res_count_query = select(func.count(ResearchReport.id))
-    if current_user.organization_id:
-        res_count_query = res_count_query.where(ResearchReport.organization_id == current_user.organization_id)
-    else:
-        res_count_query = res_count_query.where(ResearchReport.created_by_id == current_user.id)
-        
-    res_result = await db.execute(res_count_query)
-    research_used = res_result.scalar() or 0
+    org_scope_rr = ResearchReport.organization_id == current_user.organization_id \
+        if current_user.organization_id else ResearchReport.created_by_id == current_user.id
+    org_scope_ip = IdentifiedProfile.organization_id == current_user.organization_id \
+        if current_user.organization_id else IdentifiedProfile.created_by_id == current_user.id
 
-    # Count Classifications: Only count profiles that are actually useful (Fit OR Intent found)
-    class_count_query = select(func.count(IdentifiedProfile.id)).where(
-        or_(
-            IdentifiedProfile.is_fit == True,
-            IdentifiedProfile.intent.isnot(None)
-        )
-    )
-    if current_user.organization_id:
-        class_count_query = class_count_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
-    else:
-        class_count_query = class_count_query.where(IdentifiedProfile.created_by_id == current_user.id)
-        
-    class_result = await db.execute(class_count_query)
-    classification_used = class_result.scalar() or 0
+    # Single scan per table: combine counts into one query each
+    res_q = select(func.count(ResearchReport.id)).where(org_scope_rr)
 
-    # Count Identified Profiles (Total)
-    id_count_query = select(func.count(IdentifiedProfile.id))
-    if current_user.organization_id:
-        id_count_query = id_count_query.where(IdentifiedProfile.organization_id == current_user.organization_id)
-    else:
-        id_count_query = id_count_query.where(IdentifiedProfile.created_by_id == current_user.id)
-    
-    id_result = await db.execute(id_count_query)
-    identified_used = id_result.scalar() or 0
+    id_q = select(
+        func.count(IdentifiedProfile.id),
+        func.count(IdentifiedProfile.id).filter(
+            or_(IdentifiedProfile.is_fit == True, IdentifiedProfile.intent.isnot(None))
+        ),
+    ).where(org_scope_ip)
 
-    return {
+    async def _run(q):
+        async with SessionLocal() as s:
+            return (await s.execute(q)).all()
+
+    res_rows, id_rows = await asyncio.gather(_run(res_q), _run(id_q))
+
+    research_used   = res_rows[0][0] or 0
+    id_total, class_used = id_rows[0]
+    class_used      = class_used or 0
+    id_total        = id_total or 0
+
+    result = {
         "trial_mode": trial_mode,
         "research": {
             "used": research_used,
-            "limit": research_limit,
-            "remaining": max(0, research_limit - research_used)
+            "limit": limits["research_limit"],
+            "remaining": max(0, limits["research_limit"] - research_used),
         },
         "classification": {
-            "used": classification_used,
-            "limit": classification_limit,
-            "remaining": max(0, classification_limit - classification_used)
+            "used": class_used,
+            "limit": limits["classification_limit"],
+            "remaining": max(0, limits["classification_limit"] - class_used),
         },
         "lead_discovery": {
-            "used": identified_used,
-            "limit": identified_limit,
-            "remaining": max(0, identified_limit - identified_used)
-        }
+            "used": id_total,
+            "limit": limits["identified_limit"],
+            "remaining": max(0, limits["identified_limit"] - id_total),
+        },
     }
+    _USAGE_CACHE[cache_key] = (result, datetime.utcnow())
+    return result
 @settings_router.get("/settings/selling-profile", response_model=Optional[SellingProfileConfig])
 async def get_selling_profile(
     db: AsyncSession = Depends(get_db),

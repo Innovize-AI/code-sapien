@@ -392,23 +392,76 @@ export interface AnalyticsDataPoint {
     count: number;
 }
 
-export interface BreakdownItem {
+export interface TieredBreakdownItem {
     name: string;
-    count: number;
+    // current period
+    hot: number;
+    hand_raiser: number;
+    qualified: number;
+    unqualified: number;
+    total: number;
+    // previous period (equal-length window before current)
+    prev_hot: number;
+    prev_hand_raiser: number;
+    prev_qualified: number;
+    prev_unqualified: number;
+    prev_total: number;
+}
+
+export type AnalyticsPeriod = "7d" | "14d" | "30d" | "90d" | "12w" | "12m";
+
+export interface ReclassificationItem {
+    name: string;
+    linkedin_url?: string;
+    report_id?: string;
+    initial_tier: string;
+    lead_score: number;
+}
+
+export interface ReclassificationStats {
+    total_with_reports: number;
+    overestimated_count: number;
+    underestimated_count: number;
+    confirmed_high_count: number;
+    confirmed_low_count: number;
+    accuracy_pct: number;
+    overestimated: ReclassificationItem[];
+    underestimated: ReclassificationItem[];
 }
 
 export interface DashboardAnalytics {
+    period: AnalyticsPeriod;
     daily_trends: AnalyticsDataPoint[];
     lead_quality: Record<string, number>;
-    competitor_breakdown: BreakdownItem[];
-    keyword_breakdown: BreakdownItem[];
+    previous_summary?: Record<string, number>;
+    competitor_breakdown: TieredBreakdownItem[];
+    keyword_breakdown: TieredBreakdownItem[];
+    source_breakdown: TieredBreakdownItem[];
+    reclassification?: ReclassificationStats;
 }
 
-export const fetchDashboardAnalytics = async (): Promise<DashboardAnalytics | null> => {
+// Maps new period keys → old backend values (used until backend is redeployed)
+const LEGACY_PERIOD: Partial<Record<AnalyticsPeriod, string>> = {
+    "7d": "daily", "14d": "daily", "30d": "daily", "90d": "daily",
+    "12w": "weekly", "12m": "monthly",
+};
+
+export const fetchDashboardAnalytics = async (period: AnalyticsPeriod = "30d"): Promise<DashboardAnalytics | null> => {
     try {
-        const response = await axios.get(`${API_URL}/api/dashboard/analytics`);
+        const response = await axios.get(`${API_URL}/api/dashboard/analytics`, { params: { period } });
         return response.data;
-    } catch (e) {
+    } catch (e: any) {
+        // Old backend rejects new period keys (422) — retry with legacy value
+        if (e?.response?.status === 422 && LEGACY_PERIOD[period]) {
+            try {
+                const fallback = await axios.get(`${API_URL}/api/dashboard/analytics`, {
+                    params: { period: LEGACY_PERIOD[period] },
+                });
+                return { ...fallback.data, period };
+            } catch {
+                return null;
+            }
+        }
         console.error("Failed to fetch dashboard analytics", e);
         return null;
     }

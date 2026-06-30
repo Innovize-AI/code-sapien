@@ -17,7 +17,7 @@ from dependencies import get_current_user
 
 # Large TOAST columns not needed for the list view — deferring them removes them
 # from the SQL SELECT entirely, which is the primary cause of Disk IO exhaustion.
-_PROFILE_LIST_DEFER = {"source_posts", "interaction_history", "comment_history"}
+_PROFILE_LIST_DEFER = {"source_posts", "comment_history"}
 
 logger = logging.getLogger(__name__)
 

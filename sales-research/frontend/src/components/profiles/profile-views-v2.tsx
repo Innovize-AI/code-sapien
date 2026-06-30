@@ -71,7 +71,7 @@ function parseInteractionStats(profile: IdentifiedProfile) {
       const sources = JSON.parse(profile.source_posts || "[]");
       sources.forEach((s: any) => allTouchpoints.push({ competitor: s.competitor || "Source", title: s.title, url: s.url, comments: [] }));
     }
-    return { keyword, competitor, total: keyword + competitor || allTouchpoints.length, allTouchpoints, firstComment: allTouchpoints[0]?.comments?.[0] || null };
+    return { keyword, competitor, total: keyword + competitor || allTouchpoints.length || (profile.touchpoint_count ?? 0), allTouchpoints, firstComment: allTouchpoints[0]?.comments?.[0] || null };
   } catch { return { keyword: 0, competitor: 0, total: 0, allTouchpoints: [], firstComment: null }; }
 }
 

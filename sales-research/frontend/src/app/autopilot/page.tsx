@@ -134,11 +134,11 @@ export default function AutopilotPage() {
 
   const handleAddCompetitor = async () => {
     if (!newCompetitorUrl) return;
-    if (competitors.length >= 3) {
+    if (trialMode && competitors.length >= 3) {
       toast({
         title: "Limit Reached",
         description:
-          "Maximum of 3 competitors allowed. Please remove one first.",
+          "Maximum of 3 competitors allowed in Trial Mode. Please upgrade to add more.",
         variant: "destructive",
       });
       return;
@@ -188,10 +188,11 @@ export default function AutopilotPage() {
 
   const handleAddKeyword = async () => {
     if (!newKeyword) return;
-    if (keywordRules.length >= 5) {
+    if (trialMode && keywordRules.length >= 5) {
       toast({
         title: "Limit Reached",
-        description: "Maximum of 5 keywords allowed. Please remove one first.",
+        description:
+          "Maximum of 5 keywords allowed in Trial Mode. Please upgrade to add more.",
         variant: "destructive",
       });
       return;
@@ -572,7 +573,7 @@ export default function AutopilotPage() {
                 <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
                   <CardHeader>
                     <CardTitle>
-                      Keyword Monitoring ({keywordRules.length}/5)
+                      Keyword Monitoring ({keywordRules.length}{trialMode ? "/5" : ""})
                     </CardTitle>
                     <CardDescription>
                       Every day, we'll scan LinkedIn for posts containing these
@@ -591,13 +592,13 @@ export default function AutopilotPage() {
                           onKeyDown={(e) =>
                             e.key === "Enter" && handleAddKeyword()
                           }
-                          disabled={keywordRules.length >= 5}
+                          disabled={trialMode && keywordRules.length >= 5}
                         />
                       </div>
                       <Button
                         onClick={handleAddKeyword}
                         variant="secondary"
-                        disabled={keywordRules.length >= 5}
+                        disabled={trialMode && keywordRules.length >= 5}
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add
@@ -671,7 +672,7 @@ export default function AutopilotPage() {
                 <Card className="border-primary/10 shadow-lg bg-card/50 backdrop-blur-sm">
                   <CardHeader>
                     <CardTitle>
-                      Competitor Tracking ({competitors.length}/3)
+                      Competitor Tracking ({competitors.length}{trialMode ? "/3" : ""})
                     </CardTitle>
                     <CardDescription>
                       We'll monitor these competitor profiles daily for new
@@ -690,13 +691,13 @@ export default function AutopilotPage() {
                           onKeyDown={(e) =>
                             e.key === "Enter" && handleAddCompetitor()
                           }
-                          disabled={competitors.length >= 3}
+                          disabled={trialMode && competitors.length >= 3}
                         />
                       </div>
                       <Button
                         onClick={handleAddCompetitor}
                         variant="secondary"
-                        disabled={competitors.length >= 3}
+                        disabled={trialMode && competitors.length >= 3}
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add

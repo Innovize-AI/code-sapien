@@ -86,11 +86,12 @@ async def tasks_heartbeat(
     now = datetime.now(timezone.utc)
     tasks_to_dispatch = [] # List of (task_type, payload, fallback_func, fallback_args)
     
-    # 1. Collect Autopilot Rules
     from utils.trial_utils import check_trial_lead_limit
     is_trial_mode = os.getenv("TRIAL_MODE", "false").lower() == "true"
     result = await db.execute(select(AutopilotRule).where(AutopilotRule.is_active == True))
     rules = result.scalars().all()
+    
+    eligible_keywords = []
     
     for rule in rules:
         last_run = rule.last_run_at or (now - timedelta(days=365))
@@ -102,6 +103,10 @@ async def tasks_heartbeat(
             if is_trial_mode and rule.type == "apollo_config":
                 logger.info(f"Skipping Apollo rule {rule.id} in Trial Mode.")
                 continue
+                
+            if rule.type == "keyword":
+                eligible_keywords.append(rule)
+                continue
 
             # NEW: Global Trial Lead Limit Check
             if is_trial_mode:
@@ -110,9 +115,19 @@ async def tasks_heartbeat(
                     continue
 
             payload = {"rule_id": str(rule.id), "rule_type": rule.type}
-            fallback_func = task_service.keyword_discovery_rule_task if rule.type == "keyword" else task_service.apollo_discovery_rule_task
+            fallback_func = task_service.apollo_discovery_rule_task
             tasks_to_dispatch.append(("autopilot_rule", payload, fallback_func, (str(rule.id),)))
             rule.last_run_at = now # <--- FIX: Update timestamp before dispatching
+
+    # Process batched keywords
+    if eligible_keywords:
+        # Sort by oldest last_run_at to naturally rotate through all keywords
+        eligible_keywords = sorted(eligible_keywords, key=lambda r: r.last_run_at.timestamp() if r.last_run_at else 0)
+        batch_rules = eligible_keywords[:5] # Hardcoded limit of 5 per heartbeat for keywords
+        for rule in batch_rules:
+            payload = {"rule_id": str(rule.id), "rule_type": "keyword"}
+            tasks_to_dispatch.append(("autopilot_rule", payload, task_service.keyword_discovery_rule_task, (str(rule.id),)))
+            rule.last_run_at = now
 
     # 2. Collect Global Scheduled Tasks
     result = await db.execute(select(ScheduledTask).where(ScheduledTask.is_active == True))
@@ -125,14 +140,9 @@ async def tasks_heartbeat(
             
         if now >= (last_run + timedelta(hours=task.interval_hours)):
             if task.name == "competitor_update":
-                comp_result = await db.execute(select(Competitor))
-                for comp in comp_result.scalars().all():
-                    # Trial Mode Check for Competitor Discovery
-                    if is_trial_mode:
-                        if await check_trial_lead_limit(db, org_id=comp.organization_id, user_id=comp.created_by_id):
-                            continue
-                            
-                    tasks_to_dispatch.append(("competitor_sync", {"competitor_id": str(comp.id)}, task_service.update_single_competitor_task, (str(comp.id),)))
+                # We batch competitors independently of the ScheduledTask interval
+                # The ScheduledTask interval just acts as a master switch to enable competitor checking
+                pass
             elif task.name == "hubspot_sync":
                 # Skip for trial mode as requested
                 if os.getenv("TRIAL_MODE", "false").lower() == "true":
@@ -155,6 +165,31 @@ async def tasks_heartbeat(
             
             # Update last run for the scheduled task record
             task.last_run_at = now
+
+    # Process batched competitors directly from the Competitor table
+    comp_result = await db.execute(select(Competitor))
+    competitors = comp_result.scalars().all()
+    eligible_comps = []
+    
+    for comp in competitors:
+        c_last_run = getattr(comp, 'last_run_at', None) or (now - timedelta(days=365))
+        if c_last_run.tzinfo is None:
+            c_last_run = c_last_run.replace(tzinfo=timezone.utc)
+        if now >= (c_last_run + timedelta(hours=24)):
+            # Trial Mode Check for Competitor Discovery
+            if is_trial_mode and await check_trial_lead_limit(db, org_id=comp.organization_id, user_id=comp.created_by_id):
+                continue
+            eligible_comps.append(comp)
+            
+    if eligible_comps:
+        # Sort by oldest last_run_at
+        eligible_comps = sorted(eligible_comps, key=lambda c: getattr(c, 'last_run_at', now).timestamp() if getattr(c, 'last_run_at', None) else 0)
+        batch_comps = eligible_comps[:5] # Hardcoded limit of 5 per heartbeat for competitors
+        for comp in batch_comps:
+            tasks_to_dispatch.append(("competitor_sync", {"competitor_id": str(comp.id)}, task_service.update_single_competitor_task, (str(comp.id),)))
+            # Safely set if the attribute exists
+            if hasattr(comp, 'last_run_at'):
+                comp.last_run_at = now
 
     # 3. Sequential Background Dispatch
     async def dispatch_one(t_type, t_payload, f_func, f_args):
@@ -276,3 +311,4 @@ async def trigger_task(task_name: str, db: AsyncSession = Depends(get_db), _=Dep
         raise HTTPException(status_code=404, detail="Task not found")
         
     return {"status": "task_triggered", "task": task_name}
+

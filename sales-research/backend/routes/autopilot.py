@@ -41,7 +41,7 @@ async def create_autopilot_rule(
             detail="Apollo Discovery is not available in Trial Mode."
         )
 
-    if rule_data.type == 'keyword':
+    if is_trial and rule_data.type == 'keyword':
         existing_rules = await crud.get_autopilot_rules(
             db, 
             rule_type='keyword',
@@ -51,7 +51,7 @@ async def create_autopilot_rule(
         if len(existing_rules) >= 5:
             raise HTTPException(
                 status_code=400, 
-                detail="Maximum limit of 5 keywords reached. Please delete an existing keyword to add a new one."
+                detail="Maximum limit of 5 keywords reached in Trial Mode."
             )
             
     rule_dict = rule_data.model_dump()
@@ -108,16 +108,19 @@ async def create_autopilot_competitor(
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
-    existing_competitors = await crud.get_competitors(
-        db,
-        org_id=current_user.organization_id,
-        user_id=str(current_user.id)
-    )
-    if len(existing_competitors) >= 3:
-        raise HTTPException(
-            status_code=400, 
-            detail="Maximum limit of 3 competitors reached. Please delete an existing competitor to add a new one."
+    import os
+    is_trial = os.getenv("TRIAL_MODE", "false").lower() == "true"
+    if is_trial:
+        existing_competitors = await crud.get_competitors(
+            db,
+            org_id=current_user.organization_id,
+            user_id=str(current_user.id)
         )
+        if len(existing_competitors) >= 3:
+            raise HTTPException(
+                status_code=400, 
+                detail="Maximum limit of 3 competitors reached in Trial Mode."
+            )
         
     comp_dict = comp_data.model_dump()
     return await crud.create_competitor(

@@ -132,6 +132,33 @@ async def update_competitor_leads_task():
         except Exception as e:
             logger.error(f"Global error in competitor update task: {e}")
 
+async def competitor_leads_batch_task(limit: int, offset: int = 0):
+    """
+    DEPRECATED: This batch task is no longer used.
+    Batching is now handled directly via individual Pub/Sub dispatch in the heartbeat endpoint.
+    """
+    logger.info(f"Starting competitor leads batch task (limit: {limit}, offset: {offset})...")
+    async with SessionLocal() as db:
+        try:
+            competitors = await crud.get_competitors(db)
+            # Sort competitors to ensure consistent ordering (fallback to id if created_at is missing)
+            competitors = sorted(competitors, key=lambda c: getattr(c, 'created_at', str(c.id)))
+            batch_competitors = competitors[offset:offset + limit]
+            
+            if not batch_competitors:
+                logger.info("No competitors found for this batch.")
+                return
+
+            logger.info(f"Found {len(competitors)} total competitors. Processing {len(batch_competitors)} in this batch.")
+
+            for competitor in batch_competitors:
+                await update_single_competitor_task(str(competitor.id))
+                await asyncio.sleep(HEARTBEAT_DELAY) # Delay for local pacing
+
+            logger.info(f"Competitor leads batch task (offset: {offset}) completed.")
+        except Exception as e:
+            logger.error(f"Error in competitor leads batch task: {e}")
+
 async def keyword_discovery_rule_task(rule_id: str):
     """Processes a single keyword autopilot rule."""
     async with SessionLocal() as db:
@@ -212,6 +239,30 @@ async def keyword_discovery_task(rule_id: str = None):
             logger.info("Keyword discovery task completed.")
         except Exception as e:
             logger.error(f"Error in keyword discovery task: {e}")
+
+async def keyword_discovery_batch_task(limit: int, offset: int = 0):
+    """
+    DEPRECATED: This batch task is no longer used.
+    Batching is now handled directly via individual Pub/Sub dispatch in the heartbeat endpoint.
+    """
+    logger.info(f"Starting keyword discovery batch task (limit: {limit}, offset: {offset})...")
+    async with SessionLocal() as db:
+        try:
+            rules = await crud.get_autopilot_rules(db, rule_type="keyword")
+            # Sort rules to ensure consistent ordering (fallback to id if created_at is missing)
+            rules = sorted(rules, key=lambda r: getattr(r, 'created_at', str(r.id)))
+            batch_rules = rules[offset:offset + limit]
+            
+            logger.info(f"Found {len(rules)} total keyword rules. Processing {len(batch_rules)} rules in this batch.")
+            
+            for rule in batch_rules:
+                if rule:
+                    await keyword_discovery_rule_task(str(rule.id))
+                    await asyncio.sleep(HEARTBEAT_DELAY)
+            
+            logger.info(f"Keyword discovery batch task (offset: {offset}) completed.")
+        except Exception as e:
+            logger.error(f"Error in keyword discovery batch task: {e}")
 
 async def apollo_discovery_rule_task(rule_id: str):
     """Processes a single Apollo autopilot rule."""

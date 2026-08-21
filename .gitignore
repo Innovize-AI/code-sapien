@@ -173,3 +173,14 @@ node_modules/
 qdrant_storage/
 google-drive-slack-agent/
 code-sapien-instantly/
+
+# AIOS — client business docs (code tracked, docs/knowledge/credentials not)
+clients/*/docs/
+clients/*/knowledge/
+clients/*/credentials/
+clients/*/data/
+clients/*/*/docs/
+clients/*/*/knowledge/
+
+# AIOS — workspace business layer (files on disk, not versioned)
+workspace/

@@ -259,6 +259,16 @@ export const updateBuyerJourney = async (reportId: string, data: any) => {
     return response.data;
 };
 
+export const fetchCopilotHistory = async (reportId: string) => {
+    const response = await axios.get(`${API_URL}/api/reports/${reportId}/chat/history`);
+    return response.data;
+};
+
+export const sendCopilotMessage = async (reportId: string, message: string) => {
+    const response = await axios.post(`${API_URL}/api/reports/${reportId}/chat`, { message });
+    return response.data;
+};
+
 export const bulkAnalyzeLeads = async (
     leads: { url?: string, website?: string }[],
     options: Omit<LeadData, 'linkedin_url' | 'website' | 'email'>,

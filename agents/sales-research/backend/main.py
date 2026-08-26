@@ -95,6 +95,9 @@ app.include_router(auth_router, prefix="/api/auth")
 from routes.trial import router as trial_router
 app.include_router(trial_router, prefix="/api/trial")
 
+from routes.chat import router as copilot_chat_router
+app.include_router(copilot_chat_router, prefix="/api")
+
 @app.get("/api/config")
 async def get_global_config():
     return {

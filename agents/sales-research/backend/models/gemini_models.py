@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_gemini_model(temperature=0, model='gemini-3-flash-preview'):
+def get_gemini_model(temperature=0, model='gemini-3-flash-preview', enable_search=False):
     """
     Factory function for Gemini models.
     Use 'gemini-3-flash-preview' for standard tasks.
@@ -23,4 +23,8 @@ def get_gemini_model(temperature=0, model='gemini-3-flash-preview'):
         google_api_key=api_key,
         thinking_level= thinking_level
     )
+    
+    if enable_search:
+        llm = llm.bind(tools=[{"google_search": {}}])
+        
     return llm

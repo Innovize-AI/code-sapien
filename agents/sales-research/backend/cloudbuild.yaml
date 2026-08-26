@@ -2,7 +2,7 @@ steps:
   # 1. Build and push images using Skaffold
   - name: "gcr.io/k8s-skaffold/skaffold"
     id: skaffold-build
-    dir: "sales-research/backend"
+    dir: "agents/sales-research/backend"
     entrypoint: "/bin/bash"
     args:
       - "-c"
@@ -16,7 +16,7 @@ steps:
   # 2. Create Cloud Deploy Release
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: trigger-deploy
-    dir: "sales-research/backend"
+    dir: "agents/sales-research/backend"
     entrypoint: "bash"
     args:
       - "-c"

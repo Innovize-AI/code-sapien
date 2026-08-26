@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, text, Boolean, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 import datetime
 from db.database import Base
 
@@ -387,3 +387,16 @@ class KnowledgeAsset(Base):
     
     # Metadata for filtering/categorization
     asset_metadata = Column(Text, nullable=True) # JSON string
+
+
+class CopilotChatLog(Base):
+    __tablename__ = "copilot_chat_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    
+    report_id = Column(UUID(as_uuid=True), ForeignKey("research_reports.id", ondelete="CASCADE"), nullable=False, index=True)
+    sender_type = Column(String(50), nullable=False) # 'user' or 'assistant'
+    message_text = Column(Text, nullable=False)
+    sources = Column(JSONB, nullable=True, server_default=text("'[]'::jsonb"))
+

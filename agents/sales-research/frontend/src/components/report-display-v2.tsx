@@ -6,7 +6,9 @@ import {
   Info, Calendar, ShieldCheck, ShieldAlert, ShieldQuestion, ExternalLink,
   LayoutDashboard, Mail, Linkedin, Zap, MessageSquareQuote, MessageSquare,
   ArrowRight, X, Search, BookOpen, Edit2, Save, RotateCcw, Plus, ChevronRight,
+  Sparkles,
 } from "lucide-react";
+import { CopilotChat } from "./copilot-chat";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -366,6 +368,7 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
   const [outreachStatus, setOutreachStatus] = useState<string>(data?.outreach_status || "not_started");
   const [isOutreachEdited, setIsOutreachEdited] = useState<boolean>(data?.is_outreach_edited || false);
   const [editDepthPercentage, setEditDepthPercentage] = useState<number>(data?.edit_depth_percentage || 0);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
   useEffect(() => {
     if (data) {
@@ -2439,6 +2442,24 @@ export function ReportDisplayV2({ data, onRerun }: ReportDisplayV2Props) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Floating Action Trigger Button */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <Button 
+          onClick={() => setIsCopilotOpen(true)}
+          className="rounded-full shadow-2xl h-12 px-5 gap-2 flex items-center bg-zinc-950 text-white dark:bg-zinc-50 dark:text-zinc-950 hover:opacity-90 font-bold border border-zinc-200/10"
+        >
+          <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+          <span>Ask Copilot</span>
+        </Button>
+      </div>
+
+      {/* The Copilot Drawer */}
+      <CopilotChat 
+        reportId={data?.id || ""} 
+        isOpen={isCopilotOpen} 
+        onClose={() => setIsCopilotOpen(false)} 
+      />
     </div>
   );
 }

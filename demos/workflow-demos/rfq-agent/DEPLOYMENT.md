@@ -1,190 +1,198 @@
 # RFQ Agent — Deployment Guide
 
+Everything deploys through Cloud Build. After one-time GCP setup, every push to the
+`workflow-demos` branch that touches `demos/workflow-demos/rfq-agent/**` triggers a
+full backend + frontend deploy automatically.
+
+---
+
 ## Prerequisites
 
-- Docker installed and logged in to GCR: `gcloud auth configure-docker`
-- `gcloud` CLI authenticated: `gcloud auth login`
-- GCP project: `innovize-ai`
-- Supabase database already running
+- `gcloud` CLI installed and authenticated: `gcloud auth login`
+- GCP project created and billing enabled
+- GitHub repo connected to Cloud Build (one-time, done in GCP Console)
+- `.env` files present locally (values are read by `setup-gcp.sh`):
+  - `demos/workflow-demos/.env` — shared keys
+  - `demos/workflow-demos/rfq-agent/backend/.env` — rfq-specific keys
 
 ---
 
-## 1. Prepare Environment Variables
+## Step 1 — One-time GCP setup
 
-Copy and fill in all values in `backend/.env`:
+Run from the repo root:
 
-```env
-# Database
-DATABASE_URL=postgresql+psycopg://user:password@host:5432/dbname
-DB_SCHEMA=rfq
-
-# LLM
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=...
-LANGCHAIN_API_KEY=...         # optional — LangSmith tracing
-
-# Gmail IMAP (email watcher + send quotations)
-GMAIL_USER=admin@innovizeai.com
-GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
-GMAIL_SENDER=admin@innovizeai.com
-
-# Email config
-COMPANY_NAME=InnovizeAI
-REVIEWER_EMAIL=admin@innovizeai.com
-
-# Pub/Sub (Gmail push notifications)
-PUBSUB_TOPIC=projects/innovize-ai/topics/gmail-rfq-push
-PUBSUB_VERIFY_TOKEN=          # optional — leave blank to skip token check
-GMAIL_WATCH_EMAIL=admin@innovizeai.com
-
-# OAuth credentials — paste full contents of credentials.json here (single line)
-GOOGLE_OAUTH_CREDENTIALS={"installed":{"client_id":"...","client_secret":"...","redirect_uris":[...]}}
-
-# App
-ENVIRONMENT=production
-ALLOW_ORIGINS=https://your-frontend-url.com
-BACKEND_URL=https://your-cloud-run-url.run.app
-FRONTEND_URL=https://your-frontend-url.com
+```bash
+GCP_PROJECT=your-project-id ./demos/workflow-demos/rfq-agent/setup-gcp.sh
 ```
 
+This script:
+- Enables Cloud Run, Artifact Registry, Cloud Build, Secret Manager, Pub/Sub APIs
+- Creates the `rfq-agent` Artifact Registry Docker repo
+- Reads your `.env` files and pushes these secrets to Secret Manager:
+
+| Secret Manager name      | Env var                   | Required |
+|--------------------------|---------------------------|----------|
+| `rfq-database-url`       | `DATABASE_URL`            | yes |
+| `rfq-google-api-key`     | `GOOGLE_API_KEY`          | yes |
+| `rfq-anthropic-api-key`  | `ANTHROPIC_API_KEY`       | yes |
+| `rfq-google-oauth-creds` | `GOOGLE_OAUTH_CREDENTIALS`| yes |
+| `rfq-gmail-sender`       | `GMAIL_USER`              | yes |
+| `rfq-gmail-password`     | `GMAIL_PASSWORD`          | yes |
+| `rfq-langchain-api-key`  | `LANGCHAIN_API_KEY`       | optional |
+| `rfq-slack-webhook`      | `SLACK_WEBHOOK_URL`       | optional |
+| `rfq-pubsub-verify-token`| `PUBSUB_VERIFY_TOKEN`     | optional |
+
+- Creates the `rfq-gmail-push` Pub/Sub topic and grants Gmail SA publish permission
+- Creates a Cloud Build trigger scoped to `demos/workflow-demos/rfq-agent/**` on the `workflow-demos` branch
+- Grants Cloud Build and Cloud Run service accounts the required IAM roles
+
+> Safe to re-run — skips anything already created. Resume from a step with `--from <step>`.
+> Steps: `env` | `apis` | `artifact-registry` | `secrets` | `pubsub` | `trigger` | `iam`
+
 ---
 
-## 2. Build and Push Docker Image
+## Step 2 — Connect GitHub to Cloud Build (if not done)
+
+```
+https://console.cloud.google.com/cloud-build/triggers/connect
+```
+
+Connect the `Innovize-AI/code-sapien` repository. The trigger created in Step 1 activates on pushes.
+
+---
+
+## Step 3 — First deploy
+
+Push your branch, or trigger manually from the repo root:
+
+```bash
+gcloud builds submit \
+  --config=demos/workflow-demos/rfq-agent/cloudbuild.yaml \
+  --project=your-project-id \
+  .
+```
+
+### What Cloud Build does (8 steps):
+
+```
+1. build-backend   → docker build backend image
+2. push-backend    → push to Artifact Registry (asia-south1)
+3. deploy-backend  → gcloud run deploy rfq-backend in us-central1 (injects all secrets)
+4. get-backend-url → capture live backend URL → /workspace/backend_url.txt
+5. setup-pubsub    → create or update Pub/Sub push subscription → backend /api/webhook/gmail
+6. build-frontend  → docker build frontend (bakes backend URL in at build time)
+7. push-frontend   → push to Artifact Registry
+8. deploy-frontend → gcloud run deploy rfq-frontend in us-central1
+```
+
+Alembic migrations run automatically on backend container start.
+
+---
+
+## Step 4 — Map subdomain (one-time, after first deploy)
+
+```bash
+GCP_PROJECT=your-project-id ./demos/workflow-demos/setup-domains.sh
+```
+
+Add the CNAME record it prints at your DNS provider:
+
+```
+rfq.demos.innovizeai.com  →  ghs.googlehosted.com
+```
+
+SSL provisions automatically within ~15 minutes.
+
+---
+
+## Step 5 — Patch CORS (one-time, after domain is mapped)
+
+```bash
+FRONTEND_CR_URL=$(gcloud run services describe rfq-frontend \
+  --region=us-central1 --format="value(status.url)" --project=your-project-id)
+
+gcloud run services update rfq-backend \
+  --region=us-central1 \
+  --update-env-vars="ALLOW_ORIGINS=https://rfq.demos.innovizeai.com,$FRONTEND_CR_URL" \
+  --project=your-project-id
+```
+
+Both URLs are allowed — custom domain for production, Cloud Run URL as fallback during DNS propagation.
+
+---
+
+## Step 6 — Seed the catalog (first time only)
 
 ```bash
 cd demos/workflow-demos/rfq-agent/backend
-
-docker build -t gcr.io/innovize-ai/rfq-agent-backend .
-docker push gcr.io/innovize-ai/rfq-agent-backend
-```
-
----
-
-## 3. Deploy to Cloud Run
-
-```bash
-gcloud run deploy rfq-agent-backend \
-  --image gcr.io/innovize-ai/rfq-agent-backend \
-  --region us-central1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --min-instances 0 \
-  --max-instances 2 \
-  --memory 1Gi \
-  --cpu 1 \
-  --port 8080 \
-  --set-env-vars DATABASE_URL="postgresql+psycopg://..." \
-  --set-env-vars ANTHROPIC_API_KEY="sk-ant-..." \
-  --set-env-vars GMAIL_USER="admin@innovizeai.com" \
-  --set-env-vars GMAIL_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx" \
-  --set-env-vars COMPANY_NAME="InnovizeAI" \
-  --set-env-vars REVIEWER_EMAIL="admin@innovizeai.com" \
-  --set-env-vars PUBSUB_TOPIC="projects/innovize-ai/topics/gmail-rfq-push" \
-  --set-env-vars ENVIRONMENT="production"
-```
-
-> After deploy, note the Service URL — you'll need it for the Pub/Sub push subscription.
-
----
-
-## 4. Seed the Catalog (first time only)
-
-```bash
-# Run inside the container or locally pointing at the same DATABASE_URL
-cd backend
 python scripts/seed_catalog.py
-python scripts/seed_demo.py --clear   # optional demo RFQs
-```
-
-Or exec into the running container:
-
-```bash
-gcloud run jobs execute rfq-agent-backend --region us-central1
+python scripts/seed_demo.py --clear   # optional demo data
 ```
 
 ---
 
-## 5. Gmail Push Notifications via Pub/Sub
+## Step 7 — Connect Gmail (one-time, after first deploy)
 
-### 5a. Enable APIs in GCP
+The Pub/Sub topic and push subscription are wired automatically by Cloud Build.
+What you do once manually:
 
-```bash
-gcloud services enable gmail.googleapis.com pubsub.googleapis.com \
-  --project innovize-ai
-```
-
-### 5b. Create Pub/Sub Topic
+**1. Add OAuth credentials** — GCP Console → APIs & Services → Credentials → Create OAuth 2.0 Client ID (Desktop app). Download JSON, paste full contents as `GOOGLE_OAUTH_CREDENTIALS` in `.env`, then update the secret:
 
 ```bash
-gcloud pubsub topics create gmail-rfq-push --project innovize-ai
+echo -n '{"installed":{...}}' | gcloud secrets versions add rfq-google-oauth-creds \
+  --data-file=- --project=your-project-id
 ```
 
-### 5c. Grant Gmail Permission to Publish
+**2. Connect Gmail account** — open the deployed app → Settings → Connect Gmail. This saves the OAuth token to the database.
 
-```bash
-gcloud pubsub topics add-iam-policy-binding gmail-rfq-push \
-  --member="serviceAccount:gmail-api-push@system.gserviceaccount.com" \
-  --role="roles/pubsub.publisher" \
-  --project innovize-ai
-```
-
-### 5d. Create Push Subscription
-
-Replace `YOUR_CLOUD_RUN_URL` with the URL from step 3.
-
-```bash
-gcloud pubsub subscriptions create gmail-rfq-push-sub \
-  --topic gmail-rfq-push \
-  --push-endpoint="https://YOUR_CLOUD_RUN_URL/api/webhook/gmail" \
-  --ack-deadline=60 \
-  --project innovize-ai
-```
-
-### 5e. Download OAuth Credentials
-
-1. Go to GCP Console → APIs & Services → Credentials
-2. Create an OAuth 2.0 Client ID (Desktop app)
-3. Download JSON → save as `backend/credentials.json`
-
-### 5f. Register Gmail Watch
-
-```bash
-cd backend
-pip install google-api-python-client google-auth-oauthlib
-python scripts/setup_gmail_watch.py
-```
-
-This opens a browser for OAuth consent. After approval, a `gmail_token.json` is saved locally.
-
-> **Watch expires every 7 days.** Re-run `setup_gmail_watch.py` weekly, or set up a Cloud Scheduler job:
+> Gmail watch expires every 7 days. Schedule a weekly refresh:
 
 ```bash
 gcloud scheduler jobs create http rfq-gmail-watch-refresh \
   --schedule="0 8 * * 1" \
-  --uri="https://YOUR_CLOUD_RUN_URL/api/webhook/gmail/refresh-watch" \
+  --uri="https://rfq.demos.innovizeai.com/api/webhook/gmail/refresh-watch" \
   --http-method=POST \
   --location=us-central1 \
-  --project innovize-ai
+  --project=your-project-id
 ```
 
 ---
 
-## 6. Redeploy After Code Changes
+## Subsequent deploys (automatic)
+
+Push changes to the `workflow-demos` branch:
 
 ```bash
-docker build -t gcr.io/innovize-ai/rfq-agent-backend .
-docker push gcr.io/innovize-ai/rfq-agent-backend
-
-gcloud run deploy rfq-agent-backend \
-  --image gcr.io/innovize-ai/rfq-agent-backend \
-  --region us-central1
+git push origin workflow-demos
 ```
 
-Alembic migrations run automatically on container start.
+Cloud Build fires automatically if any file under `demos/workflow-demos/rfq-agent/**` changed.
 
 ---
 
-## Endpoints
+## Updating a secret
+
+```bash
+echo -n "new-value" | gcloud secrets versions add rfq-<name> \
+  --data-file=- --project=your-project-id
+```
+
+Redeploy to pick up the new version (Cloud Build always pulls `:latest`).
+
+---
+
+## URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend | `https://rfq.demos.innovizeai.com` |
+| Frontend (Cloud Run) | printed at end of Cloud Build |
+| Backend (Cloud Run) | printed at end of Cloud Build |
+| Health check | `GET /health` |
+
+---
+
+## API Reference
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -201,4 +209,3 @@ Alembic migrations run automatically on container start.
 | POST | `/api/emails/{id}/process` | Process email as RFQ |
 | GET | `/api/emails/watcher/status` | Email watcher status |
 | POST | `/api/webhook/gmail` | Gmail Pub/Sub push receiver |
-| POST | `/api/webhook/whatsapp` | WhatsApp webhook |

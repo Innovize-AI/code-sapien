@@ -1,0 +1,75 @@
+product_id,name,unit_price,available,lead_time_days,category,unit,description
+BOLT-M8-SS-001,M8 Stainless Steel Hex Bolt 50mm,8.5,True,3,fasteners,pcs,M8 x 50mm SS 316 hex bolt DIN 931
+BOLT-M10-GI-002,M10 GI Hex Bolt 75mm,6.0,True,3,fasteners,pcs,M10 x 75mm galvanised iron hex bolt DIN 933
+NUT-M8-SS-003,M8 Stainless Steel Hex Nut,3.5,True,3,fasteners,pcs,M8 SS 316 hex nut DIN 934
+NUT-M10-GI-004,M10 GI Hex Nut,2.8,True,3,fasteners,pcs,M10 galvanised iron hex nut DIN 934
+WASH-M8-SS-005,M8 Stainless Steel Flat Washer,1.5,True,3,fasteners,pcs,M8 SS 304 flat washer DIN 125
+SCREW-ST-006,Self-Tapping Screw 4.2x25mm Box 100,95.0,True,5,fasteners,box,4.2x25mm zinc plated self-tapping Phillips head screw
+STL-MS-PLATE-007,MS Plate 6mm 2500x1250mm,4200.0,True,7,steel,sheet,Mild steel plate IS 2062 E250 Grade 6mm thick
+STL-HR-COIL-008,HR Steel Coil 2mm 1000mm width per MT,62000.0,True,10,steel,MT,Hot rolled steel coil IS 10748 2mm thick 1000mm wide
+STL-SS-PIPE-009,SS 304 Pipe 2 inch SCH40 per meter,850.0,True,7,steel,mtr,Stainless steel 304 seamless pipe 2 inch schedule 40
+ALU-SHEET-010,Aluminium Sheet 3mm 2438x1219mm,3800.0,True,7,metals,sheet,Aluminium alloy 5052 sheet 3mm thick
+STL-ANGLE-011,MS Angle 50x50x6mm per meter,220.0,True,5,steel,mtr,Mild steel equal angle 50x50x6mm IS 2062
+STL-CHANNEL-012,MS Channel ISMC 100 per meter,420.0,True,5,steel,mtr,Mild steel C-channel ISMC 100 100x50mm IS 2062
+ELEC-CU-WIRE-013,Copper Wire 2.5 sqmm 100m roll,1850.0,True,5,electrical,roll,FR PVC insulated copper conductor 2.5 sqmm 100m
+ELEC-CU-WIRE-014,Copper Wire 6 sqmm 100m roll,4200.0,True,5,electrical,roll,FR PVC insulated copper conductor 6 sqmm 100m
+ELEC-MCB-015,MCB 32A Single Pole C-Curve,380.0,True,3,electrical,pcs,Miniature circuit breaker 32A 1P C-curve 10kA
+ELEC-CONT-016,AC Contactor 32A 3P 230V Coil,1200.0,True,5,electrical,pcs,AC magnetic contactor 32A 3 pole 230V AC coil
+ELEC-TRAY-017,Perforated Cable Tray 150x50mm per meter,320.0,True,7,electrical,mtr,GI perforated cable tray 150mm wide 50mm deep
+BRG-6205-018,Deep Groove Ball Bearing 6205-2RS,180.0,True,5,bearings,pcs,6205-2RS bearing 25x52x15mm rubber sealed
+BRG-6305-019,Deep Groove Ball Bearing 6305-ZZ,220.0,True,5,bearings,pcs,6305-ZZ bearing 25x62x17mm metal shielded
+BRG-UCF-020,Pillow Block Bearing UCF205,450.0,True,7,bearings,pcs,UCF205 square flange pillow block bearing unit 25mm bore
+BELT-VBELT-021,V-Belt A-Section A50,220.0,True,5,mechanical,pcs,Classical V-belt A section A50 length 1270mm
+PKG-CBOX-022,Corrugated Box 30x20x20cm 5-ply Bundle 25,1100.0,True,5,packaging,bundle,5-ply corrugated carton box 300x200x200mm bundle of 25
+PKG-SWRAP-023,Stretch Wrap Film 500mm 300m roll,380.0,True,3,packaging,roll,LLDPE stretch wrap film 500mm wide 300m 23 micron
+PKG-STRAP-024,PP Strapping Roll 12mm 1000m,950.0,True,5,packaging,roll,Polypropylene strapping 12mm wide 1000m box strapping
+PKG-TAPE-025,BOPP Packing Tape 48mm 66m Box 36,1100.0,True,3,packaging,box,Brown BOPP packing tape 48mm 66m box of 36 rolls
+SAF-HELM-026,Safety Helmet ISI Marked Ratchet,320.0,True,3,safety,pcs,Industrial safety helmet IS 2925 ratchet HDPE shell
+SAF-GLOVE-027,Nitrile Safety Gloves Size L Box 100,680.0,True,3,safety,box,Nitrile powder-free gloves size large box of 100
+SAF-SHOE-028,Safety Shoe Steel Toe Cap Size 8,1200.0,True,7,safety,pair,Steel toe safety shoe IS 15298 leather upper
+SAF-VEST-029,Hi-Vis Reflective Safety Vest Size L,180.0,True,3,safety,pcs,High visibility yellow safety vest 2-band reflective
+WLD-ELEC-030,Welding Electrode E6013 3.15mm 5kg,650.0,True,3,welding,pack,E6013 rutile welding electrode 3.15mm 5kg pack
+WLD-WIRE-031,MIG Welding Wire ER70S-6 0.8mm 15kg,2800.0,True,5,welding,spool,ER70S-6 MIG wire 0.8mm 15kg spool CO2 welding
+TOOL-DISC-032,Cutting Disc 230x3x22.2mm Box 25,900.0,True,3,tools,box,Resinoid cutting disc 230mm for steel box 25
+TOOL-DISC-033,Grinding Disc 125x6x22.2mm Box 25,850.0,True,3,tools,box,Depressed centre grinding wheel 125mm for mild steel box 25
+TOOL-DRILL-034,HSS Drill Bit 10mm,85.0,True,3,tools,pcs,HSS-Co high speed steel twist drill bit 10mm DIN 338
+IT-LAP-035,Laptop Core i5 13th Gen 8GB 512GB SSD,52000.0,True,7,it_hardware,pcs,Business laptop Intel Core i5 13th gen 8GB 512GB 15.6 inch
+IT-UPS-036,UPS 1KVA Line Interactive,7500.0,True,5,it_hardware,pcs,1KVA 800W line interactive UPS with AVR
+IT-SWITCH-037,Managed Switch 24-Port Gigabit,18000.0,False,14,it_hardware,pcs,24-port gigabit managed ethernet switch VLAN QoS 1U
+IT-ROUTER-038,WiFi 6 Router Dual Band,6500.0,True,5,it_hardware,pcs,WiFi 6 AX1800 dual band wireless router office use
+LUB-OIL-039,Hydraulic Oil ISO VG 46 20L,2800.0,True,5,lubricants,can,Anti-wear hydraulic oil ISO VG 46 20 litre
+LUB-GREASE-040,Lithium Grease EP-2 1kg,320.0,True,3,lubricants,tin,Lithium complex EP NLGI 2 bearing grease 1kg
+ELEC-MCCB-250,MCCB 250A 3P 36kA,8500.0,True,5,electrical,pcs,Schneider EasyPact 250A 3-pole MCCB 36kA
+ELEC-ELCB-40,Earth Leakage Circuit Breaker 40A 30mA,1450.0,False,7,electrical,pcs,ELCB 40A 30mA sensitivity 4 pole
+ELEC-BUSBAR-100,Busbar Copper 100A 3-Phase,950.0,True,3,electrical,mtr,3-phase copper busbar rated at 100A
+ELEC-DINRAIL-35,DIN Rail 35mm Top Hat 1000mm,75.0,True,2,electrical,pcs,Galvanised steel DIN rail 35mm standard 1m length
+ELEC-TERM-4,Terminal Block 4mm² Grey,15.0,True,2,electrical,pcs,Grey feed-through terminal block 4sqmm screw connection
+ELEC-SPD-T2,Surge Protection Device Type 2,2800.0,True,5,electrical,pcs,Type 2 surge protection device for power lines
+ELEC-ENC-862,Panel Enclosure 800×600×200 IP65,9500.0,True,7,electrical,pcs,Wall-mounted sheet steel IP65 electrical enclosure
+LUB-ENG-OIL40,Engine Oil SAE 40 CD/CF (Drum 208L),38000.0,True,5,lubricants,drum,Marine engine lubrication oil SAE 40 CD/CF grade
+LUB-HYD-OIL46,Hydraulic Oil ISO VG 46 (Drum 208L),35000.0,True,5,lubricants,drum,Premium anti-wear hydraulic fluid ISO VG 46
+LUB-GRS-EP2-18,Grease Multipurpose NLGI 2 (18kg Pail),7500.0,True,3,lubricants,pcs,Multipurpose extreme pressure lithium grease EP2 18kg pail
+SAF-HELM-WHITE,Safety Helmet White EN 397,280.0,True,3,safety,pcs,Industrial safety helmet white colour EN 397 certified
+SAF-SHOE-S3-42,Safety Boots Steel Toe S3 (Size 42),1800.0,True,4,safety,pair,Steel toe safety boots S3 protection grade size 42
+PNT-PRMER-RED,Paint Anti-Corrosive Primer Red (20L),6800.0,True,3,paint,tin,Red oxide anti-corrosive primer paint 20L tin
+PNT-FOUL-20L,Paint Anti-Fouling (20L),18000.0,False,10,paint,tin,Marine anti-fouling paint for ship hulls 20L tin
+WLD-ELEC-6013B,Welding Electrode E6013 3.2mm (5kg box),650.0,True,2,welding,box,Mild steel welding electrode E6013 size 3.2mm
+GEN-TISSUE-48,Toilet Paper 2-ply Roll (48 pack),950.0,True,2,general,pack,Soft 2-ply toilet paper rolls pack of 48
+GEN-SOAP-5L,Liquid Dish Soap 5L Can,450.0,True,2,general,can,Concentrated liquid dishwashing soap 5L can
+HVAC-AHU-20K,"Air Handling Unit 20,000 CFM",850000.0,True,30,hvac,pcs,"Double skin air handling unit 20,000 CFM Carrier/Trane/York"
+HVAC-FCU-1200,Fan Coil Unit 4-pipe 1200 CFM,45000.0,True,15,hvac,pcs,Concealed ceiling fan coil unit 4-pipe 1200 CFM
+HVAC-PUMP-150,Chilled Water Pump 150 GPM 30m head,120000.0,False,20,hvac,pcs,Chilled water circulation pump 150 GPM 30m head Grundfos
+HVAC-VAV-DDC,VAV Box with DDC Controller,18000.0,True,10,hvac,pcs,Variable air volume box with integrated Siemens DDC controller
+HVAC-INS-ARM25,Duct Insulation Armaflex 25mm,450.0,True,5,hvac,sqm,Armaflex class O nitrile rubber sheet insulation 25mm thick
+HVAC-DUCT-GI,GI Ductwork Medium Pressure,280.0,True,7,hvac,kg,Galvanised iron ductwork medium pressure SMACNA standards
+HVAC-R410A-11,Refrigerant R410A (11.3kg cylinder),4200.0,True,3,hvac,cyl,Refrigerant gas R410A 11.3kg disposable cylinder
+SAF-GOGGLE-CS,"Safety Goggles (clear lens, anti-scratch)",120.0,True,3,safety,pcs,Anti-scratch anti-fog clear safety glasses
+SAF-GLOVE-LTHR,Leather Welding Gloves,280.0,True,3,safety,pair,Heavy duty cowhide leather welding gloves
+SAF-PLUG-NRR33,"Ear Plugs (disposable, NRR 33) Pair",5.0,True,2,safety,pair,Soft disposable foam earplugs NRR 33 rating
+SAF-HARN-EN361,Safety Harness Full Body (EN 361),2500.0,False,5,safety,pcs,Full body fall arrest safety harness EN 361 certified
+IT-LAP-I7,"Business Laptop 14"" i7/16GB/512GB",85000.0,True,7,it_hardware,pcs,Business Laptop 14 inch Intel Core i7 16GB RAM 512GB SSD
+IT-MON-27-4K,"27"" 4K IPS Monitor USB-C",32000.0,True,5,it_hardware,pcs,27 inch 4K UHD IPS display USB-C power delivery
+IT-DOCK-TB4,Docking Station Thunderbolt 4,14500.0,False,7,it_hardware,pcs,Universal Thunderbolt 4 docking station Dell WD22
+IT-KBD-COMBO,Wireless Keyboard & Mouse Combo,4200.0,True,3,it_hardware,set,Logitech wireless keyboard and mouse combo
+IT-CHGR-65W,USB-C 65W Travel Charger,1800.0,True,3,it_hardware,pcs,65W USB-C PD travel charger wall plug
+IT-BAG-14,"Laptop Bag 14"" Padded",1200.0,True,3,it_hardware,pcs,Padded notebook carrying case bag for 14 inch laptops

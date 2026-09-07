@@ -1,0 +1,14 @@
+{
+  "company_name": "InnovizeAI",
+  "company_email": "admin@innovizeai.com",
+  "confidence_threshold": 0.75,
+  "amount_threshold": 500000,
+  "gst_rate": 18,
+  "dispatch_start_hour": 8,
+  "dispatch_end_hour": 20,
+  "quote_validity_days": 30,
+  "payment_terms": "50% advance, 50% before dispatch",
+  "reviewer_email": "admin@innovizeai.com",
+  "slack_review_channel": "#rfq-review",
+  "auto_dispatch_enabled": true
+}

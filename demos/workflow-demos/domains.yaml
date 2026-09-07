@@ -1,0 +1,22 @@
+# Subdomain → Cloud Run service mappings for demos.innovizeai.com
+# Add a new entry here when you build a new demo service.
+# Run setup-domains.sh after editing to apply mappings and get DNS records.
+
+base_domain: demos.innovizeai.com
+region: asia-south1
+
+services:
+  - subdomain: rfq
+    frontend_service: rfq-frontend
+    backend_service: rfq-backend
+    description: RFQ Agent — automated quotation from emails
+
+  # - subdomain: invoice
+  #   frontend_service: invoice-frontend
+  #   backend_service: invoice-backend
+  #   description: Invoice Extraction Agent
+
+  # - subdomain: reports
+  #   frontend_service: reports-frontend
+  #   backend_service: reports-backend
+  #   description: Sales Research Report Copilot

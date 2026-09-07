@@ -1,0 +1,156 @@
+substitutions:
+  _REGION: asia-south1
+  _REPO: rfq-agent
+  _BACKEND_SERVICE: rfq-backend
+  _FRONTEND_SERVICE: rfq-frontend
+  _COMPANY_NAME: InnovizeAI
+  _REVIEWER_EMAIL: admin@innovizeai.com
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+
+  # ── 1. Build backend image ──────────────────────────────────────────────────
+  - id: build-backend
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest
+      - ./backend
+
+  # ── 2. Push backend image ───────────────────────────────────────────────────
+  - id: push-backend
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-backend]
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend
+
+  # ── 3. Deploy backend to Cloud Run ─────────────────────────────────────────
+  - id: deploy-backend
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [push-backend]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_BACKEND_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --min-instances=0
+      - --max-instances=2
+      - --memory=1Gi
+      - --cpu=1
+      - --port=8080
+      - --timeout=300
+      - --set-env-vars=ENVIRONMENT=production,DB_SCHEMA=rfq,COMPANY_NAME=${_COMPANY_NAME},REVIEWER_EMAIL=${_REVIEWER_EMAIL},SLACK_REVIEW_CHANNEL=#rfq-review,EMAIL_POLL_INTERVAL=60
+      - --set-secrets=DATABASE_URL=rfq-database-url:latest,GOOGLE_API_KEY=rfq-google-api-key:latest,ANTHROPIC_API_KEY=rfq-anthropic-api-key:latest,GOOGLE_OAUTH_CREDENTIALS=rfq-google-oauth-creds:latest,GMAIL_SENDER=rfq-gmail-sender:latest,SECRET_KEY=rfq-secret-key:latest
+      - --quiet
+
+  # ── 4. Capture backend URL → /workspace/backend_url.txt ────────────────────
+  - id: get-backend-url
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [deploy-backend]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        URL=$(gcloud run services describe ${_BACKEND_SERVICE} \
+          --region=${_REGION} \
+          --format="value(status.url)")
+        echo "Backend URL: $$URL"
+        echo -n "$$URL" > /workspace/backend_url.txt
+
+  # ── 5. Build frontend image (bakes backend URL into Next.js rewrites) ───────
+  - id: build-frontend
+    name: gcr.io/cloud-builders/docker
+    waitFor: [get-backend-url]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        BACKEND_URL=$(cat /workspace/backend_url.txt)
+        docker build \
+          --build-arg BACKEND_URL="$$BACKEND_URL" \
+          -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA \
+          -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest \
+          ./frontend
+
+  # ── 6. Push frontend image ──────────────────────────────────────────────────
+  - id: push-frontend
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-frontend]
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend
+
+  # ── 7. Deploy frontend to Cloud Run ────────────────────────────────────────
+  - id: deploy-frontend
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [push-frontend]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_FRONTEND_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --min-instances=0
+      - --max-instances=1
+      - --memory=512Mi
+      - --cpu=1
+      - --port=3000
+      - --quiet
+
+  # ── 8. Patch backend ALLOW_ORIGINS with the live frontend URL ───────────────
+  - id: patch-cors
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [deploy-frontend]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        FRONTEND_URL=$(gcloud run services describe ${_FRONTEND_SERVICE} \
+          --region=${_REGION} \
+          --format="value(status.url)")
+        echo "Frontend URL: $$FRONTEND_URL"
+        gcloud run services update ${_BACKEND_SERVICE} \
+          --region=${_REGION} \
+          --update-env-vars="ALLOW_ORIGINS=$$FRONTEND_URL" \
+          --quiet
+
+  # ── 9. Ensure subdomain mapping exists (idempotent) ────────────────────────
+  - id: map-domain
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [patch-cors]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        DOMAIN="rfq.demos.innovizeai.com"
+        if gcloud run domain-mappings describe "$$DOMAIN" \
+             --region=${_REGION} --project=$PROJECT_ID &>/dev/null; then
+          echo "Domain mapping already exists — skipping"
+        else
+          gcloud run domain-mappings create \
+            --service=${_FRONTEND_SERVICE} \
+            --domain="$$DOMAIN" \
+            --region=${_REGION} \
+            --project=$PROJECT_ID \
+            --quiet
+          echo "Created domain mapping for $$DOMAIN"
+        fi
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA

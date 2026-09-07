@@ -73,6 +73,10 @@ if should_run "env"; then
       key="${line%%=*}"
       value="${line#*=}"
       key="${key// /}"
+      # strip leading/trailing whitespace from value
+      value="${value#"${value%%[![:space:]]*}"}"
+      value="${value%"${value##*[![:space:]]}"}"
+      # strip surrounding quotes
       if [[ "$value" =~ ^\"(.*)\"$ ]]; then value="${BASH_REMATCH[1]}"; fi
       if [[ "$value" =~ ^\'(.*)\'$ ]]; then value="${BASH_REMATCH[1]}"; fi
       export "$key=$value"
@@ -133,7 +137,10 @@ if should_run "secrets"; then
 
     if [[ -z "$value" ]]; then
       if [[ "$optional" == "optional" ]]; then
-        echo "  (skipping optional $name)"
+        # Secret must exist in Secret Manager for Cloud Run to mount it — use placeholder
+        echo -n "-" | gcloud secrets create "$name" \
+          --data-file=- --project="$PROJECT_ID" --quiet
+        echo "  (created $name with placeholder — update later if needed)"
         return 0
       fi
       echo "  ERROR: no value for $name"

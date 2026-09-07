@@ -3,7 +3,7 @@
 # Run setup-domains.sh after editing to apply mappings and get DNS records.
 
 base_domain: demos.innovizeai.com
-region: asia-south1
+region: us-central1
 
 services:
   - subdomain: rfq

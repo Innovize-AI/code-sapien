@@ -14,8 +14,8 @@ interface LinePrice {
 
 interface LineItem {
   description: string;
-  quantity?: number;
-  unit?: string;
+  quantity?: number | null;
+  unit?: string | null;
 }
 
 interface Props {

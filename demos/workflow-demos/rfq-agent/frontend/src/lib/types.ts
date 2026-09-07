@@ -1,4 +1,4 @@
-export type RFQStatus = "processing" | "dispatched" | "pending_review" | "failed";
+export type RFQStatus = "processing" | "dispatched" | "pending_review" | "failed" | "approved" | "rejected";
 export type RFQType = "product" | "freight";
 
 export interface RFQListItem {

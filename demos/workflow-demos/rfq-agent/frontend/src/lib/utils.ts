@@ -22,6 +22,8 @@ export const STATUS_LABELS: Record<RFQStatus, string> = {
   pending_review: "Pending Review",
   processing: "Processing",
   failed: "Failed",
+  approved: "Approved",
+  rejected: "Rejected",
 };
 
 export const STATUS_COLORS: Record<RFQStatus, string> = {
@@ -29,6 +31,8 @@ export const STATUS_COLORS: Record<RFQStatus, string> = {
   pending_review: "bg-amber-100 text-amber-800",
   processing: "bg-blue-100 text-blue-800",
   failed: "bg-red-100 text-red-800",
+  approved: "bg-emerald-100 text-emerald-800",
+  rejected: "bg-red-100 text-red-800",
 };
 
 export const URGENCY_COLORS: Record<string, string> = {

@@ -1,10 +1,13 @@
 substitutions:
-  _REGION: asia-south1
+  _AR_REGION: asia-south1    # Artifact Registry region (where repo was created)
+  _CR_REGION: us-central1    # Cloud Run region (must support domain mappings)
   _REPO: rfq-agent
   _BACKEND_SERVICE: rfq-backend
   _FRONTEND_SERVICE: rfq-frontend
   _COMPANY_NAME: InnovizeAI
   _REVIEWER_EMAIL: admin@innovizeai.com
+  _PUBSUB_TOPIC: rfq-gmail-push
+  _PUBSUB_SUB: rfq-gmail-push-sub
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -17,10 +20,10 @@ steps:
     args:
       - build
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
+      - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest
-      - ./backend
+      - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest
+      - ./demos/workflow-demos/rfq-agent/backend
 
   # ── 2. Push backend image ───────────────────────────────────────────────────
   - id: push-backend
@@ -29,7 +32,7 @@ steps:
     args:
       - push
       - --all-tags
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend
+      - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend
 
   # ── 3. Deploy backend to Cloud Run ─────────────────────────────────────────
   - id: deploy-backend
@@ -40,8 +43,8 @@ steps:
       - run
       - deploy
       - ${_BACKEND_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
-      - --region=${_REGION}
+      - --image=${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
+      - --region=${_CR_REGION}
       - --platform=managed
       - --allow-unauthenticated
       - --min-instances=0
@@ -50,8 +53,8 @@ steps:
       - --cpu=1
       - --port=8080
       - --timeout=300
-      - --set-env-vars=ENVIRONMENT=production,DB_SCHEMA=rfq,COMPANY_NAME=${_COMPANY_NAME},REVIEWER_EMAIL=${_REVIEWER_EMAIL},SLACK_REVIEW_CHANNEL=#rfq-review,EMAIL_POLL_INTERVAL=60
-      - --set-secrets=DATABASE_URL=rfq-database-url:latest,GOOGLE_API_KEY=rfq-google-api-key:latest,ANTHROPIC_API_KEY=rfq-anthropic-api-key:latest,GOOGLE_OAUTH_CREDENTIALS=rfq-google-oauth-creds:latest,GMAIL_SENDER=rfq-gmail-sender:latest,SECRET_KEY=rfq-secret-key:latest
+      - --set-env-vars=ENVIRONMENT=production,DB_SCHEMA=rfq,COMPANY_NAME=${_COMPANY_NAME},REVIEWER_EMAIL=${_REVIEWER_EMAIL},SLACK_REVIEW_CHANNEL=#rfq-review,EMAIL_POLL_INTERVAL=60,PUBSUB_TOPIC=projects/$PROJECT_ID/topics/${_PUBSUB_TOPIC}
+      - --set-secrets=DATABASE_URL=rfq-database-url:latest,GOOGLE_API_KEY=rfq-google-api-key:latest,ANTHROPIC_API_KEY=rfq-anthropic-api-key:latest,GOOGLE_OAUTH_CREDENTIALS=rfq-google-oauth-creds:latest,GMAIL_USER=rfq-gmail-sender:latest,GMAIL_PASSWORD=rfq-gmail-password:latest,LANGCHAIN_API_KEY=rfq-langchain-api-key:latest,SLACK_WEBHOOK_URL=rfq-slack-webhook:latest,PUBSUB_VERIFY_TOKEN=rfq-pubsub-verify-token:latest
       - --quiet
 
   # ── 4. Capture backend URL → /workspace/backend_url.txt ────────────────────
@@ -63,12 +66,39 @@ steps:
       - -c
       - |
         URL=$(gcloud run services describe ${_BACKEND_SERVICE} \
-          --region=${_REGION} \
+          --region=${_CR_REGION} \
           --format="value(status.url)")
         echo "Backend URL: $$URL"
         echo -n "$$URL" > /workspace/backend_url.txt
 
-  # ── 5. Build frontend image (bakes backend URL into Next.js rewrites) ───────
+  # ── 5. Wire Pub/Sub push subscription → backend webhook ───────────────────
+  - id: setup-pubsub
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [get-backend-url]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        BACKEND_URL=$(cat /workspace/backend_url.txt)
+        ENDPOINT="$$BACKEND_URL/api/webhook/gmail"
+        echo "Pub/Sub push endpoint: $$ENDPOINT"
+
+        if gcloud pubsub subscriptions describe ${_PUBSUB_SUB} \
+             --project=$PROJECT_ID &>/dev/null; then
+          gcloud pubsub subscriptions modify-push-config ${_PUBSUB_SUB} \
+            --push-endpoint="$$ENDPOINT" \
+            --project=$PROJECT_ID
+          echo "Updated push subscription endpoint"
+        else
+          gcloud pubsub subscriptions create ${_PUBSUB_SUB} \
+            --topic=${_PUBSUB_TOPIC} \
+            --push-endpoint="$$ENDPOINT" \
+            --ack-deadline=60 \
+            --project=$PROJECT_ID
+          echo "Created push subscription: ${_PUBSUB_SUB}"
+        fi
+
+  # ── 6. Build frontend image (bakes backend URL into Next.js rewrites) ───────
   - id: build-frontend
     name: gcr.io/cloud-builders/docker
     waitFor: [get-backend-url]
@@ -79,20 +109,20 @@ steps:
         BACKEND_URL=$(cat /workspace/backend_url.txt)
         docker build \
           --build-arg BACKEND_URL="$$BACKEND_URL" \
-          -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA \
-          -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest \
-          ./frontend
+          -t ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA \
+          -t ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest \
+          ./demos/workflow-demos/rfq-agent/frontend
 
-  # ── 6. Push frontend image ──────────────────────────────────────────────────
+  # ── 7. Push frontend image ──────────────────────────────────────────────────
   - id: push-frontend
     name: gcr.io/cloud-builders/docker
     waitFor: [build-frontend]
     args:
       - push
       - --all-tags
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend
+      - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend
 
-  # ── 7. Deploy frontend to Cloud Run ────────────────────────────────────────
+  # ── 8. Deploy frontend to Cloud Run ────────────────────────────────────────
   - id: deploy-frontend
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     waitFor: [push-frontend]
@@ -101,8 +131,8 @@ steps:
       - run
       - deploy
       - ${_FRONTEND_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA
-      - --region=${_REGION}
+      - --image=${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA
+      - --region=${_CR_REGION}
       - --platform=managed
       - --allow-unauthenticated
       - --min-instances=0
@@ -112,45 +142,7 @@ steps:
       - --port=3000
       - --quiet
 
-  # ── 8. Patch backend ALLOW_ORIGINS with the live frontend URL ───────────────
-  - id: patch-cors
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    waitFor: [deploy-frontend]
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        FRONTEND_URL=$(gcloud run services describe ${_FRONTEND_SERVICE} \
-          --region=${_REGION} \
-          --format="value(status.url)")
-        echo "Frontend URL: $$FRONTEND_URL"
-        gcloud run services update ${_BACKEND_SERVICE} \
-          --region=${_REGION} \
-          --update-env-vars="ALLOW_ORIGINS=$$FRONTEND_URL" \
-          --quiet
-
-  # ── 9. Ensure subdomain mapping exists (idempotent) ────────────────────────
-  - id: map-domain
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    waitFor: [patch-cors]
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        DOMAIN="rfq.demos.innovizeai.com"
-        if gcloud run domain-mappings describe "$$DOMAIN" \
-             --region=${_REGION} --project=$PROJECT_ID &>/dev/null; then
-          echo "Domain mapping already exists — skipping"
-        else
-          gcloud run domain-mappings create \
-            --service=${_FRONTEND_SERVICE} \
-            --domain="$$DOMAIN" \
-            --region=${_REGION} \
-            --project=$PROJECT_ID \
-            --quiet
-          echo "Created domain mapping for $$DOMAIN"
-        fi
 
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA
+  - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
+  - ${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$SHORT_SHA

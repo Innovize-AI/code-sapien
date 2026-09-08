@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Save, Loader2, CheckCircle2, Settings, Building2, Factory, ShoppingCart, Pill, Truck, Mail, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -89,7 +89,7 @@ interface ConnectedAccount {
   connected_at: string;
 }
 
-export default function SettingsPage() {
+function SettingsPage() {
   const [form, setForm] = useState<SettingsState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -370,5 +370,13 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       </div>
       <div className="col-span-2">{children}</div>
     </div>
+  );
+}
+
+export default function SettingsPageWrapper() {
+  return (
+    <Suspense>
+      <SettingsPage />
+    </Suspense>
   );
 }

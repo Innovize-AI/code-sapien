@@ -20,7 +20,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Standalone output bundles only what's needed — no node_modules copy needed
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
 # Cloud Run injects PORT; Next.js standalone server.js reads it automatically
 EXPOSE 3000
 CMD ["node", "server.js"]

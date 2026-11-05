@@ -9,14 +9,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmupdf-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ENV POETRY_VERSION=1.7.1
+ENV POETRY_VERSION=2.3.2
 RUN curl -sSL https://install.python-poetry.org | python3 -
 ENV PATH="/root/.local/bin:$PATH"
 
 COPY pyproject.toml poetry.lock* ./
 
 RUN poetry config virtualenvs.in-project true \
-    && poetry install --no-dev --no-interaction --no-ansi
+    && poetry install --no-interaction --no-ansi
 
 # Final stage
 FROM python:3.11-slim
@@ -32,7 +32,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 COPY . .
 
-ENV ENVIRONMENT=production
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 

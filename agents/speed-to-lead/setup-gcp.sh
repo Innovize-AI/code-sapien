@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# This script needs bash. If it was started with sh (dash) or another shell, stop with a clear message
+# before any bash-only syntax is read. Start it with:  bash setup-gcp.sh
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "ERROR: run this script with bash, not sh:  bash setup-gcp.sh"
+  exit 1
+fi
 # One-time GCP setup for Speed to Lead: APIs, Artifact Registry repo, Secret Manager secrets,
 # the Cloud Build trigger, and IAM. Safe to re-run: it skips what already exists.
 # Modelled on demos/workflow-demos/rfq-agent/setup-gcp.sh.
@@ -11,7 +17,10 @@
 # Usage (run from anywhere):
 #   GCP_PROJECT=innovize-ai bash setup-gcp.sh --dry-run      # show what would happen, change nothing
 #   GCP_PROJECT=innovize-ai bash setup-gcp.sh                # run all steps
-#   GCP_PROJECT=innovize-ai bash setup-gcp.sh --from iam     # resume from a step
+#   GCP_PROJECT=innovize-ai bash setup-gcp.sh --from iam     # resume from a step and run the rest
+#   GCP_PROJECT=innovize-ai bash setup-gcp.sh --only trigger # run just that one step
+#   GCP_PROJECT=innovize-ai bash setup-gcp.sh --only secrets --update
+#                                                            # push changed .env values as new secret versions
 #
 # Steps: env | apis | artifact-registry | secrets | trigger | iam
 #
@@ -36,11 +45,15 @@ fi
 # ── Arguments ──────────────────────────────────────────────────────────────────
 STEPS=(env apis artifact-registry secrets trigger iam)
 FROM_STEP="${FROM_STEP:-}"
+ONLY_STEP=""
+UPDATE=false
 DRY=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY=true; shift ;;
     --from)    FROM_STEP="${2:-}"; shift 2 ;;
+    --only)    ONLY_STEP="${2:-}"; shift 2 ;;
+    --update)  UPDATE=true; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -50,11 +63,22 @@ if [[ -n "$FROM_STEP" ]]; then
   $ok || { echo "ERROR: unknown step '$FROM_STEP'. Steps: ${STEPS[*]}"; exit 1; }
 fi
 
+if [[ -n "$ONLY_STEP" ]]; then
+  ok=false; for s in "${STEPS[@]}"; do [[ "$s" == "$ONLY_STEP" ]] && ok=true; done
+  $ok || { echo "ERROR: unknown step '$ONLY_STEP'. Steps: ${STEPS[*]}"; exit 1; }
+  [[ -n "$FROM_STEP" ]] && { echo "ERROR: use --only or --from, not both"; exit 1; }
+fi
+
 _skip=false
 [[ -n "$FROM_STEP" ]] && _skip=true
 
 should_run() {
   local step=$1
+  if [[ -n "$ONLY_STEP" ]]; then
+    if [[ "$step" == "$ONLY_STEP" ]]; then return 0; fi
+    echo "⏭  Skipping: $step"
+    return 1
+  fi
   if $_skip; then
     if [[ "$step" == "$FROM_STEP" ]]; then
       _skip=false
@@ -77,6 +101,7 @@ echo "Project : $PROJECT_ID"
 echo "Region  : $AR_REGION (Artifact Registry)"
 $DRY && echo "Mode    : DRY RUN, nothing will be created or changed"
 [[ -n "$FROM_STEP" ]] && echo "Resuming from: $FROM_STEP"
+[[ -n "$ONLY_STEP" ]] && echo "Running only: $ONLY_STEP"
 echo ""
 
 # ── Step: env ──────────────────────────────────────────────────────────────────
@@ -143,7 +168,26 @@ if should_run "secrets"; then
     local value="${!env_var:-}"
 
     if exists gcloud secrets describe "$name" --project="$PROJECT_ID"; then
-      echo "  ✓ $name already exists (skipping)"
+      # Nothing to push when .env has no value for it
+      if [[ -z "$value" ]]; then
+        echo "  ✓ $name already exists (skipping)"
+        return 0
+      fi
+      # Compare without ever printing a value
+      local current
+      current="$(gcloud secrets versions access latest --secret="$name" --project="$PROJECT_ID" 2>/dev/null || true)"
+      if [[ "$current" == "-" ]]; then
+        # an optional secret created earlier with a placeholder: replace it now that .env has a real value
+        echo -n "$value" | gcloud secrets versions add "$name" --data-file=- --project="$PROJECT_ID" --quiet >/dev/null
+        echo "  ✓ $name was a placeholder, now set from \$$env_var"
+      elif $UPDATE && [[ "$current" != "$value" ]]; then
+        echo -n "$value" | gcloud secrets versions add "$name" --data-file=- --project="$PROJECT_ID" --quiet >/dev/null
+        echo "  ✓ $name updated from \$$env_var (new version)"
+      elif $UPDATE; then
+        echo "  ✓ $name already matches \$$env_var (no change)"
+      else
+        echo "  ✓ $name already exists (skipping). Use --update to push a changed value."
+      fi
       return 0
     fi
 
@@ -199,11 +243,16 @@ if should_run "secrets"; then
   push_secret "stl-gmail-password"           "GMAIL_PASSWORD"             "Gmail app password"         optional
   push_secret "stl-langchain-api-key"        "LANGCHAIN_API_KEY"          "LangSmith API key"          optional
   echo "  Note: META_APP_SECRET is needed before production will accept any webhook request."
+  if $UPDATE && ! $DRY; then
+    echo ""
+    echo "  Cloud Run reads a secret when a revision starts. To use the new versions now, start a new revision:"
+    echo "    gcloud run services update speed-to-lead-backend --region us-central1 --update-labels redeploy=\$(date +%s)"
+  fi
 fi
 
 # ── Step: trigger ──────────────────────────────────────────────────────────────
 if should_run "trigger"; then
-  TRIGGER_NAME="speed-to-lead-deploy"
+  TRIGGER_NAME="speed-to-lead-deploy-trigger"
   echo "▶ [trigger] Creating Cloud Build trigger..."
   # The build file refuses to run without these (see its preflight step)
   SUBS="_SUPABASE_URL=${SUPABASE_URL:-},_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-},_ENVIRONMENT=${ENVIRONMENT:-staging},_TEST_FORWARD_NUMBER=${TEST_FORWARD_NUMBER:-},_META_WEBHOOK_URL=${META_WEBHOOK_URL:-}"
@@ -211,7 +260,7 @@ if should_run "trigger"; then
     echo "  ✓ Trigger '$TRIGGER_NAME' already exists (skipping)"
   elif [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_ANON_KEY:-}" ]] && ! $DRY; then
     echo "  ⚠ SUPABASE_URL or SUPABASE_ANON_KEY is empty in backend/.env, so the trigger would fail its preflight."
-    echo "    Fill them in and run:  bash setup-gcp.sh --from trigger"
+    echo "    Fill them in and run:  bash setup-gcp.sh --only trigger"
   else
     # The GitHub repository must already be connected to Cloud Build (Cloud Build, Triggers, Connect repository).
     if ! gc builds triggers create github \
@@ -226,7 +275,7 @@ if should_run "trigger"; then
         --description="Deploy Speed to Lead on changes under agents/speed-to-lead/" \
         --quiet; then
       echo "  ⚠ Could not create the trigger. Connect the GitHub repo $GITHUB_OWNER/$GITHUB_REPO to Cloud Build"
-      echo "    first, then run:  bash setup-gcp.sh --from trigger"
+      echo "    first, then run:  bash setup-gcp.sh --only trigger"
     else
       echo "  ✓ Trigger created: $TRIGGER_NAME (branch pattern $BRANCH_PATTERN)"
     fi

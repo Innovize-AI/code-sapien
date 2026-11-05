@@ -35,6 +35,17 @@ def _phone_number_id(wa_phone_number_id: str | None = None) -> str:
     return wa_phone_number_id or settings.meta_phone_number_id
 
 
+def _to(phone: str) -> str:
+    """Where a message really goes.
+
+    Outside production, every send is redirected to TEST_FORWARD_NUMBER when it is set, so a staging
+    deploy (scheduled follow-ups and broadcasts included) can never message a real buyer.
+    """
+    if not settings.is_production and settings.test_forward_number:
+        return "+" + settings.test_forward_number.lstrip("+")
+    return phone
+
+
 async def send_text(
     phone: str,
     text: str,
@@ -46,7 +57,7 @@ async def send_text(
     url = f"{_BASE}/{pid}/messages"
     payload = {
         "messaging_product": "whatsapp",
-        "to": phone,
+        "to": _to(phone),
         "type": "text",
         "text": {"body": text, "preview_url": False},
     }
@@ -72,7 +83,7 @@ async def send_document(
     url = f"{_BASE}/{pid}/messages"
     payload = {
         "messaging_product": "whatsapp",
-        "to": phone,
+        "to": _to(phone),
         "type": "document",
         "document": {"link": doc_url, "caption": caption},
     }
@@ -116,7 +127,7 @@ async def send_template(
 
     payload: dict = {
         "messaging_product": "whatsapp",
-        "to": phone,
+        "to": _to(phone),
         "type": "template",
         "template": {
             "name": template_name,

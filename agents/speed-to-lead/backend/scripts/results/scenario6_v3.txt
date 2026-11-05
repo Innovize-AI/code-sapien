@@ -1,0 +1,122 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 6: Portfolio Seeker
+  Lead wants to see projects, images, and style comparisons first.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=a835e7e1...  session=3b56a43d...
+
+  Lead : Hi, I'm Divya. I'm looking to browse some projects first. Do you have a website or an online catalog I can look through?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Divya. Yes, we can help you browse our projects.
+
+  AI  : Are you looking for a 2BHK, 3BHK, or 4BHK apartment?
+
+  [turn=1  stage=qualification  path=conversational  score=—]
+
+  Lead : Hey! I'm open to 3BHK or 4BHK. Do you have a brochure or some photos I could look at first?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, we have brochures with photos and floor plans.
+
+  AI  : Our projects range from Rs 90L to Rs 3Cr depending on config
+        and location. What's your budget bracket?
+
+  [turn=2  stage=qualification  path=conversational  score=—]
+
+  Lead : Okay, good to know! I'm looking for something in the 1.5Cr-2.5Cr range. Could you send me some pics of your luxury style projects?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : We have luxury 3BHK and 4BHK projects in that range.
+
+  AI  : Do you have a preferred area or location in mind?
+
+  [turn=3  stage=portfolio_match  path=conversational  score=—]
+
+  Lead : Oh nice! Not really, open to options. Can you share some photos or virtual tours of the projects? Curious to see the styles.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Certainly, Divya.
+
+  AI  : Aparna CyberZed in Osman Nagar offers 3BHKs from 1.18 Cr to
+        1.60 Cr, with a focus on smart home features.
+
+  AI  : Aparna Moonstone in Gopanpally has 3BHK and 4BHK options,
+        starting above 2 Cr, known for its expansive clubhouse and
+        proximity to IT hubs.
+
+  AI  : Which of these feels closer to what you had in mind? We can
+        also arrange a complimentary cab pickup for a site visit.
+
+  [turn=4  stage=consideration  path=knowledge  score=0.612]
+
+  Lead : Hmm, Moonstone sounds interesting, but can I see some photos of both first? I'd like to get a feel for the style.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, I can share brochures for both.
+
+  AI  : Aparna Moonstone in Gopanpally offers luxury 3BHK and 4BHK
+        apartments. Possession is expected around 2027.
+
+  AI  : Aparna CyberZed in Osman Nagar features smart 3BHKs, with
+        possession around 2028.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=5  stage=consideration  path=conversational  score=0.612]  [RESOURCE attached: aparna-cyberzed-brochure (pdf)]
+
+  Lead : Hey! Thanks for the info. Could you share some photos or virtual tours first, especially for Moonstone? I'd like to get a feel for the styles before a site visit.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I can share the brochure for Aparna Moonstone. It includes
+        photos and floor plans.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=6  stage=consideration  path=conversational  score=0.612]  [RESOURCE attached: aparna-moonstone-brochure (pdf)]
+
+  Lead : Hey, can you share the brochure first? I'd like to browse some photos and styles before considering a visit. Do you have other luxury projects too?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, here is the brochure for Aparna Moonstone.
+
+  AI  : We also have Aparna Newlands in Tellapur, offering premium
+        2.5 and 3 BHK apartments with a large clubhouse.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=7  stage=consideration  path=knowledge  score=0.647]  [RESOURCE attached: aparna-newlands-brochure (pdf)]
+
+  Lead : Thanks, I'll check the brochure. Can you send some photos of the interiors for both Moonstone and Newlands? I'm trying to get a feel for the styles first before visiting.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I've already sent the Moonstone and Newlands brochures,
+        which include interior photos.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=8  stage=consideration  path=conversational  score=0.647]  [RESOURCE attached: aparna-newlands-brochure (pdf)]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : consideration
+    lead_name  : Divya
+    config     : 3BHK or 4BHK
+    budget     : 1Cr-2Cr
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

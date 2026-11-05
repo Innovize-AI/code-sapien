@@ -1,0 +1,95 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 1: Fresh Lead
+  Blank state — discovery stage. Play any kind of lead from the start.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  Lead : Hi, I'm Priya. I'm a first-time buyer looking for a 3BHK near the Financial District in Hyderabad, budget around 1.2 cr. Do you have any suitable properties?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Priya. Yes, we can help you find a 3BHK.
+
+  AI  : A
+
+  [turn=1  stage=qualification  path=knowledge  score=0.703]
+
+  Lead : Hi! That's great to hear. What options do you have around Kokapet/Narsingi specifically?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : We have Aparna CyberZed with 3BHK options around 1.18 Cr
+
+  [turn=2  stage=portfolio_match  path=knowledge  score=0.687]
+
+  Lead : Okay, that's within my budget! What are the possession timelines like for CyberZed?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=3  stage=consideration  path=fallback  score=0.598]
+
+  Lead : Okay, thanks! I'll reach out. Do you have any 3BHK listings in Gachibowli or Kokapet around my budget?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna CyberZed in Osman Nagar (part of the Kokapet-Nallag
+
+  [turn=4  stage=consideration  path=knowledge  score=0.689]
+
+  Lead : Hey! Osman Nagar is a bit far from Financial District for me. Do you have anything closer, maybe in Gachibowli or Nanakramguda, in my budget?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Priya, Aparna Moonstone in Gopanpally, Gachibowli,
+
+  [turn=5  stage=consideration  path=knowledge  score=0.687]
+
+  Lead : Oh, Moonstone? I've heard good things. What's the typical size and any amenities to highlight?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=6  stage=consideration  path=fallback  score=0.614]
+
+  Lead : Okay, thanks! I'll ping them. Do you have any 3BHK listings around Gachibowli or Nanakramguda I could look at in the meantime?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  [turn=7  stage=consideration  path=knowledge  score=0.706]
+
+  Lead : Sounds good! Pls share their contact. Also, when might we be able to visit a couple of properties?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=8  stage=booking  path=fallback  score=0.604]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : booking
+    lead_name  : Priya
+    config     : 3BHK
+    budget     : 20L+
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

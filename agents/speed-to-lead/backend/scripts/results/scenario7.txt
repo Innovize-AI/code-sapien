@@ -1,0 +1,92 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 7: Visit Management
+  Visit already booked for Saturday 10am. Test reschedule or cancel.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : conversion
+  Config        : 3BHK
+  Budget        : 1Cr-2Cr
+  Visit date    : 2026-09-13 10am
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  Lead : Hi, Arjun here. I had a site visit booked for Saturday at 10 am, but something's come up. Would it be possible to reschedule for Sunday instead?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Understood, Arjun. Your Saturday 10 AM slot is now open.
+        What time works for you on Sunday, September 13, 2026?
+
+  [turn=1  stage=conversion  path=conversational  score=—]
+
+  Lead : Hey, thanks! Sunday 11am works for me if that's free?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Confirmed, Arjun. Your site visit is now scheduled for
+        Sunday, September 13, 2026, at 11 AM.
+
+  AI  : You'll get a full tour of the 3BHK configurations and
+        amenities. Our team will be there to answer all your
+        questions.
+
+  [turn=2  stage=conversion  path=conversational  score=—]
+
+  Lead : Thanks! That works for me. Looking forward to it!                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Excellent, Arjun. We look forward to your visit on Sunday.
+
+  [turn=3  stage=conversion  path=conversational  score=—]
+
+  Lead : Great! Just to confirm, same time on Sunday?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, Arjun. Sunday, September 13, 2026, at 11 AM.
+
+  [turn=4  stage=conversion  path=conversational  score=—]
+
+  Lead : Sounds good! See you then.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : See you then, Arjun.
+
+  [turn=5  stage=conversion  path=conversational  score=—]
+
+  Lead : Hey, something came up for Sat. Could we reschedule to Sunday instead?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Your visit is already scheduled for Sunday, September 13,
+        2026, at
+
+  [turn=6  stage=conversion  path=conversational  score=—]
+
+  Lead : Oh, sorry, I meant this *coming* Sunday, the 14th. Is 10 am still good?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Understood, Arjun. Your current slot for Sunday, September
+        13, 2026
+
+  [turn=7  stage=conversion  path=conversational  score=—]
+
+  Lead : Haha, actually I had booked for Saturday, Sept 12th. Can we do Sunday, Sept 13th instead?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Arjun, your visit is already confirmed for Sunday, September
+        13, 2026
+
+  [turn=8  stage=conversion  path=conversational  score=—]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : conversion
+    lead_name  : Arjun
+    config     : 3BHK
+    budget     : 1Cr-2Cr
+    visit_date : 2026-09-13
+══════════════════════════════════════════════════════════════════════
+

@@ -1,0 +1,18 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 6: Portfolio Seeker
+  Lead wants to see projects, images, and style comparisons first.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=c3d1817f...  session=83d23912...
+
+  Lead : Hi, I'm Divya. I'm browsing properties and was hoping to take a look at some of your projects. Do you have a portfolio I could see?                                    
+  ──────────────────────────────────────────────────────────────────────

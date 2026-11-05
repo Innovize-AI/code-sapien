@@ -1,0 +1,107 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 5: Wrong Fit
+  Play a lead with budget ~35-40L. Test how the agent handles out-of-range.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  Lead : Hi, I'm Suresh. Looking for a 2BHK flat in Hyderabad. My budget is 35-40 lakhs.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Suresh. Glad to hear from you.
+
+  AI  : You're looking for a 2BHK flat in Hyderabad, within the
+        35-40 lakh range. Is that right?
+
+  [turn=1  stage=qualification  path=conversational  score=—]
+
+  Lead : Yep, that's right! Got anything in that range, or close to it?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=2  stage=portfolio_match  path=fallback  score=0.511]
+
+  Lead : Okay, thanks! I'll connect with them. What areas are your 2BHKs usually located in?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=3  stage=consideration  path=fallback  score=0.603]
+
+  Lead : Okay, thanks! I'll reach out. Before I do, can you tell me which areas your 2BHKs are located in?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=4  stage=consideration  path=fallback  score=0.615]
+
+  Lead : Okay, thanks. What's a good time to call them? I'm free this evening.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=5  stage=booking  path=fallback  score=0.512]
+
+  Lead : Okay, thanks! I'll connect with them. Can I also get some info on available 2BHKs and pricing around 35-40L?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have specific 2BHK pricing in the 35-40 lakh range
+
+  [turn=6  stage=booking  path=knowledge  score=0.663]
+
+  Lead : Oh, really? What's the typical range for your 2BHKs then? I'm flexible for a good deal.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=7  stage=booking  path=fallback  score=0.620]
+
+  Lead : Okay, thanks! I'll call them. Btw, do you have any 2BHKs around 35-40 lakhs?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=8  stage=booking  path=fallback  score=0.640]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : booking
+    lead_name  : Suresh
+    config     : 2BHK
+    budget     : under_5L
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

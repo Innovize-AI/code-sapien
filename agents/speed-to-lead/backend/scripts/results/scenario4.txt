@@ -1,0 +1,106 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 4: CTWA Ad Click
+  Lead clicked a CyberZed 3BHK ad. Config + location pre-filled from ad.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Config        : 3BHK
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  Lead : Hi, I saw your ad for CyberZed 3BHK. Could you please share the price details?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Thanks for reaching out! You're interested in Aparna
+        CyberZed, our new launch 3BHK project in Osman Nagar.
+
+  AI  : The 3BHK units range from 1471 – 2001 sq ft. The base price
+        is approximately Rs 1.18 Cr – Rs 1.60 Cr, excluding
+        registration and other charges.
+
+  [turn=1  stage=qualification  path=knowledge  score=0.667]
+
+  Lead : Hi, thanks for the info! That's a bit over my budget of 1 Cr. Do you have anything around that range or any smaller 3BHK options?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=2  stage=portfolio_match  path=fallback  score=0.643]
+
+  Lead : Thanks, but I was hoping for a quick price range now. My budget is around 1 crore. Can you tell me if CyberZed 3BHKs are in that range?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna CyberZed 3BHKs start from approximately Rs 1.18
+
+  [turn=3  stage=portfolio_match  path=portfolio  score=0.745]
+
+  Lead : Oh, that's a bit over my budget of 1 Cr. Are there any smaller units or other projects within that range you can suggest?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=4  stage=portfolio_match  path=fallback  score=0.597]
+
+  Lead : Okay, thanks. Can you tell me the price range first? My budget is around 1 crore.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=5  stage=consideration  path=fallback  score=0.613]
+
+  Lead : Okay, thanks! I'll ping them. What's the *approximate* price range though? Just trying to see if it's in my budget of around 1 Cr.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=6  stage=consideration  path=fallback  score=0.642]
+
+  Lead : Okay, thanks! I'll ping them. Just to confirm, is the 3BHK around 1 Cr?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna CyberZed 3BHKs start from approximately Rs 1.18 Cr.
+
+  [turn=7  stage=consideration  path=knowledge  score=0.665]
+
+  Lead : Oh, 1.18 Cr is a bit above my 1 Cr budget. Are there any other options or configurations around 1 Cr you could share details on?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=8  stage=consideration  path=fallback  score=0.589]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : consideration
+    lead_name  : —
+    config     : 3BHK
+    budget     : 20L+
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

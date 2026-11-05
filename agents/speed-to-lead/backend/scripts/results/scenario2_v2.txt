@@ -1,0 +1,104 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 2: Researcher
+  Qualification stage. Lead has shown interest but not yet given budget/config.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : qualification
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=e7121e76...  session=6f41b92b...
+
+  Lead : Hello, I'm Kiran. I'm interested in your properties and would like more details.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Kiran. Happy to help.
+
+  AI  : To start, what configuration are you looking for? (e.g.,
+        2BHK, 3BHK, 4BHK)
+
+  [turn=1  stage=qualification  path=conversational  score=—]
+
+  Lead : Hey. Leaning towards a 3BHK. Could you share some options with their RERA numbers and detailed payment plans, please?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Understood, Kiran. We have several 3BHK options.
+
+  AI  : To help me narrow down the best fit, could you share your
+        budget bracket?
+
+  [turn=2  stage=qualification  path=conversational  score=—]
+
+  Lead : Okay, my budget is around 1.5-1.8 Cr. Can you share details on projects with their RERA numbers and possession dates first?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For 3BHKs in the 1.5-1.8 Cr range, Apar
+
+  [turn=3  stage=portfolio_match  path=knowledge  score=0.676]
+
+  Lead : Apar? Can you share the RERA number and a detailed payment plan for that? Also, what's the possession date looking like?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Apologies for the cut-off. For 3BHKs, **Aparna Synergy**
+
+  [turn=4  stage=consideration  path=knowledge  score=0.703]
+
+  Lead : Got it, Aparna Synergy. What are the possession dates and payment plans for their 3BHKs?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna Synergy's possession is typically 3-4 years from
+        launch; our
+
+  [turn=5  stage=consideration  path=portfolio  score=0.765]
+
+  Lead : Okay, got it. So for Aparna Synergy, what's the RERA-registered possession date, and what are the payment plan options?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna Synergy's RERA-committed possession date can be
+        shared by our team. For detailed payment plans, please call
+        7095333335.
+
+  AI  : The best way to get a real feel is to see it — want me to
+        fix a visit for you this week?
+
+  [turn=6  stage=consideration  path=portfolio  score=0.750]
+
+  Lead : Okay, please share the RERA-committed possession date for Aparna Synergy. What are the available payment plan structures like?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For Aparna Synergy, our team can provide the RERA-committed
+        possession date and detailed
+
+  [turn=7  stage=consideration  path=portfolio  score=0.759]
+
+  Lead : Great. Please share the RERA number and the committed possession date. Also, can you detail the payment plan options?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna Synergy's RERA number is P02200006615. Possession is
+        typically 3-4 years from launch; our team can share the
+        RERA-committed date.
+
+  AI  : Payment plans include construction-linked, 20:80, and
+        subvention schemes. Our sales team can detail the latest
+        options.
+
+  AI  : The best way to get a real feel is to see it — want me to
+        fix a visit for you this week?
+
+  [turn=8  stage=consideration  path=knowledge  score=0.684]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : consideration
+    lead_name  : Kiran
+    config     : 3BHK
+    budget     : unknown
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

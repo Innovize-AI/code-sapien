@@ -1,0 +1,127 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 1: Fresh Lead
+  Blank state — discovery stage. Play any kind of lead from the start.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=78e2244f...  session=5721f1bb...
+
+  Lead : Hi, I'm Priya. I'm a first-time buyer looking for a 3BHK near the Financial District, Hyderabad. My budget is around 1.2 crore. Do you have any suitable projects?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Priya. Yes, we have 3BHK options.
+
+  AI  : Are you looking for a 2BHK, 3BHK, or 4BHK?
+
+  [turn=1  stage=qualification  path=portfolio  score=0.672]
+
+  Lead : Hi! Yes, as I mentioned, I'm looking for a 3BHK. Do you have anything available near the Financial District within my budget of around 1.2 Cr?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Apologies, Priya. I see you're looking for a 3BHK.
+
+  AI  : Our projects range from Rs 90L to Rs 3Cr depending on config
+        and location. What is your budget bracket?
+
+  [turn=2  stage=portfolio_match  path=portfolio  score=0.653]
+
+  Lead : Hi! Yes, 3BHK. My budget is around 1.2 Cr. Do you have anything in that range near the Financial District?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Thanks for confirming, Priya.
+
+  AI  : Aparna CyberZed in Osman Nagar offers 3BHKs, starting from
+        around 1.17 Cr. It's about 15 minutes from the Financial
+        District.
+
+  AI  : Aparna Synergy in Gandi Maisamma also has 3BHKs, with prices
+        typically below 1.2 Cr. This project features over 15 child-
+        centric amenities.
+
+  AI  : Which of these feels closer to what you had in mind?
+
+  [turn=3  stage=portfolio_match  path=portfolio  score=0.656]
+
+  Lead : Hey! CyberZed sounds interesting given the FD proximity. Is 1.17 Cr for a basic unit or are there options within my budget for a slightly bigger one?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : CyberZed's 3BHKs start at 1.17 Cr for the smaller
+        configurations. Larger units would be above 1.2 Cr.
+
+  AI  : Aparna Newlands in Tellapur, adjacent to Nallagandla, also
+        has 3BHKs starting from around 1.36 Cr. It features a 72,865
+        sq ft clubhouse.
+
+  AI  : Which of these feels closer to what you had in mind? We can
+        arrange a free cab pickup for a site visit.
+
+  [turn=4  stage=consideration  path=portfolio  score=0.699]
+
+  Lead : Hi! CyberZed sounds interesting, especially the 1.17 Cr option. What are the exact sizes for those smaller 3BHKs? Maybe we can check that out this weekend.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : The 3BHK units at Aparna CyberZed range from 1471 to 2001 sq
+        ft. The 1.17 Cr option would be for the smaller
+        configurations.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=5  stage=booking  path=portfolio  score=0.742]
+
+  Lead : Okay, so the smaller ones are around 1.17 Cr. What would be the price range for the larger configurations, say around 1800-1900 sq ft? I'm free on Saturday afternoon for a visit.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For a 3BHK at CyberZed around 1800-1900 sq ft, the price
+        would be in the 1.4 Cr to 1.5 Cr range.
+
+  AI  : Saturday afternoon works. What time slot would be best for
+        you? We offer complimentary cab pickup from anywhere in
+        Hyderabad, 10 AM to 6 PM.
+
+  [turn=6  stage=conversion  path=knowledge  score=0.667]
+
+  Lead : Hi! Thanks for the info. That's a bit above my budget. Is there anything else in a similar area, maybe slightly smaller, closer to 1.2 Cr? I'm free Saturday afternoon, maybe around 3 PM if there's something to see.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Understood, Priya.
+
+  AI  : CyberZed's 1471 sq ft 3BHK is the closest to your budget in
+        that area, at approximately 1.18 Cr.
+
+  AI  : Let's confirm your visit for Saturday at 3 PM to CyberZed.
+        You'll have a ~60-90 minute walkthrough with a sales
+        manager, no pressure to book on the day.
+
+  [turn=7  stage=conversion  path=knowledge  score=0.645]
+
+  Lead : Sounds good! Saturday at 3 PM works for me. Is parking available there?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=8  stage=conversion  path=fallback  score=0.557]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : conversion
+    lead_name  : Priya
+    config     : 3BHK
+    budget     : 1Cr-2Cr
+    visit_date : 2024-07-06
+══════════════════════════════════════════════════════════════════════
+

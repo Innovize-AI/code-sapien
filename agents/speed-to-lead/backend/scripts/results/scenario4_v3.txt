@@ -1,0 +1,137 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 4: CTWA Ad Click
+  Lead clicked a CyberZed 3BHK ad. Config + location pre-filled from ad.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Config        : 3BHK
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=148f582c...  session=43d56ef1...
+
+  Lead : Hi, I saw your ad for CyberZed 3BHK. Could you please share the price details? Thanks!                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi! Yes, I can help with details for Aparna CyberZed.
+
+  AI  : The 3BHK units at CyberZed in Osman Nagar range from 1471 to
+        2001 sq ft. Base prices are from approximately Rs 1.18 Cr to
+        Rs 1.60 Cr, excluding registration and other charges.
+
+  AI  : Would you like to know more about the payment plans
+        available?
+
+  [turn=1  stage=qualification  path=knowledge  score=0.668]
+
+  Lead : Hmm, that's a bit over budget for me. Are there any smaller 3BHKs or slightly older units that might fit around 1 Cr?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Our projects range from Rs 90L to Rs 3Cr depending on config
+        and location.
+
+  AI  : CyberZed is a new launch, so we don't have older units
+        there. For 3BHKs closer to Rs 1 Cr, we can explore other
+        locations.
+
+  AI  : What is your preferred location?
+
+  [turn=2  stage=portfolio_match  path=knowledge  score=0.624]
+
+  Lead : Oh, okay. Is CyberZed 3BHK above 1 Cr then? My preferred location is around Hitech City/Gachibowli.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, CyberZed 3BHKs are above Rs 1 Cr.
+
+  AI  : For Hitech City/Gachibowli, we have Aparna Moonstone in
+        Gopanpally. It offers 3BHKs from 2166 sq ft, starting around
+        Rs 1.73 Cr. It's an ultra-luxury project with extensive
+        amenities.
+
+  AI  : Which of these feels closer to what you had in mind? By the
+        way, what name should I use for you?
+
+  [turn=3  stage=consideration  path=portfolio  score=0.784]
+
+  Lead : Hi, I'm Sneha. Hmm, 1.73 Cr is a bit high. Do you have anything closer to 1 Cr in Gopanpally or nearby?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Sneha. For Gopanpally, Moonstone is our only project, and
+        its 3BHKs start above Rs 1.7 Cr.
+
+  AI  : We do have Aparna Synergy in Gandi Maisamma, where 3BHKs are
+        closer to Rs 1 Cr. It's a bit further out but well-connected
+        by ORR.
+
+  AI  : Would you like to explore payment plans for Moonstone, or
+        details for Synergy?
+
+  [turn=4  stage=consideration  path=knowledge  score=0.663]
+
+  Lead : Oh, 1.7 Cr is too much for me. Can you share more details about Aparna Synergy in Gandi Maisamma? Maybe a brochure or quick brief?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna Synergy in Gandi Maisamma offers 3BHKs from 1800–2307
+        sq ft. It's a large community with 3,345 units across 15
+        towers, featuring over 15 child-centric amenities.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=5  stage=consideration  path=portfolio  score=0.786]  [RESOURCE attached: aparna-synergy-brochure (pdf)]
+
+  Lead : Hey! Thanks for the info on Aparna Synergy. What's the price range per sq ft there? I'm curious about CyberZed too, and my budget is around 1 Cr.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Sneha. Aparna Synergy's 3BHKs are priced around Rs
+        5,000-5,500 per sq ft.
+
+  AI  : For CyberZed, the price per sq ft is Rs 7,999. Given your
+        budget of around Rs 1 Cr, Synergy would be a closer fit.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=6  stage=consideration  path=portfolio  score=0.779]  [RESOURCE attached: aparna-synergy-brochure (pdf)]
+
+  Lead : Hmm, CyberZed seems a bit high then. Can you tell me the typical size of a 3BHK at Aparna Synergy and what the total price would look like?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : At Aparna Synergy, 3BHKs range from 1800 to 2307 sq ft. A
+        typical 3BHK would be in the range of Rs 90 Lakhs to Rs 1.25
+        Cr, excluding registration.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=7  stage=consideration  path=portfolio  score=0.803]  [RESOURCE attached: aparna-synergy-brochure (pdf)]
+
+  Lead : Okay, thanks! So a 1.25 Cr flat would be around 2300 sq ft then? I'm interested in the CyberZed 3BHK specifically, can you share the price range for that project?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, a 2300 sq ft 3BHK at Synergy would be around Rs 1.25
+        Cr.
+
+  AI  : For CyberZed, 3BHKs range from 1471 to 2001 sq ft, with
+        prices from approximately Rs 1.18 Cr to Rs 1.60 Cr.
+
+  AI  : The best way to get all answers in one go is a site visit —
+        want me to fix one for you this week? Cab is on us.
+
+  [turn=8  stage=consideration  path=portfolio  score=0.719]  [RESOURCE attached: aparna-synergy-brochure (pdf)]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : consideration
+    lead_name  : Sneha
+    config     : 3BHK
+    budget     : 1Cr-2Cr
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

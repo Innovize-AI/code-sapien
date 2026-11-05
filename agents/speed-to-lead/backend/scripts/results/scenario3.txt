@@ -1,0 +1,117 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 3: Fence-Sitter
+  Qualified: 3BHK, 1Cr-2Cr. At consideration — play someone raising objections.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : consideration
+  Config        : 3BHK
+  Budget        : 1Cr-2Cr
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  Lead : Hi, I'm Rajesh. I'm interested in a 3BHK at CyberZed. Can you share more details?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna CyberZed offers 3BHK apartments ranging from 1471 to
+        2001 sq ft. The project is RERA approved: P01100011037.
+
+  AI  : For detailed amenities, possession timelines, and payment
+        plans, let me connect you with our team.
+
+  AI  : Would you like to schedule a free site visit to CyberZed? We
+        can arrange
+
+  [turn=1  stage=consideration  path=portfolio  score=0.757]
+
+  Lead : Hey, thanks for the info! RERA approval is good to hear. I'm worried about project delays though, and also my home loan eligibility. Can we discuss that before a site visit?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : RERA mandates 10.75% annual compensation for project delays.
+        Aparna has a
+
+  [turn=2  stage=consideration  path=knowledge  score=0.710]
+
+  Lead : Hmm, 10.75% sounds okay on paper but what about getting my loan approved on time? That's my main worry rn.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=3  stage=consideration  path=fallback  score=0.548]
+
+  Lead : Okay, thanks! I'll ping them. Also, when can I come by for a site visit this week?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : We can schedule your site visit any day this week, based on
+        your convenience.
+
+  AI  : Would you like to book a free site visit to CyberZed? We can
+        arrange a cab pickup.
+
+  [turn=4  stage=booking  path=conversational  score=0.548]
+
+  Lead : Hey, thanks! A site visit sounds good. What's the expected possession date for CyberZed? Also, what are the loan options like?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For new launches like CyberZed, possession is typically 3-4
+        years from launch. We have tie-ups with major banks like
+        SBI, HDFC, ICICI, and Axis, and our team facilitates loan
+        approvals.
+
+  AI  : What day and time would be best for your free site visit to
+        CyberZed? We can arrange a complimentary cab pickup.
+
+  [turn=5  stage=booking  path=knowledge  score=0.678]
+
+  Lead : 3-4 years is a long wait. What if there are delays beyond that? And what about my loan eligibility since I'm self-employed? Can we discuss this during the visit? Saturday morning works for me.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, our sales manager can discuss loan eligibility for
+        self-employed individuals and RERA-mandated delay
+        compensation during your visit.
+
+  AI  : Saturday morning works. What specific time on Saturday would
+        be best for your visit? We
+
+  [turn=6  stage=conversion  path=knowledge  score=0.656]
+
+  Lead : Okay, Saturday 11 AM works for me. Will your sales manager be available then to discuss the loan and RERA compensation in detail?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=7  stage=conversion  path=fallback  score=0.631]
+
+  Lead : Okay, thanks. Can you tell me when they're usually available? I'd also like to schedule a site visit for CyberZed next weekend if possible.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=8  stage=conversion  path=fallback  score=0.594]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : conversion
+    lead_name  : Rajesh
+    config     : 3BHK
+    budget     : 1Cr-2Cr
+    visit_date : 2024-06-01
+══════════════════════════════════════════════════════════════════════
+

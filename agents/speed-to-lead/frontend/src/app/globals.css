@@ -1,0 +1,89 @@
+@import "tailwindcss";
+@import "../styles/brand-tokens.css";
+
+/*
+  Innovize AI brand v2 "Ledger and Saffron" (workspace/brand/colors.md).
+  Light by default, dark follows the OS (tokens switch --bg, --card, --accent and so on).
+  Product UI rules: ledger green is the accent, saffron is marketing only so it is not used here,
+  mint is data and dark-mode accent, warnings are amber with an icon.
+  Components use the semantic names below. Never hard-code hex.
+*/
+
+@theme inline {
+  --color-bg:        var(--bg);
+  --color-card:      var(--card);
+  --color-raised:    var(--raised);
+  --color-ink:       var(--text);
+  --color-muted:     var(--muted);
+  --color-line:      var(--line);
+  --color-accent:    var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-success:   var(--success);
+  --color-warning:   var(--warning);
+  --color-error:     var(--error);
+  --color-revenue:   var(--data-revenue);
+  --color-cost:      var(--data-cost);
+  --color-neutral-data: var(--data-neutral);
+  --color-chart-1:   var(--chart-1);
+  --color-chart-2:   var(--chart-2);
+  --color-chart-3:   var(--chart-3);
+  --color-chart-4:   var(--chart-4);
+  --color-chart-5:   var(--chart-5);
+  --color-mint-text: var(--mint-text);
+
+  --font-sans: var(--font-geist-sans), "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+
+  --radius-DEFAULT: 0.5rem;
+  --radius-lg:      0.75rem;
+  --radius-xl:      1rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headlines: Geist 600, tight tracking, never 700+ (typography.md) */
+h1, h2, h3 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Labels and tags: 11px, 500, uppercase, 0.12em */
+.label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Data, IDs, timestamps, phone numbers */
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum";
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }

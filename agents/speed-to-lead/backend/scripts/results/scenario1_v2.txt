@@ -1,0 +1,103 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 1: Fresh Lead
+  Blank state — discovery stage. Play any kind of lead from the start.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=b42fc750...  session=6a8e7f54...
+
+  Lead : Hi, I'm Priya. Saw your ad for 3BHKs near the Financial District. I'm a first-time buyer, looking for something around 1.2 Cr. Could you share some details?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Priya, glad you reached out. Yes, we have 3BHK apartments
+        that fit
+
+  [turn=1  stage=qualification  path=portfolio  score=0.665]
+
+  Lead : Oh, that's great to hear! Can you tell me a bit more about the exact locations and what amenities they offer?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : To help me narrow down options, could you tell me which
+        specific areas or localities you are considering in or
+
+  [turn=2  stage=portfolio_match  path=knowledge  score=0.610]
+
+  Lead : Hi! I was thinking about Kondapur, Gachibowli, or Narsingi. What are your thoughts on those areas, and are there any good 3BHKs in my budget there?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Priya, we have two projects that might interest you.
+
+  AI  : **Aparna Cyber
+
+  [turn=3  stage=portfolio_match  path=portfolio  score=0.673]
+
+  Lead : Hey, thanks for this! Aparna Cyber sounds interesting. Is it ready to move or under construction?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna CyberZed is a new launch project, currently under
+        construction. Possession is typically 3-4 years from launch
+        — our team can share the RERA-committed date.
+
+  AI  : Would you like to visit the site to see the progress? We can
+        arrange a cab pickup.
+
+  [turn=4  stage=consideration  path=portfolio  score=0.713]
+
+  Lead : Thanks! Could you please share the RERA date first? I'm interested in visiting, but want to check that detail.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : The RERA number for Aparna CyberZed is P02400009478. For the
+        exact RERA-committed possession date, our team can provide
+        that detail. Under-construction projects are typically 3-4
+        years from launch.
+
+  AI  : The best way to get a real feel is to
+
+  [turn=5  stage=consideration  path=knowledge  score=0.654]
+
+  Lead : Okay, thanks for the RERA info. 3-4 years is a bit long for me. Do you have anything closer to completion, maybe 1-2 years out, in the same area?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Priya, for projects closer to completion, our team can
+        provide specific RERA-committed possession dates.
+
+  [turn=6  stage=consideration  path=knowledge  score=0.642]
+
+  Lead : That's helpful! How soon are those projects typically ready for possession?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Our under-construction projects are typically ready for
+        possession 3-4 years from launch. However, for
+
+  [turn=7  stage=consideration  path=knowledge  score=0.673]
+
+  Lead : Okay, 3-4 years is a bit long for me. Do you have any properties that are closer to completion, maybe within a year or so?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=8  stage=consideration  path=fallback  score=0.598]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : consideration
+    lead_name  : Priya
+    config     : 3BHK
+    budget     : 1Cr-2Cr
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

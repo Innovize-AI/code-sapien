@@ -1,0 +1,50 @@
+[
+  {
+    "id": "aparna-cyberzed-brochure",
+    "title": "Aparna CyberZed — Project Brochure",
+    "description": "Share when a lead asks for project details, floor plans, pricing breakdown, or location map for CyberZed at Osman Nagar. Best used at consideration or portfolio_match stage when lead has shown interest in 3 BHK near Financial District.",
+    "resource_type": "pdf",
+    "url": "https://reozathmemitbhdbdcvn.supabase.co/storage/v1/object/public/resources/aparna/cyberzed-brochure.pdf",
+    "vertical": "real_estate"
+  },
+  {
+    "id": "aparna-moonstone-brochure",
+    "title": "Aparna Moonstone — Luxury Project Brochure",
+    "description": "Share when lead asks for details on ultra-luxury 3 or 4 BHK homes in Gachibowli or Gopanpally area. Shows full amenities, floor plans, and location advantages. Use at portfolio_match or consideration stage for high-budget leads.",
+    "resource_type": "pdf",
+    "url": "https://reozathmemitbhdbdcvn.supabase.co/storage/v1/object/public/resources/aparna/moonstone-brochure.pdf",
+    "vertical": "real_estate"
+  },
+  {
+    "id": "aparna-newlands-brochure",
+    "title": "Aparna Newlands — Project Brochure",
+    "description": "Share when lead is interested in 2.5 or 3 BHK apartments at Tellapur. Highlights the 72,865 sq ft clubhouse and 10 sports courts. Best for families or buyers prioritising amenities and lifestyle.",
+    "resource_type": "pdf",
+    "url": "https://reozathmemitbhdbdcvn.supabase.co/storage/v1/object/public/resources/aparna/newlands-brochure.pdf",
+    "vertical": "real_estate"
+  },
+  {
+    "id": "aparna-synergy-brochure",
+    "title": "Aparna Synergy — Project Brochure",
+    "description": "Share when lead is looking for value-for-money 2, 2.5, or 3 BHK in north Hyderabad. Best for first-time buyers, investors, or budget-conscious leads. Highlights child-centric amenities and 28-acre scale.",
+    "resource_type": "pdf",
+    "url": "https://reozathmemitbhdbdcvn.supabase.co/storage/v1/object/public/resources/aparna/synergy-brochure.pdf",
+    "vertical": "real_estate"
+  },
+  {
+    "id": "aparna-overview-video",
+    "title": "Aparna Constructions — Company Overview Video",
+    "description": "Share at discovery or qualification stage when a lead asks who Aparna is or wants to know more about the developer. 30 years track record, 61 projects, 30,000 families. Builds trust before the site visit.",
+    "resource_type": "youtube",
+    "url": "https://www.youtube.com/@aparnaconstructionsandestat8872",
+    "vertical": "real_estate"
+  },
+  {
+    "id": "aparna-payment-plan",
+    "title": "Aparna — Construction-Linked Payment Plan Guide",
+    "description": "Share when a lead asks about payment schedules, home loan eligibility, or how payments are structured. Explains construction-linked plan, 20:80 plan, and bank tie-ups. Use at consideration or booking stage.",
+    "resource_type": "pdf",
+    "url": "https://reozathmemitbhdbdcvn.supabase.co/storage/v1/object/public/resources/aparna/payment-plan-guide.pdf",
+    "vertical": "real_estate"
+  }
+]

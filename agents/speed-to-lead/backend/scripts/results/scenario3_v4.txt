@@ -1,0 +1,20 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 3: Fence-Sitter
+  Qualified: 3BHK, 1Cr-2Cr. At consideration — play someone raising objections.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : consideration
+  Config        : 3BHK
+  Budget        : 1Cr-2Cr
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=b8e3dd5f...  session=8807294e...
+
+  Lead : Hi, I'm Rajesh. Saw your ad for CyberZed 3BHKs. A bit worried about delays and the loan process though. Can we chat?                                    
+  ──────────────────────────────────────────────────────────────────────

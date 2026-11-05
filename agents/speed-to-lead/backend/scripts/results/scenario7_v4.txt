@@ -1,0 +1,21 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 7: Visit Management
+  Visit already booked for Saturday 10am. Test reschedule or cancel.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : conversion
+  Config        : 3BHK
+  Budget        : 1Cr-2Cr
+  Visit date    : 2026-09-13 10am
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=558ba5e2...  session=3abfeae9...
+
+  Lead : Hi, it's Arjun. I had a site visit booked for Saturday at 10am, but something came up. Would it be possible to reschedule for Sunday instead?                                    
+  ──────────────────────────────────────────────────────────────────────

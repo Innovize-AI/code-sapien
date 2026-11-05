@@ -1,0 +1,7 @@
+# Keep documents and images byte-for-byte. Without this, line-ending conversion can corrupt
+# plain-text PDFs such as the generated brochures.
+*.pdf binary
+*.xlsx binary
+*.ico binary
+*.png binary
+*.jpg binary

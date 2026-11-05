@@ -1,0 +1,121 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 7: Visit Management
+  Visit already booked for Saturday 10am. Test reschedule or cancel.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : conversion
+  Config        : 3BHK
+  Budget        : 1Cr-2Cr
+  Visit date    : 2026-09-13 10am
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=1f511798...  session=46a0a869...
+
+  Lead : Hi, Arjun here. I had a site visit booked for Saturday at 10am, but something's come up. Would it be possible to reschedule for Sunday instead?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, we can reschedule. Your Saturday 10 AM slot is
+        released.
+
+  AI  : What time on Sunday, September 13, 2026 works for you?
+
+  [turn=1  stage=conversion  path=conversational  score=—]
+
+  Lead : Hey, thanks! Sunday 11am works for me. Is that good for you?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=2  stage=conversion  path=fallback  score=0.522]
+
+  Lead : Okay, will do. Could you also let me know if Sunday is generally open for site visits?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=3  stage=conversion  path=fallback  score=0.582]
+
+  Lead : Okay, thanks! I'll call them. Can we reschedule for Sunday, same time, 10 AM?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, we can reschedule your visit to Sunday, September 13,
+        2026, at 10 AM.
+
+  AI  : Our sales manager will guide you through the property, which
+        usually takes 60-90 minutes. There's no pressure to book on
+        the day.
+
+  [turn=4  stage=conversion  path=conversational  score=0.582]
+
+  Lead : Sounds good! Sunday at 10 AM works for me. Looking forward to it!                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Great. Your visit is confirmed for Sunday, September 13,
+        2026, at 10 AM.
+
+  AI  : We'll send a cab to pick you up. Please share your preferred
+        pickup address.
+
+  [turn=5  stage=conversion  path=conversational  score=0.582]
+
+  Lead : Sunday sounds perfect! My pickup address is 123 Main St, Apartment 4B.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Got it. Your cab will pick you up from 123 Main St,
+        Apartment 4B for your visit on Sunday, September 13, 2026,
+        at 10 AM.
+
+  AI  : See you then.
+
+  [turn=6  stage=conversion  path=conversational  score=0.582]
+
+  Lead : Perfect, thanks! Just to confirm, is the pick-up still at 123 Main St, Apt 4B?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=7  stage=conversion  path=fallback  score=0.535]
+
+  Lead : Okay, thanks! I'll ping them. Is Sunday morning around 10am possible instead?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=8  stage=conversion  path=conversational  score=0.535]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : conversion
+    lead_name  : Arjun
+    config     : 3BHK
+    budget     : 1Cr-2Cr
+    visit_date : 2026-09-13
+══════════════════════════════════════════════════════════════════════
+

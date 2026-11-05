@@ -1,0 +1,18 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 5: Wrong Fit
+  Play a lead with budget ~35-40L. Test how the agent handles out-of-range.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=2909f8d3...  session=ef82754d...
+
+  Lead : Hi, I'm Suresh. Looking for a 2BHK flat in Hyderabad. My budget is 35-40 lakhs. Do you have anything available?                                    
+  ──────────────────────────────────────────────────────────────────────

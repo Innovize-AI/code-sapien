@@ -1,0 +1,18 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 2: Researcher
+  Qualification stage. Lead has shown interest but not yet given budget/config.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : qualification
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=9e3d9853...  session=0837e382...
+
+  Lead : Hi, I'm Kiran. I'm interested in your properties and have a few questions.                                    
+  ──────────────────────────────────────────────────────────────────────

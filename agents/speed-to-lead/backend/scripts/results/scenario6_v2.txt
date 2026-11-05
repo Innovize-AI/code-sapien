@@ -1,0 +1,97 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 6: Portfolio Seeker
+  Lead wants to see projects, images, and style comparisons first.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=6cf33401...  session=28e8ce8a...
+
+  Lead : Hi, I'm Divya. I'm starting to look at projects and wanted to browse your listings.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Divya. Happy to help you browse our projects.
+
+  AI  : Are you looking for an apartment or a villa?
+
+  [turn=1  stage=discovery  path=conversational  score=—]
+
+  Lead : Hi! I'm open to both apartments and villas right now. Do you have photos or virtual tours I can look at for your luxury projects?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : We can arrange virtual tours and share project-specific
+        photos. Our sales team can provide these details
+
+  [turn=2  stage=qualification  path=knowledge  score=0.611]
+
+  Lead : Okay, good to know about the virtual tours. Do you have a brochure or some kind of visual summary I can check out first? Want to see what styles you have.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=3  stage=qualification  path=fallback  score=0.578]
+
+  Lead : Okay, thanks! I'll check out the website first and then maybe reach out. Do you have any general info on your luxury projects I could look at?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Our ultra-luxury project is Aparna Moonstone in Gopanpally,
+        Gachibow
+
+  [turn=4  stage=qualification  path=knowledge  score=0.617]
+
+  Lead : Moonstone sounds intriguing! Do you have some photos or a virtual tour I can check out?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna Moonstone is our ultra-luxury project. To help me
+        suggest the best
+
+  [turn=5  stage=portfolio_match  path=conversational  score=0.617]
+
+  Lead : Okay, what kind of luxury styles does Moonstone offer? Do you have more photos of the interiors?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna Moonstone in Gopanpally offers ultra-luxury 3 & 4 BHK
+        apartments
+
+  [turn=6  stage=consideration  path=portfolio  score=0.653]
+
+  Lead : Ooh, ultra-luxury sounds interesting! Do you have any photos or a brochure I could look at first?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For photos and a brochure of Aparna Moonstone, our sales
+        team can provide those directly.
+
+  AI  : The
+
+  [turn=7  stage=consideration  path=conversational  score=0.653]
+
+  Lead : Okay, thanks! I'll get in touch with them. Do you have any other projects that are a bit more high-end or luxurious I could check out?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna Moonstone is our ultra-luxury project. For other
+        projects, we have Aparna
+
+  [turn=8  stage=consideration  path=knowledge  score=0.612]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : consideration
+    lead_name  : Divya
+    config     : —
+    budget     : —
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

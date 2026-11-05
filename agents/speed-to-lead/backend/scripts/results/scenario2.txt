@@ -1,0 +1,97 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 2: Researcher
+  Qualification stage. Lead has shown interest but not yet given budget/config.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : qualification
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  Lead : Hi, I'm Kiran. I'm interested in learning more about your properties. Could you please share some details?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Kiran. Happy to help.
+
+  AI  : To start, what kind of configuration are you looking for?
+        For example, a 2BHK, 3BHK, or something else?
+
+  [turn=1  stage=qualification  path=conversational  score=—]
+
+  Lead : Hey! Looking for a 3BHK. What are the possession dates like for those, and what payment plans do you offer?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Under-construction 3BHK projects typically have possession
+        in 3-4 years from launch.
+
+  [turn=2  stage=qualification  path=knowledge  score=0.679]
+
+  Lead : Ok, good to know. What are the specific RERA possession dates for the projects you're recommending?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Let me connect you with our team for specific RERA
+        possession dates for individual projects.
+
+  AI  : To help
+
+  [turn=3  stage=qualification  path=knowledge  score=0.697]
+
+  Lead : Ok, thanks. Before I connect with anyone, can you share the RERA numbers and actual possession dates for the projects we discussed?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For specific RERA possession dates, let me connect you with
+        our team.
+
+  AI  : For 3B
+
+  [turn=4  stage=portfolio_match  path=knowledge  score=0.677]
+
+  Lead : Okay, thanks. Please share the RERA number for this project and confirmed possession date. Also, can you send details on payment plans for the 3BHK?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For specific RERA numbers and confirmed possession dates,
+        our team can provide the most accurate details. Payment
+        plans
+
+  [turn=5  stage=consideration  path=knowledge  score=0.670]
+
+  Lead : Okay, sounds good. Could you please share those RERA numbers and confirmed possession dates with me now? Also, what are the payment plan options like?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For specific RERA numbers and confirmed possession dates,
+        our team can provide the most accurate details.
+
+  [turn=6  stage=consideration  path=knowledge  score=0.688]
+
+  Lead : Okay, I understand. Could you share the RERA numbers and confirmed possession dates for the projects we just discussed, please? I'd like to look those over before we move forward with anything else.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Aparna CyberStar (Gopanpally) has RERA P02400
+
+  [turn=7  stage=consideration  path=knowledge  score=0.670]
+
+  Lead : Thanks for the RERA number! What's the possession date looking like for CyberStar?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at [number] / [email]. They'll get back to
+        you shortly.
+
+  [turn=8  stage=consideration  path=fallback  score=0.617]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : consideration
+    lead_name  : Kiran
+    config     : 3BHK
+    budget     : —
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

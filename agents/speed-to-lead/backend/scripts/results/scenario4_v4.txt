@@ -1,0 +1,19 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 4: CTWA Ad Click
+  Lead clicked a CyberZed 3BHK ad. Config + location pre-filled from ad.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Config        : 3BHK
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=aa8914ab...  session=7327e71f...
+
+  Lead : Hi, I saw your ad for CyberZed 3BHK. Could you share the price details please?                                    
+  ──────────────────────────────────────────────────────────────────────

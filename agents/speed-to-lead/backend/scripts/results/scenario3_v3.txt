@@ -1,0 +1,117 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 3: Fence-Sitter
+  Qualified: 3BHK, 1Cr-2Cr. At consideration — play someone raising objections.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : consideration
+  Config        : 3BHK
+  Budget        : 1Cr-2Cr
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=129e2935...  session=7b97b2b0...
+
+  Lead : Hi, I'm Rajesh. Saw your ad for CyberZed. Interested in a 3BHK but have a few questions.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Rajesh. CyberZed offers 3BHK apartments in Osman Nagar,
+        near the Financial District. Possession is estimated around
+        2028.
+
+  AI  : Would you like to schedule a free site visit? We can arrange
+        a cab for you.
+
+  [turn=1  stage=booking  path=portfolio  score=0.726]
+
+  Lead : Hey, thanks! 2028 seems a bit far out, tbh. How concrete is that timeline? Also, how easy is it to get a home loan for this project?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : All our projects, including CyberZed, are RERA registered.
+        RERA mandates 10.75% p.a. compensation for any delays, but
+        we have a strong track record of on-time delivery.
+
+  AI  : We have home loan tie-ups with SBI, HDFC, ICICI, and Axis.
+        Our team can help you with pre-approvals.
+
+  [turn=2  stage=booking  path=knowledge  score=0.628]
+
+  Lead : Hmm, RERA compensation is good but delays are still a headache. And loan pre-approvals sound helpful. What's the typical down payment needed for CyberZed?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : We offer construction-linked payment plans, 20:80 schemes,
+        and subvention schemes. Our team can walk you through the
+        specifics during a site visit.
+
+  AI  : When would you like to visit CyberZed? We offer
+        complimentary cab service from anywhere in Hyderabad, 10 AM
+        to 6 PM, any day.
+
+  [turn=3  stage=booking  path=knowledge  score=0.672]
+
+  Lead : Thanks! Those payment plans sound interesting. I'm free this Saturday. Can we discuss the builder's track record with delays and how loan eligibility works with these schemes during the visit?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, we can cover all your questions about our track record
+        and loan eligibility during the visit.
+
+  AI  : What time on Saturday would be best for your site visit?
+
+  [turn=4  stage=conversion  path=knowledge  score=0.697]
+
+  Lead : Okay, Saturday afternoon works for me, say 3 PM? Can you also confirm the exact address for the CyberZed site?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=5  stage=conversion  path=fallback  score=0.561]
+
+  Lead : Okay, thanks for sharing the contact. Before I call them, can you at least confirm the current possession date for CyberZed and if they have any ongoing home loan tie-ups?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : CyberZed's estimated possession is around 2028. We have
+        ongoing home loan tie-ups with major banks like SBI, HDFC,
+        ICICI, and Axis.
+
+  AI  : Your site visit on Saturday at 3 PM is confirmed. A cab will
+        pick you up from the CyberZed site. The visit will be a
+        60-90 minute walkthrough with a sales manager, with no
+        pressure to book on the day.
+
+  [turn=6  stage=conversion  path=knowledge  score=0.659]
+
+  Lead : Okay, 2028 is a bit far out, hope there are no delays. Good to know about the loan tie-ups. See you Saturday at 3 PM.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : We'll see you on Saturday at 3 PM. Our team will ensure a
+        smooth visit.
+
+  [turn=7  stage=conversion  path=conversational  score=0.659]
+
+  Lead : Hey, Saturday sounds good. Just a quick Q, what's the typical possession timeline for a 3BHK there?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : For CyberZed, the estimated possession timeline is around
+        2028.
+
+  [turn=8  stage=conversion  path=knowledge  score=0.686]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : conversion
+    lead_name  : Rajesh
+    config     : 3BHK
+    budget     : 1Cr-2Cr
+    visit_date : 2024-06-08
+══════════════════════════════════════════════════════════════════════
+

@@ -1,0 +1,18 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 1: Fresh Lead
+  Blank state — discovery stage. Play any kind of lead from the start.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=b01859c2...  session=d0d786a5...
+
+  Lead : Hi, I'm Priya. Saw your ad for 3BHKs near the Financial District. I'm a first-time buyer, looking for something around 1.2 crore. Could you share some details?                                    
+  ──────────────────────────────────────────────────────────────────────

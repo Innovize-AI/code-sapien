@@ -1,0 +1,123 @@
+
+══════════════════════════════════════════════════════════════════════
+  Aparna Constructions — Speed-to-Lead Simulator
+  Firm   : Aparna Constructions  (1791a3db-8a5a-4680-b6cd-f3a2c714ca1a)
+  Vertical: real_estate
+══════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════
+  Scenario 5: Wrong Fit
+  Play a lead with budget ~35-40L. Test how the agent handles out-of-range.
+══════════════════════════════════════════════════════════════════════
+  Initial stage : discovery
+  Mode: AUTO — Claude plays the lead (8 turns max)
+
+  [DB] lead=46345b30...  session=92bdd891...
+
+  Lead : Hi, I'm Suresh. I'm looking for a 2BHK flat in Hyderabad. My budget is 35-40 lakhs. Do you have any properties that fit?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Hi Suresh. Thanks for reaching out.
+
+  AI  : We specialize in premium residential apartments and villas.
+        Our 2BHK apartments typically start from around Rs 90 lakhs.
+
+  AI  : Would you be interested in exploring options in that range,
+        or perhaps a 2.5BHK or 3BHK if your budget allows for a
+        slight increase?
+
+  [turn=1  stage=qualification  path=knowledge  score=0.678]
+
+  Lead : Oh, 90 lakhs is way out of my budget. I'm looking for something around 35-40 lakhs. Do you have any properties in that range, or can you recommend another developer who might?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I don't have a confident answer for that — let me connect
+        you with our team directly.
+
+  AI  : You can reach us at 7095333335 or
+        sales@aparnaconstructions.com. They'll get back to you
+        shortly.
+
+  [turn=2  stage=qualification  path=fallback  score=0.599]
+
+  Lead : Okay, thanks! I'll call them. Can I visit a sample flat this weekend?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Yes, you can. We can arrange a complimentary cab for your
+        site visit this weekend.
+
+  AI  : Which location would be most convenient for you?
+
+  [turn=3  stage=booking  path=conversational  score=0.599]
+
+  Lead : That sounds great! I'm in Kondapur, so anywhere around there or Gachibowli would be convenient. What kind of 2BHKs do you have within my budget of 35-40 lakhs?                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Our 2BHK apartments start from approximately Rs 90 lakhs. We
+        don't have properties in the 35-40 lakh range.
+
+  AI  : However, we can arrange a complimentary cab from Kondapur
+        for a site visit to our projects in Gachibowli or nearby
+        areas, any day between 10 AM and 6 PM.
+
+  [turn=4  stage=booking  path=knowledge  score=0.724]
+
+  Lead : Oh, 90 lakhs is way out of my budget. Thanks for the cab offer, but I'll have to pass since the prices won't work for me.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I understand. Our projects are premium, and while the
+        initial investment is higher, we offer payment plans like
+        CLP and 20:80, and have home loan tie-ups with major banks.
+
+  AI  : A site visit is free, with no commitment, and we arrange the
+        cab from Kondapur. Would you like to see the quality and
+        amenities first-hand?
+
+  [turn=5  stage=booking  path=conversational  score=0.724]
+
+  Lead : Hi, can you share some basic pricing for a 2BHK there? My budget is 35-40L. If that works, I'd definitely be interested in a site visit.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Our 2BHK apartments start from approximately Rs 90 lakhs. We
+        don't have properties in the 35-40 lakh range.
+
+  AI  : However, we can arrange a complimentary cab from Kondapur
+        for a site visit to our projects in Gachibowli or nearby
+        areas, any day between 10 AM and 6 PM.
+
+  [turn=6  stage=booking  path=knowledge  score=0.684]
+
+  Lead : Oh, 90 lakhs is way out of my budget. Thanks for the offer, but I'll pass on the site visit then.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : I understand. Our projects are premium, and while the
+        initial investment is higher, we offer payment plans like
+        CLP and 20:80, and have home loan tie-ups with major banks.
+
+  AI  : A site visit is free, with no commitment, and we arrange the
+        cab from Kondapur. Would you like to see the quality and
+        amenities first-hand?
+
+  [turn=7  stage=booking  path=conversational  score=0.684]
+
+  Lead : Oh, okay. What's the starting price range for your 2BHKs? And yeah, a site visit sounds good.                                    
+  ──────────────────────────────────────────────────────────────────────
+
+  AI  : Our 2BHK apartments start from approximately Rs 90 lakhs.
+
+  AI  : To arrange your complimentary cab from Kondapur, what day
+        and time works best for your site visit? We're available 10
+        AM to 6 PM, any day of the week.
+
+  [turn=8  stage=booking  path=knowledge  score=0.678]
+
+  [max turns (8) reached]
+
+  Final state:
+    stage      : booking
+    lead_name  : Suresh
+    config     : 2BHK
+    budget     : unknown
+    visit_date : —
+══════════════════════════════════════════════════════════════════════
+

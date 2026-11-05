@@ -98,7 +98,7 @@ steps:
       - --cpu=1
       - --port=8080
       - --timeout=300
-      - --set-env-vars=^@^ENVIRONMENT=${_ENVIRONMENT}@SUPABASE_URL=${_SUPABASE_URL}@TEST_FORWARD_NUMBER=${_TEST_FORWARD_NUMBER}@FALLBACK_ALERT_EMAIL=${_FALLBACK_ALERT_EMAIL}@BOOKING_LINK=${_BOOKING_LINK}@META_WEBHOOK_URL=${_META_WEBHOOK_URL}
+      - --set-env-vars=^|^ENVIRONMENT=${_ENVIRONMENT}|SUPABASE_URL=${_SUPABASE_URL}|TEST_FORWARD_NUMBER=${_TEST_FORWARD_NUMBER}|FALLBACK_ALERT_EMAIL=${_FALLBACK_ALERT_EMAIL}|BOOKING_LINK=${_BOOKING_LINK}|META_WEBHOOK_URL=${_META_WEBHOOK_URL}
       - --set-secrets=DATABASE_URL=stl-database-url:latest,GOOGLE_API_KEY=stl-google-api-key:latest,PINECONE_API_KEY=stl-pinecone-api-key:latest,SUPABASE_ANON_KEY=stl-supabase-anon-key:latest,SUPABASE_SERVICE_ROLE_KEY=stl-supabase-service-role-key:latest,META_ACCESS_TOKEN=stl-meta-access-token:latest,META_WEBHOOK_VERIFY_TOKEN=stl-meta-webhook-verify-token:latest,META_APP_SECRET=stl-meta-app-secret:latest,GMAIL_USER=stl-gmail-user:latest,GMAIL_PASSWORD=stl-gmail-password:latest,LANGCHAIN_API_KEY=stl-langchain-api-key:latest
       - --quiet
 

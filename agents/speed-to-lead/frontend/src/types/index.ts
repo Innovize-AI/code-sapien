@@ -72,6 +72,8 @@ export interface ConversationLog {
   pinecone_score: number | null;
   turn_number: number | null;
   created_at: string;
+  resource_sent?: string | null;
+  resource?: { id: string; title: string; type: string; url: string | null } | null;
 }
 
 export interface Visit {

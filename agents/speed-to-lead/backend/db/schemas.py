@@ -131,6 +131,8 @@ class ConversationLogOut(BaseModel):
     pinecone_score: float | None
     turn_number: int | None
     created_at: datetime
+    resource_sent: str | None = None        # id of the brochure or video attached to this reply
+    resource: dict | None = None            # its title, type and link, so the page can show it
 
     class Config:
         from_attributes = True

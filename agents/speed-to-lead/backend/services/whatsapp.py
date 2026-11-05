@@ -20,7 +20,7 @@ from config import settings
 
 log = logging.getLogger(__name__)
 
-_BASE = "https://graph.facebook.com/v20.0"
+_BASE = settings.meta_graph_url
 
 
 def _headers(access_token: str | None = None) -> dict:
@@ -151,22 +151,26 @@ def _extract_wamid(body: dict) -> str | None:
         return None
 
 
-async def mark_read(wa_message_id: str) -> None:
+async def mark_read(
+    wa_message_id: str,
+    access_token: str | None = None,
+    wa_phone_number_id: str | None = None,
+) -> None:
     """Mark an inbound message as read (shows double blue tick to parent)."""
-    url = f"{_BASE}/{settings.meta_phone_number_id}/messages"
+    url = f"{_BASE}/{_phone_number_id(wa_phone_number_id)}/messages"
     payload = {
         "messaging_product": "whatsapp",
         "status": "read",
         "message_id": wa_message_id,
     }
     async with httpx.AsyncClient(timeout=5) as client:
-        await client.post(url, json=payload, headers=_headers())
+        await client.post(url, json=payload, headers=_headers(access_token))
 
 
-async def fetch_media_url(media_id: str) -> str:
+async def fetch_media_url(media_id: str, access_token: str | None = None) -> str:
     """Resolve a Meta media ID to a downloadable URL (valid for ~5 min)."""
     url = f"{_BASE}/{media_id}"
     async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(url, headers=_headers())
+        resp = await client.get(url, headers=_headers(access_token))
         resp.raise_for_status()
         return resp.json()["url"]

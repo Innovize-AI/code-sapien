@@ -178,7 +178,25 @@ async def get_lead_history(lead_id: str, actor: auth.Actor | None = Depends(guar
                            db: AsyncSession = Depends(get_db)):
     await ensure_lead_access(db, actor, UUID(lead_id))
     logs = await crud.get_lead_conversation(db, UUID(lead_id))
-    return logs
+
+    # Attach the details of any brochure or video that went out with a reply
+    from sqlalchemy import select
+    from db.models import Resource
+    ids = {l.resource_sent for l in logs if l.resource_sent}
+    found = {}
+    if ids:
+        rows = (await db.execute(select(Resource).where(Resource.id.in_(ids)))).scalars()
+        found = {r.id: {"id": r.id, "title": r.title, "type": r.resource_type or "pdf",
+                        "url": r.url or None} for r in rows}
+    out = []
+    for l in logs:
+        item = ConversationLogOut.model_validate(l)
+        if l.resource_sent:
+            # a resource removed since keeps its id so the attachment is still visible
+            item.resource = found.get(l.resource_sent) or {
+                "id": l.resource_sent, "title": l.resource_sent, "type": "pdf", "url": None}
+        out.append(item)
+    return out
 
 
 @router.get("/lead/{lead_id}/summary")

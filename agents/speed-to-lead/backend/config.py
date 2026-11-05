@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     meta_phone_number_id: str = ""
     meta_webhook_verify_token: str = ""
     meta_app_secret: str = ""
+    # Where this service listens for Meta. Register this exact URL as the callback in the Meta app
+    # dashboard (WhatsApp, Configuration). It is only logged at startup, nothing is called from it.
+    meta_webhook_url: str = ""
+    # Meta Graph API address and version, so an upgrade or a proxy is an environment change
+    meta_graph_base_url: str = "https://graph.facebook.com"
+    meta_graph_api_version: str = "v20.0"
+
+    @property
+    def meta_graph_url(self) -> str:
+        return f"{self.meta_graph_base_url.rstrip('/')}/{self.meta_graph_api_version.strip('/')}"
 
     # LangSmith
     langchain_api_key: str = ""

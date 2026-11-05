@@ -10,7 +10,7 @@ import {
   Wallet, ChevronDown, ChevronUp,
   Search, Zap, FileText, Info, LayoutGrid,
   Sparkles, RefreshCw, MessageSquare, ClipboardList, Handshake, Target, AlertCircle,
-  UserRound, Activity, ScrollText,
+  UserRound, Activity, ScrollText, ExternalLink,
 } from "lucide-react";
 import { fetchBrokers, fetchRegistrations, fetchHistory, fetchLead, fetchLeadSummary, fetchRetrievalLogs, pauseAI, sendReply } from "@/lib/api";
 import { StageBadge, StatusBadge } from "@/components/stage-badge";
@@ -18,20 +18,25 @@ import { displayName, initials, cn } from "@/lib/utils";
 import { fmtIST } from "@/lib/format";
 import type { BrokerRow, ConversationLog, KnowledgeChunk, Lead, LeadSummary, PortfolioMatch, Registration, RetrievalLog } from "@/types";
 
-const PATH_LABELS: Record<string, { label: string; color: string }> = {
-  knowledge:      { label: "Knowledge",    color: "bg-cost/10 text-cost"     },
-  portfolio:      { label: "Portfolio",    color: "bg-chart-4/10 text-chart-4" },
-  conversational: { label: "Chat",         color: "bg-bg text-muted"   },
-  fallback:       { label: "Fallback",     color: "bg-error/10 text-error"       },
-  voice_note:     { label: "Voice Note",   color: "bg-warning/10 text-warning"   },
-  admin_manual:   { label: "Staff Reply",  color: "bg-success/10 text-success"   },
+// How a reply was produced. Every value the backend can set has a plain name here.
+const PATH_LABELS: Record<string, { label: string; color: string; hint: string }> = {
+  knowledge:      { label: "Knowledge base", color: "bg-cost/10 text-cost",         hint: "Answered from a search of the knowledge base" },
+  portfolio:      { label: "Past projects",  color: "bg-chart-4/10 text-chart-4",   hint: "Answered from matching past projects" },
+  project_facts:  { label: "Project facts",  color: "bg-accent/10 text-accent",     hint: "Answered from the project record: price, RERA, possession, payment plan, loans" },
+  conversational: { label: "Chat",           color: "bg-bg text-muted",             hint: "No lookup needed: small talk, a follow-up, or a request for material" },
+  escalation:     { label: "Escalated",      color: "bg-warning/10 text-warning",   hint: "Discount or unit availability: sent to a person and the AI paused" },
+  fallback:       { label: "Fallback",       color: "bg-error/10 text-error",       hint: "The search was not confident enough, so the AI handed over and paused" },
+  voice_note:     { label: "Voice note",     color: "bg-warning/10 text-warning",   hint: "The buyer sent audio, which the AI cannot read" },
+  admin_manual:   { label: "Staff reply",    color: "bg-success/10 text-success",   hint: "Written by a person" },
 };
 
 function PathTag({ path }: { path: string | null }) {
   if (!path) return null;
-  const cfg = PATH_LABELS[path] ?? { label: path, color: "bg-bg text-muted" };
+  const cfg = PATH_LABELS[path] ?? {
+    label: path.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase()), color: "bg-bg text-muted", hint: path,
+  };
   return (
-    <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded", cfg.color)}>
+    <span title={cfg.hint} className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded", cfg.color)}>
       {cfg.label}
     </span>
   );
@@ -209,6 +214,35 @@ function RetrievalDetail({ log }: { log: RetrievalLog }) {
   );
 }
 
+// ── Attachment sent with a reply ──────────────────────────────────────────────
+
+function AttachmentCard({ resource }: { resource: NonNullable<ConversationLog["resource"]> }) {
+  const isVideo = resource.type === "youtube" || resource.type === "video";
+  const Icon = isVideo ? PlayCircle : FileText;
+  const body = (
+    <>
+      <div className="w-9 h-9 rounded-lg bg-accent/10 text-accent flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4" strokeWidth={1.75} />
+      </div>
+      <div className="min-w-0 text-left">
+        <p className="text-sm font-medium text-ink truncate">{resource.title.replace(/\s[—–]\s/g, ": ")}</p>
+        <p className="text-[11px] text-muted">
+          {isVideo ? "Video link" : "PDF document"} sent with this reply
+        </p>
+      </div>
+      {resource.url && <ExternalLink className="w-3.5 h-3.5 text-muted flex-shrink-0" strokeWidth={1.75} />}
+    </>
+  );
+  const cls = "mt-1.5 flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2 max-w-full";
+  return resource.url ? (
+    <a href={resource.url} target="_blank" rel="noopener noreferrer" className={cn(cls, "hover:border-ink/30")}>
+      {body}
+    </a>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
+}
+
 // ── Message bubble ────────────────────────────────────────────────────────────
 
 function MessageBubble({ msg, retrieval }: { msg: ConversationLog; retrieval?: RetrievalLog }) {
@@ -236,8 +270,17 @@ function MessageBubble({ msg, retrieval }: { msg: ConversationLog; retrieval?: R
         <div className="bg-accent rounded-2xl rounded-br-sm px-4 py-2.5 shadow-sm">
           <p className="text-sm text-on-accent whitespace-pre-wrap">{msg.message_text}</p>
         </div>
+        {msg.resource && <AttachmentCard resource={msg.resource} />}
         <div className="flex items-center gap-1.5 mt-1 mr-1">
           {msg.path_taken && <PathTag path={msg.path_taken} />}
+          {msg.resource && (
+            <span
+              title={`${msg.resource.title.replace(/\s[—–]\s/g, ": ")} was sent with this reply`}
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent"
+            >
+              Resource sent
+            </span>
+          )}
           {msg.pinecone_score != null && (
             <span className="text-[10px] text-muted">conf {msg.pinecone_score.toFixed(2)}</span>
           )}

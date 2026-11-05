@@ -86,6 +86,10 @@ async def receive_message(request: Request, background_tasks: BackgroundTasks):
 def _verify_signature(request: Request, body: bytes) -> None:
     # Use global app secret as the HMAC key (firm-level secret lookup would require async)
     if not settings.meta_app_secret:
+        # Without the app secret a request cannot be proven to come from Meta, so anyone could post
+        # fake messages. Production refuses; other environments allow it for local testing.
+        if settings.is_production:
+            raise HTTPException(status_code=503, detail="Webhook signature secret is not configured")
         return
 
     sig_header = request.headers.get("X-Hub-Signature-256", "")

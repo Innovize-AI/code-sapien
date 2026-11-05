@@ -54,6 +54,21 @@ async def lifespan(app: FastAPI):
         await _crud.seed_plans(db)
         await pinecone_svc.load_resource_catalogue(db)
 
+    # Meta setup check. Messages from a firm or a person's number use the credentials stored for it
+    # in the database, so these environment values are the fallback and the webhook handshake.
+    if settings.meta_webhook_url:
+        logging.info("Meta webhook callback URL to register: %s", settings.meta_webhook_url)
+    else:
+        logging.warning("META_WEBHOOK_URL is not set. Set it to this service's public /webhook URL.")
+    if not settings.meta_webhook_verify_token:
+        logging.warning("META_WEBHOOK_VERIFY_TOKEN is not set. Only verify tokens saved on a firm "
+                        "in the database will pass Meta's webhook handshake.")
+    if not settings.meta_app_secret:
+        logging.warning(
+            "META_APP_SECRET is not set. Webhook signatures are NOT checked, so anyone could post fake "
+            "messages. %s", "Production will refuse webhook requests until it is set."
+            if settings.is_production else "Set it before going live.")
+
     scheduler_svc.start()
 
     yield

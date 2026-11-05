@@ -1,0 +1,17 @@
+# The Dockerfile runs "COPY . ." so anything not listed here ends up inside the image.
+# Never ship real credentials or the local virtualenv.
+.env
+.env.*
+!.env.example
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.git
+tests
+# simulation outputs and local seed material are not needed at runtime
+scripts/results
+Dockerfile
+.dockerignore

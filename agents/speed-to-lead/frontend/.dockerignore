@@ -1,0 +1,11 @@
+node_modules
+.next
+.next-demo
+.git
+# Environment files hold real values on a developer machine. The build gets what it needs as build args.
+.env
+.env.*
+!.env.local.example
+npm-debug.log
+Dockerfile
+.dockerignore

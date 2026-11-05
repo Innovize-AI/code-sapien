@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { Suspense, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { formatDistanceToNow } from "date-fns";
@@ -28,7 +28,7 @@ function Avatar({ lead }: { lead: Lead }) {
   );
 }
 
-export default function ConversationsPage() {
+function ConversationsView() {
   const router = useRouter();
   const params = useSearchParams();
   const { firmId } = useFirm();
@@ -244,5 +244,14 @@ export default function ConversationsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// useSearchParams needs a Suspense boundary so the page can be built for production
+export default function ConversationsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ConversationsView />
+    </Suspense>
   );
 }
